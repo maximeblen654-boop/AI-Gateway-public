@@ -1,0 +1,1226 @@
+{
+  "revision": "laoli-video-api-v1.36-2026-10-02",
+  "sourceZipSha256": null,
+  "scope": "Exact v1.36 schemas; 2 unambiguous special families enabled in contract; H3 and 5 conflicting-open families blocked, archived families blocked for new submissions; customer quote and key entitlement remain independent.",
+  "currency": "CNY",
+  "creditCny": 1,
+  "models": [
+    {
+      "apiModelId": "3.0",
+      "upstreamModelId": "特价2.0-需要过人脸技术-可参考过人脸素材库",
+      "documentedName": "特价2.0-需要过人脸技术-可参考过人脸素材库",
+      "documentedStatus": "enabled",
+      "availability": "documented_candidate",
+      "blockedReason": null,
+      "durationSeconds": [
+        5,
+        10,
+        15
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 0,
+        "audio": 0,
+        "total": 9
+      },
+      "inputMode": "images",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 6000,
+      "billingUnitText": "条",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "Classic30",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "images",
+      "mediaLimitText": "9/0/0"
+    },
+    {
+      "apiModelId": "3.5",
+      "upstreamModelId": "特价2.5需要过人脸技术-可参考过人脸素材库",
+      "documentedName": "特价2.5需要过人脸技术-可参考过人脸素材库",
+      "documentedStatus": "enabled",
+      "availability": "documented_candidate",
+      "blockedReason": null,
+      "durationSeconds": [
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 0,
+        "audio": 0,
+        "total": 30
+      },
+      "inputMode": "images",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 6000,
+      "billingUnitText": "条",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "Classic35",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "images",
+      "mediaLimitText": "30/0/0"
+    },
+    {
+      "apiModelId": "minimax-h3-1080p",
+      "upstreamModelId": "H3-KS",
+      "documentedName": "H3-KS",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "H3开放列表与具体Schema paused/deprecated冲突，待核对",
+      "durationSeconds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 6,
+        "audio": 2,
+        "video": 0,
+        "total": 8
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 6000,
+      "billingUnitText": "条",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "NewVideo_minimax_h3_1080p",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "6/0/2",
+      "schemaModelStatus": "paused",
+      "schemaDeprecated": true
+    },
+    {
+      "apiModelId": "sd-native-full-2.0",
+      "upstreamModelId": "原生不卡人脸-全参2.0",
+      "documentedName": "原生不卡人脸-全参2.0",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "上游摘要与具体Schema开放说明冲突，待核对",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 12
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 4000,
+      "billingUnitText": "秒",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "sd-native-full-2.0",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "9/3/3"
+    },
+    {
+      "apiModelId": "sd-native-full-2.5",
+      "upstreamModelId": "原生不卡人脸-全参2.5",
+      "documentedName": "原生不卡人脸-全参2.5",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "上游摘要与具体Schema开放说明冲突，待核对",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "480p",
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 4000,
+      "billingUnitText": "秒",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "sd-native-full-2.5",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "30/10/10"
+    },
+    {
+      "apiModelId": "sd-native-full-2.5-nonofficial",
+      "upstreamModelId": "原生不卡人脸-全参2.5-非官",
+      "documentedName": "原生不卡人脸-全参2.5-非官",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "上游摘要与具体Schema开放说明冲突，待核对",
+      "durationSeconds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "480p",
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 4000,
+      "billingUnitText": "条",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "sd-native-full-2.5-nonofficial",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "30/10/10"
+    },
+    {
+      "apiModelId": "wan-3.0-video-ref",
+      "upstreamModelId": "WAN3.0-可参考视频",
+      "documentedName": "WAN3.0-可参考视频",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "上游摘要与具体Schema开放说明冲突，待核对",
+      "durationSeconds": [
+        4
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 1,
+        "video": 1,
+        "audio": 1,
+        "total": 3
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 4000,
+      "billingUnitText": "秒",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "wan-3.0-video-ref",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "1/1/1"
+    },
+    {
+      "apiModelId": "wan-3.0-no-video-ref",
+      "upstreamModelId": "WAN3.0-不可参考视频",
+      "documentedName": "WAN3.0-不可参考视频",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "blockedReason": "上游摘要与具体Schema开放说明冲突，待核对",
+      "durationSeconds": [
+        4
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 1,
+        "video": 0,
+        "audio": 1,
+        "total": 2
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "promptMaxLength": 4000,
+      "billingUnitText": "秒",
+      "currentKeyEntitlement": null,
+      "customerQuote": null,
+      "schemaName": "wan-3.0-no-video-ref",
+      "durationText": "合同允许范围",
+      "basePriceText": "公开合同采购成本",
+      "inputFormatText": "references",
+      "mediaLimitText": "1/0/1"
+    },
+    {
+      "apiModelId": "sd-2.5-native-seconds",
+      "documentedName": "人脸直入+满血全参2.5-按秒计费",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5–30",
+      "basePriceText": "720p：0.75",
+      "billingUnitText": "秒",
+      "mediaLimitText": "30/10/10",
+      "inputFormatText": "references",
+      "example": "request-native-seconds.json",
+      "durationSeconds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "sd-2.5-native-seconds"
+    },
+    {
+      "apiModelId": "NSH3",
+      "documentedName": "NSH3",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–15",
+      "basePriceText": "768p：2.00；2k：3.00",
+      "billingUnitText": "条",
+      "mediaLimitText": "9/3/3",
+      "inputFormatText": "references",
+      "example": "request-nsh3.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "768p",
+        "2k"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "21:9",
+        "adaptive"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 15
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "NSH3"
+    },
+    {
+      "apiModelId": "3.0-native",
+      "documentedName": "满血9-3-3-2.0-人脸直入",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5/10/15",
+      "basePriceText": "720p：2.50",
+      "billingUnitText": "条",
+      "mediaLimitText": "9/3/3",
+      "inputFormatText": "内联三类素材",
+      "example": "request-3.0-native.json",
+      "durationSeconds": [
+        5,
+        10,
+        15
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 15
+      },
+      "inputMode": "inline_multimedia",
+      "requiredAnyMedia": [
+        "image",
+        "video"
+      ],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "3.0-native"
+    },
+    {
+      "apiModelId": "3.5-native",
+      "documentedName": "满血30-10-10-2.5-人脸直入",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "30",
+      "basePriceText": "720p：2.50",
+      "billingUnitText": "条",
+      "mediaLimitText": "30/10/10",
+      "inputFormatText": "内联三类素材",
+      "example": "request-3.5-native.json",
+      "durationSeconds": [
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "inline_multimedia",
+      "requiredAnyMedia": [
+        "image",
+        "video"
+      ],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "3.5-native"
+    },
+    {
+      "apiModelId": "3.0-1-S级",
+      "documentedName": "S级 SD2.0",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–15",
+      "basePriceText": "480p：0.40；720p：0.70；1080p：1.10",
+      "billingUnitText": "秒",
+      "mediaLimitText": "9/3/3，合计12",
+      "inputFormatText": "references",
+      "example": "request-s30.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 12
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "3.0-1-S级"
+    },
+    {
+      "apiModelId": "3.5-1-S级",
+      "documentedName": "S级 SD2.5",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–30",
+      "basePriceText": "480p：0.50；720p：0.83；1080p：1.20",
+      "billingUnitText": "秒",
+      "mediaLimitText": "30/10/10",
+      "inputFormatText": "references",
+      "example": "request-s35.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "3:4",
+        "4:3",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "3.5-1-S级"
+    },
+    {
+      "apiModelId": "seedance-2.0-dr",
+      "documentedName": "SD2.0 推荐",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–15",
+      "basePriceText": "720p：4.50",
+      "billingUnitText": "条",
+      "mediaLimitText": "9/3/3",
+      "inputFormatText": "references",
+      "example": "request-seedance-2.0-dr.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 15
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "seedance-2.0-dr"
+    },
+    {
+      "apiModelId": "seedance-2.5-num",
+      "documentedName": "SD2.5 N",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5–30",
+      "basePriceText": "720p：9.00",
+      "billingUnitText": "条",
+      "mediaLimitText": "9/0/3",
+      "inputFormatText": "references",
+      "example": "request-seedance-2.5-num.json",
+      "durationSeconds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 0,
+        "audio": 3,
+        "total": 12
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "seedance-2.5-num"
+    },
+    {
+      "apiModelId": "seedance-2.5-sr",
+      "documentedName": "SD2.5 特价",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–30",
+      "basePriceText": "720p：9.00",
+      "billingUnitText": "条",
+      "mediaLimitText": "30/0/10",
+      "inputFormatText": "references",
+      "example": "request-seedance-2.5-sr.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "21:9"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 0,
+        "audio": 10,
+        "total": 40
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "seedance-2.5-sr"
+    },
+    {
+      "apiModelId": "happyhorse-1.0",
+      "documentedName": "快乐马1.0",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5/10",
+      "basePriceText": "720p：1.50；1080p：2.25",
+      "billingUnitText": "条",
+      "mediaLimitText": "3/0/0，至少1图",
+      "inputFormatText": "references",
+      "example": "request-happyhorse-1.0.json",
+      "durationSeconds": [
+        5,
+        10
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 3,
+        "video": 0,
+        "audio": 0,
+        "total": 3
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [
+        "image"
+      ],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "happyhorse-1.0"
+    },
+    {
+      "apiModelId": "happyhorse-1.1",
+      "documentedName": "快乐马1.1",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5/10",
+      "basePriceText": "720p：1.80；1080p：2.70",
+      "billingUnitText": "条",
+      "mediaLimitText": "3/0/0，至少1图",
+      "inputFormatText": "references",
+      "example": "request-happyhorse-1.1.json",
+      "durationSeconds": [
+        5,
+        10
+      ],
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 3,
+        "video": 0,
+        "audio": 0,
+        "total": 3
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [
+        "image"
+      ],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "happyhorse-1.1"
+    },
+    {
+      "apiModelId": "wan-3.0-720p-ty",
+      "documentedName": "Wan3.0 720P",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "5–25",
+      "basePriceText": "720p：4.50",
+      "billingUnitText": "条",
+      "mediaLimitText": "10/5/5",
+      "inputFormatText": "references",
+      "example": "request-wan-3.0-720p-ty.json",
+      "durationSeconds": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 10,
+        "video": 5,
+        "audio": 5,
+        "total": 20
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "wan-3.0-720p-ty"
+    },
+    {
+      "apiModelId": "wan-3.0-prime-dr",
+      "documentedName": "Wan3.0 Prime",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "2–30",
+      "basePriceText": "720p：9.00",
+      "billingUnitText": "条",
+      "mediaLimitText": "10/5/5",
+      "inputFormatText": "references",
+      "example": "request-wan-3.0-prime-dr.json",
+      "durationSeconds": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16"
+      ],
+      "mediaLimits": {
+        "image": 10,
+        "video": 5,
+        "audio": 5,
+        "total": 20
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "wan-3.0-prime-dr"
+    },
+    {
+      "apiModelId": "sd-official-2.0",
+      "documentedName": "官转2.0 · 火山审核",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–15",
+      "basePriceText": "480p：0.45；720p：0.90；1080p：2.40；4k：4.92",
+      "billingUnitText": "秒",
+      "mediaLimitText": "9/3/3",
+      "inputFormatText": "references",
+      "example": "request-sd-official-2.0.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p",
+        "4k"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "mediaLimits": {
+        "image": 9,
+        "video": 3,
+        "audio": 3,
+        "total": 15
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "sd-official-2.0"
+    },
+    {
+      "apiModelId": "sd-official-2.5",
+      "documentedName": "官转2.5 · 火山审核",
+      "documentedStatus": "paused",
+      "availability": "documented_paused",
+      "durationText": "4–30",
+      "basePriceText": "480p：0.63；720p：1.20（带视频或纯音频1.35）",
+      "billingUnitText": "秒",
+      "mediaLimitText": "30/10/10",
+      "inputFormatText": "references",
+      "example": "request-sd-official-2.5.json",
+      "durationSeconds": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "resolutions": [
+        "480p",
+        "720p"
+      ],
+      "ratios": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "mediaLimits": {
+        "image": 30,
+        "video": 10,
+        "audio": 10,
+        "total": 50
+      },
+      "inputMode": "references",
+      "requiredAnyMedia": [],
+      "currentKeyEntitlement": null,
+      "webCardIdentity": null,
+      "customerQuote": null,
+      "blockedReason": "上游当前暂停新建，历史任务保留查询与下载",
+      "upstreamModelId": "sd-official-2.5"
+    }
+  ],
+  "sourceContractSha256": {
+    "markdown": "34ca437944624a024fb8e07c64d5f89c0a4c0597d03dd66c5cab3da22d4001c8",
+    "openapi": "c81af1a6c85c6226a26bd11cfc144c09e507aacbdd77ba734a8817a06d957d45"
+  },
+  "wireProfiles": {
+    "images": {
+      "duration": "duration",
+      "aspectRatio": "ratio",
+      "image": "images",
+      "video": "video_b64s",
+      "audio": "audio_b64s",
+      "fixed": {
+        "face_direct": false
+      }
+    },
+    "inline_multimedia": {
+      "duration": "duration",
+      "aspectRatio": "ratio",
+      "image": "images",
+      "video": "video_b64s",
+      "audio": "audio_b64s",
+      "fixed": {}
+    },
+    "references": {
+      "duration": "seconds",
+      "aspectRatio": "aspect_ratio",
+      "references": "references",
+      "fixed": {}
+    }
+  }
+}

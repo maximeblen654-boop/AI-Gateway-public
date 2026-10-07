@@ -1,0 +1,50 @@
+# Local media tests
+
+This directory retains synthetic protocol fixtures and regression tests for the media BFF. Prior execution reports, images, private environment state and artifact identities are not part of the public source distribution.
+
+## Self-contained contract tests
+
+From the repository root, using the Node version pinned in CI:
+
+```sh
+node --test tools/phase5-media-e2e/default-contract.test.mjs
+node --import ./tools/phase5-media-e2e/register-contract.mjs --test tools/phase5-media-e2e/restoration.test.mjs
+```
+
+`contract-fixture.mjs` and `register-contract.mjs` provide an explicit synthetic model for the restoration test. The production contract remains unchanged. These tests use temporary local storage and fake supplier receipts.
+
+## Optional browser and package checks
+
+The browser harnesses exercise a separately provisioned, isolated local Core/Bridge/BFF environment. They are not invoked by ordinary build or CI jobs. Provision new test identities and synthetic media for each environment; never obtain fixtures or credentials from another checkout. Local output directories must remain ignored. The harness setup must validate the intended local service identity before changing test state.
+
+The optional full browser harness currently targets Windows, system Chrome, and the local Docker Desktop `desktop-linux` context. It requires the following independently provisioned test services, using this checkout's source:
+
+| Service | Required local identity/address |
+| --- | --- |
+| Core, PostgreSQL, Redis | Compose project `phase5`; containers `sub2api-dev`, `sub2api-postgres-dev`, `sub2api-redis-dev`; Core at `127.0.0.1:18080` |
+| Bridge | Build `backend/cmd/studio-bridge`; container `phase5-studio-bridge`, command `/app/studio-bridge`; use the test database/Redis and the same JWT/service authentication configuration as Core |
+| Bridge host entry | `phase5-bridge-proxy`, published only at `127.0.0.1:18082`; the current loopback fixture shares Core's network namespace |
+| Simulator | `simulator.mjs` in `phase5-sim-core`; local HTTPS port 19090 and loopback statistics port 19091; use locally generated test certificates with explicit trust, never disable TLS checks |
+| BFF and browser entry | Starter owns `127.0.0.1:8093` and `127.0.0.1:3000`; development Vue uses port 3001, or `--embedded` uses the selected Core image's frontend |
+
+This is an explicit local test topology, not a production deployment prescription or an automatic environment installer. Keep Core data under the checkout's private `deploy/data` mount and BFF state under ignored `.evidence`. The harness reads only the selected task's binding fields for its report. Do not share these paths with another environment.
+
+Prepare the test database through normal application initialization and administration: create two distinct active customer users, a test Account pointing only at the simulator on port 19090, the corresponding group/API-key access and explicit test cost rules. Customer fixture passwords must match the isolated administrator test password used by this legacy browser harness; credentials stay only in the private local configuration. Sync the simulator's models, then configure and publish `phase5-native-image-v1` and `phase5-native-video-v1` through Media Workbench. The artifact harness expects the native image and video protocols plus the supported `3.0` inline test offer; it updates only this test Account's specifications and reference limits. Missing offers fail the test. Never enable a real supplier or paid submission gate to satisfy a test.
+
+Record the IDs from that new environment and generate small synthetic video/audio inputs:
+
+```powershell
+node tools/phase5-media-e2e/configure-fixture.cjs ACCOUNT_ID CUSTOMER_ID OTHER_CUSTOMER_ID
+node tools/phase5-media-e2e/start-local.mjs --embedded
+node tools/phase5-media-e2e/artifact-browser.cjs
+```
+
+Replace the three uppercase arguments with numeric test IDs. The setup records the running Core's immutable image ID in `.evidence/local-fixture.json`, generates synthetic media using ffmpeg, and refuses to overwrite an existing manifest. It does not write users, Published configuration, or credentials. `PHASE5_FIXTURE_MANIFEST` can select an explicit private manifest instead. Account, user, image, local supplier and submission-gate checks run before browser actions. Bridge binary identity is measured in the running container; no prior binary, seed, screenshot or report is required. Full artifact acceptance restarts only the declared test Core/BFF/Bridge/simulator services, so reserve those services for this run.
+
+For the older optional development browser harnesses, omit `--embedded`. `reference-browser.cjs` additionally uses the explicit synthetic-contract import and requires the matching isolated test Core build. Use `start-local.mjs --synthetic-contract` for that BFF. This does not change the normal application's model contract. The artifact harness uses ordinary Published configuration instead of a contract overlay.
+
+`node --test tools/phase5-media-e2e/fixture-config.test.cjs` checks fixture isolation without starting Docker or contacting any service. Its passing result is not browser E2E evidence. CI also retains the application tests and the synthetic usage-display regression; release artifacts can only be requested manually.
+
+`package-boundaries.cjs` checks the public release file list and uses a synthetic Docker context. It requires existing frontend development dependencies and a local Docker builder. It does not build or publish the application image. `create-overlay.mjs` is an optional isolated test-build helper; it does not alter the production source contract.
+
+Configuration, preparation/recovery checks, supplier dispatch, and real customer delivery are separate test scopes. A local fixture passing does not certify a production deployment or a paid provider operation.

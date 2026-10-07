@@ -1,0 +1,69 @@
+{
+  "supplier": "Supplier-A",
+  "base_url": "https://supplier.example/v1",
+  "provider": "openai_responses",
+  "upstream_usage_path": "/v1/usage",
+  "probe_models": false,
+  "samples": 1,
+  "timeout_seconds": 120,
+  "reasoning_efforts": ["high", "xhigh", "max"],
+  "sub2api": {
+    "base_url": "http://127.0.0.1:8080",
+    "admin_email_env": "SUB2API_ADMIN_EMAIL",
+    "admin_password_env": "SUB2API_ADMIN_PASSWORD",
+    "test_email_env": "SUB2API_TEST_EMAIL",
+    "test_password_env": "SUB2API_TEST_PASSWORD"
+  },
+  "lines": [
+    {
+      "name": "A05",
+      "account_name": "Supplier-A / A05",
+      "api_key_env": "SUPPLIER_A05_API_KEY",
+      "downstream_api_key_env": "SUB2API_A05_API_KEY",
+      "downstream_key_name": "Supplier-A A05 verification",
+      "model": "gpt-5.6-sol",
+      "upstream_model": "gpt-5.6-sol",
+      "product": "GPT-5.6 Sol A05",
+      "product_description": "Supplier-A A05 product pool",
+      "cost_multiplier": 1,
+      "price_multiplier": 1,
+      "concurrency": 1,
+      "rate_limit_rpm": 0,
+      "priority": 0,
+      "expect_non_stream": true,
+      "known_limitations": []
+    },
+    {
+      "name": "A06",
+      "account_name": "Supplier-A / A06",
+      "api_key_env": "SUPPLIER_A06_API_KEY",
+      "downstream_api_key_env": "SUB2API_A06_API_KEY",
+      "downstream_key_name": "Supplier-A A06 verification",
+      "model": "gpt-5.6-sol",
+      "product": "GPT-5.6 Sol A06",
+      "cost_multiplier": 1,
+      "price_multiplier": 1,
+      "concurrency": 1,
+      "rate_limit_rpm": 0,
+      "priority": 0,
+      "expect_non_stream": false,
+      "known_limitations": ["non-stream Responses returns non_stream_not_allowed"]
+    },
+    {
+      "name": "A10",
+      "account_name": "Supplier-A / A10",
+      "api_key_env": "SUPPLIER_A10_API_KEY",
+      "downstream_api_key_env": "SUB2API_A10_API_KEY",
+      "downstream_key_name": "Supplier-A A10 verification",
+      "model": "gpt-5.6-sol",
+      "product": "GPT-5.6 Sol A10",
+      "cost_multiplier": 1,
+      "price_multiplier": 1,
+      "concurrency": 1,
+      "rate_limit_rpm": 0,
+      "priority": 0,
+      "expect_non_stream": true,
+      "known_limitations": ["observed long-tail latency; production distribution is unknown"]
+    }
+  ]
+}

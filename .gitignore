@@ -1,0 +1,191 @@
+# 本地杂项文档、测试数据和外部项目副本
+/docs-local/
+.codex
+
+# ===================
+# Go 后端
+# ===================
+# 二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/bin/
+backend/server
+backend/sub2api
+backend/main
+
+# Go 测试二进制
+*.test
+
+# 测试覆盖率
+*.out
+coverage.html
+
+# 依赖（使用 go mod）
+vendor/
+
+# Go 编译缓存
+backend/.gocache/
+
+# ===================
+# Node.js / Vue 前端
+# ===================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.local
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js.timestamp-*
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===================
+# 环境配置
+# ===================
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+*.env
+!.env.example
+docker-compose.override.yml
+
+# ===================
+# IDE / 编辑器
+# ===================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# ===================
+# 操作系统
+# ===================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===================
+# 临时文件
+# ===================
+tmp/
+temp/
+*.tmp
+*.temp
+*.log
+*.bak
+.cache/
+.dev/
+.serena/
+
+# ===================
+# 构建产物
+# ===================
+dist/
+build/
+release/
+
+# 后端嵌入的前端构建产物
+# Keep a placeholder file so `//go:embed all:dist` always has a match in CI/lint,
+# while still ignoring generated frontend build outputs.
+backend/internal/web/dist/
+!backend/internal/web/dist/
+backend/internal/web/dist/*
+!backend/internal/web/dist/.keep
+
+# 后端运行时缓存数据
+backend/data/
+
+# ===================
+# 本地配置文件（包含敏感信息）
+# ===================
+backend/config.yaml
+deploy/config.yaml
+backend/.installed
+
+# ===================
+# 其他
+# ===================
+tests
+!deploy/tests/
+!deploy/tests/**
+CLAUDE.md
+.claude
+scripts
+!backend/scripts/
+!backend/scripts/resolve-version.sh
+.code-review-state
+#openspec/
+code-reviews/
+AGENTS.md
+!/AGENTS.md
+backend/cmd/server/server
+deploy/docker-compose.override.yml
+.gocache/
+vite.config.js
+.serena/
+.codex/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+!frontend/tests/
+!frontend/tests/media-workbench/
+!frontend/tests/media-workbench/*
+aicodex
+output/
+.codegraph/
+
+# Vitest / Vite cache at repo root
+.vite/
+# 本地闭源插件开发目录及构建产物不进入 Sub2API 仓库
+/plugins/
+
+# 本项目本机验证与历史基线运行文件（不得提交）
+/.local-newapi-baseline/
+/.local-sub2api-release/
+/.local-upstream-ab/
+
+# 数据库、运行日志与本地凭据
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+postgres-data/
+redis-data/
+logs/
+secrets/
+credentials/
+
+# Private audit and operator material (ignore rules do not remove Git history).
+/.evidence/
+/.local-project-control/
+
+
+# Private operation records and local test output
+/PROJECT*.md
+/AGENTS.md
+/SOURCE_FOR_PUBLIC.json
+/CLEAN_SNAPSHOT_HANDOFF.md
+/docs/AI_GATEWAY_HANDOFF_*.md
+/docs/PUBLIC_READINESS_AUDIT.md
+/docs/evidence/
+/tools/phase5-media-e2e/evidence/
+
+# Reviewed source files nested under otherwise ignored directory names.
+!/skills/sub2api-admin/scripts/
+!/skills/sub2api-admin/scripts/sub2api-admin.js
+!/tools/supplier-onboarding/tests/
+!/tools/supplier-onboarding/tests/test_onboard.py

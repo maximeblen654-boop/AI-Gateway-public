@@ -1,0 +1,250 @@
+package studiobridge
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/redis/go-redis/v9"
+)
+
+const StudioTicketTTL = 45 * time.Second
+const StudioProofMaxTTL = 15 * time.Minute
+const studioRevocationTTL = 8 * 24 * time.Hour // exceeds the maximum configured access JWT lifetime
+
+var ErrStudioTicketInvalid = errors.New("invalid studio ticket")
+
+type StudioIdentity struct {
+	UserID       int64  `json:"user_id"`
+	SessionProof string `json:"session_proof,omitempty"`
+}
+
+type studioTicketRecord struct {
+	Purpose      string `json:"purpose"`
+	UserID       int64  `json:"user_id"`
+	SessionID    string `json:"session_id"`
+	TokenVersion int64  `json:"token_version"`
+	UserEpoch    string `json:"user_epoch"`
+	SessionEpoch string `json:"session_epoch"`
+	ExpiresAt    int64  `json:"expires_at"`
+}
+
+type StudioTicketService struct {
+	redis *redis.Client
+	users interface {
+		GetByID(context.Context, int64) (*service.User, error)
+	}
+}
+
+func NewStudioTicketService(rdb *redis.Client, users interface {
+	GetByID(context.Context, int64) (*service.User, error)
+}) *StudioTicketService {
+	return &StudioTicketService{redis: rdb, users: users}
+}
+
+func studioTicketKey(ticket string) string {
+	sum := sha256.Sum256([]byte(ticket))
+	return "studio:ticket:" + hex.EncodeToString(sum[:])
+}
+
+func studioUserEpochKey(userID int64) string { return fmt.Sprintf("studio:user-epoch:%d", userID) }
+func studioSessionEpochKey(userID int64, sid string) string {
+	sum := sha256.Sum256([]byte(sid))
+	return fmt.Sprintf("studio:session-epoch:%d:%x", userID, sum[:])
+}
+
+func studioTicketRandom() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func (s *StudioTicketService) epochs(ctx context.Context, userID int64, sid string) (string, string, error) {
+	if s == nil || s.redis == nil || sid == "" {
+		return "", "", ErrStudioTicketInvalid
+	}
+	// Preserve native refresh-family revocation as well as Studio revocation.
+	// A set alone may contain revoked/expired token hashes, so require a live
+	// native record belonging to this user and family.
+	hashes, err := s.redis.SMembers(ctx, "token_family:"+sid).Result()
+	if err != nil || len(hashes) == 0 || len(hashes) > 4096 {
+		return "", "", ErrStudioTicketInvalid
+	}
+	keys := make([]string, len(hashes))
+	for i, h := range hashes {
+		keys[i] = "refresh_token:" + h
+	}
+	records, err := s.redis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return "", "", err
+	}
+	live := false
+	for _, v := range records {
+		text, ok := v.(string)
+		if !ok {
+			continue
+		}
+		var record service.RefreshTokenData
+		if json.Unmarshal([]byte(text), &record) == nil && record.UserID == userID && record.FamilyID == sid && record.ExpiresAt.After(time.Now()) {
+			live = true
+			break
+		}
+	}
+	if !live {
+		return "", "", ErrStudioTicketInvalid
+	}
+	values, err := s.redis.MGet(ctx, studioUserEpochKey(userID), studioSessionEpochKey(userID, sid)).Result()
+	if err != nil {
+		return "", "", err
+	}
+	u, _ := values[0].(string)
+	v, _ := values[1].(string)
+	return u, v, nil
+}
+
+func (s *StudioTicketService) Issue(ctx context.Context, userID int64, sid string, issuedAt, expiresAt int64) (string, error) {
+	if s == nil || s.redis == nil || s.users == nil || userID <= 0 || sid == "" {
+		return "", ErrStudioTicketInvalid
+	}
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if user == nil || !user.IsActive() {
+		return "", ErrStudioTicketInvalid
+	}
+	u, v, err := s.epochs(ctx, userID, sid)
+	if err != nil {
+		return "", err
+	}
+	if v != "" || issuedAt <= 0 || expiresAt <= time.Now().Unix() {
+		return "", ErrStudioTicketInvalid
+	}
+	if u != "" {
+		revokedAt, parseErr := strconv.ParseInt(u, 10, 64)
+		if parseErr != nil || issuedAt <= revokedAt {
+			return "", ErrStudioTicketInvalid
+		}
+	}
+	ticket, err := studioTicketRandom()
+	if err != nil {
+		return "", err
+	}
+	record, err := json.Marshal(studioTicketRecord{Purpose: "image-studio", UserID: userID, SessionID: sid, TokenVersion: user.TokenVersion, UserEpoch: u, SessionEpoch: v, ExpiresAt: expiresAt})
+	if err != nil {
+		return "", err
+	}
+	if err := s.redis.Set(ctx, studioTicketKey(ticket), record, StudioTicketTTL).Err(); err != nil {
+		return "", err
+	}
+	// A concurrent revocation between the epoch read and SET must not leave a usable ticket.
+	currentU, currentV, err := s.epochs(ctx, userID, sid)
+	if err != nil || u != currentU || v != currentV {
+		_ = s.redis.Del(ctx, studioTicketKey(ticket)).Err()
+		return "", ErrStudioTicketInvalid
+	}
+	return ticket, nil
+}
+
+func (s *StudioTicketService) Consume(ctx context.Context, ticket string) (*StudioIdentity, error) {
+	if s == nil || s.redis == nil || s.users == nil || len(ticket) != 43 {
+		return nil, ErrStudioTicketInvalid
+	}
+	if _, err := base64.RawURLEncoding.DecodeString(ticket); err != nil {
+		return nil, ErrStudioTicketInvalid
+	}
+	// GETDEL is atomic: even a failed downstream validation burns the ticket.
+	data, err := s.redis.GetDel(ctx, studioTicketKey(ticket)).Bytes()
+	if err != nil {
+		return nil, ErrStudioTicketInvalid
+	}
+	var record studioTicketRecord
+	if json.Unmarshal(data, &record) != nil || record.Purpose != "image-studio" || record.UserID <= 0 || record.SessionID == "" || record.ExpiresAt <= time.Now().Unix() {
+		return nil, ErrStudioTicketInvalid
+	}
+	if err := s.validateRecord(ctx, &record); err != nil {
+		return nil, err
+	}
+	proof, err := studioTicketRandom()
+	if err != nil {
+		return nil, err
+	}
+	record.Purpose = "image-studio-session"
+	payload, err := json.Marshal(record)
+	if err != nil {
+		return nil, err
+	}
+	ttl := time.Until(time.Unix(record.ExpiresAt, 0))
+	if ttl > StudioProofMaxTTL {
+		ttl = StudioProofMaxTTL
+	}
+	if ttl <= 0 || s.redis.Set(ctx, studioProofKey(proof), payload, ttl).Err() != nil {
+		return nil, ErrStudioTicketInvalid
+	}
+	return &StudioIdentity{UserID: record.UserID, SessionProof: proof}, nil
+}
+
+func studioProofKey(proof string) string {
+	return "studio:proof:" + studioTicketKey(proof)[len("studio:ticket:"):]
+}
+
+func (s *StudioTicketService) Verify(ctx context.Context, proof string) (*StudioIdentity, error) {
+	if s == nil || s.redis == nil || s.users == nil || len(proof) != 43 {
+		return nil, ErrStudioTicketInvalid
+	}
+	if _, err := base64.RawURLEncoding.DecodeString(proof); err != nil {
+		return nil, ErrStudioTicketInvalid
+	}
+	data, err := s.redis.Get(ctx, studioProofKey(proof)).Bytes()
+	if err != nil {
+		return nil, ErrStudioTicketInvalid
+	}
+	var record studioTicketRecord
+	if json.Unmarshal(data, &record) != nil || record.Purpose != "image-studio-session" || record.ExpiresAt <= time.Now().Unix() {
+		return nil, ErrStudioTicketInvalid
+	}
+	if err := s.validateRecord(ctx, &record); err != nil {
+		return nil, err
+	}
+	return &StudioIdentity{UserID: record.UserID}, nil
+}
+
+func (s *StudioTicketService) validateRecord(ctx context.Context, record *studioTicketRecord) error {
+	u, v, err := s.epochs(ctx, record.UserID, record.SessionID)
+	if err != nil || u != record.UserEpoch || v != record.SessionEpoch {
+		return ErrStudioTicketInvalid
+	}
+	user, err := s.users.GetByID(ctx, record.UserID)
+	if err != nil || user == nil || !user.IsActive() || user.TokenVersion != record.TokenVersion {
+		return ErrStudioTicketInvalid
+	}
+	return nil
+}
+
+func (s *StudioTicketService) RevokeSession(ctx context.Context, userID int64, sid string) error {
+	if s == nil || s.redis == nil || userID <= 0 || sid == "" {
+		return ErrStudioTicketInvalid
+	}
+	epoch, err := studioTicketRandom()
+	if err != nil {
+		return err
+	}
+	return s.redis.Set(ctx, studioSessionEpochKey(userID, sid), epoch, studioRevocationTTL).Err()
+}
+
+func (s *StudioTicketService) RevokeUser(ctx context.Context, userID int64) error {
+	if s == nil || s.redis == nil || userID <= 0 {
+		return ErrStudioTicketInvalid
+	}
+	return s.redis.Set(ctx, studioUserEpochKey(userID), strconv.FormatInt(time.Now().Unix(), 10), studioRevocationTTL).Err()
+}

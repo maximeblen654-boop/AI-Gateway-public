@@ -1,0 +1,122 @@
+/* The palette lives on <html> so Teleported dialogs, select menus and toasts inherit it. */
+html[data-site-theme='yellow'] {
+  --site-primary-50: 255 250 235; --site-primary-100: 255 241 199; --site-primary-200: 253 222 149;
+  --site-primary-300: 246 195 94; --site-primary-400: 226 160 38; --site-primary-500: 169 104 0;
+  --site-primary-600: 145 84 0; --site-primary-700: 119 68 0; --site-primary-800: 96 57 8;
+  --site-primary-900: 74 46 13; --site-primary-950: 47 30 10;
+  --site-accent: #ffdf91; --site-tint: #fff0ca; --site-canvas-light: #fffdfa;
+  --site-canvas-mid: #f8f4e9; --site-canvas-deep: #fff2d8; --site-shadow: rgba(151, 111, 43, 0.15);
+}
+
+html[data-site-theme='blue'] {
+  --site-primary-50: 241 248 255; --site-primary-100: 218 236 255; --site-primary-200: 185 218 252;
+  --site-primary-300: 142 194 245; --site-primary-400: 92 155 224; --site-primary-500: 52 120 198;
+  --site-primary-600: 38 96 170; --site-primary-700: 30 75 137; --site-primary-800: 28 59 105;
+  --site-primary-900: 27 45 77; --site-primary-950: 18 31 54;
+  --site-accent: #80bdff; --site-tint: #dceeff; --site-canvas-light: #f8fcff;
+  --site-canvas-mid: #e9f4ff; --site-canvas-deep: #d3eaff; --site-shadow: rgba(47, 108, 178, 0.16);
+}
+
+html[data-site-theme='pink'] {
+  --site-primary-50: 255 248 250; --site-primary-100: 252 232 239; --site-primary-200: 247 203 217;
+  --site-primary-300: 235 163 190; --site-primary-400: 211 125 159; --site-primary-500: 178 89 128;
+  --site-primary-600: 151 66 105; --site-primary-700: 124 51 85; --site-primary-800: 98 42 70;
+  --site-primary-900: 75 36 56; --site-primary-950: 51 25 38;
+  --site-accent: #efbccb; --site-tint: #f9e4eb; --site-canvas-light: #fffcfd;
+  --site-canvas-mid: #fcf2f5; --site-canvas-deep: #f7e1e8; --site-shadow: rgba(153, 87, 113, 0.14);
+}
+
+html[data-site-theme='green'] {
+  --site-primary-50: 245 252 247; --site-primary-100: 224 243 230; --site-primary-200: 187 224 199;
+  --site-primary-300: 145 205 165; --site-primary-400: 91 169 123; --site-primary-500: 52 132 87;
+  --site-primary-600: 39 107 69; --site-primary-700: 32 85 57; --site-primary-800: 31 66 47;
+  --site-primary-900: 26 53 39; --site-primary-950: 16 34 25;
+  --site-accent: #abd9bd; --site-tint: #e0f1e5; --site-canvas-light: #fcfffc;
+  --site-canvas-mid: #f0f9f1; --site-canvas-deep: #dceee1; --site-shadow: rgba(82, 137, 99, 0.14);
+}
+
+html[data-site-theme='lavender'] {
+  --site-primary-50: 249 248 255; --site-primary-100: 236 233 255; --site-primary-200: 216 208 250;
+  --site-primary-300: 187 175 235; --site-primary-400: 153 137 214; --site-primary-500: 119 102 187;
+  --site-primary-600: 97 79 162; --site-primary-700: 78 64 131; --site-primary-800: 64 54 106;
+  --site-primary-900: 52 46 82; --site-primary-950: 35 31 57;
+  --site-accent: #bca3dc; --site-tint: #e9dcf4; --site-canvas-light: #fdfaff;
+  --site-canvas-mid: #f1e9f8; --site-canvas-deep: #e7d9f3; --site-shadow: rgba(111, 76, 146, 0.16);
+}
+
+html[data-site-theme] body { background: var(--site-canvas-light); }
+
+html[data-site-theme] .site-grid {
+  background-image: linear-gradient(rgb(var(--site-primary-500) / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--site-primary-500) / 0.035) 1px, transparent 1px);
+}
+
+html[data-site-theme] .site-standalone {
+  background: linear-gradient(130deg, var(--site-canvas-light), var(--site-canvas-mid) 54%, var(--site-canvas-deep));
+}
+
+html[data-site-theme] .app-layout:not(.app-layout--catalog) {
+  background: radial-gradient(ellipse 48% 38% at 83% 6%, color-mix(in srgb, var(--site-accent) 38%, transparent), transparent 78%),
+    radial-gradient(ellipse 38% 44% at 4% 88%, color-mix(in srgb, var(--site-accent) 23%, transparent), transparent 78%),
+    linear-gradient(130deg, var(--site-canvas-light), var(--site-canvas-mid) 52%, var(--site-canvas-deep));
+}
+
+html[data-site-theme] .app-layout:not(.app-layout--catalog) > .bg-mesh-gradient { opacity: 0; }
+
+html[data-site-theme] .app-layout:not(.app-layout--catalog) .sidebar {
+  border-color: rgba(255, 255, 255, 0.84);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.84), color-mix(in srgb, var(--site-tint) 54%, white));
+  box-shadow: inset -1px 0 rgba(255, 255, 255, 0.8), 10px 0 32px var(--site-shadow);
+  backdrop-filter: blur(28px) saturate(1.2);
+}
+
+html[data-site-theme] .app-layout:not(.app-layout--catalog) header.glass {
+  border-color: rgba(255, 255, 255, 0.82);
+  background: color-mix(in srgb, var(--site-canvas-light) 79%, transparent);
+  box-shadow: 0 8px 26px var(--site-shadow);
+  backdrop-filter: blur(24px) saturate(1.2);
+}
+
+html[data-site-theme] :is(.card, .glass-card, .card-glass, .dropdown, .modal-content, .dialog-container, .select-dropdown-portal) {
+  border-color: color-mix(in srgb, var(--site-accent) 35%, white);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.91), color-mix(in srgb, var(--site-tint) 55%, rgba(255, 255, 255, 0.78)));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.9), 0 14px 34px var(--site-shadow);
+  backdrop-filter: blur(24px) saturate(1.18);
+}
+
+html[data-site-theme] :is(.input, .select-trigger, .select-search-input, .btn-secondary) {
+  border-color: color-mix(in srgb, var(--site-accent) 40%, white);
+  background: color-mix(in srgb, var(--site-canvas-light) 83%, white);
+}
+
+html[data-site-theme] :is(.dropdown-item:hover, .btn-ghost:hover) {
+  background: color-mix(in srgb, var(--site-tint) 62%, white);
+}
+
+html[data-site-theme] .site-theme-picker-menu .dropdown-item[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--site-accent) 35%, white);
+  color: rgb(var(--site-primary-800));
+  font-weight: 700;
+}
+
+html.dark[data-site-theme] .app-layout:not(.app-layout--catalog) {
+  background: radial-gradient(ellipse at 84% 4%, rgb(var(--site-primary-500) / 0.17), transparent 55%), #111827;
+}
+
+html.dark[data-site-theme] .site-standalone { background: #111827; }
+
+html.dark[data-site-theme] .app-layout:not(.app-layout--catalog) :is(.sidebar, header.glass),
+html.dark[data-site-theme] :is(.card, .glass-card, .card-glass, .dropdown, .modal-content, .dialog-container, .select-dropdown-portal) {
+  border-color: rgb(var(--site-primary-400) / 0.22);
+  background: linear-gradient(145deg, rgba(39, 47, 58, 0.94), rgba(31, 41, 55, 0.85));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+}
+
+html.dark[data-site-theme] :is(.input, .select-trigger, .select-search-input, .btn-secondary) {
+  border-color: rgb(var(--site-primary-400) / 0.25);
+  background: #1f2937;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-theme-picker * { transition-duration: 1ms !important; }
+}
