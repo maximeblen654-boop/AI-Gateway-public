@@ -1,0 +1,65 @@
+# Optional Linux Compose overlay for an existing sub2api service. All three
+# processes share loopback; no unauthenticated private-network HTTP exception.
+# Separate hosts/containers may instead use independently managed HTTPS origins
+# with the same artifacts and env contract; see studio/README.md.
+services:
+  sub2api:
+    environment:
+      STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
+    ports:
+      - "127.0.0.1:${STUDIO_BRIDGE_PORT:-8091}:8091"
+      - "127.0.0.1:${STUDIO_BFF_PORT:-4173}:4173"
+  studio-bridge:
+    image: ${STUDIO_BRIDGE_IMAGE:?Use an immutable verified Bridge image}
+    user: "65532:65532"
+    network_mode: service:sub2api
+    env_file: ${STUDIO_BRIDGE_ENV_FILE:?Private Bridge-only environment file required}
+    environment:
+      STUDIO_IMAGE_CORE_URL: http://127.0.0.1:8080
+      STUDIO_BRIDGE_LISTEN_ADDR: 0.0.0.0:8091
+      STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      sub2api:
+        condition: service_healthy
+    restart: unless-stopped
+  studio-bff:
+    image: ${STUDIO_BFF_IMAGE:?Use an immutable verified BFF image}
+    user: "1000:1000"
+    network_mode: service:sub2api
+    env_file: ${STUDIO_BFF_ENV_FILE:?Private BFF-only environment file required}
+    environment:
+      STUDIO_BRIDGE_URL: http://127.0.0.1:8091
+      STUDIO_IMAGE_BFF_HOST: 0.0.0.0
+      STUDIO_IMAGE_BFF_PORT: 4173
+      STUDIO_ASSET_ROOT: /state/assets
+      STUDIO_IMAGE_DATA_ROOT: /state/images
+      STUDIO_VIDEO_DATA_ROOT: /state/videos
+      STUDIO_OPERATION_ROOT: /state/legacy-operations
+      STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
+    volumes:
+      - type: bind
+        source: ${STUDIO_ASSET_HOST_ROOT:?Existing assets root required}
+        target: /state/assets
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${STUDIO_IMAGE_HOST_ROOT:?Private image root required}
+        target: /state/images
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${STUDIO_VIDEO_HOST_ROOT:?Private video root required}
+        target: /state/videos
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${STUDIO_LEGACY_HOST_ROOT:?Existing legacy root required}
+        target: /state/legacy-operations
+        bind: {create_host_path: false}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on: [studio-bridge]
+    restart: unless-stopped

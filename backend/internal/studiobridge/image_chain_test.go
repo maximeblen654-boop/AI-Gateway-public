@@ -63,7 +63,7 @@ func TestImageBFFBridgeCoreLoopbackRecovery(t *testing.T) {
 	}))
 	defer core.Close()
 	keys := &imageKeys{}
-	bridge, err := NewImage(ImageOptions{ServiceToken: strings.Repeat("s", 32), GroupID: 3, CoreURL: core.URL, Keys: keys, Verify: func(_ context.Context, proof string) (int64, error) {
+	bridge, err := NewImage(ImageOptions{ImageSubmissionEnabled: true, ServiceToken: strings.Repeat("s", 32), GroupID: 3, CoreURL: core.URL, Keys: keys, Verify: func(_ context.Context, proof string) (int64, error) {
 		if proof != "valid-proof" {
 			return 0, errors.New("bad proof")
 		}
@@ -72,7 +72,6 @@ func TestImageBFFBridgeCoreLoopbackRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bridge.enabled = true // inaccessible outside this test/package; production stays hard OFF
 	server := httptest.NewServer(bridge)
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

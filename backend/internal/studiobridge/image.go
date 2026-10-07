@@ -73,6 +73,7 @@ func (r SQLImageCredentialReader) resolve(ctx context.Context, user, group, keyI
 }
 
 type ImageOptions struct {
+	ImageSubmissionEnabled bool
 	VideoSubmissionEnabled bool
 	ServiceToken           string
 	GroupID                int64
@@ -104,7 +105,7 @@ func NewImage(opts ImageOptions) (*ImageBridge, error) {
 		*client = *opts.Client
 	}
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &ImageBridge{opts: opts, base: base, client: client}, nil
+	return &ImageBridge{opts: opts, base: base, client: client, enabled: opts.ImageSubmissionEnabled}, nil
 }
 
 var imageTaskPath = regexp.MustCompile(`^tasks/[A-Za-z0-9_-]{1,128}(?:/result)?$`)
@@ -222,6 +223,15 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	if operation == "readiness" {
+		var readiness map[string]any
+		if json.Unmarshal(data, &readiness) != nil {
+			writeError(w, 502, "invalid readiness")
+			return
+		}
+		readiness["paid_enabled"] = b.enabled && readiness["paid_enabled"] == true
+		data, _ = json.Marshal(readiness)
+	}
 	writeSuccess(w, struct {
 		Contract string          `json:"contract"`
 		KeyID    int64           `json:"key_ref"`

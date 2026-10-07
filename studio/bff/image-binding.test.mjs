@@ -26,7 +26,7 @@ function fixture(t,{lost=false,count=1}={}) {
   const results=createImageResultStore({rootDir:path.join(root,'results')});
   const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call,results});
   const input={quote_token:'a'.repeat(64),client_key:'client-key-01',prompt:'synthetic',references:[]};
-  return {root,tasks,input,results,stats:()=>({posts,gets})};
+  return {root,tasks,input,results,call,stats:()=>({posts,gets})};
 }
 test('Published quote, durable journal/claim, full original result delivery',async t=>{
   const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
@@ -43,6 +43,15 @@ test('claim/response loss uses frozen original key and GET only after restart',a
   await assert.rejects(f.tasks.dispatch(owner,f.input),/lost response/);
   const task=f.tasks.prepare(owner,f.input).task;await f.tasks.recover(owner,task.task_id);await f.tasks.dispatch(owner,f.input);
   assert.equal(f.stats().posts,1);assert.ok(f.stats().gets>=2);
+});
+test('late pending recovery cannot overwrite completed originals',async t=>{
+  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'p',spec:{count:1,images:0}});
+  const prepared=f.tasks.prepare(owner,f.input).task;
+  let finish,started;const arrived=new Promise(r=>{started=r});
+  const stale=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async()=>{started();await new Promise(r=>{finish=r});return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:prepared.task_id,status:'unknown',billing_state:'pending',result_available:false}};}});
+  const pending=stale.recover(owner,prepared.task_id);await arrived;
+  await f.tasks.recover(owner,prepared.task_id);finish();assert.equal((await pending).status,'completed');
+  assert.deepEqual(f.tasks.result(owner,prepared.task_id,0).data,Buffer.from(png,'base64'));
 });
 test('expected count follows immutable quote rather than historical 1/4 assumptions',async t=>{
   const f=fixture(t,{count:2});await f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}});assert.equal((await f.tasks.dispatch(owner,f.input)).results.length,2);
@@ -85,6 +94,19 @@ test('session/CSRF and HTTP paid gate remain hard off with environment flags',as
   const reply=await fetch(base+'/studio/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(f.input)});
   assert.equal(reply.status,503);assert.equal(f.stats().posts,0);assert.equal(IMAGE_PAID_ENABLED,false);
   assert.equal((await fetch(base+'/studio/api/image/quotes',{method:'POST',body:'{}'})).status,403);
+});
+test('explicit server permission dispatches an owner-resolved prepared request once',async t=>{
+  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
+  const sessions={authenticate:async()=>owner,sameOrigin:()=>true};
+  const server=http.createServer(createImageHandler({sessions,tasks:f.tasks,paidEnabled:true}));
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
+  const base=`http://127.0.0.1:${server.address().port}`;
+  const input={...f.input,asset_refs:[]};delete input.references;
+  const post=body=>fetch(base+'/studio/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(body)});
+  // An empty ordered private-asset list requires no resolver; browser URLs are forbidden.
+  const first=await post(input);assert.equal(first.status,200);assert.equal((await first.json()).status,'completed');
+  assert.equal((await post(input)).status,200);assert.equal(f.stats().posts,1);
+  assert.equal((await post({...input,references:[]})).status,409);assert.equal(f.stats().posts,1);
 });
 test('session exchange keeps proof server-side and rejects cross-origin/revoked identity',async()=>{
   const proof='p'.repeat(43);let revoked=false;

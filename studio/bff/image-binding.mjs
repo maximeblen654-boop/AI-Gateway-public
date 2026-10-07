@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 
 export const IMAGE_BINDING_CONTRACT = 'published_image_binding_v1';
-export const IMAGE_PAID_ENABLED = false; // review-only; environment cannot enable
+export const IMAGE_PAID_ENABLED = false; // Default; only trusted server configuration may opt in.
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const taskPattern = /^img_[a-f0-9]{32}$/;
 function syncDir(root) {
@@ -57,6 +57,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
   function read(kind,identity) { const file=location(kind,identity);if(!fs.lstatSync(file).isFile())throw new Error('Unsafe journal entry');return JSON.parse(fs.readFileSync(file,'utf8')); }
   function owner(session) {if(!Number.isSafeInteger(session?.ownerId)||session.ownerId<=0)throw new Error('Image owner required');return session.ownerId;}
   async function catalog(session) {return (await call(session,'GET','catalog')).payload;}
+  async function readiness(session) {return (await call(session,'GET','readiness')).payload;}
   async function quote(session,input) {
     const id=owner(session);
     if(!input || Object.keys(input).some(k=>!['offer_id','spec'].includes(k)))throw new Error('Invalid quote input');
@@ -71,7 +72,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     if(!input || Object.keys(input).some(k=>!['quote_token','client_key','prompt','references','asset_refs'].includes(k)) || !/^[A-Za-z0-9._:-]{8,200}$/.test(input.client_key||'') || typeof input.prompt!=='string' || !input.prompt.trim() ||
       (!Array.isArray(input.references) && !Array.isArray(input.asset_refs)) || (Array.isArray(input.references)&&Array.isArray(input.asset_refs)) ||
       (Array.isArray(input.references)&&input.references.some(x=>typeof x!=='string')) || (Array.isArray(input.asset_refs)&&input.asset_refs.some(x=>typeof x!=='string'))) throw new Error('Invalid image task request');
-    const references=Array.isArray(input.asset_refs)?(assetResolver?assetResolver(session,input.asset_refs):(()=>{throw new Error('asset_store_unavailable')})()):input.references;
+    const references=Array.isArray(input.asset_refs)?(input.asset_refs.length===0?[]:assetResolver?assetResolver(session,input.asset_refs):(()=>{throw new Error('asset_store_unavailable')})()):input.references;
     if(!Array.isArray(references)||references.some(x=>typeof x!=='string')) throw new Error('Invalid resolved image references');
     const identity=[id,input.client_key],fingerprint=hash({quote_token:input.quote_token,client_key:input.client_key,prompt:input.prompt,references});
     try {const old=read('task',identity);if(old.owner!==id || old.requestHash!==fingerprint)throw new Error('Image task binding conflict');return {task:old,identity,first:false};}
@@ -96,12 +97,18 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     const {task,identity}=get(session,taskID);
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
+    if(!['unknown','persisted','completed'].includes(receipt.status) || !['pending','billing_unknown','billed'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
     if(receipt.status==='completed' && receipt.billing_state==='billed' && receipt.result_available) {
       const payload=(await call(session,'GET',`tasks/${taskID}/result`,undefined,task.keyRef)).payload;
       if(!Array.isArray(payload?.data) || payload.data.length!==task.quote.spec.count)throw new Error('Result count mismatch');
       const saved=[];
       for(let i=0;i<payload.data.length;i++)saved.push(await results.saveResult(task.owner,taskID,i,payload.data[i]));
       task.results=saved;task.status='completed';write(location('task',identity),task);
+    } else if(task.status!=='completed') {
+      // A concurrent recovery may have completed while this GET was in flight.
+      const latest=read('task',identity);
+      if(latest.status==='completed')return view(latest);
+      task.status=receipt.status==='persisted'?'billing_pending':'unknown';write(location('task',identity),task);
     }
     return view(task);
   }
@@ -112,6 +119,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     try {write(marker,{contract:IMAGE_BINDING_CONTRACT,requestHash:task.requestHash},true);first=true;} catch(e){if(e.code!=='EEXIST')throw e;}
     if(first) {
       // No retry even on throw or missing response; recovery only issues GET.
+      task.status='unknown';write(location('task',identity),task);
       await call(session,'POST','tasks',task.request,task.keyRef);
     }
     return recover(session,task.task_id);
@@ -130,5 +138,5 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     return {contract:IMAGE_BINDING_CONTRACT,tasks:items.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')||a.task_id.localeCompare(b.task_id))};
   }
   function result(session,taskID,index) {const {task}=get(session,taskID);if(task.status!=='completed'||index<0||index>=task.quote.spec.count)throw new Error('Image result unavailable');return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
-  return {catalog,quote,prepare,dispatch,recover,result,history,view};
+  return {catalog,readiness,quote,prepare,dispatch,recover,result,history,view};
 }

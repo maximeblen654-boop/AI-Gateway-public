@@ -62,6 +62,7 @@ FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS backend-builder
 ARG VERSION=
 ARG COMMIT=docker
 ARG DATE
+ARG GO_BUILD_PARALLELISM=2
 ARG GOPROXY
 ARG GOSUMDB
 # Populated by buildx from the --platform target (e.g. linux/amd64).
@@ -96,7 +97,7 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
     VERSION_VALUE="${VERSION}" && \
     if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(./scripts/resolve-version.sh)"; fi && \
     DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -p ${GO_BUILD_PARALLELISM} \
     -tags embed \
     -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=${COMMIT} -X main.Date=${DATE_VALUE} -X main.BuildType=release" \
     -trimpath \
@@ -109,6 +110,22 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
 FROM ${POSTGRES_IMAGE} AS pg-client
 
 # -----------------------------------------------------------------------------
+# Optional Bridge artifact; default build below remains the Core application.
+# Build with --target studio-bridge; share the existing Go caches and inputs.
+FROM backend-builder AS studio-bridge-builder
+RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=sub2api-gobuild,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -p ${GO_BUILD_PARALLELISM} -trimpath -ldflags="-s -w" -o /app/studio-bridge ./cmd/studio-bridge
+
+FROM ${ALPINE_IMAGE} AS studio-bridge
+ARG COMMIT=unknown
+LABEL org.opencontainers.image.revision=$COMMIT
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=studio-bridge-builder /app/studio-bridge /app/studio-bridge
+USER 65532:65532
+ENTRYPOINT ["/app/studio-bridge"]
+
 # Stage 4: Final Runtime Image
 # -----------------------------------------------------------------------------
 FROM ${ALPINE_IMAGE}

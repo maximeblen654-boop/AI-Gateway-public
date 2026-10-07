@@ -1,0 +1,26 @@
+// Recovery-only subset of the deployed slot protocol. No upload, quote, hold
+// or generation method is available. New Account credentials remain in Core.
+import {createHash} from 'node:crypto';
+const id=value=>{if(typeof value!=='string'||! /^[A-Za-z0-9_-]{1,128}$/.test(value))throw Error('legacy_identity_required');return value};
+function origin(value){const u=new URL(value);if(u.username||u.password||u.search||u.hash||u.pathname!=='/'||u.protocol!=='https:'&&!(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname)))throw Error('legacy_private_origin_required');return u.origin;}
+async function json(response,limit=8192){if(Number(response.headers.get('content-length'))>limit)throw Error('legacy_response_too_large');let size=0;const chunks=[];for await(const chunk of response.body){size+=chunk.length;if(size>limit)throw Error('legacy_response_too_large');chunks.push(chunk)}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+export function createLegacyLedger({baseUrl,serviceToken,session,fetchImpl=fetch}){
+  const base=origin(baseUrl);
+  if(typeof serviceToken!=='string'||serviceToken.length<32||!Number.isSafeInteger(session?.ownerId)||session.ownerId<=0||typeof session.sessionProof!=='string'||!session.sessionProof)throw Error('legacy_session_required');
+  async function call(operation,method,body){const res=await fetchImpl(`${base}/api/v1/internal/studio/video/${operation}`,{method,redirect:'error',signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','X-Studio-Service-Token':serviceToken,'X-Studio-Session-Proof':session.sessionProof},...(body?{body:JSON.stringify(body)}:{})});if(!res.ok)throw Error('legacy_ledger_unavailable');return json(res);}
+  function owner(input){if(input.ownerId!==session.ownerId)throw Error('legacy_owner_mismatch');id(input.childId);}
+  async function settle(input,action){owner(input);const e=input.evidence;if(e?.ownerId!==session.ownerId||e.childId!==input.childId)throw Error('legacy_evidence_mismatch');await call('snapshots/evidence','POST',{userId:session.ownerId,childId:e.childId,requestHash:e.requestHash,status:e.status,supplierTaskId:e.supplierTaskId||'',reason:e.reason||'',hash:''});return call(`orders/${id(input.childId)}/${action}`,'POST',{});}
+  return {reserve(){throw Error('legacy_new_task_disabled')},getSettlement(input){owner(input);return call(`orders/${id(input.childId)}`,'GET')},capture:input=>settle(input,'capture'),release:input=>settle(input,'release')};
+}
+export function createLegacySupplier({baseUrl,apiKey,keySlotId,fetchImpl=fetch}){
+  const base=origin(baseUrl);id(keySlotId);
+  if(typeof apiKey!=='string'||!apiKey||/[\r\n]/.test(apiKey))throw Error('legacy_credentials_required');
+  function slot(input){if(input.keySlotId!==keySlotId)throw Error('supplier_key_slot_mismatch');}
+  function request(path,headers={},method='GET'){return fetchImpl(`${base}${path}`,{method,headers:{Authorization:`Bearer ${apiKey}`,...headers},redirect:'error',signal:AbortSignal.timeout(120000)});}
+  return {
+    submitOnce(){throw Error('legacy_new_task_disabled')},
+    async recoverSubmission(input){slot(input);const key=input.idempotencyKey;if(typeof key!=='string'||!/^[\x21-\x7e]{1,255}$/.test(key))throw Error('legacy_key_invalid');const res=await request('/v1/video-submissions/current',{'Idempotency-Key':key});if(![200,202,404].includes(res.status))throw Error('legacy_receipt_unavailable');const receipt=await json(res);if(res.status===200){if(!['accepted','rejected'].includes(receipt.receipt)||receipt.idempotency_key_hash!==createHash('sha256').update(key).digest('hex'))throw Error('legacy_receipt_mismatch');if(receipt.receipt==='accepted'){const task=receipt.task;id(task?.task_id??task?.id);if(task.id&&task.task_id&&task.id!==task.task_id)throw Error('legacy_receipt_mismatch')}}else if(receipt.receipt!==(res.status===202?'pending':'not_found'))throw Error('legacy_receipt_mismatch');return {status:res.status,receipt,retryAfter:res.headers.get('retry-after')};},
+    async getTask(input){slot(input);const res=await request(`/v1/videos/${id(input.taskId)}`);if(!res.ok)throw Error('legacy_task_unavailable');return json(res);},
+    async downloadOriginal(input){slot(input);const method=input.method||'GET';if(!['GET','HEAD'].includes(method)||input.range!==undefined&&!/^bytes=\d+-\d*$/.test(input.range))throw Error('legacy_range_invalid');const res=await request(`/v1/videos/${id(input.taskId)}/download`,input.range?{Range:input.range}:{},method);if(![200,206,416].includes(res.status))throw Error('legacy_original_unavailable');if(res.status!==416&&(!/^video\//i.test(res.headers.get('content-type')||'')||res.headers.get('x-video-quality')!=='original')){await res.body?.cancel();throw Error('legacy_original_unavailable')}if(res.status===206){const range=/^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get('content-range')||'');if(!input.range||!range||Number(range[1])>Number(range[2])||Number(range[2])>=Number(range[3])||Number(range[1])!==Number(input.range.match(/^bytes=(\d+)-/)[1])||res.headers.has('content-length')&&Number(res.headers.get('content-length'))!==Number(range[2])-Number(range[1])+1){await res.body?.cancel();throw Error('legacy_range_invalid')}}return {status:res.status,response:res,restartFromZero:Boolean(input.range)&&res.status===200};}
+  };
+}

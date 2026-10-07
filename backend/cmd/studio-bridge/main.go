@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/studiobridge"
 	_ "github.com/lib/pq"
@@ -45,12 +46,26 @@ func main() {
 		log.Fatal("bridge identity configuration unavailable")
 	}
 	group, _ := strconv.ParseInt(os.Getenv("STUDIO_IMAGE_GROUP_ID"), 10, 64)
-	image, err := studiobridge.NewImage(studiobridge.ImageOptions{ServiceToken: token, GroupID: group, CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db}})
+	image, err := studiobridge.NewImage(studiobridge.ImageOptions{ImageSubmissionEnabled: os.Getenv("STUDIO_IMAGE_PUBLISHED_SUBMISSION") == "true", ServiceToken: token, GroupID: group, CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db}})
 	if err != nil {
 		log.Fatal("image bridge configuration unavailable")
 	}
 	mux := http.NewServeMux()
 	mux.Handle(studiobridge.ImagePath, image)
+	if os.Getenv("STUDIO_LEGACY_VIDEO_RECOVERY") == "true" {
+		// Existing installations only. Never create or migrate the legacy table.
+		rows, e := db.Query("SELECT child_id, user_id, request_hash, state, final_fingerprint FROM studio_video_orders LIMIT 0")
+		if e != nil {
+			log.Fatal("legacy video order schema prerequisite unavailable")
+		}
+		_ = rows.Close()
+		legacy, e := studiobridge.NewLegacyVideoRecovery(studiobridge.LegacyVideoOptions{ServiceToken: token, Verify: identity.VerifySession, Redis: rdb, Orders: service.NewStudioVideoOrderService(repository.NewStudioVideoOrderRepository(db))})
+		if e != nil {
+			log.Fatal("legacy video recovery configuration unavailable")
+		}
+		mux.Handle(studiobridge.LegacyVideoOrdersPath, legacy)
+		mux.Handle(studiobridge.LegacyVideoEvidencePath, legacy)
+	}
 	if raw := os.Getenv("STUDIO_VIDEO_GROUP_ID"); raw != "" {
 		videoGroup, _ := strconv.ParseInt(raw, 10, 64)
 		video, e := studiobridge.NewVideo(studiobridge.ImageOptions{ServiceToken: token, GroupID: videoGroup, VideoSubmissionEnabled: os.Getenv("STUDIO_VIDEO_ACCOUNT_SUBMISSION") == "true", CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db, Video: true}})

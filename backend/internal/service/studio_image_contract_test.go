@@ -212,10 +212,13 @@ func (r *studioBillingFixture) Apply(_ context.Context, cmd *UsageBillingCommand
 	return &UsageBillingApplyResult{Applied: true}, nil
 }
 
-func studioContractFixture(t *testing.T) (*StudioImageRuntime, StudioImageQuote, *APIKey, *studioAccountFixture, *studioBillingFixture) {
+func studioContractFixture(t *testing.T, origins ...string) (*StudioImageRuntime, StudioImageQuote, *APIKey, *studioAccountFixture, *studioBillingFixture) {
 	t.Helper()
 	ctx := context.Background()
 	a := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, GroupIDs: []int64{3}, Credentials: map[string]any{"api_key": "synthetic-only", "base_url": "https://supplier.example/v1"}, Extra: map[string]any{"quota_limit": 100.0}}
+	if len(origins) != 0 {
+		a.Credentials["base_url"] = origins[0]
+	}
 	ma := &studioMediaFixture{a: mediaworkbench.Account{ID: 7, Platform: "openai", Type: "apikey", Status: "active", Schedulable: true, RuntimeReady: true, BaseURL: a.GetOpenAIBaseURL(), Catalog: &mediaworkbench.Catalog{Models: []string{"gpt-image-2"}, SyncedAt: "2026-10-05T00:00:00Z"}}}
 	service := mediaworkbench.NewService(ma)
 	_, err := service.Initialize(ctx, 7, []string{"image"})

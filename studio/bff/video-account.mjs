@@ -58,6 +58,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
   async function prepare(session,{clientKey,offerId,request,preparationId}) {
     const uid=owner(session);
     const existing=journal.getByClientKey(uid,clientKey);
+    if(legacy?.getByClientKey?.(session,clientKey))fail('Original slot task cannot be requoted');
     let profile=existing?.children[0]?.account.builder_profile;
     if (!existing) {
       const offers=(await catalog(session))?.offers;
@@ -83,7 +84,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
       children:[{bodyBytes:wire.bytes,account:{...q,key_ref:reply.key_ref,plan,...(profile?{builder_profile:profile}:{}),...(preparationId?{preparation_id:preparationId}:{})}}]});
     return view(op);
   }
-  function get(session,id){const op=journal.getForOwner(owner(session),id);if(!op)fail('Operation not found');return op;}
+  function get(session,id){const op=journal.getForOwner(owner(session),id),old=legacy?.get?.(session,id);if(op&&old)fail('Conflicting journal roots');if(!op&&!old)fail('Operation not found');return op||old;}
   function view(op){return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
   function child(session,id){const op=get(session,id);if(op.version!==2)fail('Legacy task requires original recovery');return op.children[0];}
   async function current(session,c){const s=(await call(session,'GET',`tasks/${c.childId}`,undefined,c.account.key_ref)).payload;
@@ -128,6 +129,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     if(['completed','captured','failed'].includes(s.status)){await delivery(session,id).operation.reconcileChild(owner(session),id,0);s.status=s.status==='failed'?'released':'captured';}
     return {...view(get(session,id)),status:s.status};
   }
-  async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};return delivery(session,id).openOriginal(owner(session),id,0,options);}
-  return {catalog,prepare,prepareReferences,getPreparation,dispatch,recover,original,history:session=>journal.listForOwner(owner(session)).items.map(view)};
+  async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};if(options?.index)fail('Invalid child index');return delivery(session,id).openOriginal(owner(session),id,0,options);}
+  function history(session){const current=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];if(old.some(op=>current.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');return [...current,...old].map(view);}
+  return {catalog,prepare,prepareReferences,getPreparation,dispatch,recover,original,history};
 }

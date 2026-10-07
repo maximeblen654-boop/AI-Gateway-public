@@ -77,8 +77,8 @@ func NewStudioImageRuntime(core *OpenAIGatewayService, media mediaworkbench.Repo
 		root = filepath.Join("data", "studio-image-bindings")
 	}
 	r := &StudioImageRuntime{Core: core, Media: media, Store: NewStudioImageStore(root)}
-	// Review-only Phase 3A. No environment variable can enable paid submission.
-	r.enabled = false
+	// Independent server gate; client headers and readiness cannot activate it.
+	r.enabled = os.Getenv("STUDIO_IMAGE_PUBLISHED_SUBMISSION") == "true"
 	r.network = r.dispatchHTTP
 	return r
 }
