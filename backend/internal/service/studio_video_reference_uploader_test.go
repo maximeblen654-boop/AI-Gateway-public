@@ -89,7 +89,13 @@ func TestReferenceUploaderUnknownInitAndLostComplete(t *testing.T) {
 			done := false
 			received := []int{}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				lose := func() { conn, _, e := w.(http.Hijacker).Hijack(); require.NoError(t, e); _ = conn.Close() }
+				lose := func() {
+					hijacker, ok := w.(http.Hijacker)
+					require.True(t, ok, "local HTTP fixture must support response loss")
+					conn, _, e := hijacker.Hijack()
+					require.NoError(t, e)
+					require.NoError(t, conn.Close())
+				}
 				switch {
 				case r.Method == "POST" && r.URL.Path == "/v1/media/uploads":
 					inits++

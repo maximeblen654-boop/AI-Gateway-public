@@ -231,7 +231,7 @@ func (u *HTTPAccountBoundReferenceUploader) do(ctx context.Context, account *Acc
 	if e != nil {
 		return nil, e
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if readErr != nil {
 		return nil, errors.New("supplier response unreadable")

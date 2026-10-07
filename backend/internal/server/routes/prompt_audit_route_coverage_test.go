@@ -54,6 +54,7 @@ func TestEveryGatewayPOSTRouteIsClassifiedForPromptAuditCoverage(t *testing.T) {
 	excluded := map[string]string{
 		"/studio/images/quotes":                 "Published offer/spec quote only; prompt is accepted by the audited task route",
 		"/studio/videos/quotes":                 "Published video offer/spec quote; no generation is executed",
+		"/studio/videos/prepare":                "Authenticated reference upload preparation; accepts specs/assets only, no prompt or model generation",
 		"/studio/videos/tasks":                  "Account-backed task dispatch has its own private binding and moderation gate",
 		"/studio/videos/tasks/:task_id/capture": "Trusted original-result settlement control endpoint; no prompt execution",
 		"/studio/videos/tasks/:task_id/release": "Trusted failed-task settlement control endpoint; no prompt execution",

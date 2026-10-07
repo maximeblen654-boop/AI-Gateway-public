@@ -123,8 +123,12 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			if p.MediaType != descriptor.MediaType || a.Platform != "openai" {
 				add("NEEDS_DEVELOPMENT", "ADAPTER_UNKNOWN", pid, "adapter_bindings", "The Account platform does not own this builder")
 			}
-			if p.MediaType == "image" && !(p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == "openai_json" && p.AdapterConfig.WireProfile == "") && !(p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)) {
-				add("NEEDS_DEVELOPMENT", "VALUE_HARDCODED", pid, "upstream_model", "Core Images currently accepts only its coded image-model families or the configured OpenAI Images JSON family")
+			if p.MediaType == "image" {
+				configuredProfile := p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == "openai_json" && p.AdapterConfig.WireProfile == ""
+				legacyProfile := p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)
+				if !configuredProfile && !legacyProfile {
+					add("NEEDS_DEVELOPMENT", "VALUE_HARDCODED", pid, "upstream_model", "Core Images currently accepts only its coded image-model families or the configured OpenAI Images JSON family")
+				}
 			}
 			if p.MediaType == "image" && (len(p.Capabilities.DurationsSeconds) > 0 || p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0) {
 				add("NEEDS_DEVELOPMENT", "PARAMETER_TYPE_UNSUPPORTED", pid, "capabilities", "This image builder cannot express duration, video or audio references")
