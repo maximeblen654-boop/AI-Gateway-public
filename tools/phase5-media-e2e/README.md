@@ -128,6 +128,7 @@ node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-inline
 node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-references
 node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-failure
 node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-unknown
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-rejection
 node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-unknown
 # After restarting only the bound test Core/BFF, preserving all state:
 node tools/phase5-media-e2e/customer-browser.cjs --recover
@@ -140,3 +141,24 @@ Do not rerun a failed scenario to manufacture a new intent; inspect the saved
 original first. Compare native order/usage/dedup records before and after restart
 as a separate check. Unit tests, a runnable harness and successful image builds
 alone do not establish browser acceptance or once-only billing.
+
+The harness clicks the Studio entry button after navigation or reload and waits
+for the authenticated catalog. Recovery changes media type only when needed and
+waits for the corresponding server history, so it does not test against a stale
+list. `--user-index=1` selects the second already provisioned fixture customer;
+it does not create an identity or bypass login.
+
+Published video dispatch requires the existing `studio_video_orders` ledger
+table as well as the ordinary application migration ledger. A missing legacy
+table is an environment/schema prerequisite failure, not successful generation
+or a missing supplier price. The browser harness never creates or migrates it.
+Preserve any `reserve_pending` task and investigate without resubmission.
+
+When dispatch is independently blocked, a new reference preparation can be
+checked with `--scenario=video-references --quote-only --user-index=1`. This
+uploads only to the local simulator, checks quote binding and ownership, and
+records generation as `NOT_RUN`. Do not use it to replace the full video scenario
+or to retry an existing intent. Recovery reports successful delivery, preserved
+unknown outcomes, quote-only cases and blocked generation separately; a recovery
+PASS means the recorded state remained recoverable, not that every task generated
+a result. Keep any diagnosed prerequisite blocker in the private evidence.
