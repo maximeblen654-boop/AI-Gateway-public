@@ -188,7 +188,8 @@ async function main() {
     const r = await read(origin, '/studio-v2/api/session/exchange', json({ ticket: ticket.body.data.ticket }, headers));
     assert.equal(r.status, 200); assert.match(r.cookie, /^studio_media_session=.+; Path=\/studio-v2;/);
     const replay = await read(origin, '/studio-v2/api/session/exchange', json({ ticket: ticket.body.data.ticket }, headers));
-    assert.equal(replay.status, 403); return r.cookie.split(';')[0];
+    // An already-consumed ticket is unauthenticated (401), not a CSRF failure (403).
+    assert.equal(replay.status, 401); return r.cookie.split(';')[0];
   };
   const exchangeOld = async state => {
     const r = await read(origin, '/studio/api/auth/session', json({ ticket: seedTicket(state.access_token) }, headers));
