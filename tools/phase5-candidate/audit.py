@@ -10,7 +10,7 @@ import tarfile
 APP = 'e49b7e0a04682dcd89637c4825c7f9e514964587'
 SECRET_PATTERNS = (
     rb'GOCSPX-[A-Za-z0-9_-]{20,}', rb'gh[pousr]_[A-Za-z0-9]{30,}',
-    rb'github_pat_[A-Za-z0-9_]{30,}', rb'AKIA[0-9A-Z]{16}',
+    rb'github_pat_[A-Za-z0-9_]{30,}', rb'(?<![A-Za-z0-9_])AKIA[0-9A-Z]{16}(?![A-Za-z0-9_])',
     rb'-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----[\r\n]+[A-Za-z0-9+/=]{40,}',
 )
 
@@ -73,6 +73,7 @@ def main():
             raise ValueError('build_not_complete')
         for image in built['images']:
             component = image['component']
+            report['last_component'] = component
             record = {'component': component, 'image_id': image['docker_image_id'],
                       'layers': 0, 'files_scanned': 0, 'application_files_matched': 0}
             notices = set()
@@ -94,12 +95,14 @@ def main():
                 record['environment_names'] = [item.split('=', 1)[0] for item in env]
                 record['labels'] = labels
                 for descriptor in manifest['layers']:
+                    report['last_layer'] = descriptor['digest']
                     record['layers'] += 1
                     with tarfile.open(fileobj=blob(descriptor['digest']), mode='r|*') as layer:
                         for member in layer:
                             if not member.isfile():
                                 continue
                             name = member.name.removeprefix('./').lstrip('/')
+                            report['last_path_sha256'] = hashlib.sha256(name.encode()).hexdigest()
                             check_path(name)
                             expected = source_path(component, name)
                             digest = hashlib.sha256()

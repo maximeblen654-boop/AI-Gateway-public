@@ -49,6 +49,10 @@ application files against the frozen public checkout, and checks the included
 license notices and FFmpeg's redistribution-sensitive nonfree flag. This is a
 bounded distribution check coupled with the already reviewed public source, not
 a claim that pattern scanning can prove the absence of every possible secret.
+AWS access-ID detection requires complete token boundaries. The pinned official
+Node binary contains matching substrings inside longer string-table entries;
+those are not standalone access IDs. No base layer, file or matched value is
+exempted; standalone synthetic IDs still fail the audit regression.
 Only an image ID that passed both this audit and the existing full smoke can be
 pushed. Test container writable layers, env files and databases are never exported.
 

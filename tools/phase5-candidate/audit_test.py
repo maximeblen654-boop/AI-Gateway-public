@@ -24,6 +24,14 @@ class DistributionAuditTests(unittest.TestCase):
                 audit.check_bytes(value)
         audit.check_bytes(b'GITHUB_TOKEN is passed only to a publishing step, not baked into images')
 
+    def test_aws_ids_require_complete_tokens_not_substrings_of_binary_string_tables(self):
+        value = b'AKIA' + b'A' * 16
+        for surrounding in [value, b'key="' + value + b'"', b'\x00' + value + b'\x00']:
+            with self.assertRaisesRegex(ValueError, '^credential_signature_detected$'):
+                audit.check_bytes(surrounding)
+        for surrounding in [b'PREFIX' + value + b'SUFFIX', value + b'B', b'_' + value]:
+            audit.check_bytes(surrounding)
+
     def test_only_exact_frozen_application_paths_are_accepted(self):
         self.assertEqual(audit.source_path('bff', 'app/studio/bff/image-server.mjs'), 'studio/bff/image-server.mjs')
         self.assertEqual(audit.source_path('core', 'app/resources/config.example.yaml'), 'backend/resources/config.example.yaml')
