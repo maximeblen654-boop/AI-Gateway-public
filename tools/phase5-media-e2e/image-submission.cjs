@@ -34,10 +34,13 @@ async function main() {
     return {request,auth};
   }
   let owner=await session(emails[0]),other=await session(emails[1]);
-  const json=async(r,status=200)=>{assert.equal(r.status,status);return r.json()};
+  const json=async(r,status=200)=>{assert.equal(r.status,status,'HTTP '+http.at(-1)?.path);return r.json()};
   const readiness=await json(await owner.request('image/readiness'));assert.equal(readiness.paid_enabled,true);
   if(process.argv.includes('--recover')) {
     const old=JSON.parse(fs.readFileSync(output,'utf8')),before=stats();
+    assert(old.final,'Incomplete submission evidence cannot pass restart acceptance');
+    assert.deepEqual(old.tasks.map(t=>t.mode),['success','reference','reject','lost','delay']);
+    assert.deepEqual(old.tasks.map(t=>t.status),['completed','completed','unknown','unknown','completed']);
     for(const task of old.tasks) {
       const restored=await json(await owner.request('image/tasks/'+task.id));assert.equal(restored.status,task.status);
       assert.equal((await other.request('image/tasks/'+task.id)).status,409);
@@ -53,6 +56,9 @@ async function main() {
   const offer=catalog.offers.find(o=>o.model==='phase5-native-image-v1');assert(offer,'Normal Published test image offer required');
   const spec={resolution:offer.spec.resolution[0],aspect_ratio:offer.spec.aspect_ratio?.[0]||'',quality:offer.spec.quality?.[0]||'',duration_seconds:0,count:1,images:0,videos:0,audio:0};
   const tasks=[];
+  const report={at:new Date().toISOString(),model:offer.model,revision:offer.published_revision,start,tasks,http};
+  fs.writeFileSync(output,JSON.stringify(report,null,2),{flag:'wx'});
+  const save=()=>fs.writeFileSync(output,JSON.stringify(report,null,2));
   for(const mode of ['success','reference','reject','lost','delay']) {
     const refs=[];
     if(mode==='reference'){
@@ -64,6 +70,8 @@ async function main() {
     const prepared=await json(await owner.request('image/prepare',input));const before=stats();
     if(refs.length)assert.equal((await other.request('image/prepare',input)).status,409);
     assert.equal(before.posts,start.posts+tasks.length,'quote/prepare must not submit');
+    const record={mode,id:prepared.task_id,status:'prepared',input,price:q.sale_price,spec:q.spec};
+    tasks.push(record);save();
     if(mode==='delay'){
       await assert.rejects(owner.request('image/tasks',input,{signal:AbortSignal.timeout(150)}));
       await new Promise(resolve=>setTimeout(resolve,2500));
@@ -79,10 +87,10 @@ async function main() {
     assert.equal((await other.request('image/tasks/'+prepared.task_id)).status,409);
     await json(await owner.request('image/tasks',input));
     assert.equal(stats().posts,before.posts+1,'one supplier POST per intent');
-    tasks.push({mode,id:prepared.task_id,status:expected,input,price:q.sale_price,spec:q.spec});
+    record.status=expected;save();
   }
   const final=stats();assert.equal(final.init,start.init,'images must not start supplier reference uploads');
-  fs.writeFileSync(output,JSON.stringify({at:new Date().toISOString(),model:offer.model,revision:offer.published_revision,start,final,tasks,http},null,2),{flag:'wx'});
+  report.final=final;save();
   console.log(JSON.stringify({submission:'PASS',modes:tasks.map(t=>({mode:t.mode,status:t.status})),supplier_posts:final.posts-start.posts,upload_init_delta:final.init-start.init}));
 }
 main().catch(error=>{console.error(error.message.replace(/[\r\n]+/g,' ').slice(0,250));process.exitCode=1});

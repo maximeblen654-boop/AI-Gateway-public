@@ -8,11 +8,12 @@ https.createServer({key:fs.readFileSync(root+'/simulator-key.pem'),cert:fs.readF
  if(!req.headers.authorization?.startsWith('Bearer '))return reply(401,{error:'auth'});
  let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>2**20)return reply(413,{error:'size'});chunks.push(c)}const body=Buffer.concat(chunks);
  if(req.method==='GET'&&url.pathname==='/v1/models')return reply(200,{object:'list',data:[{id:'phase5-native-image-v1',object:'model',owned_by:'phase5-local-simulator'},{id:'phase5-native-video-v1',object:'model',owned_by:'phase5-local-simulator'},{id:'gpt-image-2',object:'model',owned_by:'phase5-local-simulator'},{id:'特价2.0-需要过人脸技术-可参考过人脸素材库',object:'model',owned_by:'phase5-local-simulator'},{id:'LOCAL TEST ONLY - reference protocol',object:'model',owned_by:'phase5-local-simulator'}]});
- if(req.method==='POST'&&url.pathname==='/v1/images/generations'){
+ if(req.method==='POST'&&['/v1/images/generations','/v1/images/edits'].includes(url.pathname)){
+   state.image_posts=(state.image_posts||0)+1;save();
    const v=JSON.parse(body);
    if(!['phase5-native-image-v1','gpt-image-2'].includes(v.model)||typeof v.prompt!=='string'||v.n!==1||!/^\d+x\d+$/.test(v.size)||v.response_format!==undefined&&v.response_format!=='b64_json'||v.images!==undefined&&(!Array.isArray(v.images)||v.images.some(i=>typeof i.image_url!=='string'||!i.image_url.startsWith('data:image/'))))return reply(422,{error:'image_contract'});
-   state.image_posts=(state.image_posts||0)+1;
-   (state.image_requests||=[]).push({model:v.model,size:v.size,n:v.n,images:v.images?.length||0,request_hash:crypto.createHash('sha256').update(body).digest('hex')});save();
+   if(url.pathname.endsWith('/edits')&&!v.images?.length||url.pathname.endsWith('/generations')&&v.images?.length)return reply(422,{error:'image_endpoint_contract'});
+   (state.image_requests||=[]).push({endpoint:url.pathname,model:v.model,size:v.size,n:v.n,images:v.images?.length||0,request_hash:crypto.createHash('sha256').update(body).digest('hex')});save();
    if(v.prompt.startsWith('READINESS_REJECT '))return reply(422,{error:'synthetic_rejection'});
    if(v.prompt.startsWith('READINESS_LOST ')){req.socket.destroy();return;}
    if(v.prompt.startsWith('READINESS_DELAY '))await new Promise(r=>setTimeout(r,2000));

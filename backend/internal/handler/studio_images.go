@@ -106,12 +106,11 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 		studioError(c, err)
 		return
 	}
-	parsed, err := h.gatewayService.ParseOpenAIImagesRequest(c, plan.MaterializeJSON())
+	parsed, err := h.gatewayService.ParsePublishedImagePlan(plan)
 	if err != nil {
 		studioError(c, err)
 		return
 	}
-	parsed.Endpoint = plan.Path
 	reqLog := requestLogger(c, "handler.studio_images")
 	if !h.ensureResponsesDependencies(c, reqLog) {
 		return

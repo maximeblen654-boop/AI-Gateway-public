@@ -193,11 +193,32 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 		return nil, fmt.Errorf("missing request context")
 	}
 	endpoint := normalizeOpenAIImagesEndpointPath(c.Request.URL.Path)
+	req, err := parseOpenAIImagesRequest(endpoint, strings.TrimSpace(c.GetHeader("Content-Type")), body)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateOpenAIImagesModel(req.Model); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+// Published plans have already passed Account mapping, adapter and capability
+// validation. Their model identity is authoritative; the native endpoint's
+// historical model family list must not become another sales catalog.
+func (s *OpenAIGatewayService) ParsePublishedImagePlan(plan imageplan.Plan) (*OpenAIImagesRequest, error) {
+	if plan.Method != http.MethodPost || plan.Encoding != "application/json" ||
+		(plan.Path != imageplan.Generations && plan.Path != imageplan.Edits) {
+		return nil, fmt.Errorf("invalid compiled image plan")
+	}
+	return parseOpenAIImagesRequest(plan.Path, plan.Encoding, plan.MaterializeJSON())
+}
+
+func parseOpenAIImagesRequest(endpoint, contentType string, body []byte) (*OpenAIImagesRequest, error) {
 	if endpoint == "" {
 		return nil, fmt.Errorf("unsupported images endpoint")
 	}
 
-	contentType := strings.TrimSpace(c.GetHeader("Content-Type"))
 	req := &OpenAIImagesRequest{
 		Endpoint:    endpoint,
 		ContentType: contentType,
@@ -228,9 +249,6 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 
 	applyOpenAIImagesDefaults(req)
-	if err := validateOpenAIImagesModel(req.Model); err != nil {
-		return nil, err
-	}
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
 	req.RequiredCapability = classifyOpenAIImagesCapability(req)
 	return req, nil

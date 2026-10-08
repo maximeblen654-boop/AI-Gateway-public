@@ -48,3 +48,49 @@ For the older optional development browser harnesses, omit `--embedded`. `refere
 `package-boundaries.cjs` checks the public release file list and uses a synthetic Docker context. It requires existing frontend development dependencies and a local Docker builder. It does not build or publish the application image. `create-overlay.mjs` is an optional isolated test-build helper; it does not alter the production source contract.
 
 Configuration, preparation/recovery checks, supplier dispatch, and real customer delivery are separate test scopes. A local fixture passing does not certify a production deployment or a paid provider operation.
+
+## Controlled image submission (local simulator only)
+
+`image-submission.cjs` exercises the real authentication, Bridge, packaged BFF,
+Published quote, private asset and Core dispatch paths against `simulator.mjs`.
+Provision the existing local fixture through normal administration; no fixture
+loader or direct Published writes are used. See `deploy/studio/README.md` for
+the generic runtime artifacts, private state and legacy recovery configuration.
+
+This optional test requires the explicit `STUDIO_IMAGE_PUBLISHED_SUBMISSION=true`
+server setting in all three test components. Keep all actual supplier accounts
+outside this environment. This setting is not the legacy image/video gate and
+is not enabled by the ordinary startup template. Bind BFF to host loopback
+18083, Bridge to 18082, Core to 18080; the BFF public origin is
+`http://127.0.0.1:18083`. Its internal Bridge address must match the actual
+listener, which may differ from the generic overlay's default 8091.
+
+Set `PHASE5_FIXTURE_MANIFEST` to the private fixture manifest and
+`PHASE5_READINESS_EVIDENCE` to a new absolute private JSON filename. Then run:
+
+```sh
+node tools/phase5-media-e2e/image-submission.cjs
+# Restart only the identified test Core and BFF, preserving their state.
+node tools/phase5-media-e2e/image-submission.cjs --recover
+```
+
+The file preserves opaque quote state and must never be committed. Recovery
+acceptance requires all five original scenarios to have finished: text image,
+reference image, supplier rejection, lost supplier response, and a client
+timeout while Core persists the result. Every scenario keeps one original
+intent and supplier POST. Unknown supplier outcomes remain unknown and unbilled;
+they do not authorize another submission. Re-login after BFF restart is expected.
+The report is HTTP acceptance, not browser UI or real supplier evidence.
+
+The packaged Linux permission test uses only temporary synthetic directories:
+
+```sh
+docker run --rm --network none --user 0 --entrypoint node \
+  --mount type=bind,src="$PWD/deploy/studio/runtime-permissions.test.mjs",dst=/app/runtime-permissions.test.mjs,readonly \
+  studio-bff:candidate --test /app/runtime-permissions.test.mjs
+```
+
+Only this fixture setup runs as root. Application children run as UID1000:
+root-owned 0700 state is rejected, an explicit local owner handoff permits
+durable access, and another process can read only its owner's journal. The
+runtime entrypoint never changes production ownership or permissions.
