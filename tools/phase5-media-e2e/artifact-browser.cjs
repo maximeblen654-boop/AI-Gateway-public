@@ -34,7 +34,7 @@ async function main() {
   const listen = p => {
     p.on('response', r => {
       const u = new URL(r.url());
-      if (u.origin === base && (u.pathname.startsWith('/studio/api/') || /\/auth\/(login|studio-ticket)$/.test(u.pathname) || u.pathname.includes('media-workbench'))) report.http.push({ method: r.request().method(), path: u.pathname, status: r.status() });
+      if (u.origin === base && (u.pathname.startsWith('/studio-v2/api/') || /\/auth\/(login|studio-media-ticket)$/.test(u.pathname) || u.pathname.includes('media-workbench'))) report.http.push({ method: r.request().method(), path: u.pathname, status: r.status() });
     });
   };
   async function login(email) {
@@ -84,12 +84,12 @@ async function main() {
     await p.getByTestId('studio-prompt').fill('Synthetic local artifact acceptance ' + randomUUID());
   }
   async function upload(p, file) {
-    const response = p.waitForResponse(r => r.url().endsWith('/studio/api/assets/uploads'));
+    const response = p.waitForResponse(r => r.url().endsWith('/studio-v2/api/assets/uploads'));
     await p.getByTestId('studio-asset-input').setInputFiles(file); const r = await response;
     assert(r.status() === 201, 'asset upload HTTP ' + r.status()); return r.json();
   }
   async function quote(p, kind) {
-    const endpoint = `/studio/api/${kind}/${kind === 'video' ? 'quotes' : 'prepare'}`;
+    const endpoint = `/studio-v2/api/${kind}/${kind === 'video' ? 'quotes' : 'prepare'}`;
     const response = p.waitForResponse(r => new URL(r.url()).pathname === endpoint && r.request().method() === 'POST');
     await p.getByTestId('studio-quote').click(); const r = await response; const body = await r.json();
     assert(r.status() === 200, kind + ' request HTTP ' + r.status() + ' ' + (body.error || ''));
@@ -97,7 +97,7 @@ async function main() {
     return { request: r.request().postDataJSON(), response: body };
   }
   const post = (p, route, body, kind = 'video') => p.evaluate(async ({ route, body, kind }) => {
-    const r = await fetch('/studio/api/' + route, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': kind + '-binding-v1' }, body: JSON.stringify(body) });
+    const r = await fetch('/studio-v2/api/' + route, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': kind + '-binding-v1' }, body: JSON.stringify(body) });
     return { status: r.status, body: await r.json() };
   }, { route, body, kind });
   const videoBinding = id => {

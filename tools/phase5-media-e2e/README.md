@@ -15,6 +15,16 @@ node --import ./tools/phase5-media-e2e/register-contract.mjs --test tools/phase5
 
 ## Optional browser and package checks
 
+The current Published frontend/BFF uses `/studio-v2/api/*` and the independent
+`studio_media_session; Path=/studio-v2` cookie. Its public ticket endpoint is
+`/api/v1/auth/studio-media-ticket`; `dev-proxy.mjs` rewrites only that exact path
+to the new Bridge's `/api/v1/auth/studio-ticket`. Optional
+`PHASE5_LEGACY_BFF_PORT` and `PHASE5_LEGACY_BRIDGE_PORT` route `/studio/*` and
+the old ticket endpoint to independently provisioned legacy services. If absent,
+those legacy routes fail closed; they never fall through to the new BFF/Core.
+Keep old and new state directories separate. The starter disables legacy recovery
+in the new BFF; retained old services remain the sole writers for their tasks.
+
 The browser harnesses exercise a separately provisioned, isolated local Core/Bridge/BFF environment. They are not invoked by ordinary build or CI jobs. Provision new test identities and synthetic media for each environment; never obtain fixtures or credentials from another checkout. Local output directories must remain ignored. The harness setup must validate the intended local service identity before changing test state.
 
 The optional full browser harness currently targets Windows, system Chrome, and the local Docker Desktop `desktop-linux` context. It requires the following independently provisioned test services, using this checkout's source:

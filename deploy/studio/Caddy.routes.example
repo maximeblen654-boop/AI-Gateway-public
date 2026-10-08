@@ -1,0 +1,35 @@
+# Review-only fragment. Insert into the existing site after separately verifying
+# its routes and listener ownership. Values below are deployment placeholders.
+# Preserve the site's TLS, security headers, static rules and ordinary Core route.
+route {
+@media_ticket path /api/v1/auth/studio-media-ticket
+handle @media_ticket {
+  rewrite * /api/v1/auth/studio-ticket
+  reverse_proxy {$NEW_STUDIO_BRIDGE_ORIGIN}
+}
+@legacy_ticket path /api/v1/auth/studio-ticket
+handle @legacy_ticket {
+  reverse_proxy {$LEGACY_STUDIO_BRIDGE_ORIGIN}
+}
+@media_api path /studio-v2/api/*
+handle @media_api {
+  reverse_proxy {$NEW_STUDIO_BFF_ORIGIN}
+}
+@media_unknown path /studio-v2 /studio-v2/*
+handle @media_unknown {
+  respond 404
+}
+@legacy_api path /studio/api/*
+handle @legacy_api {
+  reverse_proxy {$LEGACY_STUDIO_BFF_ORIGIN} {
+    header_up Host {$LEGACY_STUDIO_BFF_HOST}
+  }
+}
+handle_path /studio/* {
+  # Only legacy static paths are stripped. Its own file whitelist/method checks remain.
+  reverse_proxy {$LEGACY_STUDIO_BFF_ORIGIN} {
+    header_up Host {$LEGACY_STUDIO_BFF_HOST}
+  }
+}
+}
+# The ordered route prevents the static prefix rewrite from consuming an API.

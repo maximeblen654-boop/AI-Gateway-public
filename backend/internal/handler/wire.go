@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
@@ -145,6 +147,7 @@ func ProvideOpenAIGatewayHandler(
 	h.studioImage.APIKeys = apiKeyService
 	h.studioVideo = service.NewStudioVideoRuntime(gatewayService, mediaRepository, videoOrders)
 	h.studioVideo.APIKeys = apiKeyService
+	gatewayService.StartImageReceiptWorker(context.Background(), apiKeyService)
 	return h
 }
 

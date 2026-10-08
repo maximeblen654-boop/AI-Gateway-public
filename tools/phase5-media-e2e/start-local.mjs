@@ -86,6 +86,8 @@ async function main() {
     STUDIO_BRIDGE_SERVICE_TOKEN: coreEnv.STUDIO_BRIDGE_SERVICE_TOKEN,
     STUDIO_IMAGE_BFF_PORT: '8093',
     STUDIO_VIDEO_ACCOUNT_SUBMISSION: 'false',
+    STUDIO_IMAGE_PUBLISHED_SUBMISSION: 'false',
+    STUDIO_LEGACY_VIDEO_RECOVERY: 'false',
   };
   if (coreEnv.STUDIO_FFPROBE_PATH) bffEnv.STUDIO_FFPROBE_PATH = coreEnv.STUDIO_FFPROBE_PATH;
   assert(bffEnv.STUDIO_BRIDGE_SERVICE_TOKEN, 'required Bridge service token is not configured');
@@ -107,6 +109,8 @@ async function main() {
     TMP: process.env.TMP,
     SystemRoot: process.env.SystemRoot,
     PHASE5_FRONTEND_MODE: embedded ? 'embedded' : 'development',
+    PHASE5_LEGACY_BFF_PORT: process.env.PHASE5_LEGACY_BFF_PORT,
+    PHASE5_LEGACY_BRIDGE_PORT: process.env.PHASE5_LEGACY_BRIDGE_PORT,
   });
   for (const [port, marker] of [[8093, bffScript], ...(!embedded ? [[3001, viteScript]] : []), [3000, proxyArgs[0]]]) {
     assert(await waitForPort(port), `required local service did not listen on ${port}`);
@@ -115,6 +119,7 @@ async function main() {
     if (port === 8093) assert(commandLine.includes('register-contract.mjs') === syntheticContract, 'existing BFF contract mode differs; restart only that BFF');
     if (port === 3000) assert(commandLine.includes('--embedded') === embedded, 'existing local proxy frontend mode differs; restart only that proxy');
   }
+  await assertJsonHealth('http://127.0.0.1:8093/health', 'BFF', body => body?.api_prefix === '/studio-v2/api' && body?.cookie_name === 'studio_media_session');
   console.log(`phase5 local startup verified: Vue=${embedded ? 'Core embedded' : '3001'} proxy=3000 BFF=8093 Bridge=18082 Core=18080`);
 }
 

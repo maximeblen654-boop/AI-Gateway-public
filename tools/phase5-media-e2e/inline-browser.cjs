@@ -3,7 +3,7 @@ const {execFileSync}=require('node:child_process');const fs=require('node:fs');
 process.chdir(require('node:path').resolve(__dirname,'../..'));
 const events=[];const base='http://127.0.0.1:3000';
 (async()=>{const {env,emails}=await require('./local-identities.cjs')();const browser=await chromium.launch({channel:'chrome',headless:true});const ctx=await browser.newContext();const page=await ctx.newPage();
-page.on('response',r=>{const url=new URL(r.url());if(url.pathname.startsWith('/studio/api/')||url.pathname==='/api/v1/auth/login'||url.pathname==='/api/v1/auth/studio-ticket')events.push({method:r.request().method(),path:url.pathname,status:r.status()})});
+page.on('response',r=>{const url=new URL(r.url());if(url.pathname.startsWith('/studio-v2/api/')||url.pathname==='/api/v1/auth/login'||url.pathname==='/api/v1/auth/studio-media-ticket')events.push({method:r.request().method(),path:url.pathname,status:r.status()})});
 try{
 await page.goto(base+'/login');await page.getByLabel('邮箱').fill(emails[0]);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard');
 await page.goto(base+'/video-studio');await page.getByTestId('studio-media-open').click();await page.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached',timeout:15000});

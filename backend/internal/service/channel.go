@@ -103,6 +103,8 @@ type ChannelModelPricing struct {
 	ImageInputPrice              *float64    `json:"image_input_price"`
 	ImageOutputPrice             *float64    `json:"image_output_price"`
 	PerRequestPrice              *float64    `json:"per_request_price"`
+	// Legacy Group JSON: flat reference-image price, not a token price.
+	ImageReferencePrice *float64 `json:"image_reference_price,omitempty"`
 	// Retain NUMERIC text for strict bound-media accounting; legacy pricing keeps
 	// its float fields. This is loaded only from account-stats pricing rows.
 	AccountStatsPerRequestExact *string             `json:"-"`

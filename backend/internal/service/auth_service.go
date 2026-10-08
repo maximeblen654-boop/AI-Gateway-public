@@ -71,6 +71,7 @@ type JWTClaims struct {
 
 // AuthService 认证服务
 type AuthService struct {
+	studioTickets         *StudioTicketService
 	entClient             *dbent.Client
 	userRepo              UserRepository
 	redeemRepo            RedeemCodeRepository
@@ -86,6 +87,17 @@ type AuthService struct {
 	affiliateService      *AffiliateService
 	defaultSubAssigner    DefaultSubscriptionAssigner
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+}
+
+func (s *AuthService) SetStudioTicketService(tickets *StudioTicketService) {
+	s.studioTickets = tickets
+}
+
+func (s *AuthService) RevokeStudioSession(ctx context.Context, userID int64, sid string) error {
+	if s.studioTickets == nil {
+		return nil
+	}
+	return s.studioTickets.RevokeSession(ctx, userID, sid)
 }
 
 type CaptchaProof struct {
@@ -1506,6 +1518,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 	// 会话绑定检查：指纹变化的旧 token 不允许换发新 token。
 	if s.settingService != nil && s.settingService.IsSessionBindingEnabled(ctx) && claims.BindingHash != "" {
 		if current := sessionBindingHashFromContext(ctx); current != "" && current != claims.BindingHash {
+			_ = s.RevokeStudioSession(ctx, claims.UserID, claims.SessionID)
 			_ = s.RevokeSessionFamily(ctx, claims.SessionID)
 			return "", ErrSessionBindingMismatch
 		}
@@ -1838,6 +1851,7 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 	// data.BindingHash 为空表示功能开启前签发的旧会话，放行并在轮转时补齐绑定。
 	if s.settingService != nil && s.settingService.IsSessionBindingEnabled(ctx) && data.BindingHash != "" {
 		if current := sessionBindingHashFromContext(ctx); current != "" && current != data.BindingHash {
+			_ = s.RevokeStudioSession(ctx, data.UserID, data.FamilyID)
 			_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
 			logger.LegacyPrintf("service.auth", "[Auth] Session binding mismatch on refresh for user %d, family revoked", data.UserID)
 			return nil, ErrSessionBindingMismatch
@@ -1874,6 +1888,19 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, refreshToken strin
 	return s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
 }
 
+// RefreshSessionIdentity resolves a presented refresh token before logout so a
+// Studio ticket can be tied to the revoked session without trusting a user ID.
+func (s *AuthService) RefreshSessionIdentity(ctx context.Context, refreshToken string) (int64, string, error) {
+	if s.refreshTokenCache == nil || !strings.HasPrefix(refreshToken, refreshTokenPrefix) {
+		return 0, "", ErrRefreshTokenInvalid
+	}
+	data, err := s.refreshTokenCache.GetRefreshToken(ctx, hashToken(refreshToken))
+	if err != nil || data == nil || data.UserID <= 0 || data.FamilyID == "" {
+		return 0, "", ErrRefreshTokenInvalid
+	}
+	return data.UserID, data.FamilyID, nil
+}
+
 // RevokeSessionFamily 撤销单个会话家族（该会话的所有 refresh token）。
 // 用于会话绑定失效等单会话级撤销场景，不影响用户的其他设备会话。
 func (s *AuthService) RevokeSessionFamily(ctx context.Context, familyID string) error {
@@ -1902,6 +1929,11 @@ func (s *AuthService) RevokeAllUserSessions(ctx context.Context, userID int64) e
 func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID int64) error {
 	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return fmt.Errorf("get user: %w", err)
+	}
+	if s.studioTickets != nil {
+		if err := s.studioTickets.RevokeUser(ctx, userID); err != nil {
+			return fmt.Errorf("revoke Studio sessions: %w", err)
+		}
 	}
 
 	if err := s.RevokeAllUserSessions(ctx, userID); err != nil {

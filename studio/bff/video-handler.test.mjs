@@ -9,7 +9,7 @@ test('HTTP task dispatch uses authenticated owner, opaque operation and closed d
  let calls=0;
  const sessions={authenticate:async r=>r.headers.cookie==='fixture'?{ownerId:1}:null,sameOrigin:r=>r.headers.origin==='https://studio.example'};
  const tasks={dispatch:async(s,id)=>{assert.equal(s.ownerId,1);calls++;return{operation_id:id,status:'unknown'}}};
- async function server(enabled){const s=http.createServer(createVideoHandler({sessions,tasks,...(enabled?{paidEnabled:true}:{})}));await new Promise(resolve=>s.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>s.close(resolve)));return `http://127.0.0.1:${s.address().port}/studio/api/video/tasks`}
+ async function server(enabled){const s=http.createServer(createVideoHandler({sessions,tasks,...(enabled?{paidEnabled:true}:{})}));await new Promise(resolve=>s.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>s.close(resolve)));return `http://127.0.0.1:${s.address().port}/studio-v2/api/video/tasks`}
  const url=await server(true),closed=await server(false);
  const options={method:'POST',headers:{Cookie:'fixture',Origin:'https://studio.example','X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({operation_id:'op_'+'a'.repeat(64)})};
  assert.equal((await fetch(url,{...options,headers:{}})).status,401);
@@ -30,7 +30,7 @@ test('HTTP quote resolves ordered asset refs server-side and never falls back to
   const server=http.createServer(createVideoHandler({sessions,tasks,resolveAssets}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
-  const url=`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`;
+  const url=`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`;
   const response=await fetch(url,{method:'POST',headers:{Cookie:'fixture',Origin:'https://studio.example','X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'client-1',offer_id:'offer-3',model:'3.0',prompt:'@图片1',duration:5,resolution:'720p',ratio:'16:9',assets:[{kind:'image',asset_ref:'asset_one'}]})});
   assert.equal(response.status,200);assert.equal(seen.session.ownerId,7);assert.equal(seen.input.request.assets.length,1);assert.equal(seen.input.request.assets[0].type,'image');
   const rejected=await fetch(url,{method:'POST',headers:{Cookie:'fixture',Origin:'https://studio.example','X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'client-2',offer_id:'offer-3',model:'3.0',prompt:'text',duration:5,resolution:'720p',ratio:'16:9',assets:[{kind:'image',asset_ref:'asset_one'}]})});
@@ -44,14 +44,14 @@ test('reference preparation failures are explicit and do not call Core quote wit
   const server=http.createServer(createVideoHandler({sessions,tasks,resolveAssets:async()=>{throw new Error('account_bound_reference_upload_unavailable')}}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
-  const response=await fetch(`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`,{method:'POST',headers:{Origin:'https://studio.example','X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'client-3',offer_id:'offer-ref',model:'minimax-h3-1080p',prompt:'reference',duration:5,resolution:'1080p',ratio:'16:9',assets:[{kind:'image',asset_ref:'asset_ref'}]})});
+  const response=await fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`,{method:'POST',headers:{Origin:'https://studio.example','X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'client-3',offer_id:'offer-ref',model:'minimax-h3-1080p',prompt:'reference',duration:5,resolution:'1080p',ratio:'16:9',assets:[{kind:'image',asset_ref:'asset_ref'}]})});
   assert.equal(response.status,422);assert.equal(prepared,0);assert.equal((await response.json()).error,'account_bound_reference_upload_unavailable');
 });
 
 test('omitted assets remains a legal no-material quote', async t => {
  const server=http.createServer(createVideoHandler({sessions:{authenticate:async()=>({ownerId:7}),sameOrigin:()=>true},tasks:{prepare:async(s,input)=>{assert.deepEqual(input.request.assets,[]);return {operation_id:'op_'+'d'.repeat(64)}}}}));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
- const response=await fetch(`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-assets',offer_id:'offer',model:'3.0',prompt:'text',duration:5,resolution:'720p',ratio:'16:9'})});
+ const response=await fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-assets',offer_id:'offer',model:'3.0',prompt:'text',duration:5,resolution:'720p',ratio:'16:9'})});
  assert.equal(response.status,200);
 });
 
@@ -64,7 +64,7 @@ test('reference profiles only require preparation for actual reference assets', 
  const intake={uploadPayload:()=>({kind:'image',mimeType:'image/png',size:1,sha256:'a'.repeat(64),bytes:Buffer.from([1])})};
  const server=http.createServer(createVideoHandler({sessions:{authenticate:async()=>({ownerId:7}),sameOrigin:()=>true},tasks,resolveAssets:createVideoAssetResolver({intake,tasks})}));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
- const quote=async extra=>fetch(`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-reference',offer_id:'offer',model:profile.apiModelId,prompt:'text',duration:5,resolution:'720p',ratio:'16:9',...extra})});
+ const quote=async extra=>fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-reference',offer_id:'offer',model:profile.apiModelId,prompt:'text',duration:5,resolution:'720p',ratio:'16:9',...extra})});
  assert.equal((await quote({})).status,200);
  assert.equal((await quote({assets:[]})).status,200);
  const missing=await quote({assets:[{kind:'image',asset_ref:'asset_one'}]});assert.equal(missing.status,422);assert.equal((await missing.json()).error,'account_video_preparation_missing');

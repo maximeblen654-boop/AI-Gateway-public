@@ -1513,6 +1513,45 @@ func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService
 	return router
 }
 
+func TestLegacyReceiptReadAfterQuotaExhaustionStillAuthenticates(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	user := &service.User{ID: 11, Role: service.RoleUser, Status: service.StatusActive, Balance: 0}
+	group := &service.Group{ID: 8, Platform: service.PlatformOpenAI, Status: service.StatusActive}
+	key := &service.APIKey{ID: 105, UserID: user.ID, Key: "synthetic-receipt-key", Status: service.StatusAPIKeyQuotaExhausted, User: user, Group: group, GroupID: &group.ID, Quota: 1, QuotaUsed: 1}
+	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, presented string) (*service.APIKey, error) {
+		if presented != key.Key {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		copy := *key
+		return &copy, nil
+	}}
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		router.Handle(method, "/v1/images/receipts/:client_key", func(c *gin.Context) {
+			actual, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			require.Equal(t, user.ID, actual.UserID)
+			c.Status(200)
+		})
+	}
+	request := func(method, credential string) int {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(method, "/v1/images/receipts/img_synthetic", nil)
+		r.Header.Set("x-api-key", credential)
+		router.ServeHTTP(w, r)
+		return w.Code
+	}
+	require.Equal(t, 200, request(http.MethodGet, key.Key))
+	require.NotEqual(t, 200, request(http.MethodPost, key.Key))
+	require.NotEqual(t, 200, request(http.MethodGet, "wrong"))
+	key.Status = "inactive"
+	require.NotEqual(t, 200, request(http.MethodGet, key.Key))
+	require.False(t, isAsyncImageTaskRead(http.MethodGet, "/v1/images/receipts-forged/x"))
+}
+
 func requireAPIKeyAuthError(t *testing.T, w *httptest.ResponseRecorder, code, message string) {
 	t.Helper()
 

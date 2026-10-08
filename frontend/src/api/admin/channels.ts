@@ -52,6 +52,7 @@ export interface ChannelModelPricing {
   flex_multiplier?: number | null
   max_reasoning_effort_multiplier?: number | null
   image_input_price: number | null
+  image_reference_price?: number | null
   image_output_price: number | null
   per_request_price: number | null
   intervals: PricingInterval[]

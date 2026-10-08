@@ -79,7 +79,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y ffmpeg
           fi
-          node --test studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
+          node --test studio/bff/plan-a-isolation.test.mjs studio/bff/asset-intake.test.mjs studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
 
   golangci-lint:
     runs-on: ubuntu-latest

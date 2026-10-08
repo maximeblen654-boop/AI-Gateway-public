@@ -8,8 +8,8 @@ services:
     environment:
       STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
     ports:
-      - "127.0.0.1:${STUDIO_BRIDGE_PORT:-8091}:8091"
-      - "127.0.0.1:${STUDIO_BFF_PORT:-4173}:4173"
+      - "127.0.0.1:${STUDIO_BRIDGE_PORT:-8094}:8091"
+      - "127.0.0.1:${STUDIO_BFF_PORT:-4174}:4173"
   studio-bridge:
     image: ${STUDIO_BRIDGE_IMAGE:?Use an immutable verified Bridge image}
     user: "65532:65532"
@@ -18,6 +18,7 @@ services:
     environment:
       STUDIO_IMAGE_CORE_URL: http://127.0.0.1:8080
       STUDIO_BRIDGE_LISTEN_ADDR: 0.0.0.0:8091
+      STUDIO_LEGACY_VIDEO_RECOVERY: "false"
       STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
     read_only: true
     cap_drop: [ALL]
@@ -38,7 +39,7 @@ services:
       STUDIO_ASSET_ROOT: /state/assets
       STUDIO_IMAGE_DATA_ROOT: /state/images
       STUDIO_VIDEO_DATA_ROOT: /state/videos
-      STUDIO_OPERATION_ROOT: /state/legacy-operations
+      STUDIO_LEGACY_VIDEO_RECOVERY: "false"
       STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
     volumes:
       - type: bind
@@ -52,10 +53,6 @@ services:
       - type: bind
         source: ${STUDIO_VIDEO_HOST_ROOT:?Private video root required}
         target: /state/videos
-        bind: {create_host_path: false}
-      - type: bind
-        source: ${STUDIO_LEGACY_HOST_ROOT:?Existing legacy root required}
-        target: /state/legacy-operations
         bind: {create_host_path: false}
     read_only: true
     tmpfs:

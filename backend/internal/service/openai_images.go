@@ -255,7 +255,7 @@ func parseOpenAIImagesRequest(endpoint, contentType string, body []byte) (*OpenA
 }
 
 func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
-	fields := imageplan.JSONFields{Endpoint: req.Endpoint, N: req.N}
+	fields := imageplan.JSONFields{Endpoint: req.Endpoint, N: req.N, LegacyStringReferences: IsDurableImageModel(gjson.GetBytes(body, "model").String()) || isImage2ProModel(gjson.GetBytes(body, "model").String())}
 	if err := imageplan.ParseJSON(body, &fields); err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func applyOpenAIImagesDefaults(req *OpenAIImagesRequest) {
 }
 
 func isOpenAIImageGenerationModel(model string) bool {
-	return imageplan.IsImageModel(model)
+	return imageplan.IsImageModel(model) || IsDurableImageModel(model) || isImage2ProModel(model)
 }
 
 // IsGPTImageGenerationModel identifies the GPT native image-generation model family.

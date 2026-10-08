@@ -22,13 +22,14 @@ async function main() {
   async function session(email) {
     const login=await fetch(core+'/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:env.ADMIN_PASSWORD})});
     assert.equal(login.status,200,'real login');const auth=(await login.json()).data.access_token;
+    // Direct internal Bridge call; the public proxy alone renames this endpoint.
     const ticket=await fetch(bridge+'/api/v1/auth/studio-ticket',{method:'POST',headers:{Authorization:'Bearer '+auth}});
     assert.equal(ticket.status,200,'real ticket');const issued=(await ticket.json()).data;
-    const exchange=await fetch(base+'/studio/api/session/exchange',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','X-Studio-Request':'session-exchange-v1'},body:JSON.stringify({ticket:issued.ticket})});
+    const exchange=await fetch(base+'/studio-v2/api/session/exchange',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','X-Studio-Request':'session-exchange-v1'},body:JSON.stringify({ticket:issued.ticket})});
     assert.equal(exchange.status,200,'real session');const cookie=exchange.headers.get('set-cookie').split(';')[0];
     const request=async (route,body,options={})=>{
       const {headers,...rest}=options;
-      const response=await fetch(base+'/studio/api/'+route,{method:body===undefined?'GET':'POST',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','X-Studio-Request':'image-binding-v1',...headers},...(body===undefined?{}:{body:Buffer.isBuffer(body)?body:JSON.stringify(body)}),...rest});
+      const response=await fetch(base+'/studio-v2/api/'+route,{method:body===undefined?'GET':'POST',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','X-Studio-Request':'image-binding-v1',...headers},...(body===undefined?{}:{body:Buffer.isBuffer(body)?body:JSON.stringify(body)}),...rest});
       http.push({path:route,status:response.status});return response;
     };
     return {request,auth};

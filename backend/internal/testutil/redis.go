@@ -19,3 +19,12 @@ func NewRedisGatewayCache(t *testing.T) service.GatewayCache {
 
 	return repository.NewGatewayCache(redisClient)
 }
+
+// NewStudioTicketStore uses the production adapter with an isolated Redis.
+func NewStudioTicketStore(t *testing.T) (service.StudioTicketStore, *redis.Client) {
+	t.Helper()
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	return repository.NewStudioTicketStore(client), client
+}

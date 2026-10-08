@@ -19,6 +19,7 @@ import (
 
 // AuthHandler handles authentication-related requests
 type AuthHandler struct {
+	studioTickets        *service.StudioTicketService
 	cfg                  *config.Config
 	authService          *service.AuthService
 	userService          *service.UserService
@@ -725,6 +726,28 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	var req LogoutRequest
 	// 允许空请求体（向后兼容）
 	_ = c.ShouldBindJSON(&req)
+	// Mark the authenticated session revoked before deleting its refresh token.
+	// The access JWT alone remains cryptographically valid until expiry.
+	if h.studioTickets != nil {
+		var uid int64
+		var sid string
+		if req.RefreshToken != "" {
+			uid, sid, _ = h.authService.RefreshSessionIdentity(c.Request.Context(), req.RefreshToken)
+		}
+		if uid == 0 {
+			if header := strings.TrimSpace(c.GetHeader("Authorization")); strings.HasPrefix(strings.ToLower(header), "bearer ") {
+				if claims, err := h.authService.ValidateToken(strings.TrimSpace(header[7:])); err == nil {
+					uid, sid = claims.UserID, claims.SessionID
+				}
+			}
+		}
+		if uid > 0 && sid != "" {
+			if err := h.studioTickets.RevokeSession(c.Request.Context(), uid, sid); err != nil {
+				response.InternalError(c, "Failed to revoke Studio session")
+				return
+			}
+		}
+	}
 
 	// 如果提供了Refresh Token，撤销它
 	if req.RefreshToken != "" {

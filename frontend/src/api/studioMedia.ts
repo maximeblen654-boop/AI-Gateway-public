@@ -59,13 +59,13 @@ export function ensureStudioSession(): Promise<{ owner_id: number }> {
     sameWebsiteSession(token)
     const { data: user } = await apiClient.get<{ id: number }>('/auth/me')
     sameWebsiteSession(token)
-    const existing = await fetch(buildGatewayUrl('/studio/api/session'), { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) })
+    const existing = await fetch(buildGatewayUrl('/studio-v2/api/session'), { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) })
     sameWebsiteSession(token)
     if (existing.ok) { const session = record(await existing.json()); sameWebsiteSession(token); if (session.owner_id === user.id) return { owner_id: user.id } }
-    const issued = await apiClient.post<{ ticket: string }>('/auth/studio-ticket')
+    const issued = await apiClient.post<{ ticket: string }>('/auth/studio-media-ticket')
     sameWebsiteSession(token)
     if (!issued.data.ticket) throw new StudioError('studio_ticket_unavailable')
-    const result = record(await json('/studio/api/session/exchange', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': 'session-exchange-v1' }, body: JSON.stringify({ ticket: issued.data.ticket }) }))
+    const result = record(await json('/studio-v2/api/session/exchange', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': 'session-exchange-v1' }, body: JSON.stringify({ ticket: issued.data.ticket }) }))
     sameWebsiteSession(token)
     if (result.owner_id !== user.id) throw new StudioError('studio_session_mismatch')
     return { owner_id: user.id }
@@ -77,7 +77,7 @@ export async function studioRequest<T = unknown>(kind: StudioKind, operation: st
   const token = localStorage.getItem('auth_token')
   await ensureStudioSession()
   sameWebsiteSession(token)
-  const result = await json(`/studio/api/${kind}/${operation}`, body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': `${kind}-binding-v1` }, body: JSON.stringify(body) })
+  const result = await json(`/studio-v2/api/${kind}/${operation}`, body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Studio-Request': `${kind}-binding-v1` }, body: JSON.stringify(body) })
   sameWebsiteSession(token)
   return result as T
 }
@@ -101,7 +101,7 @@ export async function studioGenerate(task: StudioTask): Promise<StudioTask> {
 }
 export function studioResultUrl(task: StudioTask, index = 0): string {
   if (task.status !== 'completed' || !Number.isInteger(index) || index < 0 || index >= task.resultCount) throw new StudioError('result_unavailable')
-  return buildGatewayUrl(`/studio/api/${task.kind}/${task.kind === 'image' ? `tasks/${task.id}/results/${index}` : `operations/${task.id}/original`}`)
+  return buildGatewayUrl(`/studio-v2/api/${task.kind}/${task.kind === 'image' ? `tasks/${task.id}/results/${index}` : `operations/${task.id}/original`}`)
 }
 export function studioErrorMessage(error: unknown): string {
   if (error instanceof Error && ['invalid_local_asset','file_changed','asset_upload_failed','invalid_asset_receipt'].includes(error.message)) return '素材上传或校验未通过，请检查类型、大小和数量。'

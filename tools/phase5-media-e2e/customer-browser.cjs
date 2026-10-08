@@ -30,7 +30,7 @@ async function main() {
   const browser = await chromium.launch({channel:'chrome',headless:true});
   const contexts=[];
   async function openStudio(page) {
-    const catalog=page.waitForResponse(r=>/\/studio\/api\/(image|video)\/catalog$/.test(r.url())&&r.status()===200);
+    const catalog=page.waitForResponse(r=>/\/studio-v2\/api\/(image|video)\/catalog$/.test(r.url())&&r.status()===200);
     await page.getByTestId('studio-media-open').click();
     await catalog;
     await expect(page.getByTestId('studio-kind')).toBeEnabled();
@@ -38,7 +38,7 @@ async function main() {
   async function login(email) {
     const context=await browser.newContext({locale:'zh-CN'});contexts.push(context);
     const page=await context.newPage();page.setDefaultTimeout(30000);
-    page.on('response',r=>{const u=new URL(r.url());if(u.origin===base && (u.pathname.startsWith('/studio/api/') || /\/auth\/(login|studio-ticket)$/.test(u.pathname)))report.http.push({method:r.request().method(),path:u.pathname,status:r.status()})});
+    page.on('response',r=>{const u=new URL(r.url());if(u.origin===base && (u.pathname.startsWith('/studio-v2/api/') || /\/auth\/(login|studio-media-ticket)$/.test(u.pathname)))report.http.push({method:r.request().method(),path:u.pathname,status:r.status()})});
     // Optional product tours only. No identity injection or API success mocks.
     await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');for(const k of ['admin_guide_1_admin_v4_interactive','user_guide_2_user_v4_interactive','user_guide_3_user_v4_interactive'])localStorage.setItem(k,'true')});
     await page.goto(base+'/login');await page.getByLabel('邮箱').fill(email);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);
@@ -47,14 +47,14 @@ async function main() {
     return page;
   }
   const api = (page,kind,route,body) => page.evaluate(async({kind,route,body})=>{
-    const r=await fetch(`/studio/api/${kind}/${route}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Studio-Request':`${kind}-binding-v1`},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    const r=await fetch(`/studio-v2/api/${kind}/${route}`,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Studio-Request':`${kind}-binding-v1`},...(body===undefined?{}:{body:JSON.stringify(body)})});
     return {status:r.status,body:await r.json().catch(()=>null)};
   },{kind,route,body});
   const taskPath = c => (c.kind==='image'?'tasks/':'operations/')+c.id;
   async function selectTask(page,c) {
     const kind=page.getByTestId('studio-kind');await expect(kind).toBeEnabled();
     if(await kind.inputValue()!==c.kind){
-      const history=page.waitForResponse(r=>r.url().endsWith(`/studio/api/${c.kind}/${c.kind==='image'?'tasks':'operations'}`)&&r.status()===200);
+      const history=page.waitForResponse(r=>r.url().endsWith(`/studio-v2/api/${c.kind}/${c.kind==='image'?'tasks':'operations'}`)&&r.status()===200);
       await kind.selectOption(c.kind);await history;await expect(kind).toBeEnabled();
     }
     const button=page.locator(`[data-task-id="${c.id}"]`);
@@ -122,7 +122,7 @@ async function main() {
     const catalog=await api(page,kind,'catalog');assert.equal(catalog.status,200);const offer=catalog.body.offers.find(o=>o.model===model);assert(offer,'Normally Published test offer is required');
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id);
     const before=stats(),refs=[];
-    const upload=async file=>{const response=page.waitForResponse(r=>r.url().endsWith('/studio/api/assets/uploads')&&r.request().method()==='POST');await page.getByTestId('studio-asset-input').setInputFiles(file);const r=await response;assert.equal(r.status(),201);refs.push(await r.json());await expect(page.getByTestId('studio-kind')).toBeEnabled()};
+    const upload=async file=>{const response=page.waitForResponse(r=>r.url().endsWith('/studio-v2/api/assets/uploads')&&r.request().method()==='POST');await page.getByTestId('studio-asset-input').setInputFiles(file);const r=await response;assert.equal(r.status(),201);refs.push(await r.json());await expect(page.getByTestId('studio-kind')).toBeEnabled()};
     if(scenario==='image-reference'||scenario==='video-inline'||scenario==='video-references')await upload(png);
     if(scenario==='video-references'){
       await upload({name:'synthetic.mp4',mimeType:'video/mp4',buffer:docker('exec','phase5-sim-core','cat','/fixture/synthetic-original.mp4')});
@@ -132,7 +132,7 @@ async function main() {
     await page.getByTestId('studio-prompt').fill(`READINESS_${mode} browser ${randomUUID()}`);
     const c={name:scenario,kind,model,user_index:userIndex,before,expected:mode==='LOST'||(mode==='REJECT'&&kind==='image')?'unknown':mode==='REJECT'?'released':'completed',refs:refs.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),published_revision:offer.published_revision,...(quoteOnly?{generation_status:'NOT_RUN'}:{})};
     report.cases.push(c);save();
-    const prepared=page.waitForResponse(r=>r.url().endsWith(`/studio/api/${kind}/${kind==='image'?'prepare':'quotes'}`)&&r.request().method()==='POST');
+    const prepared=page.waitForResponse(r=>r.url().endsWith(`/studio-v2/api/${kind}/${kind==='image'?'prepare':'quotes'}`)&&r.request().method()==='POST');
     await page.getByTestId('studio-quote').click();const response=await prepared;assert.equal(response.status(),200);const view=await response.json();c.id=view.task_id||view.operation_id;c.price=view.sale_price;c.spec=view.spec;
     if(quoteOnly)c.quote_pass=true;
     if(kind==='video'){c.quote_request=response.request().postDataJSON();c.child_id=view.children[0].task_id}save();
@@ -158,7 +158,7 @@ async function main() {
     }
     // Reload a quote and confirm the stored server identity, without original inputs.
     await page.reload();await openStudio(page);await expect(page.getByTestId('studio-task-id')).toContainText(c.id);await expect(page.getByTestId('studio-generate')).toBeEnabled();
-    if(scenario==='image-response-loss')await page.route('**/studio/api/image/tasks',async route=>{if(route.request().method()!=='POST')return route.continue();await route.fetch();await route.abort('connectionreset');},{times:1});
+    if(scenario==='image-response-loss')await page.route('**/studio-v2/api/image/tasks',async route=>{if(route.request().method()!=='POST')return route.continue();await route.fetch();await route.abort('connectionreset');},{times:1});
     await page.getByTestId('studio-generate').evaluate(button=>{button.click();button.click()});
     if(c.expected==='completed')await result(page,c);
     else {await expect(page.getByTestId('studio-status')).toContainText(c.expected==='unknown'?'结果待确认':'费用已释放',{timeout:60000});await expect(page.getByTestId('studio-generate')).toHaveCount(0)}

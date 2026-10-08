@@ -42,7 +42,7 @@ test('asset upload route performs real HTTP intake with session ownership and re
   const server=(await import('node:http')).createServer(createImageHandler({sessions,tasks,assetIntake:intake}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
-  const url=`http://127.0.0.1:${server.address().port}/studio/api/assets/uploads`;
+  const url=`http://127.0.0.1:${server.address().port}/studio-v2/api/assets/uploads`;
   const sha256=createHash('sha256').update(png).digest('hex');
   const headers={Cookie:'u7',Origin:'https://studio.example','X-Studio-Request':'asset-intake-v1','X-Studio-Asset-Kind':'image','X-Content-SHA256':sha256,'Content-Type':'image/png'};
   const response=await fetch(url,{method:'POST',headers,body:png});
@@ -59,7 +59,7 @@ test('image prepare accepts only private refs and never dispatches', async t=>{
  const http=await import('node:http');let prepares=0;
  const server=http.createServer(createImageHandler({sessions:{authenticate:async()=>({ownerId:7}),sameOrigin:()=>true},tasks:{prepare:(s,input)=>{prepares++;assert.deepEqual(input.asset_refs,[]);return {task:{task_id:'local'}}},view:t=>t,dispatch:()=>assert.fail('must not dispatch')}}));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
- const post=body=>fetch(`http://127.0.0.1:${server.address().port}/studio/api/image/prepare`,{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'image-binding-v1'},body:JSON.stringify(body)});
+ const post=body=>fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/image/prepare`,{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'image-binding-v1'},body:JSON.stringify(body)});
  assert.equal((await post({references:['https://untrusted.invalid/reference']})).status,409);assert.equal(prepares,0);
  assert.equal((await post({asset_refs:[]})).status,200);assert.equal(prepares,1);
 });

@@ -127,7 +127,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return recover(session,task.task_id);
   }
-  function view(task) {return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results,
+  function view(task) {return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
     offer_id:task.quote.offer_id,sale_price:task.quote.sale_price,spec:task.quote.spec,expires_at:task.quote.expires_at};}
   function history(session) {
     const id=owner(session),items=[];

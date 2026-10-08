@@ -49,7 +49,7 @@ function createCoreStudioClient({ baseUrl, serviceToken, fetchImpl = fetch }) {
   };
 }
 
-function createStudioSessionBridge({ core, secureCookies = false, publicOrigin, now = () => Date.now() }) {
+function createStudioSessionBridge({ core, secureCookies = false, publicOrigin, cookieName = 'studio_session', cookiePath = '/studio', now = () => Date.now() }) {
   if (typeof core?.consume !== 'function' || typeof core?.verify !== 'function') throw new Error('Studio core client required');
   if (publicOrigin !== undefined) {
     const parsed = new URL(publicOrigin);
@@ -58,15 +58,16 @@ function createStudioSessionBridge({ core, secureCookies = false, publicOrigin, 
     }
     if (parsed.protocol === 'https:' && !secureCookies) throw new Error('HTTPS Studio requires secure cookies');
   }
+  if (!((cookieName === 'studio_session' && cookiePath === '/studio') || (cookieName === 'studio_media_session' && cookiePath === '/studio-v2'))) throw new Error('Invalid Studio cookie scope');
   const sessions = new Map();
   function cookie(request) {
-    const matches = (request.headers.cookie || '').split(';').map(part => part.trim()).filter(part => part.startsWith('studio_session='));
+    const matches = (request.headers.cookie || '').split(';').map(part => part.trim()).filter(part => part.startsWith(`${cookieName}=`));
     if (matches.length !== 1) return null;
-    const value = matches[0].slice('studio_session='.length);
+    const value = matches[0].slice(cookieName.length + 1);
     return SESSION_PATTERN.test(value) ? value : null;
   }
   function header(value, maxAge) {
-    return `studio_session=${value}; Path=/studio; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secureCookies ? '; Secure' : ''}`;
+    return `${cookieName}=${value}; Path=${cookiePath}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secureCookies ? '; Secure' : ''}`;
   }
   function sameOrigin(request) {
     const origin = request.headers.origin;

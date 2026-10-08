@@ -261,6 +261,16 @@
             />
           </div>
         </div>
+        <template v-if="enableReferencePrice && (entry.billing_mode === 'image' || entry.billing_mode === 'per_request')">
+          <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
+            {{ t('admin.channels.form.imageReferencePrice') }} <span class="font-normal">$</span>
+          </label>
+          <div class="mt-1 w-48">
+            <input :value="entry.image_reference_price" :aria-label="t('admin.channels.form.imageReferencePrice')"
+              @input="emitField('image_reference_price', ($event.target as HTMLInputElement).value)"
+              type="number" step="any" min="0" class="input text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -287,6 +297,7 @@ const props = withDefaults(defineProps<{
   hideTokenIntervals?: boolean
   enableTimePricing?: boolean
   enableTierMultipliers?: boolean
+  enableReferencePrice?: boolean
 }>(), {
   hideTokenIntervals: false,
   enableTimePricing: false,

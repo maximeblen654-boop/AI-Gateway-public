@@ -78,6 +78,7 @@ func enforceSessionBinding(
 	}
 
 	if authService != nil {
+		_ = authService.RevokeStudioSession(c.Request.Context(), claims.UserID, claims.SessionID)
 		_ = authService.RevokeSessionFamily(c.Request.Context(), claims.SessionID)
 	}
 	if auditService != nil {

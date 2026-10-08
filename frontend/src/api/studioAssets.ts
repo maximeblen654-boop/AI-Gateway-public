@@ -1,3 +1,5 @@
+import { buildGatewayUrl } from './client'
+
 export interface StudioAssetReceipt {
   asset_ref: string
   kind: 'image' | 'video' | 'audio'
@@ -21,7 +23,7 @@ export async function uploadStudioAsset(file: File, kind: StudioAssetReceipt['ki
   const bytes = await file.arrayBuffer()
   if (bytes.byteLength !== file.size) throw new Error('file_changed')
   const sha256 = await sha256Hex(bytes)
-  const response = await fetch('/studio/api/assets/uploads', {
+  const response = await fetch(buildGatewayUrl('/studio-v2/api/assets/uploads'), {
     method: 'POST', credentials: 'same-origin', cache: 'no-store', signal,
     headers: { 'Content-Type': file.type, 'X-Studio-Request': 'asset-intake-v1', 'X-Studio-Asset-Kind': kind, 'X-Content-SHA256': sha256 },
     body: bytes,

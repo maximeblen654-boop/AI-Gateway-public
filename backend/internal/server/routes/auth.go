@@ -5,6 +5,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/repository"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -259,4 +260,9 @@ func RegisterAuthRoutes(
 		authenticated.POST("/auth/revoke-all-sessions", h.Auth.RevokeAllSessions)
 		authenticated.POST("/auth/oauth/bind-token", h.Auth.PrepareOAuthBindAccessTokenCookie)
 	}
+
+	// Legacy BFF consumes only legacy-purpose tickets issued by its Bridge.
+	h.Auth.EnableStudioTickets(repository.NewStudioTicketStore(redisClient))
+	v1.POST("/internal/studio/tickets/consume", h.Auth.ConsumeStudioTicket)
+	v1.POST("/internal/studio/sessions/verify", h.Auth.VerifyStudioSession)
 }

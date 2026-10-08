@@ -20,27 +20,28 @@ func IsImageModel(model string) bool {
 }
 
 type JSONFields struct {
-	Endpoint          string
-	Model             string
-	ExplicitModel     bool
-	Prompt            string
-	Stream            bool
-	N                 int
-	Size              string
-	ExplicitSize      bool
-	ResponseFormat    string
-	Quality           string
-	Background        string
-	OutputFormat      string
-	Moderation        string
-	InputFidelity     string
-	Style             string
-	HasMask           bool
-	HasNativeOptions  bool
-	OutputCompression *int
-	PartialImages     *int
-	InputImageURLs    []string
-	MaskImageURL      string
+	LegacyStringReferences bool
+	Endpoint               string
+	Model                  string
+	ExplicitModel          bool
+	Prompt                 string
+	Stream                 bool
+	N                      int
+	Size                   string
+	ExplicitSize           bool
+	ResponseFormat         string
+	Quality                string
+	Background             string
+	OutputFormat           string
+	Moderation             string
+	InputFidelity          string
+	Style                  string
+	HasMask                bool
+	HasNativeOptions       bool
+	OutputCompression      *int
+	PartialImages          *int
+	InputImageURLs         []string
+	MaskImageURL           string
 }
 
 func (r *JSONFields) IsEdits() bool { return r.Endpoint == Edits }
@@ -158,6 +159,13 @@ func ParseJSON(body []byte, req *JSONFields) error {
 				return fmt.Errorf("invalid images field type")
 			}
 			for _, item := range images.Array() {
+				if req.LegacyStringReferences && item.Type == gjson.String {
+					if !strings.HasPrefix(item.String(), "data:image/") {
+						return fmt.Errorf("reference must be a data URL")
+					}
+					req.InputImageURLs = append(req.InputImageURLs, item.String())
+					continue
+				}
 				if imageURL := strings.TrimSpace(item.Get("image_url").String()); imageURL != "" {
 					req.InputImageURLs = append(req.InputImageURLs, imageURL)
 					continue

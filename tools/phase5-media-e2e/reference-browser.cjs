@@ -3,12 +3,12 @@ const {execFileSync}=require('node:child_process');const fs=require('node:fs');
 process.chdir(require('node:path').resolve(__dirname,'../..'));
 const events=[];const base='http://127.0.0.1:3000';
 (async()=>{const {env,emails}=await require('./local-identities.cjs')();const browser=await chromium.launch({channel:'chrome',headless:true});const ctx=await browser.newContext();const page=await ctx.newPage();
-page.on('response',r=>{const url=new URL(r.url());if(url.pathname.startsWith('/studio/api/')||url.pathname==='/api/v1/auth/login'||url.pathname==='/api/v1/auth/studio-ticket')events.push({method:r.request().method(),path:url.pathname,status:r.status()})});
+page.on('response',r=>{const url=new URL(r.url());if(url.pathname.startsWith('/studio-v2/api/')||url.pathname==='/api/v1/auth/login'||url.pathname==='/api/v1/auth/studio-media-ticket')events.push({method:r.request().method(),path:url.pathname,status:r.status()})});
 try{
 await page.goto(base+'/login');await page.getByLabel('邮箱').fill(emails[0]);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard');
 await page.goto(base+'/video-studio');await page.getByTestId('studio-media-open').click();await page.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached',timeout:15000});
 await page.getByTestId('studio-offer-select').selectOption({label:'LOCAL TEST ONLY - reference protocol'});
-const before=await (await fetch('http://127.0.0.1:19091')).json();let quoteBody;page.on('request',r=>{if(new URL(r.url()).pathname==='/studio/api/video/quotes')quoteBody=r.postDataJSON()});
+const before=await (await fetch('http://127.0.0.1:19091')).json();let quoteBody;page.on('request',r=>{if(new URL(r.url()).pathname==='/studio-v2/api/video/quotes')quoteBody=r.postDataJSON()});
 await page.getByTestId('studio-prompt').fill('Synthetic local media test');
 await page.getByTestId('studio-asset-input').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64')});
 await page.getByTestId('studio-status').filter({hasText:'素材已保存'}).waitFor();
@@ -25,7 +25,7 @@ require('./fixture-config.cjs').stopOwnedBff();
 execFileSync(process.execPath,['tools/phase5-media-e2e/start-local.mjs','--synthetic-contract'],{cwd:process.cwd(),windowsHide:true,stdio:'pipe'});
 await page.waitForTimeout(1500);
 await page.getByTestId('studio-quote').click();await page.waitForTimeout(900);if(await page.getByTestId('studio-status').innerText()!==firstStatus)throw Error('restart identity');
-const post=async(p,body)=>p.evaluate(async body=>{const r=await fetch('/studio/api/video/quotes',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'video-binding-v1'},body:JSON.stringify(body)});return {status:r.status,value:await r.json()}},body);
+const post=async(p,body)=>p.evaluate(async body=>{const r=await fetch('/studio-v2/api/video/quotes',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'video-binding-v1'},body:JSON.stringify(body)});return {status:r.status,value:await r.json()}},body);
 execFileSync('docker',['--context','desktop-linux','restart','sub2api-dev'],{windowsHide:true,stdio:'pipe'});
 for(let i=0;i<30;i++){try{if((await fetch('http://127.0.0.1:18080/health')).ok)break}catch{}await new Promise(r=>setTimeout(r,500))}
 const restored=await post(page,{...originalQuote,client_key:'restart-'+require('crypto').randomUUID()});if(restored.status!==200||!restored.value.operation_id)throw Error('durable preparation quote '+restored.status);

@@ -110,22 +110,34 @@ test('session/CSRF and HTTP paid gate remain hard off with environment flags',as
   const server=http.createServer(createImageHandler({sessions,tasks:f.tasks}));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
   process.env.STUDIO_IMAGE_PUBLISHED_SUBMISSION='true';t.after(()=>delete process.env.STUDIO_IMAGE_PUBLISHED_SUBMISSION);
   const base=`http://127.0.0.1:${server.address().port}`;
-  const reply=await fetch(base+'/studio/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(f.input)});
+  const reply=await fetch(base+'/studio-v2/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(f.input)});
   assert.equal(reply.status,503);assert.equal(f.stats().posts,0);assert.equal(IMAGE_PAID_ENABLED,false);
-  assert.equal((await fetch(base+'/studio/api/image/quotes',{method:'POST',body:'{}'})).status,403);
+  assert.equal((await fetch(base+'/studio-v2/api/image/quotes',{method:'POST',body:'{}'})).status,403);
 });
 test('explicit server permission dispatches an owner-resolved prepared request once',async t=>{
   const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
-  const sessions={authenticate:async()=>owner,sameOrigin:()=>true};
+  let currentOwner=owner;
+  const sessions={authenticate:async()=>currentOwner,sameOrigin:()=>true};
   const server=http.createServer(createImageHandler({sessions,tasks:f.tasks,paidEnabled:true}));
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
   const base=`http://127.0.0.1:${server.address().port}`;
   const input={...f.input,asset_refs:[]};delete input.references;
-  const post=body=>fetch(base+'/studio/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(body)});
+  const post=body=>fetch(base+'/studio-v2/api/image/tasks',{method:'POST',headers:{'X-Studio-Request':'image-binding-v1'},body:JSON.stringify(body)});
   // An empty ordered private-asset list requires no resolver; browser URLs are forbidden.
-  const first=await post(input);assert.equal(first.status,200);assert.equal((await first.json()).status,'completed');
+  const first=await post(input);assert.equal(first.status,200);const task=await first.json();assert.equal(task.status,'completed');
   assert.equal((await post(input)).status,200);assert.equal(f.stats().posts,1);
   assert.equal((await post({...input,references:[]})).status,409);assert.equal(f.stats().posts,1);
+  const resultPath=`/studio-v2/api/image/tasks/${task.task_id}/results/0`;
+  assert.equal(task.results[0].url,resultPath);
+  const stored=f.results.metadata(1,task.task_id,0);
+  const download=await fetch(base+resultPath);assert.equal(download.status,200);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()),Buffer.from(png,'base64'));
+  assert.equal((await fetch(base+resultPath.replace('/studio-v2/','/studio/'))).status,404);
+  currentOwner={ownerId:2};assert.equal((await fetch(base+resultPath)).status,409);
+  const restarted=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),call:f.call,results:f.results});
+  assert.equal((await restarted.recover(owner,task.task_id)).results[0].url,resultPath);
+  assert.deepEqual(f.results.metadata(1,task.task_id,0),stored,'new URL projection does not rewrite old metadata/hash');
+  assert.equal(f.stats().posts,1);
 });
 test('session exchange keeps proof server-side and rejects cross-origin/revoked identity',async()=>{
   const proof='p'.repeat(43);let revoked=false;

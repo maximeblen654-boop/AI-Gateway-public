@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -756,6 +757,9 @@ func checkBillingModeRequirements(p ChannelModelPricing) error {
 }
 
 func checkPricesNotNegative(p ChannelModelPricing) error {
+	if p.ImageReferencePrice != nil && (math.IsNaN(*p.ImageReferencePrice) || math.IsInf(*p.ImageReferencePrice, 0)) {
+		return infraerrors.BadRequest("INVALID_PRICE", "image_reference_price must be finite")
+	}
 	checks := []struct {
 		field string
 		val   *float64
@@ -768,6 +772,7 @@ func checkPricesNotNegative(p ChannelModelPricing) error {
 		{"image_input_price", p.ImageInputPrice},
 		{"image_output_price", p.ImageOutputPrice},
 		{"per_request_price", p.PerRequestPrice},
+		{"image_reference_price", p.ImageReferencePrice},
 	}
 	for _, c := range checks {
 		if c.val != nil && *c.val < 0 {

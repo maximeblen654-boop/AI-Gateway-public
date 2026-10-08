@@ -340,6 +340,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
+	if MeteredAccountTestsDisabled(account) {
+		return s.sendErrorAndEnd(c, "Metered image account tests disabled; use read-only model discovery")
+	}
 
 	// Synthetic UI load-test accounts exercise the real SSE parsing and modal
 	// interactions, but intentionally do not send their placeholder credentials

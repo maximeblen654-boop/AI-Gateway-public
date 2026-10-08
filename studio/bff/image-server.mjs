@@ -9,7 +9,7 @@ import { createImageResultStore } from './image-result-store.mjs';
 import { createPublishedImageClient, createImageTaskRuntime, IMAGE_BINDING_CONTRACT, IMAGE_PAID_ENABLED } from './image-binding.mjs';
 import { createAssetIntake, assetIntakeContract } from './asset-intake.mjs';
 import { createVideoAssetResolver } from './video-assets.mjs';
-import {legacyRecoveryFromEnvironment} from './video-legacy-recovery.mjs';
+import fs from 'node:fs';
 const {createCoreStudioClient,createStudioSessionBridge}=createRequire(import.meta.url)('./studio-session.js');
 
 async function jsonBody(request) {
@@ -23,8 +23,9 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
     try {
       const url=new URL(req.url,'http://localhost');
       if(url.search) {reply(400,{error:'invalid_image_path'});return;}
-      if(req.method==='GET'&&url.pathname==='/health'){reply(200,{service:'studio-bff',contract:IMAGE_BINDING_CONTRACT,node:process.versions.node});return;}
-      if(req.method==='POST' && url.pathname==='/studio/api/session/exchange') {
+      if(req.method==='GET'&&url.pathname==='/health'){reply(200,{service:'studio-bff',contract:IMAGE_BINDING_CONTRACT,node:process.versions.node,api_prefix:'/studio-v2/api',cookie_name:'studio_media_session'});return;}
+      if(!/^\/studio-v2\/api\/(?:session(?:\/|$)|assets\/|image\/)/.test(url.pathname)){reply(404,{error:'image_route_not_found'});return;}
+      if(req.method==='POST' && url.pathname==='/studio-v2/api/session/exchange') {
         const body=await jsonBody(req);
         const exchange=await sessions.exchange(req,body.ticket);
         if(!exchange) {reply(401,{error:'invalid_studio_ticket'});return;}
@@ -32,12 +33,12 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
       }
       const session=await sessions.authenticate(req);
       if(!session) {reply(401,{error:'image_session_required'});return;}
-      const requestContract = url.pathname==='/studio/api/assets/uploads' ? 'asset-intake-v1' : 'image-binding-v1';
+      const requestContract = url.pathname==='/studio-v2/api/assets/uploads' ? 'asset-intake-v1' : 'image-binding-v1';
       if(req.method!=='GET' && (!sessions.sameOrigin(req) || req.headers['x-studio-request']!==requestContract)) {reply(403,{error:'image_csrf'});return;}
-      if(req.method==='DELETE' && url.pathname==='/studio/api/session') {res.setHeader('Set-Cookie',sessions.clear(req));reply(200,{ok:true});return;}
-      if(req.method==='GET' && url.pathname==='/studio/api/session') {reply(200,{owner_id:session.ownerId});return;}
-      if(req.method==='GET' && url.pathname==='/studio/api/assets/readiness') {reply(200,{contract:assetIntakeContract,enabled:Boolean(assetIntake)});return;}
-      if(req.method==='POST' && url.pathname==='/studio/api/assets/uploads') {
+      if(req.method==='DELETE' && url.pathname==='/studio-v2/api/session') {res.setHeader('Set-Cookie',sessions.clear(req));reply(200,{ok:true});return;}
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/session') {reply(200,{owner_id:session.ownerId});return;}
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/assets/readiness') {reply(200,{contract:assetIntakeContract,enabled:Boolean(assetIntake)});return;}
+      if(req.method==='POST' && url.pathname==='/studio-v2/api/assets/uploads') {
         if (!assetIntake) { reply(503,{error:'asset_store_unavailable',uploaded:false,supplier_request_sent:false}); return; }
         if (!sessions.sameOrigin(req) || req.headers['x-studio-request']!=='asset-intake-v1') {
           reply(403,{error:'asset_csrf'}); return;
@@ -63,26 +64,26 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         }
         return;
       }
-      if(req.method==='GET' && url.pathname==='/studio/api/image/readiness') {
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/image/readiness') {
         const enabled=paidEnabled===true && (await tasks.readiness(session)).paid_enabled===true;
         reply(200,{contract:IMAGE_BINDING_CONTRACT,paid_enabled:enabled});return;
       }
-      if(req.method==='GET' && url.pathname==='/studio/api/image/catalog') {reply(200,await tasks.catalog(session));return;}
-      if(req.method==='GET' && url.pathname==='/studio/api/image/tasks') {reply(200,tasks.history(session));return;}
-      if(req.method==='POST' && url.pathname==='/studio/api/image/quotes') {reply(200,await tasks.quote(session,await jsonBody(req)));return;}
-      if(req.method==='POST' && url.pathname==='/studio/api/image/prepare') {
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/image/catalog') {reply(200,await tasks.catalog(session));return;}
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/image/tasks') {reply(200,tasks.history(session));return;}
+      if(req.method==='POST' && url.pathname==='/studio-v2/api/image/quotes') {reply(200,await tasks.quote(session,await jsonBody(req)));return;}
+      if(req.method==='POST' && url.pathname==='/studio-v2/api/image/prepare') {
         const input=await jsonBody(req);
         if(!input || !Array.isArray(input.asset_refs) || Object.hasOwn(input,'references'))throw Error('Private asset refs required');
         reply(200,tasks.view(tasks.prepare(session,input).task));return;
       }
-      if(req.method==='POST' && url.pathname==='/studio/api/image/tasks') {
+      if(req.method==='POST' && url.pathname==='/studio-v2/api/image/tasks') {
         if(paidEnabled!==true){reply(503,{error:'published_image_paid_gate_off'});return;}
         const input=await jsonBody(req);
         const stored=input&&Object.keys(input).length===1&&/^img_[a-f0-9]{32}$/.test(input.task_id);
         if(!stored&&(!input || !Array.isArray(input.asset_refs) || Object.hasOwn(input,'references')))throw Error('Private asset refs required');
         reply(200,await tasks.dispatch(session,input));return;
       }
-      const match=/^\/studio\/api\/image\/tasks\/(img_[a-f0-9]{32})(?:\/results\/([0-9]))?$/.exec(url.pathname);
+      const match=/^\/studio-v2\/api\/image\/tasks\/(img_[a-f0-9]{32})(?:\/results\/([0-9]))?$/.exec(url.pathname);
       if(req.method==='GET' && match) {
         if(match[2]===undefined) {reply(200,await tasks.recover(session,match[1]));return;}
         const result=tasks.result(session,match[1],Number(match[2]));
@@ -94,11 +95,12 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
 }
 
 export function buildImageServer(env=process.env, {legacyVideo}={}) {
-  legacyVideo ??= legacyRecoveryFromEnvironment(env);
+  if (legacyVideo || env.STUDIO_LEGACY_VIDEO_RECOVERY === 'true') throw new Error('Legacy tasks must remain with the legacy BFF');
+  assertSeparateRoots(env);
   const root=env.STUDIO_IMAGE_DATA_ROOT;
   if(!root || !path.isAbsolute(root) || !env.STUDIO_PUBLIC_ORIGIN)throw new Error('Private root and public origin required');
   const common={baseUrl:env.STUDIO_BRIDGE_URL,serviceToken:env.STUDIO_BRIDGE_SERVICE_TOKEN};
-  const sessions=createStudioSessionBridge({core:createCoreStudioClient(common),publicOrigin:env.STUDIO_PUBLIC_ORIGIN,secureCookies:env.STUDIO_PUBLIC_ORIGIN.startsWith('https:')});
+  const sessions=createStudioSessionBridge({cookieName:'studio_media_session',cookiePath:'/studio-v2',core:createCoreStudioClient(common),publicOrigin:env.STUDIO_PUBLIC_ORIGIN,secureCookies:env.STUDIO_PUBLIC_ORIGIN.startsWith('https:')});
   const assetRoot=env.STUDIO_ASSET_ROOT;
   if(assetRoot && !path.isAbsolute(assetRoot))throw new Error('Private asset root required');
   const assetIntake=assetRoot?createAssetIntake({rootDir:assetRoot,ffprobePath:env.STUDIO_FFPROBE_PATH||'ffprobe'}):undefined;
@@ -107,13 +109,29 @@ export function buildImageServer(env=process.env, {legacyVideo}={}) {
   const imageHandler=createImageHandler({sessions,tasks,assetIntake,paidEnabled:env.STUDIO_IMAGE_PUBLISHED_SUBMISSION==='true'});
   if(!env.STUDIO_VIDEO_DATA_ROOT)return http.createServer(imageHandler);
   if(!path.isAbsolute(env.STUDIO_VIDEO_DATA_ROOT))throw new Error('Private video root required');
-  const videoTasks=createAccountVideoRuntime({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'journal'),call:createAccountVideoClient(common),resultStore:createVideoResultStore({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'results')}),legacy:legacyVideo});
+  const videoTasks=createAccountVideoRuntime({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'journal'),call:createAccountVideoClient(common),resultStore:createVideoResultStore({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'results')})});
   const resolveAssets=createVideoAssetResolver({intake:assetIntake,tasks:videoTasks});
   const videoHandler=createVideoHandler({sessions,tasks:videoTasks,resolveAssets,paidEnabled:env.STUDIO_VIDEO_ACCOUNT_SUBMISSION==='true'});
   return http.createServer((req,res)=>{
-    return req.url.startsWith('/studio/api/video/')||req.url.startsWith('/studio/api/operations')?videoHandler(req,res):imageHandler(req,res);
+    return req.url.startsWith('/studio-v2/api/video/')?videoHandler(req,res):imageHandler(req,res);
   });
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const server=buildImageServer();server.listen(Number(process.env.STUDIO_IMAGE_BFF_PORT||8092),process.env.STUDIO_IMAGE_BFF_HOST||'127.0.0.1');
+}
+
+// Resolve existing ancestors before opening state: aliases/symlinks must not make
+// two writers share a root. No permissions or historical files are changed.
+export function assertSeparateRoots(env) {
+  const physical = value => {
+    if (!path.isAbsolute(value)) throw new Error('Private root must be absolute');
+    let ancestor = path.resolve(value), tail = [];
+    while (!fs.existsSync(ancestor)) { tail.unshift(path.basename(ancestor)); const parent = path.dirname(ancestor); if(parent === ancestor) throw new Error('Private root unavailable'); ancestor = parent; }
+    return path.join(fs.realpathSync(ancestor), ...tail);
+  };
+  const roots = ['STUDIO_IMAGE_DATA_ROOT','STUDIO_VIDEO_DATA_ROOT','STUDIO_ASSET_ROOT','STUDIO_OPERATION_ROOT'].filter(key => env[key]).map(key => physical(env[key]));
+  for (let i=0;i<roots.length;i++) for(let j=0;j<i;j++) {
+    const overlap = (a,b) => { const rel=path.relative(a,b); return rel==='' || (!rel.startsWith('..'+path.sep) && rel!=='..' && !path.isAbsolute(rel)); };
+    if(overlap(roots[i],roots[j]) || overlap(roots[j],roots[i])) throw new Error('Studio state roots must be separate');
+  }
 }

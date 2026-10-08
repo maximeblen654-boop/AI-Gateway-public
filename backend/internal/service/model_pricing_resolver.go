@@ -30,6 +30,7 @@ type ResolvedPricing struct {
 
 	// 按次/图片模式：默认价格（未命中层级时使用）
 	DefaultPerRequestPrice float64
+	ImageReferencePrice    *float64
 
 	// 来源标识
 	Source string // "channel", "litellm", "fallback"
@@ -278,6 +279,7 @@ func applyChannelImageInputPrice(chPricing *ChannelModelPricing, pricing *ModelP
 
 // applyRequestTierOverrides 应用按次/图片模式的渠道覆盖
 func (r *ModelPricingResolver) applyRequestTierOverrides(chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
+	resolved.ImageReferencePrice = chPricing.ImageReferencePrice
 	resolved.RequestTiers = filterValidIntervals(chPricing.Intervals)
 	if chPricing.PerRequestPrice != nil {
 		resolved.DefaultPerRequestPrice = *chPricing.PerRequestPrice

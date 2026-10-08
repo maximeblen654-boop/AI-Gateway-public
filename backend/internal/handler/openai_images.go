@@ -74,6 +74,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 	requestModel := parsed.Model
+	if service.IsProtectedStudioImageModel(requestModel) && !service.ImageReceiptRequested(c) {
+		h.errorResponse(c, http.StatusBadRequest, "studio_task_required", "Use the protected Studio task flow for this image product")
+		return
+	}
+	if service.ImageReceiptRequested(c) && (!service.ValidImageReceiptKey(strings.TrimSpace(c.GetHeader(service.ImageReceiptHeader))) || !service.IsStudioReceiptModel(parsed.Model) || parsed.Stream || (parsed.Multipart && parsed.Model != "gpt-image-2.5") || parsed.N != 1) {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "receipt requires one non-streaming NEW batch and a valid task key")
+		return
+	}
 	ensureCompositeTargetPlatform(c, apiKey, requestModel)
 	clientRequestModel := clientRequestedModel(c, requestModel)
 	routingModel := requestModel
@@ -236,6 +244,26 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		}
 
 		service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
+		if service.ImageReceiptRequested(c) {
+			if accountReleaseFunc != nil {
+				defer accountReleaseFunc()
+			}
+			view, receiptErr := h.gatewayService.DispatchImageReceipt(requestCtx, c, account, body, parsed, &service.OpenAIRecordUsageInput{
+				APIKey: apiKey, User: apiKey.User, Account: account, Subscription: subscription,
+				APIKeyService: h.apiKeyService, QuotaPlatform: service.QuotaPlatform(c.Request.Context(), apiKey),
+				ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, requestModel, account.GetMappedModel(firstReceiptModel(channelMapping.MappedModel, requestModel))),
+			})
+			if receiptErr != nil {
+				if writeImageReceiptPriceCapError(c, receiptErr) {
+					return
+				}
+				h.errorResponse(c, http.StatusServiceUnavailable, "receipt_unavailable", "image receipt operation unavailable")
+				return
+			}
+			c.Header("Cache-Control", "no-store")
+			c.JSON(http.StatusOK, view)
+			return
+		}
 		if !parsed.Stream && !jsonKeepaliveStarted {
 			stopJSONKeepalive = service.StartOpenAIImagesJSONKeepalive(c, h.openAIImagesJSONKeepaliveInterval())
 			jsonKeepaliveStarted = true
@@ -437,4 +465,21 @@ func (h *OpenAIGatewayHandler) openAIImagesJSONKeepaliveInterval() time.Duration
 
 func isMultipartImagesContentType(contentType string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/form-data")
+}
+
+// Only these service sentinels prove rejection before receipt claim/dispatch.
+// Other receipt errors can follow acceptance and must retain unknown semantics.
+func writeImageReceiptPriceCapError(c *gin.Context, err error) bool {
+	status, code := 0, ""
+	switch {
+	case errors.Is(err, service.ErrImageReceiptInvalidPriceCap):
+		status, code = http.StatusBadRequest, "image_receipt_invalid_price_cap"
+	case errors.Is(err, service.ErrImageReceiptPriceCapExceeded):
+		status, code = http.StatusConflict, "image_receipt_price_cap_exceeded"
+	default:
+		return false
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(status, gin.H{"error": gin.H{"code": code, "type": code, "message": code}})
+	return true
 }

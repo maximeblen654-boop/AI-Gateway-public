@@ -34,24 +34,28 @@ The BFF must receive its own environment file, never the complete Core env:
 | BFF | `STUDIO_PUBLIC_ORIGIN`, `STUDIO_BRIDGE_URL`, `STUDIO_BRIDGE_SERVICE_TOKEN`; absolute private `STUDIO_ASSET_ROOT`, `STUDIO_IMAGE_DATA_ROOT`, `STUDIO_VIDEO_DATA_ROOT` |
 | BFF listener | `STUDIO_IMAGE_BFF_HOST` defaults `127.0.0.1`, `STUDIO_IMAGE_BFF_PORT` defaults `8092` (packaged image uses `4173`) |
 | BFF actions | `STUDIO_IMAGE_PUBLISHED_SUBMISSION`, `STUDIO_VIDEO_ACCOUNT_SUBMISSION`; each enabled only by literal `true` on the server |
-| Legacy recovery only | `STUDIO_LEGACY_VIDEO_RECOVERY=true`, existing `STUDIO_OPERATION_ROOT`, original `STUDIO_VIDEO_BASE_URL`, `STUDIO_VIDEO_KEY_SLOT_ID`, `STUDIO_VIDEO_API_KEY` |
+| Plan A ownership | New BFF and Bridge: `STUDIO_LEGACY_VIDEO_RECOVERY=false`; do not mount legacy task/result roots |
 
 Supply secrets privately through the existing runtime configuration mechanism.
-The legacy API key is the original slot credential; it is never used for new
-Account tasks. New supplier credentials stay in Core. Neither browser data nor
+Legacy credentials and slot recovery remain with the retained old BFF/Bridge.
+New supplier credentials stay in Core. Neither browser data nor
 an environment variable on a different component overrides a closed gate.
 Readiness requires BFF, Bridge and Core permission. Quotes and image preparation
 do not submit images. Unknown submission outcomes recover by GET only.
 
-`STUDIO_IMAGE_CORE_URL` and `STUDIO_BRIDGE_URL` are **root origins**, not an
-`/images/generations` endpoint. Existing validation requires HTTPS or loopback
+For the **new** Bridge/BFF, `STUDIO_IMAGE_CORE_URL` and `STUDIO_BRIDGE_URL` are
+**root origins**, not an `/images/generations` endpoint. The old Bridge uses its
+original full image endpoint; never copy the new value over that setting. The
+old BFF's Core origin also serves administrator price APIs and stays pointed at
+the single Core, not at either Bridge. Existing validation requires HTTPS or loopback
 HTTP. In separate network namespaces use a privately managed HTTPS endpoint
 and normal certificate trust. No insecure DNS-network exception is added.
 
 `deploy/docker-compose.studio.yml` is an optional Linux Compose overlay for a
 Core service named `sub2api`, with Core on port 8080. Bridge and BFF share that
 service's loopback and receive separately scoped env files. Only host loopback
-8091/4173 is added; the existing Core port bindings remain inherited. Set
+8094/4174 is added (container listeners remain 8091/4173); old listener bindings
+remain reserved. This overlay defines only the new components. Set
 `STUDIO_CORE_IMAGE`, `STUDIO_BRIDGE_IMAGE` and `STUDIO_BFF_IMAGE` to the verified
 immutable image IDs or registry digests. The overlay refuses an omitted Core
 identity rather than inheriting a mutable tag from the base Compose file.
@@ -59,7 +63,7 @@ It adds no proxy, database or second Core. Independent
 HTTPS-connected containers or host services can use the same artifacts without
 the overlay. Check the merged Compose configuration privately before use; do
 not print its resolved secrets. A Core replacement in the shared topology also
-requires recreating its dependent network-namespace users. A container restart
+requires an independently approved replacement of its dependent network-namespace users. A container restart
 must run Core first, wait for health, then restart Bridge/BFF and any local
 simulator sharing its namespace. Restarting those dependents before Core can
 leave them attached to the old namespace even when container names match.
@@ -80,35 +84,78 @@ stores, a different root owner, or group/world-accessible state. It does not
 change ownership or permissions and does not manufacture an empty legacy root.
 Existing root:root/0700 data consequently fails closed under UID1000.
 
-Before a separately approved migration, inventory the precise mounted roots and
-record owner/mode metadata. Preserve all files, including hidden receipt and
-cancellation sidecars. A controlled owner transfer of only those approved roots
-and their regular contents to UID1000 (directories 0700, files retaining private
-modes) is required if they are root-owned. Reject symlinks, unexpected mounts and
-concurrent writers first. Do not chmod777, recursively change a parent data
-directory, or run the service as root to bypass this prerequisite. A production
-owner transfer is a separate production change; local permission tests are not
-authorization to execute it there. Keep the metadata needed for a scoped rollback.
+Inventory precise mounts, owners and modes before an approved runtime change.
+Keep old root:root/0700 roots with their old executors. Provision distinct new
+roots for UID1000, directories 0700 and private file modes, only under separately
+approved production permission work. The new BFF rejects overlapping roots and
+legacy recovery injection. Do not chmod777, change a common parent, or transfer
+old roots to make the new BFF their writer. Preserve hidden receipt/claim sidecars.
 
-The legacy operation root and `video-results` remain together. New Account
-journals, image journals/results and private assets use distinct roots. The BFF
-looks up old tasks by authenticated owner, rejects collisions between roots and
-never converts slot/USD records to Account/CNY. Existing legacy original paths
-under `/studio/api/operations/{id}/children/{index}/original` are retained.
+The legacy operation root and `video-results` remain together under the old BFF.
+New Account journals, image journals/results and private assets use distinct
+roots. Old slot/USD records never become Account/CNY records. The optional
+legacy reader module is retained for rollback compatibility tests, but the new
+Plan A server does not activate it or expose its legacy route aliases.
 
-Bridge legacy routes expose only original order GET, terminal evidence,
-capture/release with the existing ledger semantics. The existing
-`studio_video_orders` table is a prerequisite: startup checks its columns and
-does not install a migration. No legacy quote, hold, upload or submission is
-exposed. Original supplier recovery uses the original key slot and receipt key,
-with only GET/HEAD requests. Pending/not-found receipts remain unresolved; they
-never authorize another POST. Existing terminal settlements are read before
-reconciliation and are not repeatedly posted.
+The retained old Bridge continues its original new-order and recovery contracts.
+Its historical startup may execute bundled SQL: do not replace or restart it as
+part of the new BFF setup. The new Bridge's optional legacy facade remains off.
+The existing `studio_video_orders` table is preserved; this change installs no
+migration. Pending/not-found receipts never authorize another generation POST.
+Existing terminal settlements are read before recovery and are not charged again.
 
 Rollback retains both generations of data and their corresponding recovery
 components. Disable new intents first; do not overwrite new orders, bindings,
 preparations or balances with an old database. Runtime rollout, sales Publish,
 and permission to perform real supplier actions remain separate decisions.
+
+## Plan A routes, session and rollback conditions
+
+The ordinary website and native authentication use **one writable Core**. Restore
+legacy consumers at `/api/v1/internal/studio/tickets/consume` and
+`/api/v1/internal/studio/sessions/verify` with the old Bridge service secret.
+The old and new Bridge secrets may differ; each BFF gets only its own secret.
+The two ticket purposes are not interchangeable. Website logout, revoke-all and
+session-binding revocation update the shared native Studio epoch keys; both
+generations verify those facts on every authenticated request. Local BFF logout
+clears only that generation's cookie.
+
+| Public route | Executor | Rewrite |
+| --- | --- | --- |
+| `/studio/*.html`, static files (GET/HEAD, old whitelist) | Retained old BFF | Remove `/studio` for static paths only |
+| `/studio/api/auth/session`, old logout, `/studio/api/image/*`, `/studio/api/video/*`, old `/studio/api/operations/*` | Retained old BFF | None |
+| `/api/v1/auth/studio-ticket` | Retained old Bridge | None |
+| `/api/v1/auth/studio-media-ticket` | New Bridge | Exact path to `/api/v1/auth/studio-ticket` |
+| `/studio-v2/api/session*`, `/studio-v2/api/image/*`, `/studio-v2/api/video/*`, `/studio-v2/api/assets/*` | New BFF | None |
+| Website login/logout/current-user/admin price APIs | Single Core | Existing website routes |
+
+Use exact path/prefix matching, never a catch-all `startsWith('/studio')`.
+Old cookie: `studio_session; Path=/studio`. New cookie:
+`studio_media_session; Path=/studio-v2`. Both remain HttpOnly, SameSite=Strict,
+Secure on HTTPS. Mutations require the original Origin and X-Studio-Request
+contract. Upload, preview and download stay under the corresponding cookie path.
+See `Caddy.routes.example` for a review-only routing fragment, not a production
+configuration or permission to replace the current proxy.
+
+Before approval, bind the single Core image, both Bridge/BFF executors, exact
+mounts and old pending tasks. Retain the Core receipt root including claims,
+upstream responses and original result bytes; retain its native request IDs and
+float billing fingerprints. A legacy receipt GET bypasses new-request quota
+admission only: native identity, key/user status and owner/Group checks remain.
+The Group `image_reference_price` JSON value is preserved, not recalculated.
+New async receipt intents persist a first-dispatch fact before I/O. Recovery with
+no upstream receipt ID remains unknown, even for an old journal with zero attempts.
+
+Deployment order (separate approval): freeze new intents; verify existing task
+writers and state; replace only the single Core with a compatibility-tested
+candidate; verify old session/receipt/price APIs; start isolated new Bridge/BFF
+with new actions off; verify new authentication and downloads; switch only the
+new proxy prefixes. Preserve every old container and writable layer. If any
+old route/owner/hash/ledger check fails, stop new admission and revert that
+route/component. Do not run two Core writers or roll a database over new orders.
+The fallback Core must also understand no-replay async journals; the pre-fix
+worker is not safe to resume. Keep incompatible pending tasks frozen for their
+matching executor. No runtime change authorizes sales Publish or paid dispatch.
 
 ## Customer task confirmation and results
 

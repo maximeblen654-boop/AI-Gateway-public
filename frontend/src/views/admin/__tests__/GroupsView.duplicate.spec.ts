@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AdminGroup } from '@/types'
 import GroupsView from '@/views/admin/GroupsView.vue'
+import PricingEntryCard from '@/components/admin/channel/PricingEntryCard.vue'
 import { adminAPI } from '@/api/admin'
 
 const {
@@ -322,6 +323,41 @@ describe('GroupsView duplicate action', () => {
 
     expect(updateGroup).toHaveBeenCalledTimes(1)
     expect(showError).toHaveBeenCalledWith('group name already exists')
+    wrapper.unmount()
+  })
+
+  it.each([undefined, null, 0, 0.237891])('preserves the Group reference-image price %s when saving other fields', async (referencePrice) => {
+    const pricing = { models: ['synthetic-image'], billing_mode: 'image', per_request_price: 0.123456, image_reference_price: referencePrice, intervals: [] }
+    listGroups.mockResolvedValueOnce({ items: [{ ...sourceGroup, model_pricing: [pricing] }], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(sourceGroup)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ model_pricing: [expect.objectContaining({
+      per_request_price: 0.123456, image_reference_price: referencePrice
+    })] }))
+    wrapper.unmount()
+  })
+
+  it.each(['image', 'per_request'])('edits only the explicit reference price in %s Group cards', async (billingMode) => {
+    const pricing = { models: ['synthetic-image'], billing_mode: billingMode, per_request_price: 0.123456, image_reference_price: 0.237891, intervals: [] }
+    listGroups.mockResolvedValueOnce({ items: [{ ...sourceGroup, model_pricing: [pricing] }], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(sourceGroup)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    const card = wrapper.getComponent(PricingEntryCard)
+    await card.get('.cursor-pointer').trigger('click')
+    await card.get('input[aria-label="admin.channels.form.imageReferencePrice"]').setValue('0.345678')
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ model_pricing: [expect.objectContaining({
+      per_request_price: 0.123456, image_reference_price: 0.345678
+    })] }))
     wrapper.unmount()
   })
 
