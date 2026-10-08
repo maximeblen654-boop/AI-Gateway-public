@@ -116,7 +116,7 @@ machines):
 ```sh
 cd backend
 go test -p 1 ./internal/mediaworkbench ./internal/imageplan ./internal/videoplan ./internal/studiobridge
-go test -p 1 -tags=unit ./internal/service -run 'TestStudioImage|TestVideoRuntime|TestVideoCatalog' -count=1
+go test -p 1 -tags=unit ./internal/handler ./internal/service -run 'TestStudioImage|TestVideoRuntime|TestVideoCatalog' -count=1
 cd ..
 node --test --test-concurrency=1 studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
 ```

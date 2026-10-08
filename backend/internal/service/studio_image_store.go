@@ -19,9 +19,10 @@ import (
 var ErrStudioImageUnknown = errors.New("original image dispatch outcome unknown; POST replay disabled")
 var ErrStudioImageConflict = errors.New("image task binding conflict")
 
+// StudioImageReceiptVersion identifies receipts that require result-spec checks.
 // Old executors only understand ImageBindingVersion as a receipt version and
-// must not resume new tasks without the result-specification prerequisite.
-const studioImageReceiptVersion = "published_image_receipt_v2"
+// must not resume these tasks without the result-specification prerequisite.
+const StudioImageReceiptVersion = "published_image_receipt_v2"
 
 type StudioImageOwner struct {
 	UserID   int64 `json:"user_id"`
@@ -236,7 +237,7 @@ func (s *StudioImageStore) Claim(r StudioImageReceipt) (*StudioImageReceipt, boo
 	if err := s.init(); err != nil {
 		return nil, false, err
 	}
-	if r.TaskID == "" || r.Version != studioImageReceiptVersion || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
+	if r.TaskID == "" || r.Version != StudioImageReceiptVersion || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
 		return nil, false, ErrStudioImageConflict
 	}
 	path := s.path("task", r.TaskID)
@@ -279,7 +280,7 @@ func (s *StudioImageStore) Receipt(taskID string, owner StudioImageOwner) (*Stud
 	if err := studioRead(s.path("task", taskID), r); err != nil {
 		return nil, err
 	}
-	if r.TaskID != taskID || r.Quote.Owner != owner || (r.Version != mediaworkbench.ImageBindingVersion && r.Version != studioImageReceiptVersion) || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
+	if r.TaskID != taskID || r.Quote.Owner != owner || (r.Version != mediaworkbench.ImageBindingVersion && r.Version != StudioImageReceiptVersion) || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
 	return r, nil

@@ -23,7 +23,7 @@ func TestStudioImageUnknownReceiptRemainsReadableDuringGenerationPause(t *testin
 	q, err = store.Quote(token, owner, now)
 	require.NoError(t, err)
 	body := []byte(`{"model":"gpt-image-2","n":1,"prompt":"synthetic"}`)
-	_, first, err := store.Claim(service.StudioImageReceipt{Version: mediaworkbench.ImageBindingVersion, TaskID: "original", Quote: q, Request: body, PayloadHash: service.HashUsageRequestPayload(body)})
+	_, first, err := store.Claim(service.StudioImageReceipt{Version: service.StudioImageReceiptVersion, TaskID: "original", Quote: q, Request: body, PayloadHash: service.HashUsageRequestPayload(body)})
 	require.NoError(t, err)
 	require.True(t, first)
 	h := &OpenAIGatewayHandler{studioImage: &service.StudioImageRuntime{Store: store, Core: &service.OpenAIGatewayService{}}}

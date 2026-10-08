@@ -55,7 +55,7 @@ func TestStudioImageReceiptVersionRetainsHistoricalIdentity(t *testing.T) {
 	r, q, key, _, billing := studioContractFixture(t)
 	receipt, err := r.Dispatch(context.Background(), nil, q, "versioned-result", "synthetic", nil, key)
 	require.NoError(t, err)
-	require.Equal(t, studioImageReceiptVersion, receipt.Version)
+	require.Equal(t, StudioImageReceiptVersion, receipt.Version)
 	// Reconstruct an old on-disk receipt; its quote/request/accounting identity
 	// remains readable, and an existing charge is not repeated or rewritten.
 	receipt.Version = mediaworkbench.ImageBindingVersion
@@ -93,7 +93,7 @@ func TestStudioImageWrongSpecNeverSettlesOrResubmits(t *testing.T) {
 			require.Error(t, err)
 			receipt, err := restarted.Store.Receipt("spec-mismatch", q.Owner)
 			require.NoError(t, err)
-			require.Equal(t, studioImageReceiptVersion, receipt.Version)
+			require.Equal(t, StudioImageReceiptVersion, receipt.Version)
 			require.Equal(t, "unknown", receipt.Status)
 			require.Equal(t, "pending", receipt.BillingState)
 			require.Empty(t, receipt.ResultHash)
