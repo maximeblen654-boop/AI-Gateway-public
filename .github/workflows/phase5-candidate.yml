@@ -1,0 +1,68 @@
+name: Phase 5 candidate (no release)
+
+on:
+  workflow_dispatch:
+  # workflow_dispatch is unavailable until this file exists on the default branch.
+  # This opt-in push route is confined to one branch, these tools, and a commit marker.
+  push:
+    branches: [codex/phase5-production-readiness]
+    paths:
+      - .github/workflows/phase5-candidate.yml
+      - tools/phase5-candidate/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase5-candidate-e49b7e0
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: >-
+      github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
+      github.ref == 'refs/heads/codex/phase5-production-readiness' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[plan-a-candidate:e49b7e0]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      APPLICATION_SHA: e49b7e0a04682dcd89637c4825c7f9e514964587
+      CANDIDATE_WORKFLOW_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout orchestration only
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: orchestration
+          persist-credentials: false
+      - name: Checkout frozen public application
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: e49b7e0a04682dcd89637c4825c7f9e514964587
+          path: application
+          persist-credentials: false
+      - name: Use target Node for the harness
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.21.0'
+      - name: Validate orchestration boundaries
+        run: node --test orchestration/tools/phase5-candidate/boundaries.test.mjs
+      - name: Check hosted resources before creating a builder
+        run: node orchestration/tools/phase5-candidate/build.mjs preflight
+      - name: Ephemeral hosted builder (no external cache export)
+        id: builder
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          driver: docker-container
+      - name: Build frozen Core, Bridge and BFF; export OCI locally on runner
+        env:
+          BUILDX_BUILDER: ${{ steps.builder.outputs.name }}
+        run: node orchestration/tools/phase5-candidate/build.mjs build
+      - name: Actual image identity, isolated startup and dual-entry smoke
+        run: node orchestration/tools/phase5-candidate/smoke.mjs
+      - name: Record results without publishing images or private state
+        if: always()
+        run: node orchestration/tools/phase5-candidate/build.mjs report
+      # Deliberately no upload-artifact: account-wide free storage headroom could
+      # not be verified. OCI files die with the runner: ARTIFACT_NOT_PERSISTED.
+      # No registry login/push, release, production secrets, or cache upload.
