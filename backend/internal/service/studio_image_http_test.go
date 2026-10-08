@@ -30,10 +30,22 @@ func (s studioImageLoopbackHTTP) Do(req *http.Request, proxy string, accountID i
 }
 
 func TestStudioImageRealHTTPRecovery(t *testing.T) {
-	for _, mode := range []string{"success", "reject", "lost_response", "timeout"} {
+	for _, mode := range []string{"success", "reject", "lost_response", "timeout", "wrong_pixels", "wrong_ratio", "wrong_count", "missing_metadata"} {
 		t.Run(mode, func(t *testing.T) {
 			var posts atomic.Int32
 			result := studioResult(t, "png")
+			switch mode {
+			case "wrong_pixels":
+				result = studioPixelResult(t, 512, 512)
+			case "wrong_ratio":
+				result = studioPixelResult(t, 1024, 576)
+			case "wrong_count":
+				result = []byte(`{"data":[]}`)
+			case "missing_metadata":
+				// Supplier JSON dimensions cannot stand in for a decodable image.
+				result = []byte(`{"data":[{"b64_json":"AQ==","width":1024,"height":1024}]}`)
+			}
+			transportUnknown := mode == "reject" || mode == "lost_response" || mode == "timeout"
 			supplier := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				posts.Add(1)
 				require.Equal(t, "POST", req.Method)
@@ -77,7 +89,10 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, billing.applied)
 			} else {
-				require.ErrorIs(t, err, ErrStudioImageUnknown)
+				require.Error(t, err)
+				if transportUnknown {
+					require.ErrorIs(t, err, ErrStudioImageUnknown)
+				}
 				require.NotContains(t, err.Error(), "provider detail")
 				require.Zero(t, billing.applied)
 			}
@@ -93,9 +108,17 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				require.Equal(t, "billed", receipt.BillingState)
 				require.Equal(t, 1, billing.applied)
 			} else {
-				require.ErrorIs(t, recoveredErr, ErrStudioImageUnknown)
+				require.Error(t, recoveredErr)
+				if transportUnknown {
+					require.ErrorIs(t, recoveredErr, ErrStudioImageUnknown)
+				}
+				require.Equal(t, "unknown", receipt.Status)
+				require.Equal(t, "pending", receipt.BillingState)
+				require.Empty(t, receipt.ResultHash)
 				require.Zero(t, billing.applied)
+				require.Zero(t, billing.calls)
 			}
+			t.Logf("request size=1024x1024 n=1; task=http-original status=%s billing=%s supplier_posts=%d native_billing_calls=%d applied=%d", receipt.Status, receipt.BillingState, posts.Load(), billing.calls, billing.applied)
 			_, err = restarted.Recover(context.Background(), "http-original", StudioImageOwner{9, 2, 3})
 			require.Error(t, err)
 		})

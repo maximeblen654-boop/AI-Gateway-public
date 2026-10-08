@@ -182,7 +182,7 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	if q.Accounting.Validate(q) != nil || (a.HasAnyQuotaLimit() && !q.AccountQuotaEnabled) {
 		return nil, ErrStudioImageAccounting
 	}
-	receipt := StudioImageReceipt{Version: mediaworkbench.ImageBindingVersion, TaskID: taskID, Quote: q, Request: body, PayloadHash: HashUsageRequestPayload(body), RequestHash: requestHash, Endpoint: plan.Path}
+	receipt := StudioImageReceipt{Version: studioImageReceiptVersion, TaskID: taskID, Quote: q, Request: body, PayloadHash: HashUsageRequestPayload(body), RequestHash: requestHash, Endpoint: plan.Path}
 	persisted, first, err := r.Store.Claim(receipt)
 	if err != nil {
 		return nil, err

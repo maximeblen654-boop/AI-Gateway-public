@@ -30,10 +30,10 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     const identity = binding ? { mode:'account_video_v1', ownerId, childId:child.childId, taskId:child.taskId,
       accountId:binding.offer.account_id, bindingHash:child.account.binding_hash, requestHash:child.bodySha256 }
       : {ownerId,childId:child.childId,taskId:child.taskId,keySlotId:child.keySlotId,requestHash:child.bodySha256};
-    return {child,identity};
+    return {child,identity,expectedSpec:binding ? binding.spec || {} : undefined};
   }
-  async function original(identity) {
-    const cached = resultStore.load(identity);
+  async function original(identity, expectedSpec) {
+    const cached = resultStore.load(identity, expectedSpec);
     if (cached) return cached;
     const opened = await supplier.downloadOriginal(identity.mode === 'account_video_v1'
       ? {identity,taskId:identity.taskId,method:'GET'}
@@ -62,7 +62,7 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
         chunks.push(Buffer.from(value));
       }
       if (received !== length) fail('original_length_mismatch');
-      return resultStore.put(identity, { bytes: Buffer.concat(chunks, received), mimeType });
+      return resultStore.put(identity, { bytes: Buffer.concat(chunks, received), mimeType }, expectedSpec);
     } catch (error) {
       await reader.cancel().catch(() => {});
       throw error;
@@ -73,14 +73,19 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     // and native idempotent capture tolerate a process dying between them;
     // adding a durable dispatch lock here would strand that safe recovery.
     return once(`${ownerId}:${operationId}:${index}`, async () => {
-      const { child, identity } = context(ownerId, operationId, index);
+      const { child, identity, expectedSpec } = context(ownerId, operationId, index);
       if (child.status === 'rejected') return coordinator.reconcileChild(ownerId, operationId, index);
       const settled = await ledger.getSettlement({ ownerId, childId: child.childId });
       if (!settled || settled.ownerId !== ownerId || settled.childId !== child.childId) fail('settlement_receipt_mismatch');
       if (settled.status === 'released') fail('download_not_ready');
-      if (settled.status === 'captured') return settled;
+      if (settled.status === 'captured') {
+        // A historical monetary success is not proof of matching media. Read
+        // and verify the same original without repeating capture or refunding.
+        if (expectedSpec) await original(identity, expectedSpec);
+        return settled;
+      }
       if (settled.status !== 'held') fail('settlement_receipt_mismatch');
-      let stored = resultStore.load(identity);
+      let stored = resultStore.load(identity, expectedSpec);
       if (!stored) {
         const task = await supplier.getTask(child.account ? {identity,taskId:child.taskId} : {keySlotId:child.keySlotId,taskId:child.taskId});
         if ((task?.task_id ?? task?.id) !== child.taskId ||
@@ -89,7 +94,7 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
           evidence: { ownerId, childId: child.childId, requestHash: child.bodySha256,
             status: 'failed', supplierTaskId: child.taskId, reason: 'supplier_failed' } });
         if (task.status !== 'completed') fail('terminal_evidence_unknown');
-        stored = await original(identity);
+        stored = await original(identity, expectedSpec);
       }
       // Stored full bytes were hashed and decoded before this evidence becomes
       // authoritative. Native capture remains the idempotent money boundary.
@@ -102,19 +107,19 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
   async function openOriginal(ownerId, operationId, index, { method = 'GET', range } = {}) {
     if (!['GET', 'HEAD'].includes(method) || (range !== undefined &&
         (typeof range !== 'string' || !/^bytes=(0|[1-9]\d*)-\d*$/.test(range)))) fail('invalid_original_request');
-    const { child, identity } = context(ownerId, operationId, index);
+    const { child, identity, expectedSpec } = context(ownerId, operationId, index);
     if (child.status !== 'accepted') fail('task_unavailable');
     const settled = await ledger.getSettlement({ ownerId, childId: child.childId });
     if (!settled || settled.ownerId !== ownerId || settled.childId !== child.childId || settled.status !== 'captured') fail('download_not_ready');
     // Older captured orders may import their original once, without a new
     // generation or another capture. All subsequent reads use the private copy.
-    let stored = resultStore.load(identity);
+    let stored = resultStore.load(identity, expectedSpec);
     if (!stored) {
       stored = await once(`original:${ownerId}:${operationId}:${index}`, async () => {
         const task = await supplier.getTask(child.account ? {identity,taskId:child.taskId} : {keySlotId:child.keySlotId,taskId:child.taskId});
         if ((task?.task_id ?? task?.id) !== child.taskId ||
             (task.id && task.task_id && task.id !== task.task_id) || task.status !== 'completed') fail('download_not_ready');
-        return original(identity);
+        return original(identity, expectedSpec);
       });
     }
     let status = 200, bytes = stored.bytes;
@@ -132,8 +137,8 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     return { status, response: new Response(method === 'HEAD' ? null : bytes, { status, headers }) };
   }
   async function inspectTask(ownerId, operationId, index) {
-    const { child, identity } = context(ownerId, operationId, index);
-    if (child.status === 'accepted' && resultStore.load(identity)) {
+    const { child, identity, expectedSpec } = context(ownerId, operationId, index);
+    if (child.status === 'accepted' && resultStore.load(identity, expectedSpec)) {
       return { childId: child.childId, taskId: child.taskId, status: 'completed', progress: 100,
         billingAction: 'reconcile_authoritative_ledger' };
     }

@@ -1,6 +1,7 @@
 import { CompilePlan, CompilePublishedPlan, Materialize } from '../api/video-request-builder.mjs';
 import { createOperationJournal } from './operation-journal.js';
 import { createVideoDelivery } from './video-delivery.mjs';
+import { videoResultExpectation } from './video-result-spec.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
@@ -98,6 +99,9 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const fresh=child(session,id);
     if(fresh.status==='intent'){
       if(now()>=Date.parse(c.account.binding.expires_at))fail('video_quote_expired');
+      // Do not incur supplier work for a specification whose delivered pixel
+      // meaning is still unknown. Preview/quote does not perform this action.
+      videoResultExpectation(c.account.binding.spec);
       // Persist before the only submission. A lost response only leads to GET.
       journal.markDispatching(owner(session),id,0);
       try {await call(session,'POST','tasks',{quote_token:c.account.quote_token,task_id:c.childId},c.account.key_ref);}catch{return {...view(get(session,id)),status:'unknown'};}

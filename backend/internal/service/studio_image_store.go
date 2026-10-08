@@ -19,6 +19,10 @@ import (
 var ErrStudioImageUnknown = errors.New("original image dispatch outcome unknown; POST replay disabled")
 var ErrStudioImageConflict = errors.New("image task binding conflict")
 
+// Old executors only understand ImageBindingVersion as a receipt version and
+// must not resume new tasks without the result-specification prerequisite.
+const studioImageReceiptVersion = "published_image_receipt_v2"
+
 type StudioImageOwner struct {
 	UserID   int64 `json:"user_id"`
 	APIKeyID int64 `json:"api_key_id"`
@@ -232,7 +236,7 @@ func (s *StudioImageStore) Claim(r StudioImageReceipt) (*StudioImageReceipt, boo
 	if err := s.init(); err != nil {
 		return nil, false, err
 	}
-	if r.TaskID == "" || r.Version != mediaworkbench.ImageBindingVersion || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
+	if r.TaskID == "" || r.Version != studioImageReceiptVersion || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
 		return nil, false, ErrStudioImageConflict
 	}
 	path := s.path("task", r.TaskID)
@@ -275,7 +279,7 @@ func (s *StudioImageStore) Receipt(taskID string, owner StudioImageOwner) (*Stud
 	if err := studioRead(s.path("task", taskID), r); err != nil {
 		return nil, err
 	}
-	if r.TaskID != taskID || r.Quote.Owner != owner || r.Version != mediaworkbench.ImageBindingVersion || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
+	if r.TaskID != taskID || r.Quote.Owner != owner || (r.Version != mediaworkbench.ImageBindingVersion && r.Version != studioImageReceiptVersion) || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
 	return r, nil
@@ -283,7 +287,7 @@ func (s *StudioImageStore) Receipt(taskID string, owner StudioImageOwner) (*Stud
 
 func studioQuoteHash(q StudioImageQuote) string { q.BindingHash = ""; return studioHash(q) }
 func (s *StudioImageStore) PersistResult(r *StudioImageReceipt, data []byte) error {
-	if _, err := ValidateStudioImageResult(data, r.Quote.Binding.Spec.Count); err != nil {
+	if _, err := validateStudioImageReceiptResult(r, data); err != nil {
 		return err
 	}
 	if err := s.write(s.path("result", r.TaskID), data, false); err != nil {
@@ -301,6 +305,6 @@ func (s *StudioImageStore) Result(r *StudioImageReceipt) ([]byte, error) {
 	if r.ResultHash == "" || HashUsageRequestPayload(b) != r.ResultHash {
 		return nil, ErrStudioImageUnknown
 	}
-	_, err = ValidateStudioImageResult(b, r.Quote.Binding.Spec.Count)
+	_, err = validateStudioImageReceiptResult(r, b)
 	return b, err
 }

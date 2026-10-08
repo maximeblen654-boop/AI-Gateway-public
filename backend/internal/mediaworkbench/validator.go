@@ -171,6 +171,10 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			for _, m := range p.AdapterConfig.SizeMappings {
 				if !dimensionPattern.MatchString(m.WireSize) && m.WireSize != "auto" {
 					add("UI_FIXABLE", "INVALID_VALUE_MAPPING", pid, "adapter_config.size_mappings", "Wire size must be auto or positive width x height")
+				} else if p.MediaType == "image" {
+					if _, _, err := validateImageMapping(m); err != nil {
+						add("UI_FIXABLE", "IMAGE_SPEC_MAPPING_MISMATCH", pid, "adapter_config.size_mappings", err.Error())
+					}
 				}
 			}
 			mappingKeys := map[string]bool{}

@@ -168,17 +168,11 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 
 	fields := map[string]any{"model": p.SiteModel, "prompt": "<dry-run-prompt>", "n": spec.Count}
 	if spec.Resolution != "" || spec.AspectRatio != "" {
-		found := false
-		for _, m := range p.AdapterConfig.SizeMappings {
-			if m.Resolution == spec.Resolution && m.AspectRatio == spec.AspectRatio {
-				fields["size"] = m.WireSize
-				found = true
-				break
-			}
+		size, _, _, err := ImageDimensions(p.AdapterConfig, spec)
+		if err != nil {
+			return imageplan.Plan{}, err
 		}
-		if !found {
-			return imageplan.Plan{}, errMissingMapping
-		}
+		fields["size"] = size
 	}
 	if spec.Quality != "" {
 		fields["quality"] = spec.Quality

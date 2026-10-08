@@ -21,6 +21,7 @@ func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 		// Pure decimal arithmetic for the CNY runtime contract; no transport,
 		// credential, database, scheduler or billing-service dependency is admitted.
 		"github.com/shopspring/decimal": true,
+		"strconv":                       true, // pure integer parsing of pixel dimensions and ratios
 	}
 	for _, dir := range []string{".", "../imageplan", "../videoplan"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))

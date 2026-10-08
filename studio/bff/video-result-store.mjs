@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { assertVideoResultSpec, decodedVideoMeasurement } from './video-result-spec.mjs';
 
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -48,32 +49,38 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > limit) fail('video_result_corrupt');
     return fs.readFileSync(file);
   }
-  function load(identity) {
+  function load(identity, expectedSpec) {
     const directory = location(identity);
     if (!fs.existsSync(directory)) return null;
     safeDirectory(directory);
     let meta;
     try { meta = JSON.parse(fileBytes(path.join(directory, 'meta.json'), 4096)); }
     catch { fail('video_result_corrupt'); }
-    if (meta.version !== 1 || Object.keys(identity).some(key => meta[key] !== identity[key]) ||
+    if (![1, 2].includes(meta.version) || meta.version === 2 && (identity.mode !== 'account_video_v1' || !Object.hasOwn(meta, 'media')) || Object.keys(identity).some(key => meta[key] !== identity[key]) ||
         !MIME.has(meta.mimeType) || !Number.isSafeInteger(meta.size) || meta.size < 1 ||
         meta.size > maxResultBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '')) fail('video_result_identity_mismatch');
     const bytes = fileBytes(path.join(directory, 'original.bin'), maxResultBytes);
     if (bytes.length !== meta.size || digest(bytes) !== meta.sha256) fail('video_result_corrupt');
+    if (expectedSpec) {
+      // Pre-existing originals lack decoded measurements. Verify their bytes
+      // without rewriting the old task, quote, result identity or billing.
+      const measured = Object.hasOwn(meta, 'media') ? meta.media : validate(path.join(directory, 'original.bin'), bytes, meta.mimeType);
+      assertVideoResultSpec(measured, expectedSpec);
+    }
     return { ...meta, bytes };
   }
-  function command(executable, args) {
+  function command(executable, args, maxBuffer = 128 * 1024) {
     try {
       return execFileSync(executable, args, { encoding: 'utf8', timeout: 60_000,
-        maxBuffer: 128 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        maxBuffer, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch { fail('video_result_decode_failed'); }
   }
   function validate(file, bytes, mimeType) {
     if (mimeType === 'video/mp4' ? bytes.toString('ascii', 4, 8) !== 'ftyp'
       : !bytes.subarray(0, 4).equals(Buffer.from('1a45dfa3', 'hex'))) fail('video_result_type_mismatch');
     let probe;
-    try { probe = JSON.parse(command(ffprobePath, ['-v', 'error', '-show_entries',
-      'format=format_name,duration:stream=codec_type,width,height', '-of', 'json', file])); }
+    try { probe = JSON.parse(command(ffprobePath, ['-v', 'error', '-select_streams', 'v', '-show_frames', '-show_entries',
+      'format=format_name,duration:stream=codec_type,width,height,sample_aspect_ratio:stream_side_data=rotation:frame=media_type,width,height,best_effort_timestamp_time,duration_time,pkt_duration_time', '-of', 'json', file], 2 * 1024 * 1024)); }
     catch { fail('video_result_decode_failed'); }
     const videos = probe.streams?.filter(stream => stream.codec_type === 'video') || [];
     if (videos.length !== 1 || !Number.isFinite(Number(probe.format?.duration)) ||
@@ -84,10 +91,11 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
       fail('video_result_invalid_media');
     }
     const progress = command(ffmpegPath, ['-v', 'error', '-xerror', '-err_detect', 'explode', '-max_alloc', '134217728',
-      '-threads', '1', '-i', file, '-map', '0:v:0', '-threads', '1', '-f', 'null',
+      '-threads', '1', '-i', file, '-map', '0:v:0', '-threads', '1', '-fps_mode', 'passthrough', '-f', 'null',
       '-progress', 'pipe:1', '-']);
     if (!/^progress=end\r?$/m.test(progress) ||
         Number([...progress.matchAll(/^frame=(\d+)\r?$/gm)].at(-1)?.[1]) < 1) fail('video_result_decode_failed');
+    return decodedVideoMeasurement(probe, Number([...progress.matchAll(/^frame=(\d+)\r?$/gm)].at(-1)?.[1]));
   }
   function usage() {
     let total = 0;
@@ -106,7 +114,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     }
     return total;
   }
-  function put(identity, { bytes, mimeType }) {
+  function put(identity, { bytes, mimeType }, expectedSpec) {
     const target = location(identity);
     if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > maxResultBytes || !MIME.has(mimeType)) {
       fail('video_result_invalid_media');
@@ -115,7 +123,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     const existing = load(identity);
     if (existing) {
       if (existing.mimeType !== mimeType || existing.sha256 !== digest(body)) fail('video_result_conflict');
-      return existing;
+      return load(identity, expectedSpec);
     }
     if (usage() + body.length + 4096 > maxStoreBytes) fail('video_result_capacity');
     const temp = path.join(root, `.pending-${randomUUID()}`);
@@ -123,9 +131,11 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     try {
       const file = path.join(temp, 'original.bin');
       writeDurable(file, body);
-      validate(file, body, mimeType);
-      const meta = { version: 1, ...identity, mimeType, size: body.length, sha256: digest(body),
-        storedAt: new Date().toISOString() };
+      const media = validate(file, body, mimeType);
+      // A rollback reader that only knows v1 must reject Account originals
+      // instead of treating a retained wrong-spec original as capture evidence.
+      const meta = { version: identity.mode === 'account_video_v1' ? 2 : 1, ...identity, mimeType, size: body.length, sha256: digest(body),
+        storedAt: new Date().toISOString(), media };
       writeDurable(path.join(temp, 'meta.json'), Buffer.from(JSON.stringify(meta)));
       syncDirectory(temp);
       try { fs.renameSync(temp, target); }
@@ -134,7 +144,9 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
         if (!raced || raced.mimeType !== mimeType || raced.sha256 !== meta.sha256) throw error;
       }
       syncDirectory(root);
-      return load(identity);
+      // Commit structurally valid original bytes even on a specification
+      // mismatch. Recovery must inspect this same evidence, never regenerate.
+      return load(identity, expectedSpec);
     } finally {
       if (fs.existsSync(temp)) {
         for (const name of fs.readdirSync(temp)) fs.unlinkSync(path.join(temp, name));

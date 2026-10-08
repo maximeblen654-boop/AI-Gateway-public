@@ -1,10 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { CompilePlan, Materialize, buildVideoRequestBytes, makeVerifiedAssetReceipt } from './video-request-builder.mjs';
+import { CompilePlan, CompilePublishedPlan, Materialize, buildVideoRequestBytes, makeVerifiedAssetReceipt } from './video-request-builder.mjs';
 import catalog from '../../backend/internal/videoplan/contract.json' with { type: 'json' };
 
 const input = () => ({ ownerId: '1', model: '3.0', prompt: 'fixture', duration: 5, resolution: '720p', ratio: '16:9', assets: [] });
+
+test('every controlled Published wire profile preserves the selected output parameters',()=>{
+ for(const inputMode of ['images','inline_multimedia','references']){
+  const profile={apiModelId:'synthetic-profile',upstreamModelId:'synthetic-upstream',documentedStatus:'enabled',inputMode,durationSeconds:[5],resolutions:['1280x720'],ratios:['16:9'],mediaLimits:{image:0,video:0,audio:0,total:0}};
+  const plan=CompilePublishedPlan({...input(),model:profile.apiModelId,resolution:'1280x720'},profile);
+  const fields=JSON.parse(Materialize(plan).bytes);
+  assert.equal(fields.model,'synthetic-upstream');assert.equal(fields.resolution,'1280x720');
+  assert.equal(fields[inputMode==='references'?'seconds':'duration'],5);
+  assert.equal(fields[inputMode==='references'?'aspect_ratio':'ratio'],'16:9');
+  assert.equal(fields[inputMode==='references'?'duration':'seconds'],undefined);
+ }
+});
 
 test('legacy exact bytes and shared deterministic plan', () => {
   const x = input();

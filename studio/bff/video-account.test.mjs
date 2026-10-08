@@ -18,19 +18,21 @@ test('browser can read an unsubmitted video quote after restart without asking C
  assert.equal(restored.status,'intent');assert.equal(restored.sale_price.currency,'CNY');assert.ok(restored.expires_at);
  assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});
 });
-const request=()=>({model:'3.0',prompt:'fixture',duration:5,resolution:'720p',ratio:'16:9',assets:[]});
+const request=()=>({model:'3.0',prompt:'fixture',duration:5,resolution:'1280x720',ratio:'16:9',assets:[]});
 let original;
-function video(){return original ||= execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=32x32:r=5','-t','0.4','-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1'],{windowsHide:true,maxBuffer:1<<20});}
+function video(){return original ||= execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=1280x720:r=5','-t','5','-an','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1'],{windowsHide:true,maxBuffer:1<<20});}
+const profile={apiModelId:'3.0',upstreamModelId:'synthetic-video',documentedStatus:'enabled',inputMode:'images',durationSeconds:[5],resolutions:['1280x720','720p'],ratios:['16:9'],mediaLimits:{image:9,video:0,audio:0,total:9}};
 
-function fixture(t,{lost=false,corrupt=false,currency='CNY'}={}){
+function fixture(t,{lost=false,corrupt=false,currency='CNY',resultBytes,resultTimeout=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'account-video-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const journalRoot=path.join(root,'journal'),store=createVideoResultStore({rootDir:path.join(root,'original')});
- const tasks=new Map();let posts=0,captures=0,quoteCalls=0,q;
+ const tasks=new Map();let posts=0,captures=0,quoteCalls=0,downloads=0,releases=0,q;
  const call=async (s,method,operation,payload,keyRef)=>{
   assert.equal(s.ownerId,1);
-  if(operation==='catalog')return {payload:{offers:[{offer_id:'offer1',model:'3.0'},{offer_id:'o',model:'3.0'}]}};
+  if(operation==='catalog')return {payload:{offers:[{offer_id:'offer1',model:'3.0',video_profile:profile},{offer_id:'o',model:'3.0',video_profile:profile}]}};
   if(operation==='quotes'){
    quoteCalls++;
+   assert.equal(payload.request.resolution,payload.spec.resolution);assert.equal(payload.request.duration,payload.spec.duration_seconds);assert.equal(payload.request.ratio,payload.spec.aspect_ratio);assert.equal(payload.request.model,'synthetic-video');
    const binding={version:VIDEO_CONTRACT,quote_id:'quote-original',owner:{user_id:1,api_key_id:2,group_id:3},published_revision:'pub-original',
     offer:{offer_id:payload.offer_id,account_id:7,site_model:'3.0',adapter:{revision:'laoli_video_json_v136_r1'},sale_price:{amount:'0.80',currency,billing_mode:'per_request'}},
     spec:payload.spec,request_hash:hash(JSON.stringify(payload.request)),expires_at:new Date(Date.now()+120000).toISOString()};
@@ -39,8 +41,9 @@ function fixture(t,{lost=false,corrupt=false,currency='CNY'}={}){
   assert.equal(keyRef,2,'recovery must retain original customer key');
   if(operation==='tasks'){posts++;tasks.set(payload.task_id,{status:'completed',upstream_id:'original-upstream'});if(lost)throw Error('lost submit response');return {key_ref:2,payload:{}};}
   const [,id,action]=operation.split('/');const state=tasks.get(id);assert.ok(state);
+  if(action==='release')releases++;
   if(!action){assert.equal(method,'GET');return {key_ref:2,payload:{contract:VIDEO_CONTRACT,task_id:id,...state,binding_hash:q.binding_hash,request_hash:q.binding.request_hash}};}
-  if(action==='result'){assert.equal(method,'GET');return {key_ref:2,payload:{mime_type:'video/mp4',bytes_base64:(corrupt?Buffer.from('not a video'):video()).toString('base64')}};}
+  if(action==='result'){assert.equal(method,'GET');downloads++;if(resultTimeout)throw Error('local result timeout');return {key_ref:2,payload:{mime_type:'video/mp4',bytes_base64:(corrupt?Buffer.from('not a video'):resultBytes||video()).toString('base64')}};}
   if(action==='capture'){
    assert.equal(method,'POST');
    const saved=store.load({mode:VIDEO_CONTRACT,ownerId:1,childId:id,taskId:state.upstream_id,accountId:7,bindingHash:q.binding_hash,requestHash:q.binding.request_hash});
@@ -49,9 +52,48 @@ function fixture(t,{lost=false,corrupt=false,currency='CNY'}={}){
   }
   throw Error('unexpected operation '+operation);
  };
- const make=(legacy,now)=>createAccountVideoRuntime({rootDir:journalRoot,call,resultStore:store,legacy,now});
- return {make,root:journalRoot,store,counts:()=>({posts,captures,quoteCalls})};
+ const make=(legacy,now)=>createAccountVideoRuntime({rootDir:journalRoot,call,resultStore:createVideoResultStore({rootDir:path.join(root,'original')}),legacy,now});
+ return {make,root:journalRoot,store,downloads:()=>downloads,releases:()=>releases,priorCapture:()=>{for(const state of tasks.values())state.status='captured';},counts:()=>({posts,captures,quoteCalls})};
 }
+
+test('unproven resolution meaning blocks new dispatch before any supplier work',async t=>{
+ const f=fixture(t),r=f.make(),op=await r.prepare(session,{clientKey:'ambiguous-pixels',offerId:'offer1',request:{...request(),resolution:'720p'}});
+ await assert.rejects(r.dispatch(session,op.operation_id),/video_result_resolution_unverifiable/);
+ assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});assert.equal(f.downloads(),0);
+ assert.equal((await f.make().recover(session,op.operation_id)).status,'intent');
+});
+
+test('wrong video specs stay held across duplicate clicks and restart; never redownload or settle',async t=>{
+ for(const [name,size,seconds,error] of [
+  ['pixels','640x360',5,/video_result_dimensions_mismatch/],
+  ['ratio','1280x1280',5,/video_result_aspect_mismatch/],
+  ['duration','1280x720',2,/video_result_duration_mismatch/],
+ ])await t.test(name,async t=>{
+ const tiny=execFileSync('ffmpeg',['-v','error','-f','lavfi','-i',`color=c=blue:s=${size}:r=5`,'-t',String(seconds),'-an','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1'],{windowsHide:true,maxBuffer:1<<20});
+ const f=fixture(t,{resultBytes:tiny}),r=f.make(),op=await r.prepare(session,{clientKey:'downgraded',offerId:'offer1',request:request()});
+ await assert.rejects(r.dispatch(session,op.operation_id),error);
+ const restarted=f.make();
+ await assert.rejects(restarted.recover(session,op.operation_id),error);
+ await assert.rejects(restarted.dispatch(session,op.operation_id),error);
+ await assert.rejects(restarted.original(session,op.operation_id),/download_not_ready/);
+ assert.deepEqual(f.counts(),{posts:1,captures:0,quoteCalls:1});assert.equal(f.downloads(),1);
+ assert.equal(f.releases(),0);
+ assert.equal(restarted.history(session)[0].children[0].status,'accepted');
+ // Even a pre-existing Core capture is not a successful delivery attestation.
+ // No new capture/release call may be used to reinterpret that history.
+ f.priorCapture();await assert.rejects(restarted.recover(session,op.operation_id),error);
+ assert.equal(f.counts().captures,0);assert.equal(f.releases(),0);assert.equal(f.downloads(),1);
+ t.diagnostic(JSON.stringify({task:op.children[0].task_id,actual:{size,seconds},...f.counts(),releaseCalls:f.releases(),resultGets:f.downloads(),journalStatus:'accepted'}));
+ });
+});
+
+test('result timeout only retries original GET after restart, never POST or settlement',async t=>{
+ const f=fixture(t,{resultTimeout:true}),r=f.make(),op=await r.prepare(session,{clientKey:'result-timeout',offerId:'offer1',request:request()});
+ await assert.rejects(r.dispatch(session,op.operation_id),/local result timeout/);
+ await assert.rejects(f.make().dispatch(session,op.operation_id),/local result timeout/);
+ assert.deepEqual(f.counts(),{posts:1,captures:0,quoteCalls:1});assert.equal(f.downloads(),2);
+ assert.equal(f.releases(),0);
+});
 
 test('expired video quote cannot first dispatch; expiry never prevents original task recovery',async t=>{
  const f=fixture(t),r=f.make(),op=await r.prepare(session,{clientKey:'expiry-check',offerId:'offer1',request:request()});

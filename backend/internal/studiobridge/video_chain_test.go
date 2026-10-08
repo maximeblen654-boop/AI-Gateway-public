@@ -23,7 +23,7 @@ func TestVideoBFFBridgeCoreLoopbackRecovery(t *testing.T) {
 	require.NoError(t, e)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	original, e := exec.CommandContext(ctx, ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=32x32:r=5", "-t", "0.4", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1").Output()
+	original, e := exec.CommandContext(ctx, ffmpeg, "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=1280x720:r=5", "-t", "5", "-an", "-c:v", "libx264", "-threads", "1", "-pix_fmt", "yuv420p", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1").Output()
 	require.NoError(t, e)
 	var mu sync.Mutex
 	posts, captures := 0, 0
@@ -40,7 +40,7 @@ func TestVideoBFFBridgeCoreLoopbackRecovery(t *testing.T) {
 			// recovery assertions below exercise the complete bridge path.
 			_ = json.NewEncoder(w).Encode(map[string]any{"offers": []any{map[string]any{
 				"offer_id": "offer-original", "model": "3.0",
-				"video_profile": map[string]any{"apiModelId": "3.0", "upstreamModelId": "3.0", "documentedStatus": "enabled", "durationSeconds": []int{5}, "resolutions": []string{"720p"}, "ratios": []string{"16:9"}, "inputMode": "images", "requiredAnyMedia": []string{}, "mediaLimits": map[string]int{"image": 9, "video": 0, "audio": 0, "total": 9}, "promptMaxLength": 6000},
+				"video_profile": map[string]any{"apiModelId": "3.0", "upstreamModelId": "3.0", "documentedStatus": "enabled", "durationSeconds": []int{5}, "resolutions": []string{"1280x720"}, "ratios": []string{"16:9"}, "inputMode": "images", "requiredAnyMedia": []string{}, "mediaLimits": map[string]int{"image": 9, "video": 0, "audio": 0, "total": 9}, "promptMaxLength": 6000},
 			}}})
 		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/quotes"):
 			var in struct {

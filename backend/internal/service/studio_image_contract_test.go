@@ -276,7 +276,7 @@ func studioAccountPrice(amount string) *Channel {
 }
 func studioResult(t *testing.T, format string) []byte {
 	t.Helper()
-	im := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	im := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
 	im.Set(0, 0, color.NRGBA{R: 255, A: 255})
 	var b bytes.Buffer
 	var err error

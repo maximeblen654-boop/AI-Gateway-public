@@ -9,7 +9,7 @@ const call=createAccountVideoClient({baseUrl,serviceToken:'s'.repeat(32)});
 const store=createVideoResultStore({rootDir:path.join(root,'results')});
 const make=()=>createAccountVideoRuntime({rootDir:path.join(root,'journal'),call,resultStore:store});
 let runtime=make();
-const q=await runtime.prepare(session,{clientKey:'one-click',offerId:'offer-original',request:{model:'3.0',prompt:'<原片> & exact bytes',duration:5,resolution:'720p',ratio:'16:9',assets:[]}});
+const q=await runtime.prepare(session,{clientKey:'one-click',offerId:'offer-original',request:{model:'3.0',prompt:'<原片> & exact bytes',duration:5,resolution:'1280x720',ratio:'16:9',assets:[]}});
 assert.equal((await runtime.dispatch(session,q.operation_id)).status,'unknown');
 runtime=make();assert.equal((await runtime.recover(session,q.operation_id)).status,'captured');
 assert.equal((await runtime.dispatch(session,q.operation_id)).status,'captured');

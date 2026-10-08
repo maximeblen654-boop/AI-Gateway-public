@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -177,6 +178,30 @@ func TestVideoRuntimeUnknownNeverResubmits(t *testing.T) {
 	require.Equal(t, 0, orders.captures)
 	_, e = r.Release(context.Background(), q.Binding.Owner, "av_unknown")
 	require.Error(t, e)
+}
+
+func TestVideoRuntimeRejectsDroppedOrOverriddenSpecBeforeQuote(t *testing.T) {
+	r, _, q, key, _, orders := videoRuntimeFixture(t)
+	for _, tc := range []struct {
+		field string
+		value any
+	}{
+		{"duration", nil}, {"duration", 10}, {"resolution", nil}, {"resolution", "auto"}, {"ratio", "1:1"},
+	} {
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(q.Plan.Body, &fields))
+		if tc.value == nil {
+			delete(fields, tc.field)
+		} else {
+			fields[tc.field] = tc.value
+		}
+		body, err := json.Marshal(fields)
+		require.NoError(t, err)
+		_, _, err = r.Issue(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, body)
+		require.Error(t, err, "changed %s", tc.field)
+	}
+	require.Zero(t, orders.reserves)
+	require.Zero(t, orders.captures)
 }
 
 func TestVideoRuntimeIdentityDrift(t *testing.T) {
