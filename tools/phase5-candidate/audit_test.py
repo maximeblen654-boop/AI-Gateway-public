@@ -46,6 +46,10 @@ class DistributionAuditTests(unittest.TestCase):
                    b'( 2/10) Upgrading ca-certificates (1-r0 -> 1-r1)\n'
                    b'Executing busybox-1.37.0-r30.trigger\nOK: 10.8 MiB in 18 packages\n')
         audit.check_path('var/log/apk.log', journal)
+        audit.check_path('var/log/apk.log',
+                         b'Running `apk add --no-cache --virtual .build-deps-yarn curl gnupg tar` at 2026-01-01 00:00:00\n'
+                         b'  Executing pinentry-1.3.2-r0.post-install\n'
+                         b'Running `apk del .build-deps-yarn` at 2026-01-01 00:00:01\n')
         for value in [journal + b'customer=private-data\n',
                       journal.replace(b'ffmpeg=8.0.1-r1 ca-certificates', b'private-package'),
                       b'x' * 65537, journal + b'ghp_' + b'A' * 40]:

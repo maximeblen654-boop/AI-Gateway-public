@@ -29,13 +29,15 @@ def check_apk_log(value):
         'apk add --no-cache libstdc++',
         'apk add --no-cache --virtual .build-deps curl',
         'apk del .build-deps',
+        'apk add --no-cache --virtual .build-deps-yarn curl gnupg tar',
+        'apk del .build-deps-yarn',
         'apk add --no-cache ffmpeg=8.0.1-r1 ca-certificates',
     }
     package = r'[A-Za-z0-9+_.:~-]+'
     lines = (
         rf'apk-tools {package}, compiled for x86_64\.',
         rf'\(\s*\d+/\d+\) (?:Installing|Purging|Upgrading) {package} \({package}(?: -> {package})?\)',
-        rf'Executing {package}\.trigger',
+        rf' *Executing {package}\.(?:trigger|(?:pre|post)-(?:install|upgrade|deinstall))',
         r'OK: [0-9.]+ MiB in \d+ packages',
     )
     for line in value.decode('utf-8').splitlines():
