@@ -39,6 +39,22 @@ class DistributionAuditTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 audit.source_path(component, 'app/private/account.json')
 
+    def test_alpine_build_journal_requires_known_commands_and_package_only_records(self):
+        journal = (b'\nRunning `apk add --no-cache ffmpeg=8.0.1-r1 ca-certificates` at 2026-01-01 00:00:00\n'
+                   b'apk-tools 3.0.8-r0, compiled for x86_64.\n'
+                   b'( 1/10) Installing libgcc (15.2.0-r2)\n'
+                   b'( 2/10) Upgrading ca-certificates (1-r0 -> 1-r1)\n'
+                   b'Executing busybox-1.37.0-r30.trigger\nOK: 10.8 MiB in 18 packages\n')
+        audit.check_path('var/log/apk.log', journal)
+        for value in [journal + b'customer=private-data\n',
+                      journal.replace(b'ffmpeg=8.0.1-r1 ca-certificates', b'private-package'),
+                      b'x' * 65537, journal + b'ghp_' + b'A' * 40]:
+            with self.subTest(value_size=len(value)), self.assertRaises(ValueError):
+                audit.check_path('var/log/apk.log', value)
+        for name in ['app/apk.log', 'var/log/service.log', 'var/log/apk.log']:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                audit.check_path(name)
+
 
 if __name__ == '__main__':
     unittest.main()

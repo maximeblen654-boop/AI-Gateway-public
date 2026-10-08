@@ -20,7 +20,38 @@ def check_bytes(value):
         raise ValueError('credential_signature_detected')
 
 
-def check_path(name):
+def check_apk_log(value):
+    """Alpine's public build-package journal, never an application runtime log."""
+    if len(value) > 65536:
+        raise ValueError('package_journal_too_large')
+    check_bytes(value)
+    commands = {
+        'apk add --no-cache libstdc++',
+        'apk add --no-cache --virtual .build-deps curl',
+        'apk del .build-deps',
+        'apk add --no-cache ffmpeg=8.0.1-r1 ca-certificates',
+    }
+    package = r'[A-Za-z0-9+_.:~-]+'
+    lines = (
+        rf'apk-tools {package}, compiled for x86_64\.',
+        rf'\(\s*\d+/\d+\) (?:Installing|Purging|Upgrading) {package} \({package}(?: -> {package})?\)',
+        rf'Executing {package}\.trigger',
+        r'OK: [0-9.]+ MiB in \d+ packages',
+    )
+    for line in value.decode('utf-8').splitlines():
+        if not line:
+            continue
+        command = re.fullmatch(r'Running `([^`]+)` at \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', line)
+        if command and command[1] in commands:
+            continue
+        if not any(re.fullmatch(pattern, line) for pattern in lines):
+            raise ValueError('unexpected_package_journal_content')
+
+
+def check_path(name, package_journal=None):
+    if name == 'var/log/apk.log' and package_journal is not None:
+        check_apk_log(package_journal)
+        return
     parts = PurePosixPath(name).parts
     if '..' in parts or any(p in {'.git', '.evidence', '.ssh', '.aws'} for p in parts):
         raise ValueError('private_or_unsafe_path')
@@ -103,7 +134,11 @@ def main():
                                 continue
                             name = member.name.removeprefix('./').lstrip('/')
                             report['last_path_sha256'] = hashlib.sha256(name.encode()).hexdigest()
-                            check_path(name)
+                            package_journal = bytearray() if name == 'var/log/apk.log' else None
+                            if package_journal is None:
+                                check_path(name)
+                            elif member.size > 65536:
+                                raise ValueError('package_journal_too_large')
                             expected = source_path(component, name)
                             digest = hashlib.sha256()
                             stream = layer.extractfile(member)
@@ -111,7 +146,14 @@ def main():
                             while chunk := stream.read(1024 * 1024):
                                 check_bytes(tail + chunk)
                                 digest.update(chunk)
+                                if package_journal is not None:
+                                    package_journal.extend(chunk)
                                 tail = chunk[-256:]
+                            if package_journal is not None:
+                                check_path(name, bytes(package_journal))
+                                record.setdefault('validated_package_journals', []).append({
+                                    'layer': descriptor['digest'], 'sha256': digest.hexdigest(),
+                                    'bytes': len(package_journal)})
                             record['files_scanned'] += 1
                             if expected:
                                 original = source / expected

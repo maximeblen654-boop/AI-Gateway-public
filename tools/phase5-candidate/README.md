@@ -53,6 +53,11 @@ AWS access-ID detection requires complete token boundaries. The pinned official
 Node binary contains matching substrings inside longer string-table entries;
 those are not standalone access IDs. No base layer, file or matched value is
 exempted; standalone synthetic IDs still fail the audit regression.
+Alpine 3's `/var/log/apk.log` is retained public package-build metadata: it is
+accepted only after bounded content validation of the exact pinned base/frozen
+BFF recipe's apk commands and package/version/trigger records. Its layer and file
+hashes are recorded. Arbitrary log text, other log paths, private paths and all
+credential signatures remain rejected; no layer is skipped.
 Only an image ID that passed both this audit and the existing full smoke can be
 pushed. Test container writable layers, env files and databases are never exported.
 
