@@ -1,7 +1,6 @@
 import { CompilePlan, CompilePublishedPlan, Materialize } from '../api/video-request-builder.mjs';
 import { createOperationJournal } from './operation-journal.js';
 import { createVideoDelivery } from './video-delivery.mjs';
-import { videoResultExpectation } from './video-result-spec.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
@@ -41,6 +40,7 @@ export function createAccountVideoClient({baseUrl,serviceToken,fetchImpl=fetch})
 // create a new slot task; all prepare calls require a Core-issued opaque quote.
 export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=Date.now}) {
   const journal=createOperationJournal({rootDir});
+  const recovering=new Map();
   const preparationRoot=path.join(rootDir,'preparations');fs.mkdirSync(preparationRoot,{recursive:true,mode:0o700});
   const owner=session=> {if(!Number.isSafeInteger(session?.ownerId)||session.ownerId<=0)fail('Owner required');return session.ownerId};
   const preparationPath=(uid,id)=>path.join(preparationRoot,createHash('sha256').update(`${uid}:${id}`).digest('hex')+'.json');
@@ -99,9 +99,6 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const fresh=child(session,id);
     if(fresh.status==='intent'){
       if(now()>=Date.parse(c.account.binding.expires_at))fail('video_quote_expired');
-      // Do not incur supplier work for a specification whose delivered pixel
-      // meaning is still unknown. Preview/quote does not perform this action.
-      videoResultExpectation(c.account.binding.spec);
       // Persist before the only submission. A lost response only leads to GET.
       journal.markDispatching(owner(session),id,0);
       try {await call(session,'POST','tasks',{quote_token:c.account.quote_token,task_id:c.childId},c.account.key_ref);}catch{return {...view(get(session,id)),status:'unknown'};}
@@ -129,7 +126,18 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     };
     return createVideoDelivery({journal,ledger,supplier,resultStore,coordinator:{inspectTask:()=>current(session,c),reconcileChild:()=>ledger.release()}});
   }
-  async function recover(session,id){
+  function recover(session,id){
+    const key=`${owner(session)}:${id}`;
+    if(recovering.has(key))return recovering.get(key);
+    // Concurrent clicks/polls share one recovery and capture attempt. Nothing
+    // survives this request: re-login/restart uses fresh authentication and the
+    // original durable Core identity/idempotency, never a new generation.
+    const pending=Promise.resolve().then(()=>recoverOnce(session,id));
+    recovering.set(key,pending);
+    pending.finally(()=>{if(recovering.get(key)===pending)recovering.delete(key);}).catch(()=>{});
+    return pending;
+  }
+  async function recoverOnce(session,id){
     const op=get(session,id);
     if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.recover(session,id);}
     const c=op.children[0];if(c.status==='intent')return view(op);

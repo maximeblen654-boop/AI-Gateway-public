@@ -55,7 +55,7 @@ func TestStudioImageWebPSecurityRegression(t *testing.T) {
 			// rejection must come from the full decoder, not an earlier gate.
 			cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
 			if err != nil || format != "webp" || cfg.Width < 1 || cfg.Height < 1 ||
-				int64(cfg.Width)*int64(cfg.Height) > (128<<20)/4 || validateStudioImageContainer(data, format, false) != nil {
+				int64(cfg.Width)*int64(cfg.Height) > (128<<20)/4 || validateStudioImageContainer(data, format) != nil {
 				t.Fatal("regression does not reach full WebP decoding", err)
 			}
 			body, err := json.Marshal(map[string]any{"data": []any{map[string]string{

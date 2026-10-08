@@ -20,9 +20,9 @@ func TestPublishedImageAspectRetainsFinalWireSize(t *testing.T) {
 	wire, width, height, err := ImageDimensions(bound.Offer.ResolvedConfig, bound.Spec)
 	must(t, err)
 	if wire != fields["size"] || width != 1536 || height != 864 {
-		t.Fatal("delivery expectation diverges from final wire size")
+		t.Fatal("configured request dimensions diverge from final wire size")
 	}
-	t.Logf("spec=1K/16:9 count=1 final=%s expected_pixels=%dx%d", plan.MaterializeJSON(), width, height)
+	t.Logf("spec=1K/16:9 count=1 final=%s requested_pixels=%dx%d", plan.MaterializeJSON(), width, height)
 }
 
 func TestImageMappingCannotDowngradeDeclaredSpec(t *testing.T) {

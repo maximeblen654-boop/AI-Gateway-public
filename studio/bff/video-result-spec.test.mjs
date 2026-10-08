@@ -5,10 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createVideoResultStore} from './video-result-store.mjs';
-import {assertVideoResultSpec,decodedVideoMeasurement} from './video-result-spec.mjs';
 
 const identity={mode:'account_video_v1',ownerId:1,childId:'av_spec',taskId:'original',accountId:7,bindingHash:'a'.repeat(64),requestHash:'b'.repeat(64)};
-const expected={resolution:'320x180',aspect_ratio:'16:9',duration_seconds:2,count:1};
 const media=new Map();
 function syntheticVideo(size='320x180',seconds=2) {
  const key=`${size}/${seconds}`;
@@ -17,55 +15,44 @@ function syntheticVideo(size='320x180',seconds=2) {
 }
 function fixture(t){const rootDir=fs.mkdtempSync(path.join(os.tmpdir(),'video-spec-'));t.after(()=>fs.rmSync(rootDir,{recursive:true,force:true}));const make=()=>createVideoResultStore({rootDir});make.rootDir=rootDir;return make;}
 
-test('decoded video dimensions and timeline must match the frozen spec, including after restart',async t=>{
- for(const [name,size,seconds,error] of [
-  ['pixels','160x90',2,/video_result_dimensions_mismatch/],
-  ['ratio','320x320',2,/video_result_aspect_mismatch/],
-  ['duration','320x180',1,/video_result_duration_mismatch/],
+test('valid originals retain their bytes regardless of geometry or duration',async t=>{
+ for(const [name,size,seconds] of [
+  ['pixels','160x90',2],
+  ['ratio','320x320',2],
+  ['duration','320x180',1],
  ])await t.test(name,t=>{
   const make=fixture(t),store=make(),bytes=syntheticVideo(size,seconds);
-  assert.throws(()=>store.put(identity,{bytes,mimeType:'video/mp4'},expected),error);
-  // A structurally valid but wrong original remains private evidence. It can
-  // never become a capture proof merely by restarting or reopening the store.
+  const saved=store.put(identity,{bytes,mimeType:'video/mp4'});
+  assert.equal(saved.version,2);
   assert.deepEqual(store.load(identity).bytes,bytes);
-  assert.throws(()=>make().load(identity,expected),error);
+  assert.deepEqual(make().load(identity).bytes,bytes);
+  assert.equal(make().load(identity).sha256,saved.sha256);
  });
 });
 
-test('missing frame timestamps, rotation, or changing decoded dimensions are unverifiable',()=>{
- const probe={streams:[{codec_type:'video',width:320,height:180,sample_aspect_ratio:'1:1'}],frames:[{media_type:'video',width:320,height:180,best_effort_timestamp_time:'0',duration_time:'2'}]};
- assert.doesNotThrow(()=>assertVideoResultSpec(decodedVideoMeasurement(probe,1),expected));
- for(const change of [
-  p=>delete p.frames[0].best_effort_timestamp_time,
-  p=>delete p.frames[0].duration_time,
-  p=>p.frames[0].height=160,
-  p=>p.streams[0].side_data_list=[{rotation:90}],
-  p=>p.streams[0].sample_aspect_ratio='2:1',
- ]){
-  const changed=structuredClone(probe);change(changed);
-  assert.throws(()=>assertVideoResultSpec(decodedVideoMeasurement(changed,1),expected),/video_result_metadata_missing/);
- }
- assert.throws(()=>assertVideoResultSpec(null,expected),/video_result_metadata_missing/);
+test('historical v1/v2 metadata and optional measurements are read without rewriting them',async t=>{
+ for(const variant of ['v1','v2-unmeasured','v2-measured'])await t.test(variant,t=>{
+  const make=fixture(t),bytes=syntheticVideo('160x90'),saved=make().put(identity,{bytes,mimeType:'video/mp4'});
+  const metaFile=path.join(make.rootDir,fs.readdirSync(make.rootDir)[0],'meta.json');
+  const meta=JSON.parse(fs.readFileSync(metaFile));
+  if(variant==='v1'){delete meta.media;meta.version=1;}
+  else meta.media=variant==='v2-measured'?{version:1,width:160,height:90,frames:10,durationMicros:2000000}:null;
+  const old=JSON.stringify(meta);fs.writeFileSync(metaFile,old);
+  assert.deepEqual(make().load(identity).bytes,bytes);assert.equal(make().load(identity).sha256,saved.sha256);
+  assert.equal(fs.readFileSync(metaFile,'utf8'),old);
+  for(const changed of [{...identity,accountId:9},{...identity,requestHash:'c'.repeat(64)},{...identity,bindingHash:'d'.repeat(64)}])assert.throws(()=>make().load(changed),/video_result_identity_mismatch/);
+  assert.equal(make().load({...identity,ownerId:9}),null);
+ });
 });
 
-test('older original metadata is decoded again against the frozen order without rewriting it',t=>{
- const make=fixture(t),store=make();
- store.put(identity,{bytes:syntheticVideo('160x90'),mimeType:'video/mp4'});
- // Simulate the pre-check metadata schema, without changing original bytes.
- const digest=store.load(identity).sha256;
- const metaFile=path.join(make.rootDir,fs.readdirSync(make.rootDir)[0],'meta.json');
- const meta=JSON.parse(fs.readFileSync(metaFile));delete meta.media;meta.version=1;
- const old=JSON.stringify(meta);fs.writeFileSync(metaFile,old);
- assert.throws(()=>make().load(identity,expected),/video_result_dimensions_mismatch/);
- assert.equal(store.load(identity).sha256,digest);
- assert.equal(fs.readFileSync(metaFile,'utf8'),old);
-});
-
-test('matching decoded result is durable; unproven named resolution is not a pixel guarantee',t=>{
- const make=fixture(t),bytes=syntheticVideo(),saved=make().put(identity,{bytes,mimeType:'video/mp4'},expected);
- assert.deepEqual(make().load(identity,expected).bytes,bytes);
- assert.equal(saved.version,2,'v1 rollback readers must not treat new originals as unchecked settlement evidence');
- assert.equal(saved.media.width,320);assert.equal(saved.media.height,180);assert.equal(saved.media.durationMicros,2000000);
- assert.throws(()=>make().load(identity,{...expected,resolution:'720p'}),/video_result_resolution_unverifiable/);
- assert.throws(()=>make().load(identity,{...expected,count:2}),/video_result_spec_invalid/);
+test('missing, truncated, wrong-format and oversized originals remain invalid',t=>{
+ const make=fixture(t),bytes=syntheticVideo();
+ for(const invalid of [Buffer.alloc(0),Buffer.from('not a video'),bytes.subarray(0,60)])assert.throws(()=>make().put(identity,{bytes:invalid,mimeType:'video/mp4'}),/video_result_/);
+ assert.throws(()=>make().put(identity,{bytes,mimeType:'video/webm'}),/video_result_type_mismatch/);
+ const small=createVideoResultStore({rootDir:make.rootDir,maxResultBytes:bytes.length-1});
+ assert.throws(()=>small.put(identity,{bytes,mimeType:'video/mp4'}),/video_result_invalid_media/);
+ make().put(identity,{bytes,mimeType:'video/mp4'});
+ const originalFile=path.join(make.rootDir,fs.readdirSync(make.rootDir)[0],'original.bin');
+ const corrupted=Buffer.from(bytes);corrupted[corrupted.length-1]^=1;fs.writeFileSync(originalFile,corrupted);
+ assert.throws(()=>make().load(identity),/video_result_corrupt/);
 });

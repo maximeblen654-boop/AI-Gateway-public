@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,20 +31,26 @@ func (s studioImageLoopbackHTTP) Do(req *http.Request, proxy string, accountID i
 }
 
 func TestStudioImageRealHTTPRecovery(t *testing.T) {
-	for _, mode := range []string{"success", "reject", "lost_response", "timeout", "wrong_pixels", "wrong_ratio", "wrong_count", "missing_metadata"} {
+	for _, mode := range []string{"success", "widescreen", "different_pixels", "different_ratio", "reject", "lost_response", "timeout", "wrong_count", "missing_metadata"} {
 		t.Run(mode, func(t *testing.T) {
 			var posts atomic.Int32
 			result := studioResult(t, "png")
 			switch mode {
-			case "wrong_pixels":
+			case "different_pixels":
 				result = studioPixelResult(t, 512, 512)
-			case "wrong_ratio":
+			case "different_ratio":
 				result = studioPixelResult(t, 1024, 576)
 			case "wrong_count":
 				result = []byte(`{"data":[]}`)
 			case "missing_metadata":
 				// Supplier JSON dimensions cannot stand in for a decodable image.
 				result = []byte(`{"data":[{"b64_json":"AQ==","width":1024,"height":1024}]}`)
+			}
+			validResult := mode == "success" || mode == "widescreen" || mode == "different_pixels" || mode == "different_ratio"
+			wireSize := "1024x1024"
+			if mode == "widescreen" {
+				wireSize = "1536x864"
+				result = studioPixelResult(t, 1536, 864)
 			}
 			transportUnknown := mode == "reject" || mode == "lost_response" || mode == "timeout"
 			supplier := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -57,7 +64,7 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				var fields map[string]any
 				require.NoError(t, json.Unmarshal(body, &fields))
 				require.Equal(t, "gpt-image-2", fields["model"])
-				require.Equal(t, "1024x1024", fields["size"])
+				require.Equal(t, wireSize, fields["size"])
 				require.Equal(t, float64(1), fields["n"])
 				switch mode {
 				case "reject":
@@ -78,6 +85,23 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 			}))
 			defer supplier.Close()
 			r, q, key, _, billing := studioContractFixture(t, supplier.URL+"/v1")
+			if mode == "widescreen" {
+				ma := r.Media.(*studioMediaFixture)
+				admin := mediaworkbench.NewService(ma)
+				product := ma.a.Config.Draft.Products[0]
+				product.Capabilities.AspectRatios = []string{"16:9"}
+				product.AdapterConfig.SizeMappings = []mediaworkbench.SizeMapping{{Resolution: "1K", AspectRatio: "16:9", WireSize: wireSize}}
+				draft, e := admin.SaveDraft(context.Background(), 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
+				require.NoError(t, e)
+				require.True(t, draft.Config.Validation.PublishReady)
+				published, e := admin.Publish(context.Background(), 7, draft.Config.RecordVersion, draft.Config.Draft.Revision)
+				require.NoError(t, e)
+				r.Core.channelService = &ChannelService{repo: &studioChannelFixture{channel: studioAccountPrice("0.35")}}
+				token, e := r.Issue(context.Background(), q.Owner, key, published.Config.Published.Offers[0].OfferID, mediaworkbench.Spec{Resolution: "1K", AspectRatio: "16:9", Count: 1}, nil)
+				require.NoError(t, e)
+				q, e = r.Store.Quote(token, q.Owner, time.Now())
+				require.NoError(t, e)
+			}
 			client := supplier.Client() // trusts only the local fixture certificate
 			client.Timeout = 500 * time.Millisecond
 			client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -85,7 +109,7 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 			r.network = r.dispatchHTTP
 			c, _ := newOpenAIImagesTestContext(t, nil)
 			_, err := r.Dispatch(context.Background(), c, q, "http-original", "synthetic", nil, key)
-			if mode == "success" {
+			if validResult {
 				require.NoError(t, err)
 				require.Equal(t, 1, billing.applied)
 			} else {
@@ -103,10 +127,16 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 			_, _ = restarted.Dispatch(context.Background(), c, q, "http-original", "synthetic", nil, key)
 			receipt, recoveredErr := restarted.Recover(context.Background(), "http-original", q.Owner)
 			require.EqualValues(t, 1, posts.Load())
-			if mode == "success" {
+			if validResult {
 				require.NoError(t, recoveredErr)
 				require.Equal(t, "billed", receipt.BillingState)
 				require.Equal(t, 1, billing.applied)
+				require.Equal(t, 1, billing.calls)
+				require.Equal(t, "0.80", billing.cmd.ExactAmounts.Balance)
+				saved, readErr := restarted.Store.Result(receipt)
+				require.NoError(t, readErr)
+				require.Equal(t, result, saved, "preview/download must use unchanged supplier bytes")
+				require.Equal(t, HashUsageRequestPayload(result), receipt.ResultHash)
 			} else {
 				require.Error(t, recoveredErr)
 				if transportUnknown {
@@ -118,7 +148,7 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				require.Zero(t, billing.applied)
 				require.Zero(t, billing.calls)
 			}
-			t.Logf("request size=1024x1024 n=1; task=http-original status=%s billing=%s supplier_posts=%d native_billing_calls=%d applied=%d", receipt.Status, receipt.BillingState, posts.Load(), billing.calls, billing.applied)
+			t.Logf("request size=%s n=1; task=http-original status=%s billing=%s supplier_posts=%d native_billing_calls=%d applied=%d result_hash=%s", wireSize, receipt.Status, receipt.BillingState, posts.Load(), billing.calls, billing.applied, receipt.ResultHash)
 			_, err = restarted.Recover(context.Background(), "http-original", StudioImageOwner{9, 2, 3})
 			require.Error(t, err)
 		})

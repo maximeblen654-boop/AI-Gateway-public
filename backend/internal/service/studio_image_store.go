@@ -19,9 +19,9 @@ import (
 var ErrStudioImageUnknown = errors.New("original image dispatch outcome unknown; POST replay disabled")
 var ErrStudioImageConflict = errors.New("image task binding conflict")
 
-// StudioImageReceiptVersion identifies receipts that require result-spec checks.
-// Old executors only understand ImageBindingVersion as a receipt version and
-// must not resume these tasks without the result-specification prerequisite.
+// StudioImageReceiptVersion retains the existing durable receipt format.
+// Readers accept historical v1 and v2 without rewriting their frozen identity.
+// Rollback executors must support the file version and the current relay policy.
 const StudioImageReceiptVersion = "published_image_receipt_v2"
 
 type StudioImageOwner struct {

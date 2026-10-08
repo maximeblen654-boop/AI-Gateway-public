@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { assertVideoResultSpec, decodedVideoMeasurement } from './video-result-spec.mjs';
 
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -49,7 +48,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > limit) fail('video_result_corrupt');
     return fs.readFileSync(file);
   }
-  function load(identity, expectedSpec) {
+  function load(identity) {
     const directory = location(identity);
     if (!fs.existsSync(directory)) return null;
     safeDirectory(directory);
@@ -61,26 +60,22 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
         meta.size > maxResultBytes || !/^[a-f0-9]{64}$/.test(meta.sha256 || '')) fail('video_result_identity_mismatch');
     const bytes = fileBytes(path.join(directory, 'original.bin'), maxResultBytes);
     if (bytes.length !== meta.size || digest(bytes) !== meta.sha256) fail('video_result_corrupt');
-    if (expectedSpec) {
-      // Pre-existing originals lack decoded measurements. Verify their bytes
-      // without rewriting the old task, quote, result identity or billing.
-      const measured = Object.hasOwn(meta, 'media') ? meta.media : validate(path.join(directory, 'original.bin'), bytes, meta.mimeType);
-      assertVideoResultSpec(measured, expectedSpec);
-    }
+    // Both versions were fully decoded before their atomic commit. Optional v2
+    // measurements are historical diagnostics, not delivery/settlement gates.
     return { ...meta, bytes };
   }
-  function command(executable, args, maxBuffer = 128 * 1024) {
+  function command(executable, args) {
     try {
       return execFileSync(executable, args, { encoding: 'utf8', timeout: 60_000,
-        maxBuffer, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        maxBuffer: 128 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch { fail('video_result_decode_failed'); }
   }
   function validate(file, bytes, mimeType) {
     if (mimeType === 'video/mp4' ? bytes.toString('ascii', 4, 8) !== 'ftyp'
       : !bytes.subarray(0, 4).equals(Buffer.from('1a45dfa3', 'hex'))) fail('video_result_type_mismatch');
     let probe;
-    try { probe = JSON.parse(command(ffprobePath, ['-v', 'error', '-select_streams', 'v', '-show_frames', '-show_entries',
-      'format=format_name,duration:stream=codec_type,width,height,sample_aspect_ratio:stream_side_data=rotation:frame=media_type,width,height,best_effort_timestamp_time,duration_time,pkt_duration_time', '-of', 'json', file], 2 * 1024 * 1024)); }
+    try { probe = JSON.parse(command(ffprobePath, ['-v', 'error', '-show_entries',
+      'format=format_name,duration:stream=codec_type,width,height', '-of', 'json', file])); }
     catch { fail('video_result_decode_failed'); }
     const videos = probe.streams?.filter(stream => stream.codec_type === 'video') || [];
     if (videos.length !== 1 || !Number.isFinite(Number(probe.format?.duration)) ||
@@ -95,7 +90,6 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
       '-progress', 'pipe:1', '-']);
     if (!/^progress=end\r?$/m.test(progress) ||
         Number([...progress.matchAll(/^frame=(\d+)\r?$/gm)].at(-1)?.[1]) < 1) fail('video_result_decode_failed');
-    return decodedVideoMeasurement(probe, Number([...progress.matchAll(/^frame=(\d+)\r?$/gm)].at(-1)?.[1]));
   }
   function usage() {
     let total = 0;
@@ -114,7 +108,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     }
     return total;
   }
-  function put(identity, { bytes, mimeType }, expectedSpec) {
+  function put(identity, { bytes, mimeType }) {
     const target = location(identity);
     if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > maxResultBytes || !MIME.has(mimeType)) {
       fail('video_result_invalid_media');
@@ -123,7 +117,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     const existing = load(identity);
     if (existing) {
       if (existing.mimeType !== mimeType || existing.sha256 !== digest(body)) fail('video_result_conflict');
-      return load(identity, expectedSpec);
+      return existing;
     }
     if (usage() + body.length + 4096 > maxStoreBytes) fail('video_result_capacity');
     const temp = path.join(root, `.pending-${randomUUID()}`);
@@ -131,11 +125,11 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
     try {
       const file = path.join(temp, 'original.bin');
       writeDurable(file, body);
-      const media = validate(file, body, mimeType);
-      // A rollback reader that only knows v1 must reject Account originals
-      // instead of treating a retained wrong-spec original as capture evidence.
+      validate(file, body, mimeType);
+      // Keep v1/v2 compatibility; no file-version downgrade or rewrite of old
+      // measurements. New output measurements are unnecessary for relay billing.
       const meta = { version: identity.mode === 'account_video_v1' ? 2 : 1, ...identity, mimeType, size: body.length, sha256: digest(body),
-        storedAt: new Date().toISOString(), media };
+        storedAt: new Date().toISOString(), media: null };
       writeDurable(path.join(temp, 'meta.json'), Buffer.from(JSON.stringify(meta)));
       syncDirectory(temp);
       try { fs.renameSync(temp, target); }
@@ -144,9 +138,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
         if (!raced || raced.mimeType !== mimeType || raced.sha256 !== meta.sha256) throw error;
       }
       syncDirectory(root);
-      // Commit structurally valid original bytes even on a specification
-      // mismatch. Recovery must inspect this same evidence, never regenerate.
-      return load(identity, expectedSpec);
+      return load(identity);
     } finally {
       if (fs.existsSync(temp)) {
         for (const name of fs.readdirSync(temp)) fs.unlinkSync(path.join(temp, name));

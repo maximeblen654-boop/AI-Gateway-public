@@ -49,8 +49,8 @@ func validateImageMapping(m SizeMapping) (int, int, error) {
 	return w, h, nil
 }
 
-// ImageDimensions is shared by preview, final request compilation and result
-// verification. Callers supply the frozen offer configuration during recovery.
+// ImageDimensions is shared by preview and final request compilation. A wire
+// size is the requested value, not a promise about the supplier's output pixels.
 func ImageDimensions(config ImageConfig, spec Spec) (wire string, width, height int, err error) {
 	if spec.Resolution == "" && spec.AspectRatio == "" {
 		return "", 0, 0, nil // no fixed size was sold

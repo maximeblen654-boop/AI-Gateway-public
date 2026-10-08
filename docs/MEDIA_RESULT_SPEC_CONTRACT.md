@@ -1,117 +1,127 @@
-# Frozen media specifications and delivery verification
+# Media request correctness and original-result delivery
 
-This change targets the Published image/Account-video paths. It is a local,
-synthetic verification result, not evidence of supplier capability or deployment.
-The earlier browser acceptance established identity/recovery/billing wiring; its
-small media fixtures did not establish delivered resolution or duration.
+AI-Gateway is an API relay. Before dispatch, the configured supplier protocol,
+Published specification and frozen request must agree. After dispatch, a complete,
+valid, decodable supplier result is saved and delivered unchanged and settled at
+the original quoted price once. Actual output pixels, aspect ratio and duration
+are not quality promises or settlement gates.
+
+This policy supersedes the output-equality checks introduced in `aa219b1`.
+It does not change prices, result-count contracts, the native ledger, reservations,
+capture/release rules, or the meaning of historical settled orders.
 
 ## Request and settlement boundaries
 
 | Stage | Image | Account video |
 | --- | --- | --- |
-| Administrator | `mediaworkbench.Validate` checks explicit size mapping against aspect ratio and numeric pixel specification. A fixed specification cannot map to `auto`. | The controlled wire profile selects `duration`/`ratio` or `seconds`/`aspect_ratio`. Models and supported values come from Published configuration. |
-| Frozen quote | `ResolvedImageOffer.Spec` and `Offer.ResolvedConfig` retain the size mapping, price, Account and adapter. | `CompilePublishedVideoPlan`/`InspectForModel` compare the final request's resolution, duration, ratio and reference counts with the frozen spec. Missing/overridden parameters are rejected. |
-| Outbound request | `CompilePublishedImagePlan` → `MaterializeJSON` → `buildOpenAIImagesRequest` passes the resulting bytes unchanged. | Node `CompilePublishedPlan` → `Materialize` → Core plan validation → `Plan.Materialize` → `requestHTTP` retains the same fields/bytes. Fixed adapter fields do not contain resolution/duration/ratio overrides. |
-| Actual response | `studio_image_result.go` checks actual decoded PNG/JPEG/WebP dimensions and count, full container integrity and fixed-geometry EXIF orientation. JSON width/height claims cannot replace decoding. | `video-result-store.mjs` probes decoded video frames and fully decodes the original. It verifies one video stream, uniform actual pixel dimensions, square sample pixels, rotation and a measurable frame timeline. |
-| Money boundary | Receipt/request size must agree with the frozen mapping. Verification runs before `PersistResult` and again before existing `SettleQuotedImage`. | Frozen `binding.spec` is passed to original storage and checked before the existing authenticated capture call. Core's existing reserve/capture/release transaction model is unchanged. |
+| Administrator | `mediaworkbench.Validate` checks explicit size mappings against the requested aspect ratio and numeric size. Fixed specifications cannot map to `auto`. | Published configuration supplies supported values; the controlled adapter selects `duration`/`ratio` or `seconds`/`aspect_ratio` and reference fields. |
+| Frozen quote | Account, Published revision, adapter, price, specification, references and size mapping remain bound to the quote. | Account, connection, Published/adapter, price, specification and ordered references remain bound to preparation and the final request hash. |
+| Outbound request | `CompilePublishedImagePlan` → `MaterializeJSON` → `buildOpenAIImagesRequest` preserves the validated request bytes. | Node `CompilePublishedPlan` → `Materialize` → Core `CompilePublishedVideoPlan`/`InspectForModel` → `Plan.Materialize` → `requestHTTP` preserves the selected fields and request hash. |
+| Actual response | Decode every PNG/JPEG/WebP completely, check count, format, container integrity and bounded size. Supplier JSON dimension claims are not a substitute for valid image bytes. | Require a complete original, matching MIME/container, one video stream, valid bounded dimensions/duration and full `ffmpeg` decode. Persist original bytes and their hash before capture. |
+| Money boundary | Valid persisted result → existing `SettleQuotedImage` once at the frozen price. | Valid persisted original → existing authenticated native capture once. |
 
-## Comparison policy and explicit limits
+An erroneous `16:9 → 1024x1024` mapping, a fixed request mapped to `auto`, a
+missing required field or a request duration overridden by this site is still
+rejected before the paid POST. Model, quality, count and reference rules remain
+part of the controlled request compiler. Revoking output equality does not permit
+changing the frozen request, choosing another Account or re-quoting an old task.
 
-- Image `wire_size=WIDTHxHEIGHT` requires exactly those decoded pixels; integer
-  ratios must match by cross multiplication. No undocumented rounding allowance
-  is introduced. A label such as `1K` does not independently define a short side:
-  its explicit size mapping is the frozen pixel promise. The label's marketing
-  accuracy still requires supplier evidence. Explicit `auto`/unfixed specs do not
-  promise fixed pixels, but still require correct count and valid full images.
-- A fixed image cannot contain EXIF orientation that changes its display
-  geometry. Originals are not silently rotated, resized or re-encoded.
-- Video checks currently interpret **explicit `WIDTHxHEIGHT` only**. The existing
-  supplier contract lists `720p`, `1080p`, `4k`, etc., but the available evidence
-  does not define their pixel grids/rounding for every ratio. These labels return
-  `video_result_resolution_unverifiable`; new BFF dispatch is blocked **before**
-  a generation POST. Quoting itself still performs no generation.
-- Do not change a real `720p` offer to a pixel-valued request merely to bypass
-  this guard. Such a request must first be supported by that supplier. The local
-  positive tests use an explicitly configured synthetic pixel-valued profile;
-  they are not a capability claim for a real model.
-- Video duration is the decoded frame timeline's end minus start, not a JSON
-  supplier status nor an audio-inclusive container duration. The only allowance
-  is two microseconds for serialized endpoint rounding. There is no arbitrary
-  percentage or frame-length grace. Missing timestamps/frame duration, rotation,
-  non-square pixels or changing dimensions remain unverifiable.
-- Video probing is bounded to 2 MiB of frame metadata and 60 seconds per tool,
-  in addition to existing original-size and private-store capacity limits.
-  Exceeding bounds fails closed, not as a successful delivery.
-- `quality` labels/visual quality cannot be proved by dimensions and duration.
-  This change does not certify them.
+Legal configured supplier resolution names such as `720p`, `1080p` and `4k` are
+sent as that protocol defines them. They do not require an invented output pixel
+grid. An explicit `1280x720` value is likewise sent only when the existing
+adapter/configuration supports it. No request value is rewritten to satisfy an
+output checker.
+
+## Result policy
+
+- Requested `1024x1024` with a valid `512x512` or `1024x576` image is a successful
+  relay result. Requested `1280x720`, eight seconds with a valid different-sized
+  or shorter video is also a successful relay result.
+- Preserve the exact original bytes for preview and authenticated download.
+  Do not stretch, crop, rotate, re-encode, add frames or pad duration. Image EXIF
+  orientation is preserved rather than used as an equality gate.
+- Image response count still must equal the frozen quoted count. Video still
+  uses the existing single-original protocol. This change does not introduce
+  partial-count pricing or alter any quantity-billing contract.
+- Positive dimensions and duration, format consistency, complete decoding,
+  maximum media size, decoder resource limits, task/owner binding and original
+  hashes remain mandatory. Missing claimed width/height is acceptable when the
+  real file decodes; absent or corrupt file metadata that prevents valid decoding
+  is not a successful result.
+- The video probe is bounded to 128 KiB of structural metadata; probe and full
+  decode each have a 60-second timeout. Existing input/store size limits remain.
+  There is no output-equality tolerance policy or frame-timeline measurement.
 
 ## Recovery and financial behavior
 
-| Outcome | Durable evidence | Existing task / financial action |
-| --- | --- | --- |
-| Matching image | Frozen request, upstream response, verified result hash | Existing settlement once; `completed/billed` |
-| Wrong image pixels/ratio/count or undecodable metadata | Original request/receipt and upstream response retained | `unknown/pending`; no settlement, no automatic re-POST |
-| Image timeout / lost response | Permanent original dispatch claim | `unknown/pending`; recovery only, no second POST |
-| Matching video | Frozen quote/request and decoded original | Existing capture once |
-| Wrong video pixels/ratio/duration / unverifiable metadata | Structurally valid original and decoded measurement retained privately, bound to owner/Account/request/binding | No capture or release; existing reservation remains held. Restart checks the same original without downloading or generating a replacement. |
-| Video result GET timeout | Original task and quote remain | Retry original GET only; no generation or settlement |
-| Prior capture with discrepant original | Old captured money fact is retained | Delivery verification rejects it; no refund, re-capture or historical repricing |
+| Outcome | Existing task / financial action |
+| --- | --- |
+| Complete valid image, including different pixels/aspect | Save the unchanged result; `completed/billed`, original-price settlement once. |
+| Complete valid video, including different pixels/aspect/duration | Save the unchanged original before native capture once. |
+| Wrong image count, missing result or corrupt/undecodable bytes | Keep the original task/receipt; no successful delivery or settlement. No automatic generation retry. |
+| Image POST timeout, rejected/ambiguous response or lost response | Keep the permanent dispatch claim and existing `unknown/pending` recovery semantics; never issue a replacement POST. |
+| Video status explicitly confirms failure | Follow the existing verified-failure release path once. |
+| Video pending/unknown, missing result or result GET timeout | Query the original task/result only. No capture without a valid original, no new generation and no unconditional release. |
+| Already settled task | Recover the same original and identity; no reprice, refund or second capture. |
 
-New image receipts use `published_image_receipt_v2`; new Account-video originals
-use metadata version 2 with measurement version 1. Old executors reject these file
-versions rather than accepting retained wrong-spec bytes after rollback. These
-are private-file versions, not database schemas or new accounting states. Older
-receipts remain readable without changing their quote/request/accounting binding.
-Older stored originals without measurements are decoded
-again against the **original frozen spec**, without rewriting the old receipt.
-Already delivered historical results/charges are not automatically undone.
+Concurrent local recovery requests share one in-flight operation per owner/task.
+That in-memory coalescing is not an accounting authority: restart and re-login
+still use the durable original task and native idempotency records. Browser
+state is not the source of truth and cannot authorize another user's result.
 
-Rollback must retain a decoder/executor with these checks for unresolved media
-work. Restoring an older application image does not preserve the new guarantee
-for historical v1 records, and the old reader intentionally cannot take over new
-v2 records. Keep paid submission off and route recovery to a compatible component;
-do not delete records, down-convert metadata or restore a whole database to bypass
-the version barrier.
+### Receipt and original metadata compatibility
 
-Legacy slot journals do not have this Published specification binding. They keep
-their original recovery/receipt/ledger path and are not reinterpreted using a
-current catalog. Their format/integrity checks remain; this change does not claim
-that absent historical specification evidence has been recovered.
+Image receipt `published_image_binding_v1` and `published_image_receipt_v2`
+remain readable. New receipts keep v2. Recovery validates the original quoted
+count and saved result without reinterpreting a historical size mapping or
+rewriting the frozen request, price or ledger identity.
 
-Automatic refunds/releases for a completed-but-wrong supplier result are **not**
-implemented. The current release path requires a verified supplier failure. Any
-different compensation rule needs a separate financial decision; unknown or
-discrepant outcomes stay recoverable rather than causing another paid request.
+Video metadata v1 and v2 remain readable. New Account originals keep v2 with
+`media: null`; a prior v2 measurement is retained unchanged as historical
+diagnostic data and is not a delivery/capture condition. Stored bytes were
+fully decoded before atomic persistence; reads verify the same size, hash,
+owner, Account, request and binding identities. Existing receipts and originals
+are not migrated, downgraded or deleted.
 
-## Focused synthetic evidence
+Legacy slot journals retain their original receipt, recovery and ledger path.
+They are not reinterpreted through current Published configuration.
 
-- Before the change, new regressions reproduced acceptance of `16:9 →
-  1024x1024`, fixed size → `auto`, explicit `1024x1024 → 512x512`, and settlement
-  of undersized/wrong-ratio images. Video wrong pixels/ratio/duration were also
-  accepted by the old result store.
-- Image request: `model=gpt-image-2`, `size=1024x1024`, `n=1`. A real local TLS
-  supplier simulator receives these fields. Successful 1024×1024 output: one
-  supplier POST, one applied native billing call. Wrong pixels (512×512), wrong
-  ratio (1024×576), missing image metadata, wrong count, rejected response,
-  timeout and response loss: one original POST each, zero billing calls; runtime
-  and store reconstruction never resubmits.
-- The normal Published `1K / 16:9` case materializes `size=1536x864`, with the
-  same expected pixels at delivery; no square fallback or `auto` is introduced.
-- Video request: `resolution=1280x720`, `duration=5`, `ratio=16:9`. A 1280×720,
-  5-second synthetic clip succeeds. 640×360, 1280×1280 and 2-second clips each
-  retain the original task: one BFF task POST, one result GET, zero capture and
-  release calls through duplicate clicks and restart. These are transport/ledger
-  fixture call counts, **not real supplier charges or production SQL rows**.
-- The real Node BFF → Go Bridge HTTP contract probe preserves authentication,
-  lost-POST recovery, exact original hash, one task POST and one capture. Its Core
-  endpoint is a synthetic contract server. Separate Go runtime tests exercise
-  frozen Core requests, native repository calls, hold identity and idempotency.
-- Metadata absence, changing decoded dimensions, EXIF/display rotation, cached
-  original revalidation, changed/missing video request fields, cross-owner
-  recovery, legacy recovery and existing submission gates are covered.
+### Rollback boundary
 
-Reproduce only the affected checks (use low Go process parallelism on constrained
-machines):
+The strict `aa219b1` executor does not implement this business policy: it can
+reject a valid different-spec result or a v2 record without an output
+measurement. Earlier v1-only readers also cannot take over v2 records. A local
+application rollback must retain a recovery executor that supports these file
+versions and the relay policy; keep new submission off if that cannot be met.
+Do not down-convert records, undo historical charges or restore a whole database
+over newer tasks to force compatibility. No database schema or accounting
+state-machine change is part of this fix.
+
+## Focused synthetic verification
+
+The regressions distinguish outbound correctness from delivered geometry:
+
+- Normal Published `1K / 16:9` materializes `size=1536x864`; square/`auto` and
+  numeric downgrade mappings are rejected. A local TLS supplier observes the
+  actual image request fields, not a mocked compiler return.
+- For a `size=1024x1024`, `n=1` request, valid `512x512` and `1024x576` responses
+  preserve their exact bytes and hashes through recovery. Supplier POST and
+  applied native billing are each one, at the unchanged fixture quote.
+- An Account video request retains `resolution=1280x720`, `duration=8`,
+  `ratio=16:9`. Valid `640x360`, square and two-second originals each survive
+  duplicate clicks, fresh-session recovery and runtime/store reconstruction,
+  with one task POST and one capture. Configured `720p`/`1080p` also remain
+  unchanged in the request and are accepted without an output grid.
+- Historical image receipt v1/v2 and video original metadata v1/v2 recover
+  unchanged. Cross-owner/identity changes, malformed count/content, corruption,
+  explicit failure, pending status, timeout and response loss remain covered.
+- Node BFF → Go Bridge contract tests retain authentication, lost-POST recovery,
+  exact original hashes, single generation and single capture. Separate Core
+  tests exercise frozen request checks and native repository idempotency.
+
+These are local synthetic supplier/ledger results, not production SQL counts,
+real supplier charges or a new full browser acceptance. The earlier browser and
+database-restore evidence retains its original scope and is not re-run here.
 
 ```sh
 cd backend
@@ -121,19 +131,11 @@ cd ..
 node --test --test-concurrency=1 studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
 ```
 
-No migration, sale price, Published record, paid switch or real supplier request
-is changed by these checks. Existing images are **not** rebuilt by this test run
-and must not be presented as containing this fix.
+## Release status
 
-## Remaining release gate
-
-`BLOCKED_FOR_RELEASE`: named video resolution definitions and any supplier
-duration/pixel rounding allowances still require explicit evidence. The minimum
-follow-up is a controlled, versioned output-size policy frozen with the existing
-offer/quote (using the current Account configuration storage), plus focused
-acceptance against that policy. It must not be inferred from a similar model ID,
-current sale label or an arbitrary tolerance. No new ledger/schema is proposed.
-
-Old browser/restore PASS and old component digests retain their original scope;
-they do not certify these new checks. Build and approve only affected Core/BFF
-artifacts before considering a runtime deployment. No deployment is performed.
+`BLOCKED_FOR_RELEASE`. Output pixel grids and exact output-duration equality are
+no longer release requirements under this relay policy. Final candidate checks,
+affected Core/BFF artifacts and the existing independent production routing,
+recovery, sales/cost facts and deployment permissions remain separate gates.
+Old artifact digests do not identify this fix. No production deployment, sales
+Publish, paid enablement or real supplier request is performed by this work.
