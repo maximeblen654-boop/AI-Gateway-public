@@ -51,7 +51,11 @@ and normal certificate trust. No insecure DNS-network exception is added.
 `deploy/docker-compose.studio.yml` is an optional Linux Compose overlay for a
 Core service named `sub2api`, with Core on port 8080. Bridge and BFF share that
 service's loopback and receive separately scoped env files. Only host loopback
-8091/4173 is published. It adds no proxy, database or second Core. Independent
+8091/4173 is added; the existing Core port bindings remain inherited. Set
+`STUDIO_CORE_IMAGE`, `STUDIO_BRIDGE_IMAGE` and `STUDIO_BFF_IMAGE` to the verified
+immutable image IDs or registry digests. The overlay refuses an omitted Core
+identity rather than inheriting a mutable tag from the base Compose file.
+It adds no proxy, database or second Core. Independent
 HTTPS-connected containers or host services can use the same artifacts without
 the overlay. Check the merged Compose configuration privately before use; do
 not print its resolved secrets. A Core replacement in the shared topology also

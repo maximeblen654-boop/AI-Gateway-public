@@ -4,6 +4,7 @@
 # with the same artifacts and env contract; see studio/README.md.
 services:
   sub2api:
+    image: ${STUDIO_CORE_IMAGE:?Use an immutable verified Core image}
     environment:
       STUDIO_IMAGE_PUBLISHED_SUBMISSION: ${STUDIO_IMAGE_PUBLISHED_SUBMISSION:-false}
     ports:
