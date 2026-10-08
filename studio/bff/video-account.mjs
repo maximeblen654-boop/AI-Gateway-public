@@ -46,6 +46,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
   const readPreparation=(session,id)=>{const uid=owner(session);if(typeof id!=='string'||!id)return undefined;try{const value=JSON.parse(fs.readFileSync(preparationPath(uid,id),'utf8'));if(value.owner_id!==uid||value.preparation_id!==id)return undefined;return value;}catch{return undefined;}};
   const writePreparation=(uid,value)=>{const file=preparationPath(uid,value.preparation_id),tmp=`${file}.${randomUUID()}.tmp`;const fd=fs.openSync(tmp,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value));fs.fsyncSync(fd)}finally{fs.closeSync(fd)}fs.renameSync(tmp,file);};
   async function catalog(session){owner(session);return (await call(session,'GET','catalog')).payload;}
+  async function readiness(session){owner(session);return (await call(session,'GET','readiness')).payload;}
   async function prepareReferences(session,payload) {
     const uid=owner(session);
     const {model,...corePayload}=payload;
@@ -85,7 +86,9 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     return view(op);
   }
   function get(session,id){const op=journal.getForOwner(owner(session),id),old=legacy?.get?.(session,id);if(op&&old)fail('Conflicting journal roots');if(!op&&!old)fail('Operation not found');return op||old;}
-  function view(op){return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
+  function view(op){const b=op.children[0]?.account?.binding;return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',created_at:op.createdAt,
+    ...(b?{status:op.children[0].status,offer_id:b.offer.offer_id,model:b.offer.upstream_model,spec:b.spec,sale_price:b.offer.sale_price,expires_at:b.expires_at}:{}),
+    children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
   function child(session,id){const op=get(session,id);if(op.version!==2)fail('Legacy task requires original recovery');return op.children[0];}
   async function current(session,c){const s=(await call(session,'GET',`tasks/${c.childId}`,undefined,c.account.key_ref)).payload;
     if(s?.contract!==VIDEO_CONTRACT||s.task_id!==c.childId||s.binding_hash!==c.account.binding_hash||s.request_hash!==c.bodySha256)fail('Recovery identity mismatch');return s;}
@@ -94,9 +97,10 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     journal.readChildBody(owner(session),id,0);
     const fresh=child(session,id);
     if(fresh.status==='intent'){
+      if(now()>=Date.parse(c.account.binding.expires_at))fail('video_quote_expired');
       // Persist before the only submission. A lost response only leads to GET.
       journal.markDispatching(owner(session),id,0);
-      try {await call(session,'POST','tasks',{quote_token:c.account.quote_token,task_id:c.childId},c.account.key_ref);}catch{return {operation_id:op.operationId,status:'unknown'};}
+      try {await call(session,'POST','tasks',{quote_token:c.account.quote_token,task_id:c.childId},c.account.key_ref);}catch{return {...view(get(session,id)),status:'unknown'};}
     }
     return recover(session,id);
   }
@@ -124,12 +128,13 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
   async function recover(session,id){
     const op=get(session,id);
     if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.recover(session,id);}
-    const c=op.children[0],s=await current(session,c);
+    const c=op.children[0];if(c.status==='intent')return view(op);
+    const s=await current(session,c);
     if(s.upstream_id&&['dispatching','accepted'].includes(c.status))journal.markAccepted(owner(session),id,0,s.upstream_id);
     if(['completed','captured','failed'].includes(s.status)){await delivery(session,id).operation.reconcileChild(owner(session),id,0);s.status=s.status==='failed'?'released':'captured';}
     return {...view(get(session,id)),status:s.status};
   }
   async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};if(options?.index)fail('Invalid child index');return delivery(session,id).openOriginal(owner(session),id,0,options);}
   function history(session){const current=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];if(old.some(op=>current.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');return [...current,...old].map(view);}
-  return {catalog,prepare,prepareReferences,getPreparation,dispatch,recover,original,history};
+  return {catalog,readiness,prepare,prepareReferences,getPreparation,dispatch,recover,original,history};
 }

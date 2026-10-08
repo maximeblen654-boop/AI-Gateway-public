@@ -12,6 +12,17 @@ import { createImageResultStore } from './image-result-store.mjs';
 const { createStudioSessionBridge } = createRequire(import.meta.url)('./studio-session.js');
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const owner={ownerId:1,sessionProof:'proof'};
+test('browser restores a prepared image and confirms its stored identity without replaying inputs',async t=>{
+  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
+  const prepared=f.tasks.prepare(owner,f.input).task;
+  const runtime=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),call:f.call,results:f.results});
+  const restored=await runtime.recover(owner,prepared.task_id);
+  assert.equal(restored.status,'prepared');assert.equal(restored.sale_price.currency,'CNY');assert.equal(f.stats().gets,0);
+  assert.equal((await runtime.dispatch(owner,{task_id:prepared.task_id})).status,'completed');
+  await runtime.dispatch(owner,{task_id:prepared.task_id});assert.equal(f.stats().posts,1);
+  await assert.rejects(runtime.dispatch({ownerId:2},{task_id:prepared.task_id}));
+  assert.equal(JSON.stringify(runtime.history(owner)).includes('quote_token'),false);
+});
 function fixture(t,{lost=false,count=1}={}) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bound-image-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));let posts=0,gets=0;
   const call=async(session,method,operation,payload,key=0)=>{
@@ -28,6 +39,13 @@ function fixture(t,{lost=false,count=1}={}) {
   const input={quote_token:'a'.repeat(64),client_key:'client-key-01',prompt:'synthetic',references:[]};
   return {root,tasks,input,results,call,stats:()=>({posts,gets})};
 }
+
+test('expired prepared image refuses its first POST but an already claimed image remains recoverable',async t=>{
+ const f=fixture(t);await f.tasks.quote(owner,{offer_id:'p',spec:{count:1,images:0}});const id=f.tasks.prepare(owner,f.input).task.task_id;
+ const later=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),call:f.call,results:f.results,now:()=>Date.now()+3600000});
+ await assert.rejects(later.dispatch(owner,{task_id:id}),/image_quote_expired/);assert.equal(f.stats().posts,0);
+ await f.tasks.dispatch(owner,{task_id:id});assert.equal((await later.dispatch(owner,{task_id:id})).status,'completed');assert.equal(f.stats().posts,1);
+});
 test('Published quote, durable journal/claim, full original result delivery',async t=>{
   const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
   const task=await f.tasks.dispatch(owner,f.input);assert.equal(task.status,'completed');assert.equal(task.results.length,1);
@@ -45,8 +63,9 @@ test('claim/response loss uses frozen original key and GET only after restart',a
   assert.equal(f.stats().posts,1);assert.ok(f.stats().gets>=2);
 });
 test('late pending recovery cannot overwrite completed originals',async t=>{
-  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'p',spec:{count:1,images:0}});
+  const f=fixture(t,{lost:true});await f.tasks.quote(owner,{offer_id:'p',spec:{count:1,images:0}});
   const prepared=f.tasks.prepare(owner,f.input).task;
+  await assert.rejects(f.tasks.dispatch(owner,f.input),/lost response/);
   let finish,started;const arrived=new Promise(r=>{started=r});
   const stale=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async()=>{started();await new Promise(r=>{finish=r});return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:prepared.task_id,status:'unknown',billing_state:'pending',result_available:false}};}});
   const pending=stale.recover(owner,prepared.task_id);await arrived;

@@ -8,7 +8,8 @@ const fixturePath = () => process.env.PHASE5_FIXTURE_MANIFEST || path.join(root,
 
 function validateFixture(value) {
   assert(value && typeof value === 'object', 'Local fixture manifest is required');
-  assert.deepEqual(Object.keys(value).sort(), ['account_id', 'expected_core_image', 'schema_version', 'user_ids']);
+  assert.deepEqual(Object.keys(value).filter(k=>k!=='mock_submission').sort(), ['account_id', 'expected_core_image', 'schema_version', 'user_ids']);
+  if(value.mock_submission!==undefined)assert.equal(value.mock_submission,true);
   assert.equal(value.schema_version, 1, 'Unsupported local fixture version');
   assert(/^sha256:[a-f0-9]{64}$/.test(value.expected_core_image), 'Expected an immutable local Core image ID');
   assert(Number.isSafeInteger(value.account_id) && value.account_id > 0, 'Expected a test Account ID');
@@ -25,7 +26,7 @@ function readFixture() {
   return validateFixture(value);
 }
 
-function assertFixtureCore(core, fixture) {
+function assertFixtureCore(core, fixture, {mockSubmission=false}={}) {
   validateFixture(fixture);
   assert(core?.State?.Running && core.Config?.Labels?.['com.docker.compose.project'] === 'phase5', 'Expected a running, isolated phase5 Core');
   assert.equal(core.Image, fixture.expected_core_image, 'Core image differs from the explicit local fixture');
@@ -34,6 +35,7 @@ function assertFixtureCore(core, fixture) {
     return [value.slice(0, index), value.slice(index + 1)];
   }));
   for (const key of ['STUDIO_VIDEO_ACCOUNT_SUBMISSION', 'STUDIO_VIDEO_REAL_SUBMISSION', 'STUDIO_IMAGE_REAL_SUBMISSION']) {
+    if(key==='STUDIO_VIDEO_ACCOUNT_SUBMISSION' && mockSubmission && fixture.mock_submission===true)continue;
     assert(env[key] !== 'true', 'Real submission must remain disabled in the local fixture');
   }
   return env;

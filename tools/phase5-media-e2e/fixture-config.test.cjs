@@ -26,6 +26,13 @@ test('only the local simulator endpoint is accepted', () => {
   for (const value of ['https://supplier.example.test:19090', 'https://127.0.0.1', 'https://user:synthetic@localhost:19090', 'file:///tmp/test']) assert.throws(() => assertLocalSupplier(value));
 });
 
+test('controlled mock video requires both an explicit fixture and caller opt-in; legacy gates stay closed',()=>{
+ const c=core(),f={...fixture(),mock_submission:true};c.Config.Env=['STUDIO_VIDEO_ACCOUNT_SUBMISSION=true'];
+ assert.throws(()=>assertFixtureCore(c,f));assert.throws(()=>assertFixtureCore(c,fixture(),{mockSubmission:true}));
+ assert.doesNotThrow(()=>assertFixtureCore(c,f,{mockSubmission:true}));
+ c.Config.Env.push('STUDIO_VIDEO_REAL_SUBMISSION=true');assert.throws(()=>assertFixtureCore(c,f,{mockSubmission:true}));
+});
+
 test('BFF ownership accepts Windows separators and spaces but rejects another checkout or similar script', () => {
   const checkout = 'D:/local fixture';
   assert.equal(ownsBffCommandLine('"D:\\nodejs\\node.exe" "D:\\local fixture\\studio\\bff\\image-server.mjs"', checkout), true);

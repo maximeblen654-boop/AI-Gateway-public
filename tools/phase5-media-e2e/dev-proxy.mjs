@@ -10,7 +10,9 @@ const forward = targetPort => http.createServer((req, res) => {
 });
 
 // Local artifact acceptance serves the embedded frontend from the same Core.
-const front = forward(process.env.PHASE5_FRONTEND_MODE === 'embedded' ? 18080 : 3001), bff = forward(8093), bridge = forward(18082);
+const bffPort=Number(process.env.PHASE5_BFF_PORT||8093);
+if(![8093,18083].includes(bffPort))throw Error('Expected an existing local Studio BFF port');
+const front = forward(process.env.PHASE5_FRONTEND_MODE === 'embedded' ? 18080 : 3001), bff = forward(bffPort), bridge = forward(18082);
 http.createServer((req, res) => {
   (req.url === '/api/v1/auth/studio-ticket' ? bridge : req.url.startsWith('/studio') ? bff : front)
     .emit('request', req, res);

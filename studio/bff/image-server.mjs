@@ -78,7 +78,8 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
       if(req.method==='POST' && url.pathname==='/studio/api/image/tasks') {
         if(paidEnabled!==true){reply(503,{error:'published_image_paid_gate_off'});return;}
         const input=await jsonBody(req);
-        if(!input || !Array.isArray(input.asset_refs) || Object.hasOwn(input,'references'))throw Error('Private asset refs required');
+        const stored=input&&Object.keys(input).length===1&&/^img_[a-f0-9]{32}$/.test(input.task_id);
+        if(!stored&&(!input || !Array.isArray(input.asset_refs) || Object.hasOwn(input,'references')))throw Error('Private asset refs required');
         reply(200,await tasks.dispatch(session,input));return;
       }
       const match=/^\/studio\/api\/image\/tasks\/(img_[a-f0-9]{32})(?:\/results\/([0-9]))?$/.exec(url.pathname);
@@ -88,7 +89,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
       }
       reply(404,{error:'image_route_not_found'});
-    } catch {if(!res.headersSent)reply(409,{error:'image_binding_unavailable',recovery:'GET original task only'});else res.end();}
+    } catch(error) {if(!res.headersSent)reply(409,{error:error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',recovery:'GET original task only'});else res.end();}
   };
 }
 

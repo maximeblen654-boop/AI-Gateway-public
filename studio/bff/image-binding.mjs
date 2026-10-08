@@ -64,7 +64,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     const reply=await call(session,'POST','quotes',input);
     const q=reply.payload;
     if(q?.contract!==IMAGE_BINDING_CONTRACT || !/^[a-f0-9]{64}$/.test(q.quote_token||'') || !Number.isInteger(q.spec?.count) || q.spec.count<1 || q.spec.count>10 || !Number.isInteger(q.spec?.images) || q.spec.images<0 || q.spec.images>16 || q.sale_price?.currency!=='CNY' || q.sale_price.billing_mode!=='per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(q.sale_price.amount) || !Number.isFinite(Date.parse(q.expires_at)) || Date.parse(q.expires_at)<=now())throw new Error('Invalid Published quote response');
-    write(location('quote',[id,q.quote_token]),{...q,keyRef:reply.key_ref,owner:id},true);
+    write(location('quote',[id,q.quote_token]),{...q,offer_id:input.offer_id,keyRef:reply.key_ref,owner:id},true);
     return q;
   }
   function prepare(session,input) {
@@ -95,6 +95,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
   }
   async function recover(session,taskID) {
     const {task,identity}=get(session,taskID);
+    if(task.status==='prepared'&&!fs.existsSync(`${location('task',identity)}.sync-dispatch`))return view(task);
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
     if(!['unknown','persisted','completed'].includes(receipt.status) || !['pending','billing_unknown','billed'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
@@ -113,8 +114,10 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     return view(task);
   }
   async function dispatch(session,input) {
-    const {task,identity}=prepare(session,input);
+    const stored=input && Object.keys(input).length===1 && taskPattern.test(input.task_id);
+    const {task,identity}=stored?get(session,input.task_id):prepare(session,input);
     const marker=`${location('task',identity)}.sync-dispatch`;
+    if(!fs.existsSync(marker)&&now()>=Date.parse(task.quote.expires_at))throw new Error('image_quote_expired');
     let first=false;
     try {write(marker,{contract:IMAGE_BINDING_CONTRACT,requestHash:task.requestHash},true);first=true;} catch(e){if(e.code!=='EEXIST')throw e;}
     if(first) {
@@ -124,7 +127,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return recover(session,task.task_id);
   }
-  function view(task) {return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results};}
+  function view(task) {return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results,
+    offer_id:task.quote.offer_id,sale_price:task.quote.sale_price,spec:task.quote.spec,expires_at:task.quote.expires_at};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {

@@ -1,11 +1,11 @@
 const { execFileSync } = require('node:child_process');
 const { readFixture, assertFixtureCore, assertLocalSupplier } = require('./fixture-config.cjs');
 
-module.exports = async function localIdentities() {
+module.exports = async function localIdentities(options) {
   const fixture = readFixture();
   const core = JSON.parse(execFileSync('docker', ['--context', 'desktop-linux', 'inspect', 'sub2api-dev'],
     { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }))[0];
-  const values = assertFixtureCore(core, fixture);
+  const values = assertFixtureCore(core, fixture, options);
   const env = { ADMIN_EMAIL: values.ADMIN_EMAIL, ADMIN_PASSWORD: values.ADMIN_PASSWORD };
   if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD) throw Error('Local test administrator credentials are not configured');
   const response = await fetch('http://127.0.0.1:18080/api/v1/auth/login', {

@@ -12,6 +12,12 @@ import {createOperationJournal} from './operation-journal.js';
 
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const session={ownerId:1,sessionProof:'fixture'};
+test('browser can read an unsubmitted video quote after restart without asking Core for a nonexistent task',async t=>{
+ const f=fixture(t),r=f.make();const op=await r.prepare(session,{clientKey:'browser-quote',offerId:'offer1',request:request()});
+ const restored=await f.make().recover(session,op.operation_id);
+ assert.equal(restored.status,'intent');assert.equal(restored.sale_price.currency,'CNY');assert.ok(restored.expires_at);
+ assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});
+});
 const request=()=>({model:'3.0',prompt:'fixture',duration:5,resolution:'720p',ratio:'16:9',assets:[]});
 let original;
 function video(){return original ||= execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=32x32:r=5','-t','0.4','-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1'],{windowsHide:true,maxBuffer:1<<20});}
@@ -43,9 +49,16 @@ function fixture(t,{lost=false,corrupt=false,currency='CNY'}={}){
   }
   throw Error('unexpected operation '+operation);
  };
- const make=legacy=>createAccountVideoRuntime({rootDir:journalRoot,call,resultStore:store,legacy});
+ const make=(legacy,now)=>createAccountVideoRuntime({rootDir:journalRoot,call,resultStore:store,legacy,now});
  return {make,root:journalRoot,store,counts:()=>({posts,captures,quoteCalls})};
 }
+
+test('expired video quote cannot first dispatch; expiry never prevents original task recovery',async t=>{
+ const f=fixture(t),r=f.make(),op=await r.prepare(session,{clientKey:'expiry-check',offerId:'offer1',request:request()});
+ const later=f.make(undefined,()=>Date.now()+3600000);
+ await assert.rejects(later.dispatch(session,op.operation_id),/video_quote_expired/);assert.equal(f.counts().posts,0);
+ await r.dispatch(session,op.operation_id);assert.equal((await later.dispatch(session,op.operation_id)).status,'captured');assert.equal(f.counts().posts,1);assert.equal(f.counts().captures,1);
+});
 
 test('Published quote -> immutable task -> original store -> once-only capture',async t=>{
  const f=fixture(t),r=f.make();
