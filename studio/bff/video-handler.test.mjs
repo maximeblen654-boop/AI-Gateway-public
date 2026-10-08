@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {createVideoHandler} from './video-handler.mjs';
+import {createVideoAssetResolver} from './video-assets.mjs';
+import {CompilePublishedPlan,Materialize} from '../api/video-request-builder.mjs';
 
 test('HTTP task dispatch uses authenticated owner, opaque operation and closed default gate',async t=>{
  let calls=0;
@@ -51,4 +53,22 @@ test('omitted assets remains a legal no-material quote', async t => {
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
  const response=await fetch(`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-assets',offer_id:'offer',model:'3.0',prompt:'text',duration:5,resolution:'720p',ratio:'16:9'})});
  assert.equal(response.status,200);
+});
+
+test('reference profiles only require preparation for actual reference assets', async t => {
+ const profile={apiModelId:'local-reference',upstreamModelId:'local-reference',documentedStatus:'enabled',inputMode:'references',durationSeconds:[5],resolutions:['720p'],ratios:['16:9'],mediaLimits:{image:1,video:1,audio:1,total:3},requiredAnyMedia:[]};
+ let quotes=0,uploads=0;
+ const tasks={catalog:async()=>({offers:[{offer_id:'offer',model:profile.apiModelId,video_profile:profile}]}),
+  prepareReferences:async()=>{uploads++;throw Error('Unexpected upload')},getPreparation:()=>undefined,
+  prepare:async(s,input)=>{const wire=Materialize(CompilePublishedPlan({...input.request,ownerId:String(s.ownerId)},profile));assert.equal(JSON.parse(wire.bytes).references,undefined);quotes++;return {operation_id:'op_'+'e'.repeat(64)}}};
+ const intake={uploadPayload:()=>({kind:'image',mimeType:'image/png',size:1,sha256:'a'.repeat(64),bytes:Buffer.from([1])})};
+ const server=http.createServer(createVideoHandler({sessions:{authenticate:async()=>({ownerId:7}),sameOrigin:()=>true},tasks,resolveAssets:createVideoAssetResolver({intake,tasks})}));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const quote=async extra=>fetch(`http://127.0.0.1:${server.address().port}/studio/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({client_key:'no-reference',offer_id:'offer',model:profile.apiModelId,prompt:'text',duration:5,resolution:'720p',ratio:'16:9',...extra})});
+ assert.equal((await quote({})).status,200);
+ assert.equal((await quote({assets:[]})).status,200);
+ const missing=await quote({assets:[{kind:'image',asset_ref:'asset_one'}]});assert.equal(missing.status,422);assert.equal((await missing.json()).error,'account_video_preparation_missing');
+ const stale=await quote({assets:[],preparation_id:'old-preparation'});assert.equal(stale.status,422);assert.equal((await stale.json()).error,'account_video_preparation_mismatch');
+ profile.requiredAnyMedia=['image'];assert.equal((await quote({assets:[]})).status,409);
+ assert.equal(quotes,2);assert.equal(uploads,0);
 });

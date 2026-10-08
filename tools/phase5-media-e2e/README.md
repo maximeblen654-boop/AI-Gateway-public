@@ -33,6 +33,17 @@ Prepare the test database through normal application initialization and administ
 
 Record the IDs from that new environment and generate small synthetic video/audio inputs:
 
+The existing video ledger fixture is
+`backend/internal/repository/testdata/studio_video_orders_legacy.sql`, also used
+by `TestVideoAccountPostgresAtomicCaptureAndReplay`. If the disposable synthetic
+database lacks this table, verify its container, mounts, fixture users and
+simulator-only Accounts before applying that exact fixture in a transaction.
+Do not apply test SQL to production, a restored real database or a database with
+unique data. This creates no new application migration. Verify the migration
+ledger and existing balances, usage and billing-dedup records remain unchanged.
+An old `reserve_pending` operation is preserved for recovery; fixture setup does
+not authorize resubmitting it. Browser acceptance uses a new explicit intent.
+
 ```powershell
 node tools/phase5-media-e2e/configure-fixture.cjs ACCOUNT_ID CUSTOMER_ID OTHER_CUSTOMER_ID
 node tools/phase5-media-e2e/start-local.mjs --embedded

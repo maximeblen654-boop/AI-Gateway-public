@@ -24,6 +24,9 @@ export function createVideoAssetResolver({ intake, tasks }) {
       if (preparationId || prepare) throw Error('account_bound_reference_upload_unavailable');
       return stored.map(a => intake.inlineReceipt(session.ownerId, a.asset_ref));
     }
+    // A text-only request has no external upload to bind. An explicitly supplied
+    // preparation still has to match; required-media checks remain in the builder.
+    if (!stored.length && !prepare && !preparationId) return [];
     if (!prepare && !preparationId) throw Error('account_video_preparation_missing');
     if (prepare) {
       // Compile locally before any network action; Core also validates Published.
