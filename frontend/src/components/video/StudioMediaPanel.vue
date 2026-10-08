@@ -42,7 +42,7 @@
     <div class="mt-5">
       <h3 class="font-semibold">我的{{ kind === 'image' ? '图片' : '视频' }}任务</h3>
       <p class="text-sm">记录来自服务器；刷新或重新登录后可在此查询原任务。</p>
-      <button class="btn btn-secondary" :disabled="busy || querying" @click="reloadHistory">刷新记录</button>
+      <button class="btn btn-secondary" :disabled="busy || querying || historyLoading" @click="reloadHistory">刷新记录</button>
       <ul><li v-for="task in history" :key="task.id"><button class="btn btn-secondary my-1" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">{{ taskModel(task) }} · {{ task.price.amount }} {{ task.price.currency }} · {{ statusText(task.status) }} · {{ task.id }}</button></li></ul>
     </div>
   </section>
@@ -53,7 +53,7 @@ import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, stud
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 const kind=ref<StudioKind>('video'), offers=ref<StudioOffer[]>([]), offerId=ref(''), assets=ref<StudioAssetReceipt[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
-const busy=ref(false), querying=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
+const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 const offer=computed(()=>offers.value.find(o=>o.offer_id===offerId.value))
 const accept=computed(()=>['image','video','audio'].filter(k=>offer.value?.spec.references[k as StudioAssetReceipt['kind']].max).map(k=>`${k}/*`).join(','))
 const incompatible=computed(()=>!offer.value || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
@@ -81,9 +81,9 @@ async function load(selectedId?:unknown){const epoch=++generation;busy.value=tru
  }catch(e){error.value=studioErrorMessage(e)}finally{if(epoch===generation)busy.value=false}
  if(active.value)await refresh()
 }
-async function reloadHistory(){if(busy.value||querying.value)return;const epoch=generation,originalKind=kind.value;querying.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{querying.value=false}}
+async function reloadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);await refresh()}
-async function refresh(){if(!active.value||querying.value)return;const original=active.value;querying.value=true;try{const task=await studioTask(original);if(active.value?.id===original.id&&kind.value===original.kind){accepted(task);error.value=''}}catch(e){error.value=studioErrorMessage(e)}finally{querying.value=false}}
+async function refresh(){if(!active.value||querying.value)return;const original=active.value;querying.value=true;try{const task=await studioTask(original);if(active.value?.id===original.id&&kind.value===original.kind){accepted(task);error.value=''}}catch(e){if(active.value?.id===original.id)error.value=studioErrorMessage(e)}finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}}
 async function upload(e:Event){const input=e.target as HTMLInputElement,f=input.files?.[0];if(!f||busy.value||active.value)return;busy.value=true;error.value='';notice.value='素材上传中…';try{
  await ensureStudioSession();const k=f.type.split('/')[0] as StudioAssetReceipt['kind'];if(!['image','video','audio'].includes(k))throw new StudioError('asset_type_mismatch');assets.value.push(await uploadStudioAsset(f,k));notice.value='素材已私有保存，顺序如上。'
  }catch(e){notice.value='';error.value=studioErrorMessage(e)}finally{busy.value=false;input.value=''}}

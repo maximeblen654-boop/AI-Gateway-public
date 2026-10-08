@@ -94,3 +94,49 @@ Only this fixture setup runs as root. Application children run as UID1000:
 root-owned 0700 state is rejected, an explicit local owner handoff permits
 durable access, and another process can read only its owner's journal. The
 runtime entrypoint never changes production ownership or permissions.
+
+## Published customer browser generation and recovery
+
+`customer-browser.cjs` uses the ordinary `/login` and `/video-studio` Vue pages,
+real ticket/session exchange, Published catalog, private uploads, quotation,
+explicit generation confirmation, authenticated preview/download and server
+history. It does not replace business APIs. The response-loss scenario forwards
+the real POST before dropping only its response. The supplier fixture implements
+the existing image JSON and `/v1/videos` task/status/content protocols; its output
+is synthetic and does not establish any real supplier capability.
+
+Use the existing isolated fixture and current embedded frontend/Core and packaged
+BFF. All test Accounts must resolve only to the loopback protocol simulator;
+never enable these fixture gates around real supplier Accounts. Set the private
+fixture's `mock_submission: true`, both existing controlled submission settings
+in Core/Bridge/BFF, and BFF's public origin to `http://127.0.0.1:3000`. Keep the
+legacy real-submission settings closed. The optional local proxy supports
+`PHASE5_FRONTEND_MODE=embedded PHASE5_BFF_PORT=18083`; it still binds loopback.
+
+Set `PHASE5_FIXTURE_MANIFEST` and `PHASE5_CUSTOMER_EVIDENCE` to explicit private
+files. `PHASE5_PLAYWRIGHT_MODULE` can point to an already installed Playwright
+package; the harness uses system Chrome with an isolated headless context. It
+does not read a personal browser profile, install a browser or create a database.
+
+Run each scenario once against the same evidence file:
+
+```sh
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-text
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-reference
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-response-loss
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-inline
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-references
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-failure
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=image-unknown
+node tools/phase5-media-e2e/customer-browser.cjs --scenario=video-unknown
+# After restarting only the bound test Core/BFF, preserving all state:
+node tools/phase5-media-e2e/customer-browser.cjs --recover
+```
+
+The report retains task identities, safe HTTP summaries, request/preparation
+association, per-scenario submit/upload counters and downloaded result hashes.
+It is private, including its preparation IDs, and is not a public fixture.
+Do not rerun a failed scenario to manufacture a new intent; inspect the saved
+original first. Compare native order/usage/dedup records before and after restart
+as a separate check. Unit tests, a runnable harness and successful image builds
+alone do not establish browser acceptance or once-only billing.

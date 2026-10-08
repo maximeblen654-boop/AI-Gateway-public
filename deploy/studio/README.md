@@ -109,3 +109,28 @@ Rollback retains both generations of data and their corresponding recovery
 components. Disable new intents first; do not overwrite new orders, bindings,
 preparations or balances with an old database. Runtime rollout, sales Publish,
 and permission to perform real supplier actions remain separate decisions.
+
+## Customer task confirmation and results
+
+The ordinary customer `/video-studio` page includes the Published media panel.
+It obtains the current website user's Studio session, loads server-owned task
+history and displays the frozen quote amount/currency before an explicit Generate
+click. Image confirmation sends the stored `task_id`; video sends `operation_id`.
+Both paths resolve the original private binding on the server. The old image
+request form remains compatible; no browser-provided owner, source or price is
+used to recover an existing task.
+
+Unsubmitted quotations can be read after restart without querying a nonexistent
+Core generation task. Quote expiry blocks a first submission, while claimed
+tasks retain their original recovery identity. Refresh, relogin, polling and
+unknown outcomes only query that identity. A lost response is shown as pending
+confirmation, with no automatic quotation, generation retry or supplier switch.
+Website identity changes invalidate pending Studio requests before another
+business call is sent.
+
+Successful images use the authenticated task `results/{index}` endpoint; videos
+use the operation `original` endpoint. Preview and download share these private
+URLs. Supplier credentials and result-source URLs are not exposed. An unavailable
+catalog or closed submission gate does not by itself hide existing server task
+records. See the local browser harness in `tools/phase5-media-e2e/README.md` for
+separate browser, supplier-counter and native-ledger acceptance requirements.

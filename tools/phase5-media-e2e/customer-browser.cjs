@@ -26,11 +26,11 @@ async function main() {
   const browser = await chromium.launch({channel:'chrome',headless:true});
   const contexts=[];
   async function login(email) {
-    const context=await browser.newContext();contexts.push(context);
+    const context=await browser.newContext({locale:'zh-CN'});contexts.push(context);
     const page=await context.newPage();page.setDefaultTimeout(30000);
     page.on('response',r=>{const u=new URL(r.url());if(u.origin===base && (u.pathname.startsWith('/studio/api/') || /\/auth\/(login|studio-ticket)$/.test(u.pathname)))report.http.push({method:r.request().method(),path:u.pathname,status:r.status()})});
     // Optional product tours only. No identity injection or API success mocks.
-    await page.addInitScript(()=>{for(const k of ['admin_guide_1_admin_v4_interactive','user_guide_2_user_v4_interactive','user_guide_3_user_v4_interactive'])localStorage.setItem(k,'true')});
+    await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');for(const k of ['admin_guide_1_admin_v4_interactive','user_guide_2_user_v4_interactive','user_guide_3_user_v4_interactive'])localStorage.setItem(k,'true')});
     await page.goto(base+'/login');await page.getByLabel('邮箱').fill(email);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);
     await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard');
     await page.goto(base+'/video-studio');await expect(page.getByTestId('studio-kind')).toBeEnabled();
@@ -68,13 +68,20 @@ async function main() {
     }
     const kind=scenario.startsWith('image')?'image':'video';
     await page.getByTestId('studio-kind').selectOption(kind);await expect(page.getByTestId('studio-kind')).toBeEnabled();
+    if(await page.getByTestId('studio-task').count())await expect(page.getByTestId('studio-refresh')).toBeEnabled();
     if(await page.getByTestId('studio-new').count())await page.getByTestId('studio-new').click();
     // Unknown history cannot be replaced automatically. Explicitly select a finished
     // entry first, then choose New; pending tasks remain available in server history.
     if(await page.getByTestId('studio-task').count()) {
       const list=(await api(page,kind,kind==='image'?'tasks':'operations')).body;
       const items=kind==='image'?list.tasks:list;
-      const finished=items.find(x=>['completed','captured','released','intent','prepared'].includes(x.status));
+      let finished;
+      for(const item of items.slice(0,20)){
+        if(item.contract!== (kind==='image'?'published_image_binding_v1':'account_video_v1'))continue;
+        const id=item.task_id||item.operation_id;
+        const current=await api(page,kind,(kind==='image'?'tasks/':'operations/')+id);
+        if(current.status===200 && ['completed','captured','released','intent','prepared'].includes(current.body.status)){finished=item;break}
+      }
       assert(finished,'A prior unresolved task remains; inspect it before creating a new intent');
       await page.locator(`[data-task-id="${finished.task_id||finished.operation_id}"]`).click();await page.getByTestId('studio-new').click();
     }
@@ -94,7 +101,7 @@ async function main() {
     report.cases.push(c);save();
     const prepared=page.waitForResponse(r=>r.url().endsWith(`/studio/api/${kind}/${kind==='image'?'prepare':'quotes'}`)&&r.request().method()==='POST');
     await page.getByTestId('studio-quote').click();const response=await prepared;assert.equal(response.status(),200);const view=await response.json();c.id=view.task_id||view.operation_id;c.price=view.sale_price;c.spec=view.spec;
-    if(kind==='video')c.quote_request=response.request().postDataJSON();save();
+    if(kind==='video'){c.quote_request=response.request().postDataJSON();c.child_id=view.children[0].task_id}save();
     if(scenario==='video-references'){
       const negativeBefore=stats(),noPreparation={...c.quote_request,client_key:randomUUID()};delete noPreparation.preparation_id;
       const reordered={...c.quote_request,client_key:randomUUID(),assets:[...c.quote_request.assets].reverse()};
