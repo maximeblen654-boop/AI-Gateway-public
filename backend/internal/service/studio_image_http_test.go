@@ -52,7 +52,9 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 					w.WriteHeader(422)
 					_, _ = w.Write([]byte(`{"error":"synthetic private provider detail"}`))
 				case "lost_response":
-					conn, _, hijackErr := w.(http.Hijacker).Hijack()
+					hijacker, ok := w.(http.Hijacker)
+					require.True(t, ok)
+					conn, _, hijackErr := hijacker.Hijack()
 					require.NoError(t, hijackErr)
 					_ = conn.Close()
 				case "timeout":

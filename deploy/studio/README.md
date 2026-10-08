@@ -55,7 +55,10 @@ service's loopback and receive separately scoped env files. Only host loopback
 HTTPS-connected containers or host services can use the same artifacts without
 the overlay. Check the merged Compose configuration privately before use; do
 not print its resolved secrets. A Core replacement in the shared topology also
-requires recreating its dependent network-namespace users.
+requires recreating its dependent network-namespace users. A container restart
+must run Core first, wait for health, then restart Bridge/BFF and any local
+simulator sharing its namespace. Restarting those dependents before Core can
+leave them attached to the old namespace even when container names match.
 
 Startup order: existing PostgreSQL/Redis → Core health → Bridge health and real
 native user lookup/ticket → BFF `/health` → authenticated ticket exchange,
