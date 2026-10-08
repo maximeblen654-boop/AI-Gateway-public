@@ -133,6 +133,12 @@ async function main() {
   assert.equal(docker(['exec', 'candidate-bff', 'id', '-u']), '1000');
   assert.equal(docker(['exec', 'candidate-bff', 'stat', '-c', '%u:%a', '/state/assets']), '1000:700');
   record('bridge_bff_actual_images_nonroot_tools_private_roots');
+  if (process.env.CANDIDATE_SMOKE_SCOPE === 'startup') {
+    report.status = 'PASS';
+    report.scope = 'fresh anonymous digest pulls: startup, health, version, UID, private roots only';
+    report.persisted_images = true;
+    return;
+  }
   const read = async (base, route, opts = {}) => {
     const response = await fetch(base + route, { ...opts, signal: AbortSignal.timeout(10000) });
     report.http.push({ port: new URL(base).port, method: opts.method || 'GET', path: route, status: response.status });
