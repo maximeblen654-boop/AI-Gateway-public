@@ -55,14 +55,13 @@ func prepareImage2ProReceipt(r *imageReceiptRecord, account *Account, parsed *Op
 // POST acceptance is independent of the browser/bridge lifetime. A permanent
 // dispatch marker also prevents replay after a crash, including after the
 // supplier's two-hour dedup TTL. Only a saved response may be retried/recovered.
-func (s *OpenAIGatewayService) startImage2ProReceipt(path string, r *imageReceiptRecord, key *APIKey, quota APIKeyQuotaUpdater) {
+func (s *OpenAIGatewayService) startImage2ProReceipt(path string, key *APIKey, quota APIKeyQuotaUpdater) {
 	imageReceiptMu.Lock()
 	defer imageReceiptMu.Unlock()
-	latest, err := readImageReceipt(path)
+	r, err := readImageReceipt(path)
 	if err != nil {
 		return
 	}
-	r = latest
 	if r.Status == "failed" || r.Status == "expired" || r.BillingState == "billed" || time.Now().Before(r.NextPollAt) {
 		return
 	}

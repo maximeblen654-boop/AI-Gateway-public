@@ -382,9 +382,10 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 		// Customer aliases have their own explicit native Group price.
 		pricingModel = parsed.Model
 	}
-	if in.BillingModelSource == BillingModelSourceRequested {
+	switch in.BillingModelSource {
+	case BillingModelSourceRequested:
 		pricingModel = in.OriginalModel
-	} else if in.BillingModelSource == BillingModelSourceChannelMapped {
+	case BillingModelSourceChannelMapped:
 		pricingModel = in.ChannelMappedModel
 	}
 	resolved := s.resolveOpenAIChannelPricing(ctx, pricingModel, in.APIKey)
@@ -485,7 +486,7 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 	}
 	// No request cancellation from a disconnected bridge; total duration remains bounded.
 	if r.Protocol == image2ProReceiptProtocol {
-		s.startImage2ProReceipt(path, r, in.APIKey, in.APIKeyService)
+		s.startImage2ProReceipt(path, in.APIKey, in.APIKeyService)
 		return receiptView(r), nil
 	}
 	if r.Protocol == "durable-async-v1" {
@@ -665,7 +666,7 @@ func (s *OpenAIGatewayService) GetImageReceipt(ctx context.Context, key *APIKey,
 		return v, nil
 	}
 	if r.Protocol == image2ProReceiptProtocol {
-		s.startImage2ProReceipt(path, r, key, quota)
+		s.startImage2ProReceipt(path, key, quota)
 		return receiptView(r), nil
 	}
 	if (r.ReceiptID == "" && r.Protocol != "durable-async-v1") || r.BillingState == "billing_unknown" || r.Status == "failed" || r.Status == "expired" {

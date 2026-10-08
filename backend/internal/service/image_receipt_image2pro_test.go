@@ -112,7 +112,7 @@ func TestImage2ProDelayedHTTPResponseSurvivesCallerReturn(t *testing.T) {
 		copy.URL = &u
 		return http.DefaultClient.Do(copy)
 	}}
-	s.startImage2ProReceipt(path, r, key, nil)
+	s.startImage2ProReceipt(path, key, nil)
 	select {
 	case <-started:
 	case <-time.After(5 * time.Second):
@@ -258,7 +258,7 @@ func TestImage2ProPreflightAndManualTerminalNeverDispatch(t *testing.T) {
 				require.NoError(t, saveImageReceipt(path, &stored))
 			}
 			if scenario == "stale-start" {
-				s.startImage2ProReceipt(path, r, key, nil)
+				s.startImage2ProReceipt(path, key, nil)
 			} else {
 				require.NoError(t, s.runImage2ProReceipt(context.Background(), path, key, nil))
 			}
