@@ -11,6 +11,9 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
@@ -148,4 +151,24 @@ func TestStudioImageHistoricalReceiptVersionsResumeValidResultOnce(t *testing.T)
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestStudioImageResultCannotEscapePrivateRoot(t *testing.T) {
+	r, q, key, _, billing := studioContractFixture(t)
+	receipt, err := r.Dispatch(context.Background(), nil, q, "private-original", "synthetic", nil, key)
+	require.NoError(t, err)
+	stored, err := r.Store.Result(receipt)
+	require.NoError(t, err)
+	outside := filepath.Join(t.TempDir(), "external-result")
+	require.NoError(t, os.WriteFile(outside, stored, 0600))
+	file := r.Store.path("result", receipt.TaskID)
+	require.NoError(t, os.Rename(file, file+".original"))
+	err = os.Symlink(outside, file)
+	if err != nil && runtime.GOOS == "windows" {
+		t.Skipf("Creating a test symlink requires Windows developer mode/privilege: %v", err)
+	}
+	require.NoError(t, err)
+	_, err = r.Store.Result(receipt)
+	require.Error(t, err, "even a hash-matching result cannot escape the private root")
+	require.Equal(t, 1, billing.applied)
 }

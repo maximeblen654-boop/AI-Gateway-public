@@ -86,7 +86,8 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 			defer supplier.Close()
 			r, q, key, _, billing := studioContractFixture(t, supplier.URL+"/v1")
 			if mode == "widescreen" {
-				ma := r.Media.(*studioMediaFixture)
+				ma, ok := r.Media.(*studioMediaFixture)
+				require.True(t, ok)
 				admin := mediaworkbench.NewService(ma)
 				product := ma.a.Config.Draft.Products[0]
 				product.Capabilities.AspectRatios = []string{"16:9"}

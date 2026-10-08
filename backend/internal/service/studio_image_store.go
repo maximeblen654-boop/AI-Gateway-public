@@ -299,7 +299,14 @@ func (s *StudioImageStore) PersistResult(r *StudioImageReceipt, data []byte) err
 	return s.Save(r)
 }
 func (s *StudioImageStore) Result(r *StudioImageReceipt) ([]byte, error) {
-	b, err := os.ReadFile(s.path("result", r.TaskID))
+	// Read only the hashed original under the configured private root. Root
+	// confinement also rejects a result symlink that escapes that directory.
+	root, err := os.OpenRoot(s.Root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+	b, err := root.ReadFile("result-" + HashUsageRequestPayload([]byte(r.TaskID)))
 	if err != nil {
 		return nil, err
 	}
