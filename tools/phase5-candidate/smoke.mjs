@@ -2,9 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import net from 'node:net';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { APPLICATION_SHA, locations } from './build.mjs';
@@ -16,6 +17,8 @@ const report = { status: 'NOT_RUN', checks: [], http: [], actual_images: {},
   accounting_integration: 'NOT_RUN', persisted_images: false };
 let checkpoint = 'initial';
 const started = [], servers = [];
+const relaySockets = new Set();
+let redactValues = [];
 const digest = value => createHash('sha256').update(value).digest('hex');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 function docker(args, input) {
@@ -24,8 +27,12 @@ function docker(args, input) {
 }
 function record(name) { report.checks.push({ name, result: 'PASS' }); console.log('PASS ' + name); }
 async function waitHealth(url) {
+  report.last_health = { url, result: 'NOT_RUN' };
   for (let i = 0; i < 90; i++) {
-    try { const r = await fetch(url, { signal: AbortSignal.timeout(2000) }); if (r.ok) return; } catch {}
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      report.last_health = { url, status: r.status }; await r.arrayBuffer(); if (r.ok) return;
+    } catch (error) { report.last_health = { url, error_code: error.cause?.code || error.name }; }
     await pause(2000);
   }
   throw Error('health_deadline_' + checkpoint);
@@ -44,6 +51,7 @@ async function main() {
   const password = 'Synthetic-' + randomBytes(24).toString('hex');
   const token = randomBytes(32).toString('hex'), jwt = randomBytes(32).toString('hex');
   const email = 'candidate-admin@example.test';
+  redactValues = [password, token, jwt, email];
   const network = 'phase5-candidate-isolated';
   const envFile = (name, values) => {
     const file = path.join(tmp, name + '.env');
@@ -75,11 +83,28 @@ async function main() {
     REDIS_POOL_SIZE: '8', REDIS_MIN_IDLE_CONNS: '1', JWT_SECRET: jwt, STUDIO_BRIDGE_SERVICE_TOKEN: token };
   checkpoint = 'core_start';
   run('candidate-core', ['--network', network, '--user', '1000:1000',
-    '-p', '127.0.0.1:18080:8080', '-p', '127.0.0.1:18082:8091', '-p', '127.0.0.1:18083:4173',
     '--mount', `type=bind,src=${roots[0]},dst=/app/data`, '--env-file', envFile('core', { ...common,
       AUTO_SETUP: 'true', ADMIN_EMAIL: email, ADMIN_PASSWORD: password, SERVER_HOST: '0.0.0.0', SERVER_PORT: '8080',
       STUDIO_IMAGE_PUBLISHED_SUBMISSION: 'false', STUDIO_VIDEO_ACCOUNT_SUBMISSION: 'false',
     })], image('core'));
+  // An internal-only Docker bridge may omit published-port NAT. Keep egress
+  // blocked; the Linux host reaches the inspected container IP using bounded
+  // loopback TCP relays instead of attaching the application to an external net.
+  const coreInfo = JSON.parse(docker(['inspect', 'candidate-core']))[0];
+  const ip = coreInfo.NetworkSettings.Networks[network].IPAddress;
+  assert(/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$|^10\.\d+\.\d+\.\d+$|^192\.168\.\d+\.\d+$/.test(ip));
+  report.runtime_transport = { internal_network: network, container_ip: ip, published_ports: coreInfo.NetworkSettings.Ports };
+  for (const [hostPort, containerPort] of [[18080, 8080], [18082, 8091], [18083, 4173]]) {
+    const relay = net.createServer(socket => {
+      const upstream = net.connect(containerPort, ip);
+      for (const connection of [socket, upstream]) {
+        relaySockets.add(connection); connection.on('close', () => relaySockets.delete(connection));
+        connection.on('error', () => { socket.destroy(); upstream.destroy(); });
+      }
+      socket.pipe(upstream); upstream.pipe(socket);
+    });
+    await new Promise(resolve => relay.listen(hostPort, '127.0.0.1', resolve)); servers.push(relay);
+  }
   await waitHealth('http://127.0.0.1:18080/health');
   report.core_version = docker(['exec', 'candidate-core', 'sh', '-c', '/app/sub2api -version 2>&1']);
   assert(report.core_version.includes(APPLICATION_SHA.slice(0, 7)));
@@ -228,9 +253,25 @@ async function main() {
   report.network = 'internal Docker network; application containers have no external egress';
 }
 try { await main(); }
-catch { report.status = 'FAIL'; report.failed_checkpoint = checkpoint; console.error('candidate_smoke_failed_at_' + checkpoint); process.exitCode = 1; }
+catch (error) {
+  report.status = 'FAIL'; report.failed_checkpoint = checkpoint;
+  report.error_code = error.code || error.name;
+  report.diagnostics = [];
+  for (const name of started) {
+    try {
+      const state = JSON.parse(docker(['inspect', name]))[0].State;
+      const logs = spawnSync('docker', ['logs', '--tail', '35', name], { encoding: 'utf8', timeout: 10000 });
+      const raw = (logs.stdout || '') + (logs.stderr || '');
+      const safe = raw.split(/\r?\n/).filter(line => !/password|secret|token|cookie|authorization|api.?key|private.?key/i.test(line))
+        .map(line => redactValues.reduce((value, secret) => value.replaceAll(secret, '[REDACTED]'), line)).slice(-20);
+      report.diagnostics.push({ name, running: state.Running, exit_code: state.ExitCode, oom_killed: state.OOMKilled, safe_tail: safe });
+    } catch { report.diagnostics.push({ name, state: 'UNAVAILABLE' }); }
+  }
+  console.error('candidate_smoke_failed_at_' + checkpoint); process.exitCode = 1;
+}
 finally {
-  for (const server of servers) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  for (const socket of relaySockets) socket.destroy();
+  for (const server of servers) { server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); }
   // Only containers created by this script in this ephemeral hosted job. No rm,
   // prune, local engine, shared database, protected layer or production object.
   for (const name of started.reverse()) { try { docker(['stop', '--time', '5', name]); } catch {} }

@@ -54,7 +54,9 @@ synthetic-state, env files, container writable layers or test databases.
 `smoke.mjs` starts the three actual images with fresh synthetic PostgreSQL/Redis
 on an **internal** Docker network. Bridge/BFF share the candidate Core's namespace
 for authenticated loopback transport. This is an ephemeral harness topology,
-not a production deployment recommendation. Only host-loopback ports are exposed.
+not a production deployment recommendation. Host-loopback TCP relays reach the
+inspected internal container IP; no external Docker network is attached. This
+also avoids relying on published-port NAT for internal-only Docker networks.
 The Core may initialize/migrate this newly created disposable database; no restored
 database, local volume, old service or production endpoint is used.
 
