@@ -72,7 +72,9 @@ async function main() {
   })], 'postgres:18-alpine');
   run('candidate-redis', ['--network', network], 'redis:7-alpine', ['redis-server', '--save', '', '--appendonly', 'no']);
   for (let i = 0; i < 40; i++) {
-    try { docker(['exec', 'candidate-postgres', 'pg_isready', '-U', 'candidate', '-d', 'candidate_synthetic']); break; }
+    // initdb's temporary server accepts Unix sockets before the final TCP
+    // server starts. Core uses TCP; do not start it on a socket-only success.
+    try { docker(['exec', 'candidate-postgres', 'pg_isready', '-h', '127.0.0.1', '-U', 'candidate', '-d', 'candidate_synthetic']); break; }
     catch { if (i === 39) throw Error('synthetic_postgres_unavailable'); await pause(1000); }
   }
   const roots = ['core', 'image', 'video', 'assets'].map(p => path.join(tmp, p));

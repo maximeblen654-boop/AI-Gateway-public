@@ -84,6 +84,9 @@ inspected internal container IP; no external Docker network is attached. This
 also avoids relying on published-port NAT for internal-only Docker networks.
 The Core may initialize/migrate this newly created disposable database; no restored
 database, local volume, old service or production endpoint is used.
+PostgreSQL readiness explicitly checks TCP at 127.0.0.1 inside its container:
+the official image's temporary initdb server can accept Unix-socket probes while
+the final TCP server is still unavailable. A socket-only probe must not start Core.
 
 Before pushing, the full smoke checks real native login, the actual Bridge's ticket/consume/verify,
 the packaged BFF's cookie/CSRF, precise proxy paths, website logout/revoke-all,
