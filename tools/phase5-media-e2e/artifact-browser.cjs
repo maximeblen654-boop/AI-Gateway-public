@@ -76,8 +76,10 @@ async function main() {
   }
   async function field(label, value) { await admin.getByLabel(label, { exact: true }).fill(String(value)); }
   async function panel(p, kind, model) {
-    await p.goto(base + '/video-studio'); await p.getByTestId('studio-media-open').click();
-    await expect(p.getByTestId('studio-kind')).toBeVisible();
+    const catalog = p.waitForResponse(r => /\/studio-v2\/api\/(image|video)\/catalog$/.test(r.url()) && r.status() === 200);
+    await p.goto(base + '/video-studio'); await p.getByTestId('studio-media-panel').waitFor({state:'visible'});
+    await catalog;
+    await expect(p.getByTestId('studio-kind')).toBeEnabled();
     if (await p.getByTestId('studio-kind').inputValue() !== kind) await p.getByTestId('studio-kind').selectOption(kind);
     await expect(p.getByTestId('studio-offer-select').locator('option').filter({ hasText: model })).toHaveCount(1);
     await p.getByTestId('studio-offer-select').selectOption({ label: model });
@@ -176,7 +178,7 @@ async function main() {
     assert(reference.request.preparation_id && afterPrepare.init - beforePrepare.init === 3, 'reference upload count');
     assert(refBinding.reference_types.join(',') === 'image,video,audio', 'reference order');
     check('reference_image_video_audio', { ...refBinding, upload_init_delta: afterPrepare.init - beforePrepare.init });
-    await customer.reload(); await customer.getByTestId('studio-media-open').click();
+    await customer.reload(); await customer.getByTestId('studio-media-panel').waitFor({state:'visible'});
     const refreshed = await quote(customer, 'video'); assert(refreshed.response.operation_id === reference.response.operation_id, 'refresh operation drift');
     check('browser_refresh_same_operation');
     // Stop only the verified BFF; all private roots are reused by start-local.
@@ -187,7 +189,7 @@ async function main() {
     execFileSync(process.execPath, ['tools/phase5-media-e2e/start-local.mjs', '--embedded'], { cwd: root, windowsHide: true, stdio: 'pipe' });
     // BFF sessions are short-lived memory state. Reauthenticate through Vue;
     // persistent preparation identity is recovered only after the new session.
-    await customer.reload(); await customer.getByTestId('studio-media-open').click();
+    await customer.reload(); await customer.getByTestId('studio-media-panel').waitFor({state:'visible'});
     await expect(customer.getByTestId('studio-offer-select').locator('option').first()).toBeAttached();
     const restored = await post(customer, 'video/quotes', { ...reference.request, client_key: 'restart-' + randomUUID() });
     assert(restored.status === 200, 'durable preparation restore HTTP ' + restored.status);

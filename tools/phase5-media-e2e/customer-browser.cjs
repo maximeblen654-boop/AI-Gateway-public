@@ -30,9 +30,8 @@ async function main() {
   const browser = await chromium.launch({channel:'chrome',headless:true});
   const contexts=[];
   async function openStudio(page) {
-    const catalog=page.waitForResponse(r=>/\/studio-v2\/api\/(image|video)\/catalog$/.test(r.url())&&r.status()===200);
-    await page.getByTestId('studio-media-open').click();
-    await catalog;
+    await expect(page.getByTestId('studio-media-panel')).toBeVisible();
+    await expect(page.getByTestId('studio-offer-select').locator('option').first()).toBeAttached();
     await expect(page.getByTestId('studio-kind')).toBeEnabled();
   }
   async function login(email) {

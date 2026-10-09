@@ -169,7 +169,7 @@ export default {
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',
-    videoStudio: 'Video Studio',
+    videoStudio: 'AI Image & Video Studio',
     usage: 'Usage',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',

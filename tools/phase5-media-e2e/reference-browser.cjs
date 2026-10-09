@@ -6,7 +6,7 @@ const events=[];const base='http://127.0.0.1:3000';
 page.on('response',r=>{const url=new URL(r.url());if(url.pathname.startsWith('/studio-v2/api/')||url.pathname==='/api/v1/auth/login'||url.pathname==='/api/v1/auth/studio-media-ticket')events.push({method:r.request().method(),path:url.pathname,status:r.status()})});
 try{
 await page.goto(base+'/login');await page.getByLabel('邮箱').fill(emails[0]);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard');
-await page.goto(base+'/video-studio');await page.getByTestId('studio-media-open').click();await page.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached',timeout:15000});
+await page.goto(base+'/video-studio');await page.getByTestId('studio-media-panel').waitFor({state:'visible'});await page.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached',timeout:15000});
 await page.getByTestId('studio-offer-select').selectOption({label:'LOCAL TEST ONLY - reference protocol'});
 const before=await (await fetch('http://127.0.0.1:19091')).json();let quoteBody;page.on('request',r=>{if(new URL(r.url()).pathname==='/studio-v2/api/video/quotes')quoteBody=r.postDataJSON()});
 await page.getByTestId('studio-prompt').fill('Synthetic local media test');
@@ -20,7 +20,7 @@ await page.getByTestId('studio-media-panel').screenshot({path:'.evidence/referen
 const alerts=await page.getByRole('alert').allTextContents();if(alerts.length)throw Error(alerts.join(';'));
 const firstStatus=await page.getByTestId('studio-status').innerText();if(!firstStatus.includes('op_')||!quoteBody?.preparation_id)throw Error('no reference operation');
 const originalQuote=structuredClone(quoteBody);const after=await (await fetch('http://127.0.0.1:19091')).json();if(after.init-before.init!==3)throw Error('expected 3 uploads');
-await page.reload();await page.getByTestId('studio-media-open').click();await page.getByTestId('studio-quote').click();await page.waitForTimeout(800);if(await page.getByTestId('studio-status').innerText()!==firstStatus)throw Error('refresh identity');
+await page.reload();await page.getByTestId('studio-media-panel').waitFor({state:'visible'});await page.getByTestId('studio-quote').click();await page.waitForTimeout(800);if(await page.getByTestId('studio-status').innerText()!==firstStatus)throw Error('refresh identity');
 require('./fixture-config.cjs').stopOwnedBff();
 execFileSync(process.execPath,['tools/phase5-media-e2e/start-local.mjs','--synthetic-contract'],{cwd:process.cwd(),windowsHide:true,stdio:'pipe'});
 await page.waitForTimeout(1500);
@@ -31,7 +31,7 @@ for(let i=0;i<30;i++){try{if((await fetch('http://127.0.0.1:18080/health')).ok)b
 const restored=await post(page,{...originalQuote,client_key:'restart-'+require('crypto').randomUUID()});if(restored.status!==200||!restored.value.operation_id)throw Error('durable preparation quote '+restored.status);
 const absent=await post(page,{...originalQuote,preparation_id:undefined,client_key:'missing-preparation'});if(absent.status!==422)throw Error('missing preparation accepted');
 const reordered=await post(page,{...originalQuote,client_key:'reordered',assets:[...originalQuote.assets].reverse()});if(reordered.status!==422)throw Error('order accepted');
-const other=await browser.newContext(),p2=await other.newPage();await p2.goto(base+'/login');await p2.getByLabel('邮箱').fill(emails[1]);await p2.getByLabel('密码').fill(env.ADMIN_PASSWORD);await p2.getByRole('button',{name:'登录',exact:true}).click();await p2.waitForURL('**/dashboard');await p2.goto(base+'/video-studio');await p2.getByTestId('studio-media-open').click();await p2.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached'});
+const other=await browser.newContext(),p2=await other.newPage();await p2.goto(base+'/login');await p2.getByLabel('邮箱').fill(emails[1]);await p2.getByLabel('密码').fill(env.ADMIN_PASSWORD);await p2.getByRole('button',{name:'登录',exact:true}).click();await p2.waitForURL('**/dashboard');await p2.goto(base+'/video-studio');await p2.getByTestId('studio-media-panel').waitFor({state:'visible'});await p2.getByTestId('studio-offer-select').locator('option').first().waitFor({state:'attached'});
 const forbidden=await post(p2,{...originalQuote,client_key:'other-user'});if(forbidden.status!==422)throw Error('owner isolation failed');await other.close();
 const final=await (await fetch('http://127.0.0.1:19091')).json();if(final.init!==after.init)throw Error('extra supplier init');
 await page.getByTestId('studio-media-panel').screenshot({path:'.evidence/reference-real.png'});

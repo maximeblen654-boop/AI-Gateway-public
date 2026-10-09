@@ -235,7 +235,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Video Studio',
+      title: 'AI Image & Video Studio',
       titleKey: 'videoStudio.title',
       descriptionKey: 'videoStudio.description'
     }

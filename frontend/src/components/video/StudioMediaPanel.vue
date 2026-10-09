@@ -15,7 +15,7 @@
       <ol class="my-3"><li v-for="(a,i) in assets" :key="a.asset_ref">{{ i + 1 }}. {{ a.kind }} · {{ a.size }} bytes · 已保存 <button type="button" class="btn btn-secondary" @click="assets.splice(i,1)">移除</button></li></ol>
     </fieldset>
     <p v-if="!offers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限。</p>
-    <p v-if="incompatible && !active" role="alert">当前模型不支持这些素材类型或数量，请调整素材。</p>
+    <p v-if="offer && incompatible && !active" role="alert">当前模型不支持这些素材类型或数量，请调整素材。</p>
     <p v-if="offer?.input_mode === 'references' && assets.length && !active">点击下方准备按钮会将引用素材上传到所选模型的供应商，随后显示报价；确认生成前不会创建生成任务。</p>
     <button v-if="!active" class="btn btn-primary" :disabled="busy || !offer || incompatible || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '准备素材并获取报价' }}</button>
     <p v-if="!enabled" data-testid="studio-gate">当前生成服务未开放，仍可查看报价和已有结果。</p>
