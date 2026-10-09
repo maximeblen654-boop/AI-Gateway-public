@@ -63,7 +63,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     if(!input || Object.keys(input).some(k=>!['offer_id','spec'].includes(k)))throw new Error('Invalid quote input');
     const reply=await call(session,'POST','quotes',input);
     const q=reply.payload;
-    if(q?.contract!==IMAGE_BINDING_CONTRACT || !/^[a-f0-9]{64}$/.test(q.quote_token||'') || !Number.isInteger(q.spec?.count) || q.spec.count<1 || q.spec.count>10 || !Number.isInteger(q.spec?.images) || q.spec.images<0 || q.spec.images>16 || q.sale_price?.currency!=='CNY' || q.sale_price.billing_mode!=='per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(q.sale_price.amount) || !Number.isFinite(Date.parse(q.expires_at)) || Date.parse(q.expires_at)<=now())throw new Error('Invalid Published quote response');
+    const unitPrice=q?.unit_price||q?.sale_price, totalPrice=q?.total_price||q?.sale_price, quantity=q?.quantity??q?.spec?.count;
+    if(q?.contract!==IMAGE_BINDING_CONTRACT || !/^[a-f0-9]{64}$/.test(q.quote_token||'') || !Number.isInteger(q.spec?.count) || q.spec.count<1 || q.spec.count>10 || !Number.isInteger(q.spec?.images) || q.spec.images<0 || q.spec.images>16 || !Number.isInteger(quantity) || quantity!==q.spec.count || unitPrice?.currency!=='CNY' || unitPrice.billing_mode!=='per_request' || totalPrice?.currency!=='CNY' || totalPrice.billing_mode!=='per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(unitPrice.amount) || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(totalPrice.amount) || !Number.isFinite(Date.parse(q.expires_at)) || Date.parse(q.expires_at)<=now())throw new Error('Invalid Published quote response');
     write(location('quote',[id,q.quote_token]),{...q,offer_id:input.offer_id,keyRef:reply.key_ref,owner:id},true);
     return q;
   }
@@ -127,8 +128,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return recover(session,task.task_id);
   }
-  function view(task) {return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
-    offer_id:task.quote.offer_id,sale_price:task.quote.sale_price,spec:task.quote.spec,expires_at:task.quote.expires_at};}
+  function view(task) {const unitPrice=task.quote.unit_price||task.quote.sale_price,totalPrice=task.quote.total_price||task.quote.sale_price,quantity=task.quote.quantity??task.quote.spec.count;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
+    offer_id:task.quote.offer_id,sale_price:totalPrice,unit_price:unitPrice,total_price:totalPrice,quantity,spec:task.quote.spec,expires_at:task.quote.expires_at};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {

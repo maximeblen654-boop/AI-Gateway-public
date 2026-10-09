@@ -43,6 +43,12 @@ type StudioImageQuote struct {
 	KeyQuotaEnabled       bool                              `json:"key_quota_enabled"`
 	KeyRateEnabled        bool                              `json:"key_rate_enabled"`
 	AccountQuotaEnabled   bool                              `json:"account_quota_enabled"`
+	// UnitPrice, Quantity and TotalPrice are populated for new quotes. They are
+	// optional so receipts written before quantity pricing was introduced keep
+	// their original immutable sale_price semantics during recovery.
+	UnitPrice  *mediaworkbench.Price `json:"unit_price,omitempty"`
+	Quantity   int                   `json:"quantity,omitempty"`
+	TotalPrice *mediaworkbench.Price `json:"total_price,omitempty"`
 }
 
 type StudioImageReceipt struct {

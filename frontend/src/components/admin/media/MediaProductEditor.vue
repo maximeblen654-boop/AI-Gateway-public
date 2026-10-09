@@ -15,18 +15,18 @@
       <h3>规格</h3>
       <p class="mw-muted">按供应商实际能力填写，保存后由后台检查。</p>
       <div class="mw-field-grid">
-        <MediaTokensField label="分辨率" :model-value="product.capabilities.resolutions" @update:model-value="edit(next => { next.capabilities.resolutions = $event as string[] })" />
-        <MediaTokensField label="比例" :model-value="product.capabilities.aspect_ratios" @update:model-value="edit(next => { next.capabilities.aspect_ratios = $event as string[] })" />
-        <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric :model-value="product.capabilities.durations_seconds" @update:model-value="edit(next => { next.capabilities.durations_seconds = $event as number[] })" />
-        <label class="mw-field">单次生成数量下限<input :value="product.capabilities.count.min" class="input" type="number" step="1" @input="edit(next => { next.capabilities.count.min = numeric($event) })" /></label>
-        <label class="mw-field">单次生成数量上限<input :value="product.capabilities.count.max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.count.max = numeric($event) })" /></label>
+        <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="edit(next => { next.capabilities.resolutions = $event as string[] })" />
+        <MediaTokensField label="比例" :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="edit(next => { next.capabilities.aspect_ratios = $event as string[] })" />
+        <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric :presets="durationPresets" placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="edit(next => { next.capabilities.durations_seconds = $event as number[] })" />
+        <label class="mw-field">单次生成数量下限<input :value="product.media_type === 'video' ? 1 : product.capabilities.count.min" class="input" type="number" step="1" :disabled="disabled || product.media_type === 'video'" @input="edit(next => { next.capabilities.count.min = product.media_type === 'video' ? 1 : numeric($event) })" /><small>{{ product.media_type === 'video' ? '视频协议固定为 1 条。' : '图片是每次生成的张数。' }}</small></label>
+        <label class="mw-field">单次生成数量上限<input :value="product.media_type === 'video' ? 1 : product.capabilities.count.max" class="input" type="number" step="1" :disabled="disabled || product.media_type === 'video'" @input="edit(next => { next.capabilities.count.max = product.media_type === 'video' ? 1 : numeric($event) })" /><small>数量不会生成额外价格行。</small></label>
         <template v-for="kind in referenceKinds" :key="kind.key">
           <label class="mw-field">{{ kind.label }}下限<input :value="product.capabilities.references[kind.key].min" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].min = numeric($event) })" /></label>
           <label class="mw-field">{{ kind.label }}上限<input :value="product.capabilities.references[kind.key].max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].max = numeric($event) })" /></label>
         </template>
         <label class="mw-field">参考素材合计上限<input :value="product.capabilities.references.total_max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references.total_max = numeric($event) })" /></label>
       </div>
-      <details><summary>可选画质</summary><MediaTokensField label="画质（仅填写已确认支持的值）" :model-value="product.capabilities.qualities" @update:model-value="edit(next => { next.capabilities.qualities = $event as string[] })" /></details>
+      <details><summary>可选画质</summary><MediaTokensField label="画质（仅填写已确认支持的值）" :presets="qualityPresets" placeholder="例如：standard, high" :model-value="product.capabilities.qualities" @update:model-value="edit(next => { next.capabilities.qualities = $event as string[] })" /></details>
       <details><summary>组合限制（可选）</summary>
         <p class="mw-muted">只录入已确认不可用的组合；没有规则时保持为空。</p>
         <div v-for="(rule, index) in product.capabilities.combination_rules" :key="index" class="mw-rule">
@@ -66,10 +66,17 @@
       </details>
     </section>
     <section data-field="pricing_rules">
-      <h3>本站售价</h3>
-      <p class="mw-muted">金额按原始十进制文本保存。未填写与明确 0 元分别显示。</p>
+      <h3>本站售价与价格维度</h3>
+      <p class="mw-muted">客户可以选择已发布的全部规格；只有勾选为“会改变单价”的维度才生成价格行。数量始终按单价 × 数量计算，不进入价格矩阵。</p>
+      <div class="mw-pricing-dimensions" role="group" aria-label="会改变单价的规格">
+        <label v-for="dimension in pricingDimensionDefinitions" :key="dimension.key" class="mw-check-card">
+          <input type="checkbox" :checked="activePricingDimensions.includes(dimension.key)" :disabled="disabled || !dimensionValues(dimension.key).length" :data-test="`pricing-dimension-${dimension.key}`" @change="togglePricingDimension(dimension.key, $event)" />
+          <span><strong>{{ dimension.label }}</strong><small>{{ dimensionValues(dimension.key).length ? `${dimensionValues(dimension.key).length} 个可用值` : '先填写能力值' }}</small></span>
+        </label>
+      </div>
+      <p class="mw-muted">不勾选时使用统一售价；比例仍可选择和发送请求，只与其他价格相同。取消有不同价格的维度时会要求确认合并。</p>
       <div v-for="(rule, index) in product.pricing_rules" :key="index" class="mw-rule">
-        <strong>{{ Object.keys(rule.match).length ? '规格价' : '统一售价' }}</strong>
+        <strong>{{ pricingRuleLabel(rule) }}</strong>
         <label class="mw-field">售价
           <input class="input" inputmode="decimal" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
           <small :id="`media-price-hint-${index}`">{{ rule.sale_price == null ? '未配置售价' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费：0 元' : '已填写售价' }}</small>
@@ -78,10 +85,12 @@
           <label class="mw-field">币种<input :value="rule.sale_price.currency" class="input" @input="edit(next => { next.pricing_rules[index]!.sale_price!.currency = text($event) })" /></label>
           <label class="mw-field">计价单位<select :value="rule.sale_price.billing_mode" class="input" @change="edit(next => { next.pricing_rules[index]!.sale_price!.billing_mode = text($event) })"><option value="per_request">每次请求</option><option value="per_second">每秒</option></select></label>
         </template>
-        <details><summary>价格条件（全空表示统一价）</summary><MediaMatchEditor :model-value="rule.match" @update:model-value="edit(next => { next.pricing_rules[index]!.match = $event })" /></details>
+        <details><summary>此行覆盖的规格</summary><p class="mw-muted">{{ pricingRuleLabel(rule) }}。单次数量不参与价格行。</p></details>
         <button type="button" class="btn btn-secondary" @click="edit(next => { next.pricing_rules.splice(index, 1) })">移除此售价</button>
       </div>
-      <button type="button" class="btn btn-secondary" data-test="add-price" @click="edit(next => { next.pricing_rules.push({ match: {}, sale_price: null }) })">添加统一价 / 规格价</button>
+      <p v-if="product.pricing_rules.length" class="mw-muted" data-test="pricing-row-summary">价格行：{{ product.pricing_rules.length }}，已填写 {{ filledPricingRows }}，待填写 {{ pendingPricingRows }}。</p>
+      <div v-if="pricingPreview" class="mw-price-preview" data-test="pricing-preview"><strong>客户报价预览</strong><span>{{ pricingPreview.unit }} {{ pricingPreview.currency }} / {{ pricingPreview.quantity }} 份 = {{ pricingPreview.total }} {{ pricingPreview.currency }}</span><small>这是当前填写价格的展示预览；服务器会在报价时冻结规格、单位价、数量和总价。</small></div>
+      <button v-if="!activePricingDimensions.length && !product.pricing_rules.length" type="button" class="btn btn-secondary" data-test="add-price" @click="edit(next => { next.pricing_rules.push({ match: {}, sale_price: null }) })">添加统一售价</button>
     </section>
   </fieldset>
 </template>
@@ -94,6 +103,103 @@ const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: bo
 const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const numeric = (event: Event) => Number(text(event))
+type PricingDimensionKey = 'resolution' | 'aspect_ratio' | 'quality' | 'duration_seconds'
+const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
+const durationPresets = ['5', '10', '15']
+const qualityPresets = ['standard', 'high', 'hd', 'ultra']
+const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
+const pricingDimensionDefinitions: { key: PricingDimensionKey; label: string }[] = [
+  { key: 'resolution', label: '分辨率' },
+  { key: 'aspect_ratio', label: '比例' },
+  { key: 'quality', label: '画质' },
+  { key: 'duration_seconds', label: '时长' }
+]
+
+function valuesFor(product: Product, key: PricingDimensionKey): (string | number)[] {
+  const capability = key === 'resolution' ? product.capabilities.resolutions
+    : key === 'aspect_ratio' ? product.capabilities.aspect_ratios
+      : key === 'quality' ? product.capabilities.qualities
+        : product.capabilities.durations_seconds
+  const result: (string | number)[] = [...(capability ?? [])]
+  for (const rule of product.pricing_rules ?? []) {
+    const values = rule.match[key]
+    if (Array.isArray(values)) result.push(...values)
+  }
+  return [...new Set(result.map(String))]
+}
+function dimensionValues(key: PricingDimensionKey): string[] { return valuesFor(props.product, key).map(String) }
+function matchValues(match: Product['pricing_rules'][number]['match'], key: PricingDimensionKey): string[] {
+  const values = match[key]
+  return Array.isArray(values) ? values.map(String) : []
+}
+const activePricingDimensions = computed<PricingDimensionKey[]>(() => pricingDimensionDefinitions
+  .filter(({ key }) => (props.product.pricing_rules ?? []).some(rule => matchValues(rule.match, key).length > 0))
+  .map(({ key }) => key))
+
+function cartesian(values: string[][]): string[][] {
+  return values.reduce<string[][]>((rows, current) => rows.flatMap(row => current.map(value => [...row, value])), [[]])
+}
+function pricingMatch(key: PricingDimensionKey, value: string): Record<string, string[]> {
+  return key === 'resolution' ? { resolution: [value] }
+    : key === 'aspect_ratio' ? { aspect_ratio: [value] }
+      : key === 'quality' ? { quality: [value] }
+        : { duration_seconds: [value] }
+}
+function buildPricingRules(product: Product, dimensions: PricingDimensionKey[]): Product['pricing_rules'] {
+  const oldRules = product.pricing_rules ?? []
+  if (!dimensions.length) {
+    const source = oldRules.find(rule => Object.keys(rule.match).length === 0) ?? oldRules[0]
+    return [{ match: {}, sale_price: source?.sale_price ?? null }]
+  }
+  const combinations = cartesian(dimensions.map(key => valuesFor(product, key).map(String))).filter(row => row.length === dimensions.length)
+  return combinations.map(row => {
+    const match = dimensions.reduce<Record<string, string[]>>((result, key, index) => Object.assign(result, pricingMatch(key, row[index]!)), {})
+    const existing = oldRules.find(rule => dimensions.every((key, index) => {
+      const values = matchValues(rule.match, key)
+      return values.length === 1 && values[0] === row[index]
+    }))
+    return { match, sale_price: existing?.sale_price ?? null }
+  })
+}
+function pricesDiffer(rules: Product['pricing_rules']): boolean {
+  const amounts = new Set(rules.map(rule => rule.sale_price?.amount ?? ''))
+  return amounts.size > 1
+}
+function togglePricingDimension(key: PricingDimensionKey, event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  const current = activePricingDimensions.value
+  if (checked) {
+    edit(next => { next.pricing_rules = buildPricingRules(next, [...current, key]) })
+    return
+  }
+  if (pricesDiffer(props.product.pricing_rules ?? []) && typeof window !== 'undefined' && !window.confirm('取消此价格维度会把不同价格合并为一条统一价，是否继续？')) return
+  edit(next => { next.pricing_rules = buildPricingRules(next, current.filter(item => item !== key)) })
+}
+function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
+  const labels = pricingDimensionDefinitions.flatMap(({ key, label }) => {
+    const values = matchValues(rule.match, key)
+    return values.length ? [`${label} ${values.join(' / ')}`] : []
+  })
+  return labels.length ? labels.join(' · ') : '统一售价（所有未按维度区分的规格）'
+}
+const filledPricingRows = computed(() => (props.product.pricing_rules ?? []).filter(rule => !!rule.sale_price?.amount).length)
+const pendingPricingRows = computed(() => Math.max(0, (props.product.pricing_rules ?? []).length - filledPricingRows.value))
+function multiplyDecimalText(left: string, right: number): string {
+  if (!/^\d+(?:\.\d+)?$/.test(left) || !Number.isInteger(right) || right < 1) return left
+  const [whole, fraction = ''] = left.split('.')
+  const digits = BigInt(`${whole}${fraction}`) * BigInt(right)
+  const scale = fraction.length
+  if (!scale) return digits.toString()
+  const text = digits.toString().padStart(scale + 1, '0')
+  const result = `${text.slice(0, -scale)}.${text.slice(-scale)}`.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  return result
+}
+const pricingPreview = computed(() => {
+  const rule = (props.product.pricing_rules ?? []).find(item => !!item.sale_price?.amount)
+  if (!rule?.sale_price?.amount) return undefined
+  const quantity = props.product.media_type === 'image' ? Math.max(1, props.product.capabilities.count.min || 1) : 1
+  return { unit: rule.sale_price.amount, currency: rule.sale_price.currency, quantity, total: multiplyDecimalText(rule.sale_price.amount, quantity) }
+})
 function edit(change: (value: Product) => void) {
   if (props.disabled) return
   const next: Product = JSON.parse(JSON.stringify(props.product))

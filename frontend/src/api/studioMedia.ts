@@ -11,6 +11,7 @@ export interface StudioPrice { amount: string; currency: string; billing_mode: s
 export interface StudioTask {
   id: string; kind: StudioKind; status: string; createdAt: string; expiresAt: string
   offerId: string; model: string; spec: Record<string, unknown>; price: StudioPrice; resultCount: number
+  unitPrice?: StudioPrice; quantity?: number; totalPrice?: StudioPrice
 }
 export class StudioError extends Error {
   constructor(public code: string, public status = 0) { super(code) }
@@ -32,8 +33,15 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
   const statuses: Record<string, string> = { intent: 'prepared', captured: 'completed', accepted: 'processing', dispatching: 'unknown', persisted: 'billing_pending' }
   const status = statuses[v.status] || v.status
   if (!['prepared','completed','unknown','billing_pending','processing','queued','failed','released','reserve_pending','recovery_blocked'].includes(status)) throw new StudioError('studio_contract')
+  const spec = record(v.spec)
+  const totalPrice = studioPrice(v.total_price ?? v.sale_price)
+  const unitPrice = v.unit_price === undefined ? totalPrice : studioPrice(v.unit_price)
+  const quantityValue = v.quantity === undefined ? spec.count : v.quantity
+  if (typeof quantityValue !== 'number') throw new StudioError('studio_contract')
+  const quantity = quantityValue
+  if (!Number.isInteger(quantity) || quantity < 1 || (kind === 'video' && quantity !== 1)) throw new StudioError('studio_contract')
   return { id, kind, status, createdAt: typeof v.created_at === 'string' ? v.created_at : '', expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
-    offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec: record(v.spec), price: studioPrice(v.sale_price),
+    offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec, price: totalPrice, unitPrice, quantity, totalPrice,
     resultCount: status !== 'completed' ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : 0 }
 }
 async function json(url: string, init?: RequestInit): Promise<unknown> {

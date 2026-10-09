@@ -18,6 +18,45 @@ type UsageBillingExactAmounts struct {
 	AccountQuota    string
 }
 
+// studioImagePrices preserves the old receipt meaning when the optional
+// quantity fields are absent. New quotes carry an explicit unit and total;
+// recovery of older quotes must continue to treat their sale_price as the
+// already-frozen total and never silently reprice them.
+func studioImagePrices(q StudioImageQuote) (unit mediaworkbench.Price, total mediaworkbench.Price, quantity int, err error) {
+	quantity = q.Quantity
+	if quantity < 1 {
+		quantity = q.Binding.Spec.Count
+	}
+	if quantity < 1 || quantity > 10 {
+		return unit, total, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	if q.TotalPrice == nil {
+		if mediaworkbench.ValidateImageSalePrice(q.Binding.Offer.SalePrice) != nil {
+			return unit, total, 0, mediaworkbench.ErrRuntimeBinding
+		}
+		return q.Binding.Offer.SalePrice, q.Binding.Offer.SalePrice, quantity, nil
+	}
+	unit = q.Binding.Offer.SalePrice
+	if q.UnitPrice != nil {
+		unit = *q.UnitPrice
+	}
+	total = *q.TotalPrice
+	if mediaworkbench.ValidateImageSalePrice(unit) != nil || mediaworkbench.ValidateImageSalePrice(total) != nil {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	_, expected, e := mediaworkbench.PriceForQuantity(unit, quantity)
+	if e != nil || expected != total {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	return unit, total, quantity, nil
+}
+
+// StudioImagePrices exposes the frozen quote breakdown to the HTTP adapter
+// without allowing the adapter to recompute or alter settlement values.
+func StudioImagePrices(q StudioImageQuote) (mediaworkbench.Price, mediaworkbench.Price, int, error) {
+	return studioImagePrices(q)
+}
+
 func (m *UsageBillingExactAmounts) Validate() error {
 	if m == nil {
 		return nil
@@ -37,12 +76,17 @@ func (m *UsageBillingExactAmounts) Validate() error {
 
 func QuotedImageUsageLog(r *StudioImageReceipt) *UsageLog {
 	q := r.Quote
-	sale, _ := mediaworkbench.DecimalAmount(q.Binding.Offer.SalePrice.Amount)
+	_, frozenTotal, quantity, err := studioImagePrices(q)
+	if err != nil {
+		frozenTotal = q.Binding.Offer.SalePrice
+		quantity = q.Binding.Spec.Count
+	}
+	sale, _ := mediaworkbench.DecimalAmount(frozenTotal.Amount)
 	base, _ := mediaworkbench.DecimalAmount(q.Accounting.BaseAmount)
 	rate, _ := mediaworkbench.DecimalAmount(q.Accounting.AccountRateMultiplier)
 	baseFloat, rateFloat := base.InexactFloat64(), rate.InexactFloat64()
 	upstream, mode, inbound := q.Binding.Offer.UpstreamModel, "image", "/v1/studio/images/tasks"
-	log := &UsageLog{UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, RequestID: HashUsageRequestPayload([]byte("studio-image:" + r.TaskID)), Model: q.Binding.Offer.SiteModel, RequestedModel: q.Binding.Offer.SiteModel, UpstreamModel: &upstream, GroupID: &q.Owner.GroupID, SubscriptionID: q.SubscriptionID, TotalCost: sale.InexactFloat64(), ActualCost: sale.InexactFloat64(), RateMultiplier: 1, AccountStatsCost: &baseFloat, AccountRateMultiplier: &rateFloat, BillingMode: &mode, RequestType: RequestTypeSync, ImageCount: q.Binding.Spec.Count, InboundEndpoint: &inbound, UpstreamEndpoint: &r.Endpoint, CreatedAt: q.CreatedAt}
+	log := &UsageLog{UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, RequestID: HashUsageRequestPayload([]byte("studio-image:" + r.TaskID)), Model: q.Binding.Offer.SiteModel, RequestedModel: q.Binding.Offer.SiteModel, UpstreamModel: &upstream, GroupID: &q.Owner.GroupID, SubscriptionID: q.SubscriptionID, TotalCost: sale.InexactFloat64(), ActualCost: sale.InexactFloat64(), RateMultiplier: 1, AccountStatsCost: &baseFloat, AccountRateMultiplier: &rateFloat, BillingMode: &mode, RequestType: RequestTypeSync, ImageCount: quantity, InboundEndpoint: &inbound, UpstreamEndpoint: &r.Endpoint, CreatedAt: q.CreatedAt}
 	// Native schema accepts only these display buckets. Other administrator
 	// resolutions retain their exact commercial spec in the immutable receipt.
 	size := q.Binding.Spec.Resolution
@@ -84,7 +128,11 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 	if err := q.Accounting.Validate(q); err != nil {
 		return nil, err
 	}
-	amount := q.Binding.Offer.SalePrice.Amount
+	_, frozenTotal, quantity, err := studioImagePrices(q)
+	if err != nil {
+		return nil, err
+	}
+	amount := frozenTotal.Amount
 	accountCost := q.Accounting.EffectiveAccountQuotaCost
 	m := &UsageBillingExactAmounts{amount, "0", amount, amount, accountCost}
 	if !q.KeyQuotaEnabled {
@@ -105,7 +153,7 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 	}
 	fingerprint := HashUsageRequestPayload([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|CNY|%s|%d", q.BindingHash, q.ID, taskID, payloadHash, amount, studioHash(q.Accounting), valueOrZero(subscriptionID))))
 	// Native request_id is VARCHAR(64); opaque task identifiers are hashed.
-	cmd := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("studio-image:" + taskID)), RequestFingerprint: fingerprint, RequestPayloadHash: payloadHash, UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, SubscriptionID: subscriptionID, AccountType: AccountTypeAPIKey, Model: q.Binding.Offer.SiteModel, MediaType: "image", ImageCount: q.Binding.Spec.Count, ExactAmounts: m, QuotedImage: receipt}
+	cmd := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("studio-image:" + taskID)), RequestFingerprint: fingerprint, RequestPayloadHash: payloadHash, UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, SubscriptionID: subscriptionID, AccountType: AccountTypeAPIKey, Model: q.Binding.Offer.SiteModel, MediaType: "image", ImageCount: quantity, ExactAmounts: m, QuotedImage: receipt}
 	if subscriptionID != nil {
 		cmd.BillingType = BillingTypeSubscription
 	}

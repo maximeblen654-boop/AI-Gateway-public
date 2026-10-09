@@ -40,7 +40,7 @@ export function useMediaWorkbench() {
       products.value = clone(draftInput(dto.media_workbench_v1?.draft.products ?? []).products)
       baseline = JSON.stringify(products.value)
     }
-    if (!selectedModel.value) selectedModel.value = dto.models[0]?.model_id ?? ''
+    if (selectedModel.value && !dto.models.some(model => model.model_id === selectedModel.value)) selectedModel.value = ''
     if (!products.value.some(p => p.product_id === selectedProduct.value && p.upstream_model === selectedModel.value)) {
       selectedProduct.value = products.value.find(p => p.upstream_model === selectedModel.value)?.product_id ?? ''
     }
@@ -113,10 +113,16 @@ export function useMediaWorkbench() {
     }, 1000)
   }
   async function saveDraft(): Promise<boolean> {
-    if (pending.value || loading.value || deleted.value || conflict.value || !config.value || !detail.value) return false
+    if (pending.value || loading.value || deleted.value || conflict.value || !detail.value) return false
+    if (!products.value.length) {
+      message.value = '请先选择图片或视频产品，再保存草稿。'
+      return false
+    }
     pending.value = 'save'; saveState.value = 'saving'; clearError(); stopPolling(); validationUnavailable.value = false
     try {
-      const dto = await mediaWorkbenchAPI.saveDraft(detail.value.id, config.value.record_version, products.value)
+      // A nil media configuration is initialized atomically by the first explicit
+      // SaveDraft. The server infers media_types from the submitted products.
+      const dto = await mediaWorkbenchAPI.saveDraft(detail.value.id, config.value?.record_version ?? 0, products.value)
       if (disposed) return false
       apply(dto, true); saveState.value = 'saved'
       const c = dto.media_workbench_v1
@@ -170,18 +176,9 @@ export function useMediaWorkbench() {
       if (![404, 410, 401, 403].includes(errorStatus.value)) message.value = '本次同步失败，仍使用上次成功目录。 ' + message.value
     } finally { pending.value = '' }
   }
-  async function initialize(id: number, types: string[]) {
-    if (pending.value || loading.value) return false
-    pending.value = 'initialize'; clearError()
-    try {
-      const dto = await mediaWorkbenchAPI.initialize(id, types)
-      stopPolling(); deleted.value = false; conflict.value = false; validationUnavailable.value = false; saveState.value = ''
-      selectedModel.value = ''; selectedProduct.value = ''; apply(dto, true); return true
-    } catch (e) { failure(e); return false } finally { pending.value = '' }
-  }
   function discard() { if (detail.value) apply(detail.value, true) }
   onBeforeUnmount(() => { disposed = true; loadSequence++; stopPolling() })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
     errorStatus, diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
-    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, initialize, discard }
+    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, discard }
 }

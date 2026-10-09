@@ -133,6 +133,25 @@ func TestFoundationLifecycle(t *testing.T) {
 		t.Fatalf("counts: %+v", d)
 	}
 }
+
+func TestFirstExplicitSaveInitializesMediaConfiguration(t *testing.T) {
+	s, r := fixture()
+	ctx := context.Background()
+	product := Product{ProductID: "first", MediaType: "image", SiteModel: "model-a", UpstreamModel: "model-a"}
+	d, err := s.SaveDraft(ctx, 7, 0, DraftInput{Products: []Product{product}})
+	must(t, err)
+	if d.Config == nil || d.Config.RecordVersion < 1 || len(d.Config.MediaTypes) != 1 || d.Config.MediaTypes[0] != "image" {
+		t.Fatalf("first save did not initialize media config: %+v", d.Config)
+	}
+	// The first CAS creates the configuration and draft together; the existing
+	// validation pass then records its diagnostics in the normal second CAS.
+	if r.writes != 2 || d.Config.Draft.Products[0].ProductID != "first" {
+		t.Fatalf("first save write boundary was not atomic: writes=%d config=%+v", r.writes, d.Config)
+	}
+	if _, err = s.SaveDraft(ctx, 7, 0, DraftInput{Products: []Product{product}}); !errors.Is(err, ErrStale) {
+		t.Fatalf("repeated version-zero save must fail closed: %v", err)
+	}
+}
 func TestPreservePublishedAndProcurement(t *testing.T) {
 	s, r := fixture()
 	ctx := context.Background()

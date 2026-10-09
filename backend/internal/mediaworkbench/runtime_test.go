@@ -6,6 +6,26 @@ import (
 	"testing"
 )
 
+func TestPriceForQuantityPreservesExactScale(t *testing.T) {
+	for _, tc := range []struct {
+		amount string
+		count  int
+		want   string
+	}{
+		{"0.80", 1, "0.80"},
+		{"0.80", 2, "1.60"},
+		{"1.23456789", 3, "3.70370367"},
+	} {
+		_, total, err := PriceForQuantity(Price{Amount: tc.amount, Currency: "CNY", BillingMode: "per_request"}, tc.count)
+		if err != nil || total.Amount != tc.want {
+			t.Fatalf("%s x %d = %#v, %v; want %s", tc.amount, tc.count, total, err, tc.want)
+		}
+	}
+	if _, _, err := PriceForQuantity(Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}, 0); err == nil {
+		t.Fatal("zero quantity accepted")
+	}
+}
+
 func runtimeFixture(t *testing.T) (*Service, *memoryRepo, ResolvedImageOffer) {
 	t.Helper()
 	s, r := validatorFixture(t)

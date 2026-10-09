@@ -37,6 +37,32 @@ func ValidateImageSalePrice(p Price) error {
 	return err
 }
 
+// PriceForQuantity freezes the customer unit price and the exact total for an
+// image request. Quantity is part of the quoted request, but never a pricing
+// matrix dimension; it is applied once at quote time and carried through the
+// native settlement command.
+func PriceForQuantity(p Price, quantity int) (Price, Price, error) {
+	if ValidateImageSalePrice(p) != nil || quantity < 1 || quantity > 10 {
+		return Price{}, Price{}, ErrRuntimeBinding
+	}
+	unit, err := DecimalAmount(p.Amount)
+	if err != nil {
+		return Price{}, Price{}, err
+	}
+	total := unit.Mul(decimal.NewFromInt(int64(quantity)))
+	// Keep the unit amount's decimal scale in the frozen total so existing
+	// exact-text billing and display contracts remain stable (0.80 stays 0.80).
+	precision := int32(0)
+	if dot := strings.IndexByte(p.Amount, '.'); dot >= 0 {
+		precision = int32(len(p.Amount) - dot - 1)
+	}
+	amount := total.StringFixed(precision)
+	if _, err = DecimalAmount(amount); err != nil {
+		return Price{}, Price{}, err
+	}
+	return p, Price{Amount: amount, Currency: p.Currency, BillingMode: p.BillingMode}, nil
+}
+
 type ResolvedImageOffer struct {
 	Version           string       `json:"version"`
 	PublishedRevision string       `json:"published_revision"`

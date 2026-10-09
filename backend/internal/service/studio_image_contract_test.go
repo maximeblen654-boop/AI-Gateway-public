@@ -144,6 +144,22 @@ func TestStudioImageIssuedAccountingSnapshot(t *testing.T) {
 	}
 }
 
+func TestStudioImageIssueFreezesUnitTotalAndQuantity(t *testing.T) {
+	r, q, key, _, _ := studioContractFixture(t)
+	r.Core.channelService = &ChannelService{repo: &studioChannelFixture{channel: studioAccountPrice("0.35")}}
+	token, err := r.Issue(context.Background(), q.Owner, key, q.Binding.Offer.OfferID, mediaworkbench.Spec{Resolution: "1K", AspectRatio: "1:1", Count: 2}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen, err := r.Store.Quote(token, q.Owner, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frozen.Quantity != 2 || frozen.UnitPrice == nil || frozen.UnitPrice.Amount != "0.80" || frozen.TotalPrice == nil || frozen.TotalPrice.Amount != "1.60" {
+		t.Fatalf("quote did not freeze unit × quantity: %+v", frozen)
+	}
+}
+
 func TestStudioImageAccountingAdmissionBeforeNetwork(t *testing.T) {
 	for _, quota := range []bool{true, false} {
 		t.Run(fmt.Sprintf("quota_%t", quota), func(t *testing.T) {

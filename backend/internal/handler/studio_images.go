@@ -74,7 +74,12 @@ func (h *OpenAIGatewayHandler) StudioImageQuote(c *gin.Context) {
 		studioError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "quote_token": token, "spec": quote.Binding.Spec, "sale_price": quote.Binding.Offer.SalePrice, "expires_at": quote.ExpiresAt})
+	unitPrice, totalPrice, quantity, err := service.StudioImagePrices(quote)
+	if err != nil {
+		studioError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "quote_token": token, "spec": quote.Binding.Spec, "sale_price": totalPrice, "unit_price": unitPrice, "quantity": quantity, "total_price": totalPrice, "expires_at": quote.ExpiresAt})
 }
 
 func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {

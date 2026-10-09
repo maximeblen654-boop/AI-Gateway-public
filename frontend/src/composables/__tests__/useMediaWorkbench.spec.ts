@@ -126,8 +126,11 @@ describe('Media Workbench request lifecycle', () => {
     await start(); api.detail.mockRejectedValueOnce({ status: 404 }); await state.selectSupplier(44)
     expect(state.detail.value!.id).toBe(77); expect(state.deleted.value).toBe(false)
   })
-  it('initializing another supplier resets stale account flags', async () => {
-    await start(); state.conflict.value = true; api.initialize.mockResolvedValue(supplier(44))
-    await state.initialize(44, ['image']); expect(state.conflict.value).toBe(false); expect(state.detail.value!.id).toBe(44)
+  it('first explicit save atomically initializes a nil media configuration', async () => {
+    const dto = supplier(); dto.media_workbench_v1 = null; dto.effective_state = 'NOT_INITIALIZED'; dto.effective_sales = false
+    api.detail.mockResolvedValue(dto); await start(); state.selectModel('new-model'); state.addProduct('image')
+    api.saveDraft.mockResolvedValue(saved())
+    expect(await state.saveDraft()).toBe(true)
+    expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]))
   })
 })

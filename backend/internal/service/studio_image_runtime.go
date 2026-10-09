@@ -110,7 +110,11 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	if err != nil || !studioGroupAllows(key, resolved.Offer.SiteModel) {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
-	m := &UsageBillingExactAmounts{resolved.Offer.SalePrice.Amount, "0", "0", "0", "0"}
+	unitPrice, totalPrice, err := mediaworkbench.PriceForQuantity(resolved.Offer.SalePrice, resolved.Spec.Count)
+	if err != nil {
+		return "", err
+	}
+	m := &UsageBillingExactAmounts{totalPrice.Amount, "0", "0", "0", "0"}
 	if subscriptionID != nil {
 		m.Subscription = m.Balance
 		m.Balance = "0"
@@ -118,7 +122,7 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	if err = m.Validate(); err != nil {
 		return "", err
 	}
-	n, _ := mediaworkbench.DecimalAmount(resolved.Offer.SalePrice.Amount)
+	n, _ := mediaworkbench.DecimalAmount(totalPrice.Amount)
 	// Native usage-log money columns are DECIMAL(20,10).
 	if n.GreaterThanOrEqual(decimalSubscriptionLimit) {
 		return "", mediaworkbench.ErrRuntimeBinding
@@ -127,7 +131,7 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	if err != nil || a == nil {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
-	q := StudioImageQuote{Owner: owner, Binding: resolved, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit()}
+	q := StudioImageQuote{Owner: owner, Binding: resolved, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
 	q.ExpiresAt = q.CreatedAt.Add(2 * time.Minute)
 	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt)
 	if err != nil {
@@ -249,7 +253,11 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 		}
 		if result.Applied && receipt.Quote.SubscriptionID == nil && r.Core.userPlatformQuotaRepo != nil && r.Core.billingCacheService.HasUserPlatformQuotaLimit(ctx, receipt.Quote.Owner.UserID, PlatformOpenAI) {
 			// Reuse the existing native usage side effect; no Studio quota ledger.
-			n, _ := mediaworkbench.DecimalAmount(receipt.Quote.Binding.Offer.SalePrice.Amount)
+			_, total, _, e := studioImagePrices(receipt.Quote)
+			if e != nil {
+				return receipt, e
+			}
+			n, _ := mediaworkbench.DecimalAmount(total.Amount)
 			r.Core.billingCacheService.IncrementUserPlatformQuotaUsage(receipt.Quote.Owner.UserID, PlatformOpenAI, n.InexactFloat64())
 			// Preserve native flusher ownership and its non-flusher DB fallback.
 			if r.Core.cfg == nil || !r.Core.cfg.Database.UserPlatformQuotaFlusherEnabled {

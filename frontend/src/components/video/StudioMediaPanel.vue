@@ -11,9 +11,28 @@
       <label v-if="kind === 'image' && offer?.spec.quality?.length">品质<select v-model="quality" class="input"><option v-for="v in offer.spec.quality" :key="v">{{ v }}</option></select></label>
       <label v-if="kind === 'image'">数量<input v-model.number="count" type="number" :min="offer?.spec.count.min" :max="offer?.spec.count.max" class="input" data-testid="studio-count" /></label>
       <label>提示词<textarea v-model="prompt" placeholder="描述你想生成的内容" class="input" data-testid="studio-prompt" /></label>
-      <label>素材<input type="file" :accept="accept" :disabled="!offer || !accept" data-testid="studio-asset-input" @change="upload" /></label>
-      <ol class="my-3"><li v-for="(a,i) in assets" :key="a.asset_ref">{{ i + 1 }}. {{ a.kind }} · {{ a.size }} bytes · 已保存 <button type="button" class="btn btn-secondary" @click="assets.splice(i,1)">移除</button></li></ol>
     </fieldset>
+    <div class="mt-3 rounded-xl border border-dashed border-teal-300 p-4" data-testid="studio-asset-uploader" @dragover.prevent @drop.prevent="drop" @paste.stop="paste">
+      <label class="block cursor-pointer" data-testid="studio-asset-dropzone">
+        <span class="font-medium">参考素材</span>
+        <span class="ml-2 text-sm text-slate-600">点击选择图片 / 拖入图片 / Ctrl+V 粘贴图片</span>
+        <input type="file" :accept="accept" :disabled="!offer || !accept || busy || !!active" multiple class="sr-only" data-testid="studio-asset-input" @change="upload" />
+      </label>
+      <div v-if="uploads.length" class="mt-3 space-y-2" data-testid="studio-assets">
+        <div v-for="(item, i) in uploads" :key="item.id" class="flex items-center gap-3 rounded-lg border p-2" :data-testid="`studio-asset-${item.status}`">
+          <img v-if="item.previewUrl" :src="item.previewUrl" class="h-12 w-12 rounded object-cover" :alt="item.file.name || `参考素材 ${i + 1}`" data-testid="studio-asset-thumbnail" />
+          <span v-else class="flex h-12 w-12 items-center justify-center rounded bg-slate-100 text-xs uppercase">{{ item.kind }}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate">{{ item.file.name || `参考素材 ${i + 1}` }}</span>
+            <span v-if="item.status === 'pending'" class="text-sm text-slate-500">上传中…</span>
+            <span v-else-if="item.status === 'success'" class="text-sm text-emerald-600">上传成功 · {{ item.receipt?.size }} bytes</span>
+            <span v-else class="text-sm text-red-600">上传失败{{ item.error ? `：${item.error}` : '' }}</span>
+          </span>
+          <button type="button" class="btn btn-secondary" :disabled="!!active" :data-testid="`studio-asset-remove-${item.id}`" @click="removeAsset(item)">移除</button>
+        </div>
+        <button type="button" class="btn btn-secondary" :disabled="!!active" data-testid="studio-assets-clear" @click="clearAssets">清空全部</button>
+      </div>
+    </div>
     <p v-if="!offers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限。</p>
     <p v-if="offer && incompatible && !active" role="alert">当前模型不支持这些素材类型或数量，请调整素材。</p>
     <p v-if="offer?.input_mode === 'references' && assets.length && !active">点击下方准备按钮会将引用素材上传到所选模型的供应商，随后显示报价；确认生成前不会创建生成任务。</p>
@@ -23,7 +42,7 @@
     <p v-if="notice" role="status">{{ notice }}</p>
     <div v-if="active" class="mt-4 space-y-2" data-testid="studio-task">
       <p>已冻结：{{ taskModel(active) }} · {{ specText(active) }}</p>
-      <p data-testid="studio-price">本次报价：{{ active.price.amount }} {{ active.price.currency }}</p>
+      <p data-testid="studio-price">本次报价：{{ active.price.amount }} {{ active.price.currency }}<span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} 份）</span></p>
       <p v-if="active.status === 'prepared'">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
       <p data-testid="studio-task-id">任务：{{ active.id }}</p>
       <p data-testid="studio-status" aria-live="polite">{{ statusText(active.status) }}</p>
@@ -51,11 +70,15 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
-const kind=ref<StudioKind>('video'), offers=ref<StudioOffer[]>([]), offerId=ref(''), assets=ref<StudioAssetReceipt[]>([])
+const kind=ref<StudioKind>('video'), offers=ref<StudioOffer[]>([]), offerId=ref('')
+type UploadState = 'pending' | 'success' | 'failure'
+type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
+const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 const offer=computed(()=>offers.value.find(o=>o.offer_id===offerId.value))
 const accept=computed(()=>['image','video','audio'].filter(k=>offer.value?.spec.references[k as StudioAssetReceipt['kind']].max).map(k=>`${k}/*`).join(','))
+const assets=computed(()=>uploads.value.flatMap(item=>item.receipt ? [item.receipt] : []))
 const incompatible=computed(()=>!offer.value || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
 const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
@@ -84,9 +107,28 @@ async function load(selectedId?:unknown){const epoch=++generation;busy.value=tru
 async function reloadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);await refresh()}
 async function refresh(){if(!active.value||querying.value)return;const original=active.value;querying.value=true;try{const task=await studioTask(original);if(active.value?.id===original.id&&kind.value===original.kind){accepted(task);error.value=''}}catch(e){if(active.value?.id===original.id)error.value=studioErrorMessage(e)}finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}}
-async function upload(e:Event){const input=e.target as HTMLInputElement,f=input.files?.[0];if(!f||busy.value||active.value)return;busy.value=true;error.value='';notice.value='素材上传中…';try{
- await ensureStudioSession();const k=f.type.split('/')[0] as StudioAssetReceipt['kind'];if(!['image','video','audio'].includes(k))throw new StudioError('asset_type_mismatch');assets.value.push(await uploadStudioAsset(f,k));notice.value='素材已私有保存，顺序如上。'
- }catch(e){notice.value='';error.value=studioErrorMessage(e)}finally{busy.value=false;input.value=''}}
+function assetKind(file:File):StudioAssetReceipt['kind']|undefined{const value=file.type.split('/')[0];return ['image','video','audio'].includes(value) ? value as StudioAssetReceipt['kind'] : undefined}
+function assetError(error:unknown){return error instanceof StudioError && error.code==='asset_type_mismatch' ? '素材类型不受支持。' : studioErrorMessage(error)}
+function assetPreview(file:File){return file.type.startsWith('image/') && typeof URL.createObjectURL==='function' ? URL.createObjectURL(file) : undefined}
+function activeUploadCount(kind:StudioAssetReceipt['kind']){return uploads.value.filter(item=>item.kind===kind && item.status!=='failure').length}
+function revokePreview(item:StudioAssetUpload){if(item.previewUrl&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(item.previewUrl)}
+function removeAsset(item:StudioAssetUpload){if(active.value)return;item.controller?.abort();revokePreview(item);uploads.value=uploads.value.filter(candidate=>candidate.id!==item.id)}
+function clearAssets(){if(active.value)return;uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)});uploads.value=[];notice.value='';error.value='';intent=undefined}
+function addUpload(file:File):StudioAssetUpload{
+ const kind=assetKind(file), item:StudioAssetUpload={id:crypto.randomUUID(),file,kind:kind||'image',status:'failure',previewUrl:assetPreview(file)}
+ if(!offer.value){item.error='请先选择模型。';uploads.value.push(item);return item}
+ if(!kind){item.error='素材类型不受支持。';uploads.value.push(item);return item}
+ const rule=offer.value.spec.references[kind]
+ if(!rule.max || activeUploadCount(kind)>=rule.max || uploads.value.filter(candidate=>candidate.status!=='failure').length>=offer.value.spec.references.total_max){item.error='已达到该模型的素材数量上限。';uploads.value.push(item);return item}
+ item.status='pending';uploads.value.push(item);return item
+}
+async function uploadOne(item:StudioAssetUpload){if(item.status!=='pending')return;item.controller=new AbortController();try{
+ await ensureStudioSession();const receipt=await uploadStudioAsset(item.file,item.kind,item.controller.signal);if(!uploads.value.includes(item))return;item.receipt=receipt;item.status='success';notice.value='素材已私有保存，顺序如上。'
+ }catch(e){if(!uploads.value.includes(item)||e instanceof DOMException&&e.name==='AbortError')return;item.status='failure';item.error=assetError(e);error.value=item.error;notice.value=''}}
+async function enqueueFiles(files:File[]){if(!files.length||busy.value||active.value)return;busy.value=true;error.value='';notice.value='素材上传中…';const pending=files.map(addUpload).filter(item=>item.status==='pending');try{await Promise.all(pending.map(uploadOne))}finally{busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}
+function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
+function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
+function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
 async function quote(){if(busy.value||active.value||!offer.value||incompatible.value||!prompt.value.trim())return;busy.value=true;error.value='';notice.value='';try{
  const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
@@ -102,8 +144,8 @@ async function generate(){if(busy.value||!active.value||active.value.status!=='p
  const task=active.value;busy.value=true;error.value='';attempted.add(task.id);accepted({...task,status:'unknown'});
  try{accepted(await studioGenerate(task))}catch(e){if(e instanceof StudioError&&(e.code.includes('paid_gate_off')||e.code.endsWith('quote_expired'))){attempted.delete(task.id);accepted(task)}error.value=studioErrorMessage(e)}finally{busy.value=false}
 }
-onMounted(async()=>{try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;selected=raw.id;if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected)}catch(e){error.value=studioErrorMessage(e)}
+onMounted(async()=>{window.addEventListener('paste',paste);try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;selected=raw.id;if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected)}catch(e){error.value=studioErrorMessage(e)}
  if(mounted)timer=setInterval(()=>{clock.value=Date.now();if(!polling&&!busy.value&&active.value&&['unknown','processing','queued','billing_pending'].includes(active.value.status)){polling=true;void refresh().finally(()=>{polling=false})}},3000)
 })
-onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer)})
+onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);uploads.value.forEach(revokePreview)})
 </script>

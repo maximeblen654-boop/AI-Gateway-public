@@ -368,9 +368,44 @@ func makeDraft(input DraftInput, basedOn string, now time.Time) Draft {
 	return Draft{Revision: fmt.Sprintf("mwd_%x", sha256.Sum256(data)), BasedOnPublishedRevision: basedOn, UpdatedAt: now, Products: input.Products}
 }
 func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input DraftInput) (*Detail, error) {
-	a, err := s.mutable(ctx, id, expected)
-	if err != nil {
-		return nil, err
+	var a *Account
+	var err error
+	if expected == 0 {
+		// The first explicit save is the initialization boundary. Browsing a
+		// catalog remains read-only; an empty or repeated version-zero write
+		// cannot create a media configuration.
+		a, err = s.repo.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if a.Type != "apikey" {
+			return nil, ErrUnsupported
+		}
+		if a.Config != nil {
+			return nil, ErrStale
+		}
+		if len(input.Products) == 0 {
+			return nil, ErrInvalid
+		}
+		types := make([]string, 0, 2)
+		seen := map[string]bool{}
+		for _, p := range input.Products {
+			if p.MediaType != "image" && p.MediaType != "video" {
+				return nil, ErrInvalid
+			}
+			if !seen[p.MediaType] {
+				seen[p.MediaType] = true
+				types = append(types, p.MediaType)
+			}
+		}
+		sort.Strings(types)
+		now := time.Now().UTC()
+		a.Config = &Config{SchemaVersion: 1, RecordVersion: 0, MediaTypes: types, AdapterBindings: bindingsFor(a, types), Sales: Sales{UpdatedAt: now}, Procurement: Procurement{Entries: []ProcurementEntry{}}}
+	} else {
+		a, err = s.mutable(ctx, id, expected)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// Persist incomplete business fields before local validation.
 	for _, p := range input.Products {
