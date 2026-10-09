@@ -114,7 +114,9 @@ and permission to perform real supplier actions remain separate decisions.
 The ordinary website and native authentication use **one writable Core**. Restore
 legacy consumers at `/api/v1/internal/studio/tickets/consume` and
 `/api/v1/internal/studio/sessions/verify` with the old Bridge service secret.
-The old and new Bridge secrets may differ; each BFF gets only its own secret.
+The retained old Bridge keeps that legacy secret; the new Core, Bridge and BFF
+use their one matching private service token. No service token is exposed to a
+browser or reused as a customer credential.
 The two ticket purposes are not interchangeable. Website logout, revoke-all and
 session-binding revocation update the shared native Studio epoch keys; both
 generations verify those facts on every authenticated request. Local BFF logout
@@ -137,35 +139,28 @@ contract. Upload, preview and download stay under the corresponding cookie path.
 See `Caddy.routes.example` for a review-only routing fragment, not a production
 configuration or permission to replace the current proxy.
 
-Before approval, bind the single Core image, both Bridge/BFF executors, exact
-mounts and old pending tasks. Retain the Core receipt root including claims,
-upstream responses and original result bytes; retain its native request IDs and
-float billing fingerprints. A legacy receipt GET bypasses new-request quota
-admission only: native identity, key/user status and owner/Group checks remain.
-The Group `image_reference_price` JSON value is preserved, not recalculated.
-New async receipt intents persist a first-dispatch fact before I/O. Recovery with
-no upstream receipt ID remains unknown, even for an old journal with zero attempts.
+For an approved runtime change, bind the single immutable Core image, both
+Bridge/BFF executors, exact mounts and the existing receipt roots. Retain native
+request IDs, original bytes, claims and billing fingerprints; preserve the
+frozen price and owner/Group checks. A missing upstream receipt remains an
+unknown result and is never converted into a replacement POST.
 
-Deployment order (separate approval): freeze new intents; verify existing task
-writers and state; replace only the single Core with a compatibility-tested
-candidate; verify old session/receipt/price APIs; start isolated new Bridge/BFF
-with new actions off; verify new authentication and downloads; switch only the
-new proxy prefixes. Preserve every old container and writable layer. If any
-old route/owner/hash/ledger check fails, stop new admission and revert that
-route/component. Do not run two Core writers or roll a database over new orders.
-The fallback Core must also understand no-replay async journals; the pre-fix
-worker is not safe to resume. Keep incompatible pending tasks frozen for their
-matching executor. No runtime change authorizes sales Publish or paid dispatch.
+Start or replace only the single Core writer, wait for health, then start the
+dependent Bridge/BFF with submission gates closed. Verify authentication,
+catalog, routes and downloads before switching the new proxy prefixes. Keep
+existing containers and data available for rollback; if a route, owner, hash or
+ledger check fails, stop new admission and revert that component. Runtime
+changes do not authorize sales Publish or paid dispatch.
 
 ## Customer task confirmation and results
 
-The ordinary customer `/video-studio` page includes the Published media panel.
+The ordinary customer `/video-studio` page directly renders the Published media panel.
 It obtains the current website user's Studio session, loads server-owned task
 history and displays the frozen quote amount/currency before an explicit Generate
 click. Image confirmation sends the stored `task_id`; video sends `operation_id`.
 Both paths resolve the original private binding on the server. The old image
-request form remains compatible; no browser-provided owner, source or price is
-used to recover an existing task.
+customer form and Grok-specific controls are no longer a customer entry; retained
+backend recovery routes continue to use server-owned identity and price data.
 
 Unsubmitted quotations can be read after restart without querying a nonexistent
 Core generation task. Quote expiry blocks a first submission, while claimed

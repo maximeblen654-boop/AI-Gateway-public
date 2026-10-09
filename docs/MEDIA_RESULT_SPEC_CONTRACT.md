@@ -133,9 +133,9 @@ node --test --test-concurrency=1 studio/bff/image-binding.test.mjs studio/bff/le
 
 ## Release status
 
-`BLOCKED_FOR_RELEASE`. Output pixel grids and exact output-duration equality are
-no longer release requirements under this relay policy. Final candidate checks,
-affected Core/BFF artifacts and the existing independent production routing,
+`CONTRACT_READY_SEPARATE_RELEASE_GATES`. Output pixel grids and exact
+output-duration equality are no longer release requirements under this relay
+policy. Final candidate checks, affected Core/BFF artifacts, production routing,
 recovery, sales/cost facts and deployment permissions remain separate gates.
-Old artifact digests do not identify this fix. No production deployment, sales
-Publish, paid enablement or real supplier request is performed by this work.
+This contract does not by itself claim production deployment, sales Publish,
+paid enablement or a real supplier request.
