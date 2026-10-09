@@ -58,7 +58,7 @@
           <p class="mw-source-note">域名只用于分组；每个 Account 的模型和销售状态独立管理。</p>
         </section>
 
-        <section v-else-if="step === 'models'" ref="modelsPageRef" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
+        <section v-else-if="step === 'models'" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
           <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 返回来源与账号</button>
           <div v-if="detail" class="mw-page-heading mw-account-context">
             <div><p class="mw-eyebrow">第 2 步 · 已选择 Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
@@ -95,7 +95,7 @@
               <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
               <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
             </div>
-            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select v-model="selectedProduct" class="input" :disabled="busy"><option v-for="p in modelProducts" :key="p.product_id" :value="p.product_id">{{ p.display_name }} · {{ p.product_id }}</option></select></label></div>
+            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select v-model="selectedProduct" class="input" data-test="product-select" :disabled="busy"><option v-for="p in modelProducts" :key="p.product_id" :value="p.product_id">{{ p.display_name }} · {{ p.product_id }}</option></select></label></div>
             <MediaProductEditor v-if="product" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" @identity="selectedProduct = $event" />
             <div v-if="product && !config && addablePreInitTypes.length" class="mw-product-type-actions"><button v-for="type in addablePreInitTypes" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品后一起保存</button></div>
             <div v-if="product && config" class="mw-product-type-actions"><button v-for="type in config.media_types" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品</button></div>
@@ -132,8 +132,10 @@
       <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish" @click="confirmPublish">确认发布配置</button></template>
     </MediaDialog>
     <MediaDialog :show="salesDialog" :title="config?.sales.enabled ? '暂停媒体销售？' : '开启媒体销售？'" :busy="pending === 'sales'" @close="salesDialog = false">
-      <p>{{ config?.sales.enabled ? '暂停后停止新的媒体报价和新提交；已经提交的任务和历史订单不会被修改。' : '开启前请确认下列产品将一起受到 Account 级销售开关影响：' }}</p>
-      <ul v-if="!config?.sales.enabled" class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
+      <p>下列已发布产品将一起受到 Account 级销售开关影响：</p>
+      <ul class="mw-dialog-list" data-test="sales-products"><li v-for="p in config?.published?.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
+      <p v-if="!config?.published?.products?.length">暂无已发布产品。</p>
+      <p>{{ config?.sales.enabled ? '暂停后停止新的媒体报价和新提交；已经提交的任务和历史订单不会被修改。' : '后台会核验已发布产品的销售条件；未发布草稿不会随销售开关生效。' }}</p>
       <template #actions><button class="btn" :class="config?.sales.enabled ? 'mw-danger' : 'btn-primary'" data-test="confirm-sales" :disabled="busy" @click="confirmSales">确认{{ config?.sales.enabled ? '暂停' : '开启' }}</button></template>
     </MediaDialog>
     <MediaDialog :show="reloadDialog" title="重新读取服务器配置？" :busy="busy" @close="reloadDialog = false">
@@ -162,9 +164,8 @@ const step = ref('suppliers')
 const search = ref('')
 const filter = ref('')
 const editorElement = ref<HTMLElement>()
-const modelsPageRef = ref<HTMLElement>()
 const sourceListRef = ref<HTMLElement>()
-const modelsScrollTop = ref(0)
+const modelsScrollPosition = ref({ top: 0, left: 0 })
 const publishDialog = ref(false)
 const salesDialog = ref(false)
 const reloadDialog = ref(false)
@@ -178,6 +179,7 @@ const busy = computed(() => !!pending.value || loading.value)
 const publishedCount = computed(() => suppliers.value.reduce((n, s) => n + s.models.filter(m => m.state === 'PUBLISHED').length, 0))
 const accountStates: Record<string, string> = {
   SELLING: '媒体销售中', SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '发布未就绪',
+  NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）',
   NOT_INITIALIZED: '未开启销售', ACCOUNT_INACTIVE: '账户已停用', ACCOUNT_UNSCHEDULABLE: '不可调度',
   ACCOUNT_RUNTIME_BLOCKED: '运行受限', UNSUPPORTED_ACCOUNT_TYPE: '类型不支持', ACTIVE: '媒体销售中',
   SALES_ENABLED: '媒体销售中', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入'
@@ -204,7 +206,14 @@ const canResume = computed(() => {
   return !blocked && detail.value?.status === 'active' && detail.value.schedulable && (config.value?.published?.offers?.length ?? 0) > 0
 })
 const resumeReason = computed(() => !detail.value?.schedulable ? '账户不可调度，请打开账户详情处理。' : detail.value?.status !== 'active' ? '账户已停用，请打开账户详情处理。' : '后台尚未提供可恢复销售的已发布产品。')
-const salesLabel = computed(() => config.value?.sales.enabled ? '销售中' : detail.value?.effective_state === 'SALES_PAUSED' ? '已暂停销售' : '未开启销售')
+const salesLabel = computed(() => {
+  if (!config.value) return '未开启销售'
+  if (config.value.sales.enabled) return '销售中'
+  const state = detail.value?.effective_state
+  if (state === 'NOT_YET_ENABLED' || state === 'NOT_INITIALIZED') return '未开启销售'
+  if (state === 'SALES_PAUSED') return '已暂停销售'
+  return '销售已关闭（历史启售状态未知）'
+})
 const mediaTypeLabel = computed(() => {
   const types = config.value?.media_types ?? [...new Set(products.value.map(product => product.media_type))]
   if (types.includes('image') && types.includes('video')) return '图片 + 视频'
@@ -222,14 +231,24 @@ function clearAccountFilters() { accountSearch.value = ''; accountFilter.value =
 function toggleSource(host: string) { if (accountSearch.value || accountFilter.value || platformFilter.value) return; const next = new Set(collapsedSources.value); if (next.has(host)) next.delete(host); else next.add(host); collapsedSources.value = next }
 function sourceOpen(host: string) { return !!accountSearch.value || !!accountFilter.value || !!platformFilter.value || !collapsedSources.value.has(host) }
 function modelLabel(state: string) { return ({ PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
-function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
+function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
 function updateProduct(value: Product) { const index = products.value.findIndex(p => p.product_id === selectedProduct.value); if (index >= 0) products.value[index] = value }
 function navigate(action: () => void | Promise<void>) { if (busy.value) return; if (dirty.value) nextNavigation.value = action; else void action() }
 async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) step.value = 'models' }
-async function openEditor(modelId: string) { modelsScrollTop.value = modelsPageRef.value?.scrollTop ?? 0; selectModel(modelId); step.value = 'editor'; await nextTick(); editorElement.value?.scrollIntoView?.({ block: 'start' }) }
-async function backToModels() { step.value = 'models'; await nextTick(); if (modelsPageRef.value) modelsPageRef.value.scrollTop = modelsScrollTop.value }
+async function openEditor(modelId: string) {
+  // AppLayout and .mw-page scroll with the document, not inside the model panel.
+  modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }
+  selectModel(modelId); step.value = 'editor'
+  await nextTick()
+  editorElement.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+}
+async function backToModels() {
+  step.value = 'models'
+  await nextTick()
+  window.scrollTo({ ...modelsScrollPosition.value, behavior: 'instant' })
+}
 async function saveAndNavigate() {
   if (!await saveDraft()) return
   const action = nextNavigation.value
@@ -250,7 +269,23 @@ async function discardAndNavigate() {
 }
 async function confirmPublish() { await publish(); publishDialog.value = false }
 async function confirmSales() { if (config.value) await sales(!config.value.sales.enabled); salesDialog.value = false }
-async function reload() { if (detail.value) await selectSupplier(detail.value.id); reloadDialog.value = false; if (detail.value) step.value = 'editor' }
+async function reload() {
+  const accountId = detail.value?.id
+  if (!accountId) return
+  const previousStep = step.value
+  const modelId = selectedModel.value
+  const productId = selectedProduct.value
+  await selectSupplier(accountId)
+  reloadDialog.value = false
+  if (detail.value?.id !== accountId || message.value) return
+  const modelExists = detail.value.models.some(model => model.model_id === modelId) ||
+    products.value.some(item => item.upstream_model === modelId)
+  if (modelId && modelExists) {
+    selectModel(modelId)
+    if (products.value.some(item => item.product_id === productId && item.upstream_model === modelId)) selectedProduct.value = productId
+  }
+  step.value = previousStep === 'editor' && !selectedModel.value ? 'models' : previousStep
+}
 async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers() }
 async function locate({ path, scope }: Diagnostic) { const productIndex = /products(?:\[|\.)(\d+)/.exec(path)?.[1]; const productTarget = products.value.find(p => p.product_id === scope) ?? (productIndex !== undefined ? products.value[Number(productIndex)] : undefined); if (productTarget) { selectedModel.value = productTarget.upstream_model; selectedProduct.value = productTarget.product_id; step.value = 'editor'; await nextTick() } const field = ['adapter_config.size_mappings', 'pricing_rules', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => path.includes(key)) ?? 'model'; const section = editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`); section?.querySelectorAll('details').forEach(node => { node.open = true }); const target = section?.matches('input,select') ? section : section?.querySelector<HTMLElement>('input,select,button'); target?.focus(); section?.scrollIntoView?.({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }) }
 function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || pending.value) { event.preventDefault(); event.returnValue = '' } }

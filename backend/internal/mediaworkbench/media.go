@@ -42,8 +42,11 @@ type Config struct {
 	Procurement     Procurement               `json:"procurement"`
 }
 type Sales struct {
-	Enabled   bool      `json:"enabled"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Enabled bool `json:"enabled"`
+	// Nil preserves unknown sales history in configurations created before this
+	// field existed. Only a successful explicit enable establishes true.
+	HasEverEnabled *bool     `json:"has_ever_enabled,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 type Draft struct {
 	Revision                 string    `json:"revision"`
@@ -258,7 +261,13 @@ func describe(a *Account) *Detail {
 				states[p.UpstreamModel] = "MODEL_SYNC_REQUIRED"
 			}
 		}
-		d.EffectiveState = "SALES_PAUSED"
+		d.EffectiveState = "SALES_OFF_UNKNOWN"
+		if c.Sales.HasEverEnabled != nil {
+			d.EffectiveState = "NOT_YET_ENABLED"
+			if *c.Sales.HasEverEnabled {
+				d.EffectiveState = "SALES_PAUSED"
+			}
+		}
 		if c.Sales.Enabled {
 			d.EffectiveState = "PUBLISHED_NOT_READY"
 			if publishedReady(a) {
@@ -347,7 +356,7 @@ func (s *Service) Initialize(ctx context.Context, id int64, mediaTypes []string)
 		return describe(a), nil
 	} // repeat initialize never edits existing configuration
 	now := time.Now().UTC()
-	c := &Config{SchemaVersion: 1, RecordVersion: 1, MediaTypes: types, AdapterBindings: bindingsFor(a, types), Sales: Sales{UpdatedAt: now}, Procurement: Procurement{Entries: []ProcurementEntry{}}}
+	c := &Config{SchemaVersion: 1, RecordVersion: 1, MediaTypes: types, AdapterBindings: bindingsFor(a, types), Sales: Sales{HasEverEnabled: new(bool), UpdatedAt: now}, Procurement: Procurement{Entries: []ProcurementEntry{}}}
 	c.Draft = makeDraft(DraftInput{Products: []Product{}}, "", now)
 	a.Config = c
 	c.Validation, _ = Validate(a, c.Draft, now)
@@ -400,7 +409,7 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		}
 		sort.Strings(types)
 		now := time.Now().UTC()
-		a.Config = &Config{SchemaVersion: 1, RecordVersion: 0, MediaTypes: types, AdapterBindings: bindingsFor(a, types), Sales: Sales{UpdatedAt: now}, Procurement: Procurement{Entries: []ProcurementEntry{}}}
+		a.Config = &Config{SchemaVersion: 1, RecordVersion: 0, MediaTypes: types, AdapterBindings: bindingsFor(a, types), Sales: Sales{HasEverEnabled: new(bool), UpdatedAt: now}, Procurement: Procurement{Entries: []ProcurementEntry{}}}
 	} else {
 		a, err = s.mutable(ctx, id, expected)
 		if err != nil {
@@ -437,7 +446,11 @@ func (s *Service) SetSales(ctx context.Context, id, expected int64, enabled bool
 	if enabled && !publishedReady(a) {
 		return nil, ErrSales
 	}
-	a.Config.Sales = Sales{Enabled: enabled, UpdatedAt: time.Now().UTC()}
+	a.Config.Sales.Enabled = enabled
+	a.Config.Sales.UpdatedAt = time.Now().UTC()
+	if enabled {
+		a.Config.Sales.HasEverEnabled = &enabled
+	}
 	a.Config.RecordVersion++
 	if enabled {
 		err = s.repo.CompareAndSwapChecked(ctx, id, expected, DependenciesFor(a), a.Config)

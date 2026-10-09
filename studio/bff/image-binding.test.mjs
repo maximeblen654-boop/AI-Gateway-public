@@ -23,11 +23,15 @@ test('browser restores a prepared image and confirms its stored identity without
   await assert.rejects(runtime.dispatch({ownerId:2},{task_id:prepared.task_id}));
   assert.equal(JSON.stringify(runtime.history(owner)).includes('quote_token'),false);
 });
-function fixture(t,{lost=false,count=1}={}) {
+function fixture(t,{lost=false,count=1,frozen=false,totalOverride}={}) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bound-image-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));let posts=0,gets=0;
   const call=async(session,method,operation,payload,key=0)=>{
     assert.equal(session.ownerId,1);
-    if(operation==='quotes')return {contract:IMAGE_BINDING_CONTRACT,key_ref:42,payload:{contract:IMAGE_BINDING_CONTRACT,quote_token:'a'.repeat(64),spec:{count,images:0},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},expires_at:new Date(Date.now()+120000).toISOString()}};
+    if(operation==='quotes') {
+      const quote={contract:IMAGE_BINDING_CONTRACT,quote_token:'a'.repeat(64),spec:{count,images:0},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},expires_at:new Date(Date.now()+120000).toISOString()};
+      if(frozen) Object.assign(quote,{unit_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},total_price:{amount:totalOverride??(count===2?'1.60':'0.80'),currency:'CNY',billing_mode:'per_request'},quantity:count});
+      return {contract:IMAGE_BINDING_CONTRACT,key_ref:42,payload:quote};
+    }
     assert.equal(key,42);
     if(method==='POST') {posts++;assert.ok(fs.readdirSync(path.join(root,'journal')).some(x=>x.endsWith('.sync-dispatch')));if(lost)throw new Error('lost response');return {payload:{}};}
     gets++;
@@ -73,7 +77,13 @@ test('late pending recovery cannot overwrite completed originals',async t=>{
   assert.deepEqual(f.tasks.result(owner,prepared.task_id,0).data,Buffer.from(png,'base64'));
 });
 test('expected count follows immutable quote rather than historical 1/4 assumptions',async t=>{
-  const f=fixture(t,{count:2});await f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}});assert.equal((await f.tasks.dispatch(owner,f.input)).results.length,2);
+  const f=fixture(t,{count:2,frozen:true});await f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}});const task=await f.tasks.dispatch(owner,f.input);assert.equal(task.results.length,2);assert.equal(task.unit_price.amount,'0.80');assert.equal(task.total_price.amount,'1.60');assert.equal(task.quantity,2);
+});
+test('rejects an inconsistent frozen total while retaining legacy sale_price quotes',async t=>{
+  const f=fixture(t,{count:2,frozen:true,totalOverride:'1.61'});
+  await assert.rejects(f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}}),/Invalid Published quote response/);
+  const legacy=fixture(t,{count:2});
+  await legacy.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}});
 });
 test('browser Account/key/price authority and reference mismatch rejected',async t=>{
   const f=fixture(t);await assert.rejects(f.tasks.quote(owner,{offer_id:'p',spec:{count:1},account_id:7}));

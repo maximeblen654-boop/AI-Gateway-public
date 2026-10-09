@@ -88,7 +88,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
   }
   function get(session,id){const op=journal.getForOwner(owner(session),id),old=legacy?.get?.(session,id);if(op&&old)fail('Conflicting journal roots');if(!op&&!old)fail('Operation not found');return op||old;}
   function view(op){const b=op.children[0]?.account?.binding;return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',created_at:op.createdAt,
-    ...(b?{status:op.children[0].status,offer_id:b.offer.offer_id,model:b.offer.upstream_model,spec:b.spec,sale_price:b.offer.sale_price,expires_at:b.expires_at}:{}),
+    ...(b?{status:op.children[0].status,offer_id:b.offer.offer_id,model:b.offer.upstream_model,spec:b.spec,sale_price:b.offer.sale_price,unit_price:b.offer.sale_price,total_price:b.offer.sale_price,quantity:b.spec.count,expires_at:b.expires_at}:{}),
     children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
   function child(session,id){const op=get(session,id);if(op.version!==2)fail('Legacy task requires original recovery');return op.children[0];}
   async function current(session,c){const s=(await call(session,'GET',`tasks/${c.childId}`,undefined,c.account.key_ref)).payload;

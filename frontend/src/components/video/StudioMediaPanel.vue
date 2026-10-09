@@ -108,7 +108,13 @@ async function reloadHistory(){if(busy.value||historyLoading.value)return;const 
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);await refresh()}
 async function refresh(){if(!active.value||querying.value)return;const original=active.value;querying.value=true;try{const task=await studioTask(original);if(active.value?.id===original.id&&kind.value===original.kind){accepted(task);error.value=''}}catch(e){if(active.value?.id===original.id)error.value=studioErrorMessage(e)}finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}}
 function assetKind(file:File):StudioAssetReceipt['kind']|undefined{const value=file.type.split('/')[0];return ['image','video','audio'].includes(value) ? value as StudioAssetReceipt['kind'] : undefined}
-function assetError(error:unknown){return error instanceof StudioError && error.code==='asset_type_mismatch' ? '素材类型不受支持。' : studioErrorMessage(error)}
+function assetError(error:unknown){
+ if(error instanceof Error){
+  if(error.message==='invalid_local_asset')return '素材类型或大小不符合限制。'
+  if(error.message==='file_changed')return '文件发生变化，未上传。'
+ }
+ return error instanceof StudioError && error.code==='asset_type_mismatch' ? '素材类型不受支持。' : studioErrorMessage(error)
+}
 function assetPreview(file:File){return file.type.startsWith('image/') && typeof URL.createObjectURL==='function' ? URL.createObjectURL(file) : undefined}
 function activeUploadCount(kind:StudioAssetReceipt['kind']){return uploads.value.filter(item=>item.kind===kind && item.status!=='failure').length}
 function revokePreview(item:StudioAssetUpload){if(item.previewUrl&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(item.previewUrl)}
@@ -122,10 +128,11 @@ function addUpload(file:File):StudioAssetUpload{
  if(!rule.max || activeUploadCount(kind)>=rule.max || uploads.value.filter(candidate=>candidate.status!=='failure').length>=offer.value.spec.references.total_max){item.error='已达到该模型的素材数量上限。';uploads.value.push(item);return item}
  item.status='pending';uploads.value.push(item);return item
 }
-async function uploadOne(item:StudioAssetUpload){if(item.status!=='pending')return;item.controller=new AbortController();try{
- await ensureStudioSession();const receipt=await uploadStudioAsset(item.file,item.kind,item.controller.signal);if(!uploads.value.includes(item))return;item.receipt=receipt;item.status='success';notice.value='素材已私有保存，顺序如上。'
- }catch(e){if(!uploads.value.includes(item)||e instanceof DOMException&&e.name==='AbortError')return;item.status='failure';item.error=assetError(e);error.value=item.error;notice.value=''}}
-async function enqueueFiles(files:File[]){if(!files.length||busy.value||active.value)return;busy.value=true;error.value='';notice.value='素材上传中…';const pending=files.map(addUpload).filter(item=>item.status==='pending');try{await Promise.all(pending.map(uploadOne))}finally{busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}
+function currentUpload(item:StudioAssetUpload){return uploads.value.find(candidate=>candidate.id===item.id)}
+async function uploadOne(item:StudioAssetUpload){const current=currentUpload(item);if(!mounted||!current||current.status!=='pending')return;const controller=new AbortController();current.controller=controller;try{
+ await ensureStudioSession();if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;const receipt=await uploadStudioAsset(current.file,current.kind,controller.signal);if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;current.receipt=receipt;current.status='success';notice.value='素材已私有保存，顺序如上。'
+ }catch(e){if(!mounted||currentUpload(item)!==current||controller.signal.aborted||e instanceof DOMException&&e.name==='AbortError')return;current.status='failure';current.error=assetError(e);error.value=current.error;notice.value=''}}
+async function enqueueFiles(files:File[]){if(!files.length||busy.value||active.value)return;busy.value=true;error.value='';notice.value='素材上传中…';const pending=files.map(addUpload).filter(item=>item.status==='pending');try{await Promise.all(pending.map(uploadOne))}finally{if(mounted){busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}}
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
@@ -147,5 +154,5 @@ async function generate(){if(busy.value||!active.value||active.value.status!=='p
 onMounted(async()=>{window.addEventListener('paste',paste);try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;selected=raw.id;if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected)}catch(e){error.value=studioErrorMessage(e)}
  if(mounted)timer=setInterval(()=>{clock.value=Date.now();if(!polling&&!busy.value&&active.value&&['unknown','processing','queued','billing_pending'].includes(active.value.status)){polling=true;void refresh().finally(()=>{polling=false})}},3000)
 })
-onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);uploads.value.forEach(revokePreview)})
+onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)})})
 </script>

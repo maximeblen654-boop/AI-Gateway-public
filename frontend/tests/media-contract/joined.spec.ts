@@ -51,7 +51,9 @@ describe('real frontend + Phase 2A HTTP control-plane contract (stdio, zero netw
   let wrapper: ReturnType<typeof mount>
   it('sync → specs/decimal price/size mapping → Save(+2 CAS) → PASS → Publish → readback', async () => {
     wrapper = mount(defineComponent({ setup() { state = useMediaWorkbench(); return () => null } }))
-    await state.initialize(7, ['image', 'video'])
+    // Browsing is read-only; the first explicit SaveDraft initializes the
+    // media configuration after the operator has selected an Account.
+    await state.selectSupplier(7)
     await state.sync()
     expect(state.detail.value!.models).toContainEqual({ model_id: 'gpt-image-2', state: 'PENDING' })
     state.selectModel('gpt-image-2'); state.addProduct('image')
@@ -59,7 +61,7 @@ describe('real frontend + Phase 2A HTTP control-plane contract (stdio, zero netw
     p.capabilities.resolutions = ['1K']; p.capabilities.aspect_ratios = ['1:1']
     p.adapter_config.size_mappings = [{ resolution: '1K', aspect_ratio: '1:1', wire_size: '1024x1024' }]
     p.pricing_rules = [{ match: {}, sale_price: { amount: '0.12345678901234567890', currency: 'USD', billing_mode: 'per_request' } }]
-    const initialVersion = state.config.value!.record_version
+    const initialVersion = state.config.value?.record_version ?? 0
     expect(await state.saveDraft()).toBe(true)
     expect(state.config.value!.record_version).toBe(initialVersion + 2)
     expect(state.config.value!.validation.status).toBe('PASS'); expect(state.canPublish.value).toBe(true)

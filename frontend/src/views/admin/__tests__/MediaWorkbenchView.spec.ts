@@ -38,10 +38,11 @@ beforeEach(() => {
   api.suppliers.mockResolvedValue([supplier(), supplier(44)])
   api.detail.mockImplementation(async id => supplier(id))
   api.saveDraft.mockResolvedValue(saved())
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 })
-afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
+afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
 
 describe('Media Workbench page flow', () => {
   it('keeps source groups collapsed by default and opens exact numeric search results', async () => {
@@ -82,6 +83,14 @@ describe('Media Workbench page flow', () => {
     expect((wrapper.get('[data-test="model-search"]').element as HTMLInputElement).value).toBe('new-model')
   })
 
+  it('restores document scroll when returning to the model list', async () => {
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 12 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 420 })
+    await openEditor()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    expect(window.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ left: 12, top: 420 }))
+  })
+
   it('initializes only on the first explicit save and sends expected version zero', async () => {
     const nil = supplier(); nil.media_workbench_v1 = null; nil.effective_state = 'NOT_INITIALIZED'; nil.effective_sales = false
     api.detail.mockResolvedValue(nil)
@@ -105,13 +114,44 @@ describe('Media Workbench page flow', () => {
     expect(dialog.text()).toContain('不会自动开启销售')
   })
 
+  it('lists only published products when confirming an account-wide sales change', async () => {
+    const dto = supplier()
+    dto.media_workbench_v1!.draft.products[0]!.display_name = '未发布草稿'
+    dto.media_workbench_v1!.published!.products![0]!.display_name = '已发布产品'
+    api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="sales"]').trigger('click'); await flushPromises()
+    const list = wrapper.get('[data-test="sales-products"]')
+    expect(list.text()).toContain('已发布产品')
+    expect(list.text()).not.toContain('未发布草稿')
+  })
+
   it.each([
-    ['SALES_PAUSED', '已暂停销售'], ['NOT_INITIALIZED', '未开启销售']
+    ['NOT_YET_ENABLED', '未开启销售'], ['SALES_PAUSED', '已暂停销售'], ['SALES_OFF_UNKNOWN', '销售已关闭（历史启售状态未知）']
   ])('distinguishes initial sale state from paused state (%s)', async (state, label) => {
     const dto = supplier(); dto.effective_state = state; dto.effective_sales = false; dto.media_workbench_v1!.sales.enabled = false
     api.detail.mockResolvedValue(dto); api.suppliers.mockResolvedValue([dto])
     await openEditor()
     expect(wrapper.get('[data-test="sales-state"]').text()).toContain(label)
+  })
+
+  it('keeps the selected model and product after reloading the editor', async () => {
+    const dto = supplier()
+    const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
+    second.product_id = 'canvas-2'; second.display_name = '第二已配置产品'
+    dto.media_workbench_v1!.draft.products.push(second)
+    dto.media_workbench_v1!.published!.products!.push(JSON.parse(JSON.stringify(second)))
+    api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="product-select"]').setValue('canvas-2')
+    await wrapper.get('[data-test="display-name"]').setValue('本地修改')
+    api.saveDraft.mockRejectedValue({ status: 409 })
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="reload"]').trigger('click')
+    await wrapper.get('[data-test="confirm-reload"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="editor-page"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="selected-model-summary"]').text()).toContain('image-native-1')
+    expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-2')
   })
 
   it('keeps dirty navigation protected inside the page flow', async () => {

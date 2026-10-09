@@ -91,6 +91,9 @@ func TestFoundationLifecycle(t *testing.T) {
 	if d.Config.RecordVersion != 1 || d.Config.Sales.Enabled || d.Config.Validation.PublishReady || d.Config.Validation.Status != "FAIL" {
 		t.Fatalf("unsafe initialization: %+v", d.Config)
 	}
+	if d.Config.Sales.HasEverEnabled == nil || *d.Config.Sales.HasEverEnabled || d.EffectiveState != "NOT_YET_ENABLED" {
+		t.Fatalf("new configuration has incorrect sales history: %+v", d)
+	}
 	first, _ := json.Marshal(d.Config)
 	d, err = s.Initialize(ctx, 7, []string{"video"})
 	must(t, err)
@@ -125,6 +128,9 @@ func TestFoundationLifecycle(t *testing.T) {
 	if r.a.Status != "active" || !r.a.Schedulable || r.a.Config.RecordVersion != 4 {
 		t.Fatal("generic status or rejected mutation changed")
 	}
+	if r.a.Config.Sales.HasEverEnabled == nil || *r.a.Config.Sales.HasEverEnabled || d.EffectiveState != "NOT_YET_ENABLED" {
+		t.Fatal("disable or rejected enable changed sales history")
+	}
 	encoded, _ := json.Marshal(d)
 	if strings.Contains(string(encoded), "secret") || strings.Contains(string(encoded), "private") || d.Host != "example.com" {
 		t.Fatal("URL credentials leaked")
@@ -143,6 +149,9 @@ func TestFirstExplicitSaveInitializesMediaConfiguration(t *testing.T) {
 	if d.Config == nil || d.Config.RecordVersion < 1 || len(d.Config.MediaTypes) != 1 || d.Config.MediaTypes[0] != "image" {
 		t.Fatalf("first save did not initialize media config: %+v", d.Config)
 	}
+	if d.Config.Sales.HasEverEnabled == nil || *d.Config.Sales.HasEverEnabled || d.EffectiveState != "NOT_YET_ENABLED" {
+		t.Fatalf("first save has incorrect sales history: %+v", d)
+	}
 	// The first CAS creates the configuration and draft together; the existing
 	// validation pass then records its diagnostics in the normal second CAS.
 	if r.writes != 2 || d.Config.Draft.Products[0].ProductID != "first" {
@@ -152,6 +161,71 @@ func TestFirstExplicitSaveInitializesMediaConfiguration(t *testing.T) {
 		t.Fatalf("repeated version-zero save must fail closed: %v", err)
 	}
 }
+
+func TestSalesHistoryEnableAndPause(t *testing.T) {
+	s, _ := validatorFixture(t)
+	ctx := context.Background()
+	d, err := s.SaveDraft(ctx, 7, 1, DraftInput{Products: []Product{validProduct()}})
+	must(t, err)
+	d, err = s.Publish(ctx, 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	must(t, err)
+	if d.EffectiveState != "NOT_YET_ENABLED" || d.Config.Sales.HasEverEnabled == nil || *d.Config.Sales.HasEverEnabled {
+		t.Fatal("publishing was mistaken for enabling sales")
+	}
+	d, err = s.SetSales(ctx, 7, d.Config.RecordVersion, true)
+	must(t, err)
+	if !d.EffectiveSales || d.EffectiveState != "SELLING" || d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled {
+		t.Fatalf("successful enable did not establish sales history: %+v", d)
+	}
+	d, err = s.SetSales(ctx, 7, d.Config.RecordVersion, false)
+	must(t, err)
+	if d.EffectiveSales || d.Config.Sales.Enabled || d.EffectiveState != "SALES_PAUSED" || d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled {
+		t.Fatalf("pause did not preserve sales history: %+v", d)
+	}
+	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{})
+	must(t, err)
+	if d.EffectiveState != "SALES_PAUSED" || d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled {
+		t.Fatal("draft save erased established sales history")
+	}
+}
+
+func TestLegacySalesHistoryRemainsUnknown(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "off", true: "on"}[enabled], func(t *testing.T) {
+			s, r, _ := runtimeFixture(t)
+			r.a.Config.Sales.HasEverEnabled = nil
+			r.a.Config.Sales.Enabled = enabled
+			ctx := context.Background()
+			d, err := s.Detail(ctx, 7)
+			must(t, err)
+			wantState := "SALES_OFF_UNKNOWN"
+			if enabled {
+				wantState = "SELLING"
+			}
+			if d.Config.Sales.HasEverEnabled != nil || d.EffectiveState != wantState || d.EffectiveSales != enabled {
+				t.Fatalf("legacy read changed sales history or effective sales: %+v", d)
+			}
+			encoded, err := json.Marshal(d.Config.Sales)
+			must(t, err)
+			if strings.Contains(string(encoded), "has_ever_enabled") {
+				t.Fatal("unknown history was serialized as a known value")
+			}
+			d, err = s.SetSales(ctx, 7, d.Config.RecordVersion, false)
+			must(t, err)
+			d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{})
+			must(t, err)
+			if d.Config.Sales.HasEverEnabled != nil || d.EffectiveState != "SALES_OFF_UNKNOWN" {
+				t.Fatal("disable or draft save backfilled unknown sales history")
+			}
+			d, err = s.SetSales(ctx, 7, d.Config.RecordVersion, true)
+			must(t, err)
+			if d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled || d.EffectiveState != "SELLING" {
+				t.Fatal("explicit enable did not establish legacy sales history")
+			}
+		})
+	}
+}
+
 func TestPreservePublishedAndProcurement(t *testing.T) {
 	s, r := fixture()
 	ctx := context.Background()

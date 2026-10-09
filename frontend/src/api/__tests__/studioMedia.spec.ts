@@ -27,3 +27,12 @@ it('an in-flight session for a previous website identity cannot send a new busin
 it('valid blocked and pending Core states remain recoverable without presenting success',()=>{
  for(const status of ['reserve_pending','recovery_blocked'])expect(studioTaskView('video',{contract:'account_video_v1',operation_id:'op_'+'a'.repeat(64),status,spec:{count:1},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'}}).resultCount).toBe(0)
 })
+it('displays a frozen total only when unit price and quantity agree without repricing legacy receipts',()=>{
+ const legacy={contract:'published_image_binding_v1',task_id:'img_'+'b'.repeat(32),status:'prepared',spec:{count:4},sale_price:{amount:'0.70',currency:'CNY',billing_mode:'per_request'}}
+ const old=studioTaskView('image',legacy);expect(old.price.amount).toBe('0.70');expect(old.unitPrice).toBeUndefined()
+ const quoted={...legacy,unit_price:legacy.sale_price,total_price:{...legacy.sale_price,amount:'2.80'},quantity:4}
+ expect(studioTaskView('image',quoted)).toMatchObject({quantity:4,unitPrice:{amount:'0.70'},price:{amount:'2.80'}})
+ expect(()=>studioTaskView('image',{...quoted,total_price:{...quoted.total_price,amount:'2.81'}})).toThrow('studio_contract')
+ expect(()=>studioTaskView('image',{...quoted,quantity:2})).toThrow('studio_contract')
+ expect(()=>studioTaskView('image',{...legacy,spec:{count:11}})).toThrow('studio_contract')
+})

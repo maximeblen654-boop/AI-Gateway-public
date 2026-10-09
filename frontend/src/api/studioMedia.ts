@@ -35,11 +35,15 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
   if (!['prepared','completed','unknown','billing_pending','processing','queued','failed','released','reserve_pending','recovery_blocked'].includes(status)) throw new StudioError('studio_contract')
   const spec = record(v.spec)
   const totalPrice = studioPrice(v.total_price ?? v.sale_price)
-  const unitPrice = v.unit_price === undefined ? totalPrice : studioPrice(v.unit_price)
+  const unitPrice = v.unit_price === undefined ? (kind === 'video' ? totalPrice : undefined) : studioPrice(v.unit_price)
   const quantityValue = v.quantity === undefined ? spec.count : v.quantity
   if (typeof quantityValue !== 'number') throw new StudioError('studio_contract')
   const quantity = quantityValue
-  if (!Number.isInteger(quantity) || quantity < 1 || (kind === 'video' && quantity !== 1)) throw new StudioError('studio_contract')
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity !== spec.count || (kind === 'video' ? quantity !== 1 : quantity > 10)) throw new StudioError('studio_contract')
+  if (unitPrice) {
+    const units = (amount: string) => { const [whole, fraction = ''] = amount.split('.'); return BigInt(`${whole}${fraction.padEnd(8, '0')}`) }
+    if (unitPrice.currency !== totalPrice.currency || units(unitPrice.amount) * BigInt(quantity) !== units(totalPrice.amount)) throw new StudioError('studio_contract')
+  }
   return { id, kind, status, createdAt: typeof v.created_at === 'string' ? v.created_at : '', expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
     offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec, price: totalPrice, unitPrice, quantity, totalPrice,
     resultCount: status !== 'completed' ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : 0 }

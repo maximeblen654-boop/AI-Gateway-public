@@ -6,6 +6,10 @@ export const IMAGE_BINDING_CONTRACT = 'published_image_binding_v1';
 export const IMAGE_PAID_ENABLED = false; // Default; only trusted server configuration may opt in.
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const taskPattern = /^img_[a-f0-9]{32}$/;
+function amountUnits(amount) {
+  const [whole, fraction = ''] = amount.split('.');
+  return BigInt(`${whole}${fraction.padEnd(8, '0')}`);
+}
 function syncDir(root) {
   if (process.platform === 'win32') return;
   const fd = fs.openSync(root, 'r');
@@ -64,7 +68,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     const reply=await call(session,'POST','quotes',input);
     const q=reply.payload;
     const unitPrice=q?.unit_price||q?.sale_price, totalPrice=q?.total_price||q?.sale_price, quantity=q?.quantity??q?.spec?.count;
-    if(q?.contract!==IMAGE_BINDING_CONTRACT || !/^[a-f0-9]{64}$/.test(q.quote_token||'') || !Number.isInteger(q.spec?.count) || q.spec.count<1 || q.spec.count>10 || !Number.isInteger(q.spec?.images) || q.spec.images<0 || q.spec.images>16 || !Number.isInteger(quantity) || quantity!==q.spec.count || unitPrice?.currency!=='CNY' || unitPrice.billing_mode!=='per_request' || totalPrice?.currency!=='CNY' || totalPrice.billing_mode!=='per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(unitPrice.amount) || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(totalPrice.amount) || !Number.isFinite(Date.parse(q.expires_at)) || Date.parse(q.expires_at)<=now())throw new Error('Invalid Published quote response');
+    const hasFrozenBreakdown = q?.unit_price !== undefined || q?.total_price !== undefined || q?.quantity !== undefined;
+    if(q?.contract!==IMAGE_BINDING_CONTRACT || !/^[a-f0-9]{64}$/.test(q.quote_token||'') || !Number.isInteger(q.spec?.count) || q.spec.count<1 || q.spec.count>10 || !Number.isInteger(q.spec?.images) || q.spec.images<0 || q.spec.images>16 || !Number.isInteger(quantity) || quantity!==q.spec.count || unitPrice?.currency!=='CNY' || unitPrice.billing_mode!=='per_request' || totalPrice?.currency!=='CNY' || totalPrice.billing_mode!=='per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(unitPrice.amount) || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(totalPrice.amount) || hasFrozenBreakdown && (!q.unit_price || !q.total_price || q.quantity === undefined || amountUnits(totalPrice.amount) !== amountUnits(unitPrice.amount) * BigInt(quantity)) || !Number.isFinite(Date.parse(q.expires_at)) || Date.parse(q.expires_at)<=now())throw new Error('Invalid Published quote response');
     write(location('quote',[id,q.quote_token]),{...q,offer_id:input.offer_id,keyRef:reply.key_ref,owner:id},true);
     return q;
   }
@@ -128,8 +133,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return recover(session,task.task_id);
   }
-  function view(task) {const unitPrice=task.quote.unit_price||task.quote.sale_price,totalPrice=task.quote.total_price||task.quote.sale_price,quantity=task.quote.quantity??task.quote.spec.count;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
-    offer_id:task.quote.offer_id,sale_price:totalPrice,unit_price:unitPrice,total_price:totalPrice,quantity,spec:task.quote.spec,expires_at:task.quote.expires_at};}
+  function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
+    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {
