@@ -49,7 +49,10 @@ func TestProvideHTTPServerEnablesBoundedH2C(t *testing.T) {
 		MaxUploadBufferPerConnection: 1024 * 1024,
 		MaxUploadBufferPerStream:     256 * 1024,
 	}
-	srv := ProvideHTTPServer(cfg, gin.New())
+	router := gin.New()
+	router.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+	srv := ProvideHTTPServer(cfg, router)
+	require.Equal(t, 30*time.Second, srv.IdleTimeout)
 	require.NotNil(t, srv.Protocols)
 	require.True(t, srv.Protocols.UnencryptedHTTP2())
 	require.True(t, srv.Protocols.HTTP1())
@@ -58,6 +61,21 @@ func TestProvideHTTPServerEnablesBoundedH2C(t *testing.T) {
 	require.Equal(t, 64*1024, srv.HTTP2.MaxReadFrameSize)
 	require.Equal(t, 1024*1024, srv.HTTP2.MaxReceiveBufferPerConnection)
 	require.Equal(t, 256*1024, srv.HTTP2.MaxReceiveBufferPerStream)
+	addr, stop := serveIngressTestServer(t, srv)
+	defer stop()
+	for _, protoMajor := range []int{1, 2} {
+		protocols := new(http.Protocols)
+		protocols.SetHTTP1(protoMajor == 1)
+		protocols.SetUnencryptedHTTP2(protoMajor == 2)
+		transport := &http.Transport{Protocols: protocols}
+		client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+		resp, err := client.Get("http://" + addr + "/")
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		transport.CloseIdleConnections()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, protoMajor, resp.ProtoMajor)
+	}
 }
 
 func TestConfigureTrustedProxies(t *testing.T) {

@@ -135,6 +135,8 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	// 根据配置决定是否启用 H2C
 	if cfg.Server.H2C.Enabled {
 		h2cConfig := cfg.Server.H2C
+		// 标准库 HTTP/1 和 HTTP/2 共用监听器的空闲超时。
+		server.IdleTimeout = time.Duration(h2cConfig.IdleTimeout) * time.Second
 		server.HTTP2 = &http.HTTP2Config{
 			MaxConcurrentStreams:          int(h2cConfig.MaxConcurrentStreams),
 			MaxReadFrameSize:              h2cConfig.MaxReadFrameSize,
