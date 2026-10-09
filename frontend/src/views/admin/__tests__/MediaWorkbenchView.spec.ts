@@ -13,11 +13,14 @@ vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
 const api = vi.mocked(mediaWorkbenchAPI)
 let wrapper: VueWrapper
 let router: ReturnType<typeof createRouter>
-async function start() {
+async function mountWorkbench() {
   router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/admin/media', component: MediaWorkbenchView }, { path: '/admin/accounts', component: { template: '<div>Accounts</div>' } }] })
   await router.push('/admin/media')
   wrapper = mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [router], stubs: { AppLayout: { template: '<div><slot /></div>' } } } })
-  await flushPromises(); await wrapper.get('[data-test="supplier-77"]').trigger('click'); await flushPromises()
+  await flushPromises()
+}
+async function start(id = 77) {
+  await mountWorkbench(); await wrapper.get(`[data-test="supplier-${id}"]`).trigger('click'); await flushPromises()
 }
 beforeEach(() => {
   vi.resetAllMocks(); api.suppliers.mockResolvedValue([supplier(), supplier(44)]); api.detail.mockImplementation(async id => supplier(id)); api.saveDraft.mockResolvedValue(saved())
@@ -26,6 +29,30 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); document.documentElement.classList.remove('dark') })
 describe('Media Workbench admin interactions', () => {
+  it('groups accounts by source and matches numeric IDs exactly', async () => {
+    const account5 = supplier(5); const account15 = supplier(15)
+    account5.host = 'same.example.invalid'; account15.host = 'same.example.invalid'
+    api.suppliers.mockResolvedValue([account15, account5]); await mountWorkbench()
+    expect(wrapper.get('[data-test="source-count"]').text()).toBe('1')
+    expect(wrapper.get('[data-test="account-count"]').text()).toBe('2')
+    expect(wrapper.get('[data-test="source-same.example.invalid"]').text()).toContain('2 个账号')
+    await wrapper.get('[data-test="account-search"]').setValue('5'); await flushPromises()
+    expect(wrapper.get('[data-test="supplier-5"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="supplier-15"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="source-same.example.invalid"]').attributes('open')).toBeDefined()
+  })
+  it('filters by platform and searches the add-account list by ID', async () => {
+    const available = supplier(15); available.media_workbench_v1 = null; available.platform = 'gemini'
+    const selected = supplier(77); selected.platform = 'openai'
+    api.suppliers.mockResolvedValue([selected, available]); await mountWorkbench()
+    await wrapper.get('[data-test="platform-filter"]').setValue('gemini'); await flushPromises()
+    expect(wrapper.find('[data-test="supplier-77"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="supplier-15"]').exists()).toBe(true)
+    await wrapper.get('[data-test="add-supplier"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="add-account-search"]').setValue('15'); await flushPromises()
+    expect(wrapper.get('[data-test="add-account-select"]').text()).toContain('#15')
+    expect(wrapper.get('[data-test="add-account-select"]').text()).not.toContain('#77')
+  })
   it('renders the Go DTO null slices as empty specifications and missing prices', async () => {
     const dto = supplier(77, 'FAIL')
     Object.assign(dto.media_workbench_v1!.draft.products[0]!.capabilities, { resolutions: null })

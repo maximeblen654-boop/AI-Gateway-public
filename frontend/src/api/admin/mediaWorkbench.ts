@@ -37,7 +37,7 @@ export interface MediaConfig {
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
 }
 export interface SupplierDetail {
-  id: number; name: string; host: string; type: string; status: string; schedulable: boolean
+  id: number; name: string; host: string; platform: string; type: string; status: string; schedulable: boolean
   effective_sales: boolean; effective_state: string; sales_resume_ready?: boolean
   model_catalog: { source: string; synced_at: string; models: string[] } | null
   media_workbench_v1: MediaConfig | null

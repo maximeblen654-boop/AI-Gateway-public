@@ -12,7 +12,7 @@ export const imageProduct: Product = {
 }
 export function supplier(id = 77, status = 'PASS'): SupplierDetail {
   const result: SupplierDetail = {
-    id, name: id === 77 ? '示例图片供应商' : '示例视频供应商', host: 'supplier.example.invalid', type: 'apikey', status: 'active', schedulable: true,
+    id, name: id === 77 ? '示例图片供应商' : '示例视频供应商', host: id === 77 ? 'images.example.invalid' : 'video.example.invalid', platform: id === 77 ? 'openai' : 'gemini', type: 'apikey', status: 'active', schedulable: true,
     effective_sales: true, effective_state: 'ACTIVE', sales_resume_ready: true,
     model_catalog: { source: 'native-sync', synced_at: '2026-10-05T01:10:00Z', models: ['image-native-1', 'new-model', 'flow-needs-development'] },
     discovered_count: 3, configured_count: 1, pending_count: 2, problem_count: status === 'PASS' ? 0 : 1,

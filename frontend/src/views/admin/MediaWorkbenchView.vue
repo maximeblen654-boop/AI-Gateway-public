@@ -2,37 +2,48 @@
   <AppLayout>
     <div class="media-workbench" :class="`mw-step-${step}`" :aria-busy="!!pending || loading">
       <header class="mw-heading">
-        <div><p class="mw-eyebrow">MEDIA WORKBENCH</p><h1>媒体工作台</h1><p class="mw-muted">供应商、模型、规格和售价，都在这里管理。</p></div>
-        <button class="btn btn-primary" :disabled="busy" data-test="add-supplier" @click="navigate(() => { addDialog = true })">添加供应商</button>
+        <div><p class="mw-eyebrow">MEDIA WORKBENCH</p><h1>媒体工作台</h1><p class="mw-muted">按来源查找 Account，配置模型规格与本站售价。</p></div>
+        <button class="btn btn-primary" :disabled="busy" data-test="add-supplier" @click="navigate(openAddDialog)">添加供应商</button>
       </header>
       <div class="mw-statistics">
-        <div><span>供应商</span><strong>{{ suppliers.filter(s => s.media_workbench_v1).length }}</strong></div>
-        <div><span>已发布模型</span><strong>{{ publishedCount }}</strong></div>
+        <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
+        <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
         <div><span>待配置模型</span><strong>{{ suppliers.reduce((n, s) => n + s.pending_count, 0) }}</strong></div>
-        <div><span>需要处理</span><strong>{{ suppliers.reduce((n, s) => n + s.problem_count, 0) }}</strong></div>
+        <div><span>已发布模型</span><strong>{{ publishedCount }}</strong></div>
       </div>
       <div v-if="message" class="mw-banner" role="status" data-test="banner">
         <span>{{ message }}</span>
         <button v-if="detail && !deleted" class="btn btn-secondary" data-test="reload" :disabled="busy" @click="reloadDialog = true">重新读取</button>
-        <button v-else-if="deleted" class="btn btn-secondary" @click="navigate(returnToSuppliers)">返回供应商列表</button>
+        <button v-else-if="deleted" class="btn btn-secondary" @click="navigate(returnToSuppliers)">返回账号列表</button>
         <button v-else-if="!detail" class="btn btn-secondary" :disabled="busy" @click="loadSuppliers">重试读取</button>
       </div>
-      <p v-if="loading" role="status">正在读取供应商配置…</p>
+      <p v-if="loading" role="status">正在读取账号配置…</p>
       <div class="mw-columns">
-        <aside class="mw-suppliers mw-panel" aria-label="供应商列表">
-          <h2>供应商</h2>
-          <p v-if="!suppliers.length && !loading" class="mw-muted">暂无供应商，请先在账户管理添加 API-Key 账户。</p>
-          <button v-for="supplier in suppliers" :key="supplier.id" type="button" class="mw-supplier" :class="{ 'mw-selected': detail?.id === supplier.id }" :aria-pressed="detail?.id === supplier.id" :disabled="busy" :data-test="`supplier-${supplier.id}`" @click="navigate(() => openSupplier(supplier.id))">
-            <strong>{{ supplier.name }}</strong><span>Account #{{ supplier.id }} · {{ supplier.host }}</span>
-            <span class="mw-status">{{ supplier.effective_sales ? '● 媒体销售中' : '○ ' + effectiveLabel(supplier.effective_state) }}</span>
-            <span>{{ supplier.status === 'active' ? 'Sub2 正常' : 'Sub2 已停用' }} · {{ supplier.schedulable ? '可调度' : '不可调度' }}</span>
-            <span>发现 {{ supplier.discovered_count }} · 已配置 {{ supplier.configured_count }} · 待配置 {{ supplier.pending_count }}</span>
-            <small>最后同步 {{ supplier.model_catalog?.synced_at || '尚未同步' }}</small>
-          </button>
+        <aside class="mw-suppliers mw-panel" aria-label="来源与账号导航">
+          <h2>来源与 Account</h2>
+          <label class="mw-field mw-account-search">查找账号<input v-model="accountSearch" class="input" placeholder="ID、名称、域名或平台" type="search" data-test="account-search" /></label>
+          <div class="mw-account-filters">
+            <label class="mw-field">媒体状态<select v-model="accountFilter" class="input" data-test="account-filter"><option value="">全部状态</option><option v-for="(label, state) in accountStates" :key="state" :value="state">{{ label }}</option></select></label>
+            <label class="mw-field">平台<select v-model="platformFilter" class="input" data-test="platform-filter"><option value="">全部平台</option><option v-for="platform in platforms" :key="platform" :value="platform">{{ platform }}</option></select></label>
+          </div>
+          <div class="mw-nav-summary"><span role="status">{{ visibleAccountCount }} / {{ suppliers.length }} 个账号</span><button v-if="accountSearch || accountFilter || platformFilter" type="button" class="mw-link" data-test="clear-account-search" @click="clearAccountFilters">清空搜索与筛选</button></div>
+          <p v-if="!suppliers.length && !loading" class="mw-muted">暂无账号，请先在账户管理添加 API-Key 账户。</p>
+          <p v-else-if="!filteredGroups.length" class="mw-muted">没有匹配的账号。</p>
+          <div class="mw-source-list">
+            <details v-for="group in filteredGroups" :key="group.host" class="mw-source-group" :open="!collapsedSources.has(group.host)" :data-test="`source-${group.host || 'unknown'}`" @toggle="toggleSource(group.host, $event)">
+              <summary><strong>{{ group.host || '未识别来源' }}</strong><span>{{ group.accounts.length }} 个账号</span></summary>
+              <button v-for="supplier in group.accounts" :key="supplier.id" type="button" class="mw-supplier" :class="{ 'mw-selected': detail?.id === supplier.id }" :aria-pressed="detail?.id === supplier.id" :disabled="busy" :data-test="`supplier-${supplier.id}`" @click="navigate(() => openSupplier(supplier.id))">
+                <span class="mw-account-title"><b>#{{ supplier.id }}</b><strong>{{ supplier.name }}</strong></span>
+                <span class="mw-account-meta"><span class="mw-platform">{{ supplier.platform || '未知平台' }}</span><span :title="effectiveLabel(supplier.effective_state)">{{ accountStates[accountState(supplier)] }}</span></span>
+                <small>{{ supplier.configured_count }} 已配置 · {{ supplier.pending_count }} 待配置<span v-if="supplier.problem_count"> · {{ supplier.problem_count }} 需处理</span></small>
+              </button>
+            </details>
+          </div>
+          <p class="mw-source-note">域名仅用于分组，各 Account 独立配置。</p>
         </aside>
         <section v-if="detail" class="mw-models mw-panel" aria-label="模型列表">
-          <button type="button" class="mw-mobile-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 供应商</button>
-          <div class="mw-section-heading"><div><h2>{{ detail.name }}</h2><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div><router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link></div>
+          <button type="button" class="mw-mobile-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 来源与账号</button>
+          <div class="mw-section-heading"><div><p class="mw-eyebrow">Account #{{ detail.id }} · {{ detail.platform || '未知平台' }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div><router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link></div>
           <div class="mw-supplier-actions">
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型' }}</button>
             <button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="busy || deleted || conflict || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '恢复销售' }}</button>
@@ -68,7 +79,7 @@
           <p v-if="!canPublish" class="mw-muted">保存最新草稿后，后台检查确认可发布时启用“发布”。</p>
         </section>
         <section v-else-if="detail && step === 'editor'" class="mw-panel mw-editor"><p>同步模型或选择模型后配置。</p></section>
-        <section v-else-if="!detail" class="mw-panel mw-welcome"><h2>从供应商开始</h2><p class="mw-muted">同步模型 → 配置规格和售价 → 保存草稿 → 自动检查 → 发布</p></section>
+        <section v-else-if="!detail" class="mw-panel mw-welcome"><h2>选择一个 Account 开始</h2><p class="mw-muted">按来源展开账号，或直接搜索 #ID。</p><p class="mw-muted">同步模型 → 配置规格和售价 → 保存草稿 → 自动检查 → 发布</p></section>
       </div>
     </div>
     <MediaDialog :show="!!nextNavigation" title="有未保存修改" :busy="!!pending" @close="nextNavigation = null">
@@ -88,7 +99,9 @@
       <template #actions><button class="btn btn-primary" data-test="confirm-reload" :disabled="busy" @click="reload">重新读取</button></template>
     </MediaDialog>
     <MediaDialog :show="addDialog" title="添加媒体供应商" :busy="pending === 'initialize'" @close="addDialog = false">
-      <label class="mw-field">现有 Sub2 API-Key 账户<select v-model="addAccountId" class="input" :disabled="busy"><option :value="0">请选择</option><option v-for="supplier in availableAccounts" :key="supplier.id" :value="supplier.id">{{ supplier.name }} · #{{ supplier.id }}</option></select></label>
+      <label class="mw-field">搜索现有账号<input v-model="addAccountSearch" class="input" type="search" placeholder="Account ID 或名称" :disabled="busy" data-test="add-account-search" /></label>
+      <label class="mw-field">现有 Sub2 API-Key 账户<select v-model="addAccountId" class="input mw-account-picker" size="5" :disabled="busy" data-test="add-account-select"><option :value="0" disabled>请选择账号</option><option v-for="supplier in filteredAvailableAccounts" :key="supplier.id" :value="supplier.id">#{{ supplier.id }} · {{ supplier.name }}</option></select></label>
+      <p v-if="!filteredAvailableAccounts.length" class="mw-muted" role="status">没有匹配的未启用账号。</p>
       <p>没有合适账户？<router-link class="mw-link" to="/admin/accounts">去账户管理添加供应商 Key</router-link>。</p>
       <label class="mw-field">业务用途<select v-model="addMediaType" class="input" :disabled="busy"><option value="image">图片</option><option value="video">视频</option><option value="both">图片 + 视频</option></select></label>
       <p class="mw-muted">适配方式由后台匹配，保存后显示检查结果。</p>
@@ -106,7 +119,7 @@ import MediaDialog from '@/components/admin/media/MediaDialog.vue'
 import MediaProductEditor from '@/components/admin/media/MediaProductEditor.vue'
 import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.vue'
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
-import type { Product, Diagnostic } from '@/api/admin/mediaWorkbench'
+import type { Product, Diagnostic, SupplierDetail } from '@/api/admin/mediaWorkbench'
 import '@/styles/media-workbench.css'
 const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
@@ -121,21 +134,75 @@ const salesDialog = ref(false)
 const reloadDialog = ref(false)
 const addDialog = ref(false)
 const addAccountId = ref(0)
+const addAccountSearch = ref('')
 const addMediaType = ref('image')
+const accountSearch = ref('')
+const accountFilter = ref('')
+const platformFilter = ref('')
+const collapsedSources = ref(new Set<string>())
 const nextNavigation = ref<(() => void | Promise<void>) | null>(null)
 const busy = computed(() => !!pending.value || loading.value)
 const publishedCount = computed(() => suppliers.value.reduce((n, s) => n + s.models.filter(m => m.state === 'PUBLISHED').length, 0))
+const accountStates: Record<string, string> = {
+  ACTIVE: '媒体销售中', SELLING: '媒体销售中', SALES_ENABLED: '媒体销售中',
+  SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '发布未就绪',
+  NOT_INITIALIZED: '待启用媒体', ACCOUNT_INACTIVE: '账户已停用',
+  ACCOUNT_UNSCHEDULABLE: '不可调度', ACCOUNT_RUNTIME_BLOCKED: '运行受限',
+  UNSUPPORTED_ACCOUNT_TYPE: '类型不支持'
+}
+const sourceGroups = computed(() => {
+  const groups = new Map<string, SupplierDetail[]>()
+  for (const supplier of suppliers.value) {
+    const host = sourceHost(supplier)
+    const accounts = groups.get(host) ?? []
+    accounts.push(supplier); groups.set(host, accounts)
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([host, accounts]) => ({
+    host, accounts: accounts.sort((a, b) => a.id - b.id)
+  }))
+})
+const filteredGroups = computed(() => sourceGroups.value.map(group => ({
+  ...group, accounts: group.accounts.filter(supplier => matchesAccount(supplier, accountSearch.value) &&
+    (!accountFilter.value || accountState(supplier) === accountFilter.value) &&
+    (!platformFilter.value || supplier.platform === platformFilter.value))
+})).filter(group => group.accounts.length))
+const visibleAccountCount = computed(() => filteredGroups.value.reduce((count, group) => count + group.accounts.length, 0))
+const platforms = computed(() => [...new Set(suppliers.value.map(supplier => supplier.platform).filter(Boolean))].sort())
 const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
 const filteredModels = computed(() => detail.value?.models.filter(m => (!filter.value || m.state === filter.value) &&
   `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value))
 const procurement = computed(() => config.value?.procurement?.entries.filter(p => p.product_id === selectedProduct.value) ?? [])
-const availableAccounts = computed(() => suppliers.value.filter(s => s.type === 'apikey' && !s.media_workbench_v1))
+const availableAccounts = computed(() => suppliers.value.filter(s => s.type === 'apikey' && !s.media_workbench_v1).sort((a, b) => a.id - b.id))
+const filteredAvailableAccounts = computed(() => availableAccounts.value.filter(supplier => matchesAccount(supplier, addAccountSearch.value, true)))
 const canResume = computed(() => detail.value?.sales_resume_ready ?? (detail.value?.effective_state === 'SALES_PAUSED' &&
   detail.value.status === 'active' && detail.value.schedulable && (config.value?.published?.offers?.length ?? 0) > 0))
 const resumeReason = computed(() => !detail.value?.schedulable ? '账户不可调度，请打开账户详情处理。' : detail.value?.status !== 'active' ? '账户已停用，请打开账户详情处理。' : '后台尚未提供可恢复销售的已发布产品。')
 const accountLink = (id: number) => ({ path: '/admin/accounts', query: { account_id: String(id) } })
+function sourceHost(supplier: Pick<SupplierDetail, 'host'>) { return supplier.host?.trim().toLowerCase() ?? '' }
+function accountState(supplier: SupplierDetail) { return supplier.effective_state || 'NOT_INITIALIZED' }
+function normalizedSearch(value: string) { return value.trim().toLowerCase() }
+function exactAccountId(value: string) {
+  const match = normalizedSearch(value).match(/^(?:account\s*)?#?(\d+)$/)
+  return match ? Number(match[1]) : undefined
+}
+function matchesAccount(supplier: SupplierDetail, query: string, includeHost = true) {
+  const normalized = normalizedSearch(query)
+  if (!normalized) return true
+  const exactId = exactAccountId(normalized)
+  if (exactId !== undefined) return supplier.id === exactId
+  const haystack = [supplier.name, supplier.platform, includeHost ? sourceHost(supplier) : ''].join(' ').toLowerCase()
+  return haystack.includes(normalized)
+}
+function clearAccountFilters() { accountSearch.value = ''; accountFilter.value = ''; platformFilter.value = '' }
+function toggleSource(host: string, event: Event) {
+  const open = (event.currentTarget as HTMLDetailsElement).open
+  const next = new Set(collapsedSources.value)
+  if (open) next.delete(host); else next.add(host)
+  collapsedSources.value = next
+}
+function openAddDialog() { addAccountSearch.value = ''; addAccountId.value = 0; addDialog.value = true }
 function modelLabel(state: string) {
   return ({ PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state
 }
@@ -181,6 +248,11 @@ async function locate({ path, scope }: Diagnostic) {
   target?.focus(); section?.scrollIntoView?.({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
 }
 function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || pending.value) { event.preventDefault(); event.returnValue = '' } }
+watch([accountSearch, accountFilter, platformFilter], () => {
+  const next = new Set(collapsedSources.value)
+  for (const group of filteredGroups.value) next.delete(group.host)
+  collapsedSources.value = next
+})
 onBeforeRouteLeave(() => {
   if (busy.value) { message.value = '操作正在进行，请等待完成后离开。'; return false }
   if (!dirty.value) return true
