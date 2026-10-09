@@ -16,6 +16,16 @@ import '@/styles/site-theme.css'
 const query = new URLSearchParams(location.search)
 const scenario = query.get('scenario') ?? 'PASS'
 const dto = supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+const navigationAccounts = Array.from({ length: 46 }, (_, index) => {
+  const account = supplier(index + 1)
+  account.name = `账号 ${account.id}`
+  account.host = account.id === 46 ? '' : `source-${Math.floor(index / 15) + 1}.example.invalid`
+  account.platform = account.id % 2 ? 'openai' : 'gemini'
+  account.effective_state = account.id % 2 ? 'SELLING' : 'SALES_PAUSED'
+  account.effective_sales = account.id % 2 === 1
+  if ([15, 25].includes(account.id)) { account.media_workbench_v1 = null; account.effective_state = 'NOT_INITIALIZED'; account.effective_sales = false }
+  return account
+})
 if (scenario === 'NEEDS_DEVELOPMENT') Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, { class: 'NEEDS_DEVELOPMENT', code: 'UNSUPPORTED_REFERENCE_FLOW', message: '当前适配器还不能表达首尾帧参数', action: '请开发共享请求构造能力' })
 if (scenario === 'PAUSED') { dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'; dto.media_workbench_v1!.sales.enabled = false }
 if (scenario === 'UPSTREAM_MISSING') { dto.models[0]!.state = 'UPSTREAM_NOT_DISCOVERED'; dto.media_workbench_v1!.validation.publish_ready = false }
@@ -29,7 +39,7 @@ apiClient.defaults.adapter = async config => {
   const url = config.url ?? ''
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
   let data: unknown = {}
-  if (url === '/admin/media-workbench/suppliers') data = [copy(dto), supplier(44)]
+  if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), supplier(44)]
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
     if (config.method !== 'get' && (scenario === 'DELETED' || scenario === 'STALE')) {
       const status = scenario === 'DELETED' ? 410 : 409
@@ -40,7 +50,7 @@ apiClient.defaults.adapter = async config => {
       dto.media_workbench_v1!.record_version++
     }
     if (url.endsWith('/sales')) { dto.media_workbench_v1!.sales.enabled = input.enabled; dto.effective_sales = input.enabled; dto.media_workbench_v1!.record_version++ }
-    data = copy(dto)
+    data = scenario === 'NAVIGATION' ? copy(navigationAccounts.find(account => account.id === Number(url.split('/')[4]))) : copy(dto)
   } else if (url === '/announcements') data = []
   else if (url === '/keys') data = { items: [], pages: 1, total: 0 }
   else if (url.includes('settings')) data = { site_name: 'Media UI fixture', ops_monitoring_enabled: false }

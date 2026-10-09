@@ -1,6 +1,57 @@
 import { test, expect, type Page } from '@playwright/test'
 const themes = ['yellow', 'blue', 'pink', 'green', 'lavender']
 const viewports = [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]
+for (const width of [1440, 390]) {
+  test(`account navigation ${width}: grouping, search, filters and add selection`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
+    await page.goto('/tests/media-workbench/index.html?scenario=NAVIGATION&mode=dark&theme=blue')
+    await expect(page.getByTestId('account-count')).toHaveText('46')
+    await expect(page.getByTestId('source-count')).toHaveText('4')
+    await expect(page.getByTestId('source-unknown')).toContainText('未识别来源')
+    const group = page.getByTestId('source-source-1.example.invalid')
+    await expect(group.locator('.mw-supplier').first()).toHaveAttribute('data-test', 'supplier-1')
+    await group.locator('summary').click()
+    for (const query of ['5', '#5', 'Account #5']) {
+      await page.getByTestId('account-search').fill(query)
+      await expect(page.locator('.mw-supplier')).toHaveCount(1)
+      await expect(page.getByTestId('supplier-5')).toBeVisible()
+    }
+    for (const [query, count] of [['账号 15', 1], ['source-2.example.invalid', 15], ['gemini', 23]] as const) {
+      await page.getByTestId('account-search').fill(query)
+      await expect(page.locator('.mw-supplier')).toHaveCount(count)
+    }
+    await page.getByTestId('clear-account-search').click()
+    await page.getByTestId('account-filter').selectOption('SALES_PAUSED')
+    await expect(page.getByTestId('supplier-2')).toBeVisible()
+    await expect(page.getByTestId('supplier-1')).toHaveCount(0)
+    await page.getByTestId('platform-filter').selectOption('openai')
+    await expect(page.locator('.mw-supplier')).toHaveCount(0)
+    await page.getByTestId('clear-account-search').click()
+    await expect(page.locator('.mw-supplier')).toHaveCount(46)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+    await page.screenshot({ path: testInfo.outputPath('account-navigation.png'), fullPage: true })
+    await page.getByTestId('add-supplier').click()
+    await page.getByTestId('add-account-search').fill('#15')
+    await page.getByTestId('add-account-select').selectOption('15')
+    await expect(page.getByTestId('initialize')).toBeEnabled()
+    await page.getByTestId('add-account-search').fill('账号 25')
+    await expect(page.getByTestId('initialize')).toBeDisabled()
+    await page.getByTestId('add-account-select').selectOption('25')
+    await expect(page.getByTestId('initialize')).toBeEnabled()
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click()
+    if (width === 1440) {
+      await page.getByTestId('source-source-1.example.invalid').locator('summary').click()
+      await page.getByTestId('supplier-5').click()
+      await page.getByTestId('display-name').fill('保留账号草稿')
+      await page.getByTestId('account-search').fill('#6')
+      await page.getByTestId('supplier-6').click()
+      await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('display-name')).toHaveValue('保留账号草稿')
+    }
+  })
+}
 async function openEditor(page: Page, query: string) {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
   await page.goto(`/tests/media-workbench/index.html?${query}`)

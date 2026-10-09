@@ -36,10 +36,22 @@ describe('Media Workbench admin interactions', () => {
     expect(wrapper.get('[data-test="source-count"]').text()).toBe('1')
     expect(wrapper.get('[data-test="account-count"]').text()).toBe('2')
     expect(wrapper.get('[data-test="source-same.example.invalid"]').text()).toContain('2 个账号')
-    await wrapper.get('[data-test="account-search"]').setValue('5'); await flushPromises()
-    expect(wrapper.get('[data-test="supplier-5"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="supplier-15"]').exists()).toBe(false)
+    expect(wrapper.findAll('.mw-supplier').map(account => account.attributes('data-test'))).toEqual(['supplier-5', 'supplier-15'])
+    for (const query of ['5', '#5', 'Account #5']) {
+      await wrapper.get('[data-test="account-search"]').setValue(query); await flushPromises()
+      expect(wrapper.get('[data-test="supplier-5"]').exists()).toBe(true)
+      expect(wrapper.find('[data-test="supplier-15"]').exists()).toBe(false)
+    }
     expect(wrapper.get('[data-test="source-same.example.invalid"]').attributes('open')).toBeDefined()
+  })
+  it('keeps unknown sources visible and filters account media state', async () => {
+    const unknown = supplier(5); unknown.host = ''; unknown.effective_state = 'SALES_PAUSED'
+    api.suppliers.mockResolvedValue([supplier(), unknown]); await mountWorkbench()
+    expect(wrapper.get('[data-test="source-unknown"]').text()).toContain('未识别来源')
+    await wrapper.get('[data-test="account-filter"]').setValue('SALES_PAUSED'); await flushPromises()
+    expect(wrapper.findAll('.mw-supplier').map(account => account.attributes('data-test'))).toEqual(['supplier-5'])
+    await wrapper.get('[data-test="clear-account-search"]').trigger('click'); await flushPromises()
+    expect(wrapper.findAll('.mw-supplier')).toHaveLength(2)
   })
   it('filters by platform and searches the add-account list by ID', async () => {
     const available = supplier(15); available.media_workbench_v1 = null; available.platform = 'gemini'
@@ -52,6 +64,10 @@ describe('Media Workbench admin interactions', () => {
     await wrapper.get('[data-test="add-account-search"]').setValue('15'); await flushPromises()
     expect(wrapper.get('[data-test="add-account-select"]').text()).toContain('#15')
     expect(wrapper.get('[data-test="add-account-select"]').text()).not.toContain('#77')
+    await wrapper.get('[data-test="add-account-select"]').setValue('15')
+    await wrapper.get('[data-test="add-account-search"]').setValue('no match'); await flushPromises()
+    expect(wrapper.get('[data-test="initialize"]').attributes('disabled')).toBeDefined()
+    expect(api.initialize).not.toHaveBeenCalled()
   })
   it('renders the Go DTO null slices as empty specifications and missing prices', async () => {
     const dto = supplier(77, 'FAIL')
