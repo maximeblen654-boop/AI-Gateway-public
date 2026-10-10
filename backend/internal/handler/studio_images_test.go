@@ -38,7 +38,9 @@ func TestStudioImageReceiptResponsePreservesV2TotalAndV3Counters(t *testing.T) {
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(out.Body.Bytes(), &body))
 			require.Equal(t, tc.version, body["receipt_version"])
-			require.Equal(t, "0.80", body["settled_price"].(map[string]any)["amount"])
+			settledPrice, ok := body["settled_price"].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "0.80", settledPrice["amount"])
 			if tc.wantCounters {
 				require.Equal(t, float64(1), body["delivered_count"])
 			} else {
