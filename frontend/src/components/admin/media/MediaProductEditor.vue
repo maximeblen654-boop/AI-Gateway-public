@@ -50,6 +50,16 @@
         <option value="">请选择</option><option value="openai_json">OpenAI Images JSON</option>
       </select></label>
     </section>
+    <section v-if="product.media_type === 'image'" data-field="adapter_config.execution">
+      <h3>单请求产出能力</h3>
+      <p class="mw-muted">只填写已经核实的 Account、模型和接口能力；未知或没有多图证据时保持单图，客户多张会按批次执行。</p>
+      <div class="mw-field-grid">
+        <label class="mw-field">执行方式<select :value="product.adapter_config.execution?.mode ?? 'single'" class="input" data-test="image-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.execution!.provider })">
+          <option value="single">单图接口（未知能力也用此项）</option><option value="native_multi">已核实原生多图（使用 n）</option>
+        </select></label>
+        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" type="number" min="1" max="10" step="1" @input="edit(next => { next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode: next.adapter_config.execution?.mode ?? 'single', max_output_images: numeric($event) } })" /><small>这是上游单请求上限，不是客户一次购买数量。</small></label>
+      </div>
+    </section>
     <section v-if="product.media_type === 'image'" data-field="adapter_config.size_mappings">
       <details data-test="size-mappings">
         <summary>供应商尺寸映射</summary>

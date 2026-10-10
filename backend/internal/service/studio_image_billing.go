@@ -51,6 +51,24 @@ func studioImagePrices(q StudioImageQuote) (unit mediaworkbench.Price, total med
 	return unit, total, quantity, nil
 }
 
+func studioImagePricesForQuantity(q StudioImageQuote, delivered int) (mediaworkbench.Price, mediaworkbench.Price, int, error) {
+	unit, frozen, quoted, err := studioImagePrices(q)
+	if err != nil || delivered < 1 || delivered > quoted {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	if delivered == quoted {
+		return unit, frozen, delivered, nil
+	}
+	if q.UnitPrice == nil && q.TotalPrice == nil {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	_, partial, err := mediaworkbench.PriceForQuantity(unit, delivered)
+	if err != nil {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, err
+	}
+	return unit, partial, delivered, nil
+}
+
 // StudioImagePrices exposes the frozen quote breakdown to the HTTP adapter
 // without allowing the adapter to recompute or alter settlement values.
 func StudioImagePrices(q StudioImageQuote) (mediaworkbench.Price, mediaworkbench.Price, int, error) {
@@ -76,13 +94,16 @@ func (m *UsageBillingExactAmounts) Validate() error {
 
 func QuotedImageUsageLog(r *StudioImageReceipt) *UsageLog {
 	q := r.Quote
-	_, frozenTotal, quantity, err := studioImagePrices(q)
+	_, frozenTotal, quantity, err := studioImageReceiptPrices(r)
 	if err != nil {
 		frozenTotal = q.Binding.Offer.SalePrice
 		quantity = q.Binding.Spec.Count
 	}
 	sale, _ := mediaworkbench.DecimalAmount(frozenTotal.Amount)
 	base, _ := mediaworkbench.DecimalAmount(q.Accounting.BaseAmount)
+	if r.Version == StudioImageMultiReceiptVersion {
+		base, _ = scaleImageAccountAmount(q.Accounting.BaseAmount, quantity, q.Binding.Spec.Count)
+	}
 	rate, _ := mediaworkbench.DecimalAmount(q.Accounting.AccountRateMultiplier)
 	baseFloat, rateFloat := base.InexactFloat64(), rate.InexactFloat64()
 	upstream, mode, inbound := q.Binding.Offer.UpstreamModel, "image", "/v1/studio/images/tasks"
@@ -128,12 +149,19 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 	if err := q.Accounting.Validate(q); err != nil {
 		return nil, err
 	}
-	_, frozenTotal, quantity, err := studioImagePrices(q)
+	_, frozenTotal, quantity, err := studioImageReceiptPrices(receipt)
 	if err != nil {
 		return nil, err
 	}
 	amount := frozenTotal.Amount
 	accountCost := q.Accounting.EffectiveAccountQuotaCost
+	if receipt.Version == StudioImageMultiReceiptVersion {
+		scaled, e := scaleImageAccountAmount(accountCost, quantity, q.Binding.Spec.Count)
+		if e != nil {
+			return nil, e
+		}
+		accountCost = scaled.String()
+	}
 	m := &UsageBillingExactAmounts{amount, "0", amount, amount, accountCost}
 	if !q.KeyQuotaEnabled {
 		m.APIKeyQuota = "0"
@@ -152,6 +180,9 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 		return nil, err
 	}
 	fingerprint := HashUsageRequestPayload([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|CNY|%s|%d", q.BindingHash, q.ID, taskID, payloadHash, amount, studioHash(q.Accounting), valueOrZero(subscriptionID))))
+	if receipt.Version == StudioImageMultiReceiptVersion {
+		fingerprint = studioHash([]any{fingerprint, quantity, receipt.ResultHash})
+	}
 	// Native request_id is VARCHAR(64); opaque task identifiers are hashed.
 	cmd := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("studio-image:" + taskID)), RequestFingerprint: fingerprint, RequestPayloadHash: payloadHash, UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, SubscriptionID: subscriptionID, AccountType: AccountTypeAPIKey, Model: q.Binding.Offer.SiteModel, MediaType: "image", ImageCount: quantity, ExactAmounts: m, QuotedImage: receipt}
 	if subscriptionID != nil {
@@ -174,4 +205,26 @@ func ValidateQuotedImageBillingCommand(cmd *UsageBillingCommand) error {
 		return ErrUsageBillingRequestConflict
 	}
 	return nil
+}
+
+func studioImageReceiptPrices(r *StudioImageReceipt) (mediaworkbench.Price, mediaworkbench.Price, int, error) {
+	if r.Version != StudioImageMultiReceiptVersion {
+		return studioImagePrices(r.Quote)
+	}
+	if r.Quote.Execution == nil || r.ResultHash == "" || r.PendingCount != 0 || r.DeliveredCount < 1 || r.ExpectedCount != r.Quote.Binding.Spec.Count || r.DeliveredCount+r.FailedCount != r.ExpectedCount {
+		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	return studioImagePricesForQuantity(r.Quote, r.DeliveredCount)
+}
+
+func scaleImageAccountAmount(total string, quantity, quoted int) (decimal.Decimal, error) {
+	value, err := mediaworkbench.DecimalAmount(total)
+	if err != nil || quoted < 1 || quantity < 1 || quantity > quoted {
+		return decimal.Zero, ErrStudioImageAccounting
+	}
+	scaled := value.Mul(decimal.NewFromInt(int64(quantity))).Div(decimal.NewFromInt(int64(quoted)))
+	if !scaled.Mul(decimal.NewFromInt(int64(quoted))).Equal(value.Mul(decimal.NewFromInt(int64(quantity)))) {
+		return decimal.Zero, ErrStudioImageAccounting
+	}
+	return mediaworkbench.DecimalAmount(scaled.String())
 }

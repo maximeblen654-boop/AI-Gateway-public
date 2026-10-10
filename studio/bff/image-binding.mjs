@@ -104,18 +104,20 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     if(task.status==='prepared'&&!fs.existsSync(`${location('task',identity)}.sync-dispatch`))return view(task);
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
-    if(!['unknown','persisted','completed'].includes(receipt.status) || !['pending','billing_unknown','billed'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
-    if(receipt.status==='completed' && receipt.billing_state==='billed' && receipt.result_available) {
+    if(!['unknown','persisted','completed','partial','failed'].includes(receipt.status) || !['pending','billing_unknown','billed','not_charged'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
+    const delivered=Number.isInteger(receipt.delivered_count)?receipt.delivered_count:task.quote.spec.count;
+    if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && receipt.result_available) {
       const payload=(await call(session,'GET',`tasks/${taskID}/result`,undefined,task.keyRef)).payload;
-      if(!Array.isArray(payload?.data) || payload.data.length!==task.quote.spec.count)throw new Error('Result count mismatch');
+      if(!Array.isArray(payload?.data) || payload.data.length!==delivered)throw new Error('Result count mismatch');
       const saved=[];
       for(let i=0;i<payload.data.length;i++)saved.push(await results.saveResult(task.owner,taskID,i,payload.data[i]));
-      task.results=saved;task.status='completed';write(location('task',identity),task);
+      task.results=saved;task.status=receipt.status;task.delivered_count=delivered;task.failed_count=receipt.failed_count||0;task.pending_count=receipt.pending_count||0;write(location('task',identity),task);
     } else if(task.status!=='completed') {
       // A concurrent recovery may have completed while this GET was in flight.
       const latest=read('task',identity);
-      if(latest.status==='completed')return view(latest);
-      task.status=receipt.status==='persisted'?'billing_pending':'unknown';write(location('task',identity),task);
+      if(latest.status==='completed'||latest.status==='partial')return view(latest);
+      task.status=receipt.status==='persisted'?'billing_pending':receipt.status==='failed'?'failed':'unknown';
+      task.delivered_count=delivered;task.failed_count=receipt.failed_count||0;task.pending_count=receipt.pending_count||0;write(location('task',identity),task);
     }
     return view(task);
   }
@@ -134,7 +136,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     return recover(session,task.task_id);
   }
   function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
-    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at};}
+    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,execution:q.execution};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {
@@ -147,6 +149,6 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return {contract:IMAGE_BINDING_CONTRACT,tasks:items.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')||a.task_id.localeCompare(b.task_id))};
   }
-  function result(session,taskID,index) {const {task}=get(session,taskID);if(task.status!=='completed'||index<0||index>=task.quote.spec.count)throw new Error('Image result unavailable');return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
+  function result(session,taskID,index) {const {task}=get(session,taskID);if(!['completed','partial'].includes(task.status)||!Number.isInteger(index)||index<0||index>= (task.results?.length||task.delivered_count||0))throw new Error('Image result unavailable');return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
   return {catalog,readiness,quote,prepare,dispatch,recover,result,history,view};
 }

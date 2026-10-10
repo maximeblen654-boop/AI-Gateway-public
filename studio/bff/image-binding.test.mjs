@@ -23,26 +23,36 @@ test('browser restores a prepared image and confirms its stored identity without
   await assert.rejects(runtime.dispatch({ownerId:2},{task_id:prepared.task_id}));
   assert.equal(JSON.stringify(runtime.history(owner)).includes('quote_token'),false);
 });
-function fixture(t,{lost=false,count=1,frozen=false,totalOverride}={}) {
+function fixture(t,{lost=false,count=1,frozen=false,totalOverride,partial=false}={}) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bound-image-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));let posts=0,gets=0;
   const call=async(session,method,operation,payload,key=0)=>{
     assert.equal(session.ownerId,1);
     if(operation==='quotes') {
       const quote={contract:IMAGE_BINDING_CONTRACT,quote_token:'a'.repeat(64),spec:{count,images:0},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},expires_at:new Date(Date.now()+120000).toISOString()};
-      if(frozen) Object.assign(quote,{unit_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},total_price:{amount:totalOverride??(count===2?'1.60':'0.80'),currency:'CNY',billing_mode:'per_request'},quantity:count});
+      if(frozen) Object.assign(quote,{unit_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},total_price:{amount:totalOverride??(count===1?'0.80':(count*0.8).toFixed(2)),currency:'CNY',billing_mode:'per_request'},quantity:count});
       return {contract:IMAGE_BINDING_CONTRACT,key_ref:42,payload:quote};
     }
     assert.equal(key,42);
     if(method==='POST') {posts++;assert.ok(fs.readdirSync(path.join(root,'journal')).some(x=>x.endsWith('.sync-dispatch')));if(lost)throw new Error('lost response');return {payload:{}};}
     gets++;
-    if(operation.endsWith('/result'))return {payload:{data:Array.from({length:count},()=>({b64_json:png}))}};
-    return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:operation.slice('tasks/'.length),status:'completed',billing_state:'billed',result_available:true}};
+    if(operation.endsWith('/result'))return {payload:{data:Array.from({length:partial?2:count},()=>({b64_json:png}))}};
+    return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:operation.slice('tasks/'.length),status:partial?'partial':'completed',billing_state:'billed',result_available:true,expected_count:count,delivered_count:partial?2:count,failed_count:partial?count-2:0,pending_count:0}};
   };
   const results=createImageResultStore({rootDir:path.join(root,'results')});
   const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call,results});
   const input={quote_token:'a'.repeat(64),client_key:'client-key-01',prompt:'synthetic',references:[]};
   return {root,tasks,input,results,call,stats:()=>({posts,gets})};
 }
+
+test('partial upstream execution delivers and indexes only the frozen successful outputs',async t=>{
+  const f=fixture(t,{count:5,frozen:true,partial:true});
+  await f.tasks.quote(owner,{offer_id:'multi',spec:{count:5,images:0}});
+  const task=await f.tasks.dispatch(owner,f.input);
+  assert.equal(task.status,'partial');assert.equal(task.delivered_count,2);assert.equal(task.failed_count,3);assert.equal(task.results.length,2);
+  assert.deepEqual(f.tasks.result(owner,task.task_id,1).data,Buffer.from(png,'base64'));
+  assert.throws(()=>f.tasks.result(owner,task.task_id,2),/Image result unavailable/);
+  assert.equal(f.stats().posts,1);
+});
 
 test('expired prepared image refuses its first POST but an already claimed image remains recoverable',async t=>{
  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'p',spec:{count:1,images:0}});const id=f.tasks.prepare(owner,f.input).task.task_id;

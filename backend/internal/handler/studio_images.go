@@ -79,7 +79,7 @@ func (h *OpenAIGatewayHandler) StudioImageQuote(c *gin.Context) {
 		studioError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "quote_token": token, "spec": quote.Binding.Spec, "sale_price": totalPrice, "unit_price": unitPrice, "quantity": quantity, "total_price": totalPrice, "expires_at": quote.ExpiresAt})
+	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "quote_token": token, "spec": quote.Binding.Spec, "sale_price": totalPrice, "unit_price": unitPrice, "quantity": quantity, "total_price": totalPrice, "execution": quote.Execution, "expires_at": quote.ExpiresAt})
 }
 
 func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
@@ -157,7 +157,7 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 	studioReceiptResponse(c, receipt)
 }
 func studioReceiptResponse(c *gin.Context, r *service.StudioImageReceipt) {
-	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "result_available": r.ResultHash != ""})
+	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "result_available": r.ResultHash != "", "expected_count": r.ExpectedCount, "delivered_count": r.DeliveredCount, "failed_count": r.FailedCount, "pending_count": r.PendingCount, "execution": r.Execution})
 }
 func (h *OpenAIGatewayHandler) StudioImageReceipt(c *gin.Context) {
 	owner, _, ok := h.studioOwner(c, true)

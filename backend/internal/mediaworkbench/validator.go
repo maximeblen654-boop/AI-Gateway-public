@@ -133,6 +133,22 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			if p.MediaType == "image" && (len(p.Capabilities.DurationsSeconds) > 0 || p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0) {
 				add("NEEDS_DEVELOPMENT", "PARAMETER_TYPE_UNSUPPORTED", pid, "capabilities", "This image builder cannot express duration, video or audio references")
 			}
+			if p.MediaType == "image" {
+				if _, err := PlanImageExecution(p.AdapterConfig, 1); err != nil {
+					add("NEEDS_DEVELOPMENT", "IMAGE_EXECUTION_CAPABILITY_INVALID", pid, "adapter_config.execution", "Execution mode must declare a verified single-request output limit")
+				} else if p.AdapterConfig.Execution != nil && p.AdapterConfig.Execution.Mode == ImageExecutionProviderAsync {
+					add("NEEDS_DEVELOPMENT", "IMAGE_PROVIDER_ASYNC_UNAVAILABLE", pid, "adapter_config.execution", "Native provider batch adapters use a separate queue and settlement contract")
+				}
+				if p.AdapterConfig.EditExecution != nil {
+					edit := p.AdapterConfig
+					edit.Execution = edit.EditExecution
+					if _, err := PlanImageExecution(edit, 1); err != nil {
+						add("NEEDS_DEVELOPMENT", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", pid, "adapter_config.edit_execution", "Edit interfaces require a separately verified single-request output limit")
+					} else if edit.Execution.Mode == ImageExecutionProviderAsync {
+						add("NEEDS_DEVELOPMENT", "IMAGE_PROVIDER_ASYNC_UNAVAILABLE", pid, "adapter_config.edit_execution", "Native provider batch adapters use a separate queue and settlement contract")
+					}
+				}
+			}
 		}
 		if known && p.MediaType == "video" {
 			m, ok := VideoProfileModel(p)

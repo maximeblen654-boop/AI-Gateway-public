@@ -10,7 +10,9 @@ export interface Match {
 export interface Price { amount: string; currency: string; billing_mode: string }
 export interface PricingRule { match: Match; sale_price: Price | null }
 export interface SizeMapping { resolution: string; aspect_ratio: string; wire_size: string }
-export interface AdapterConfig { size_mappings: SizeMapping[]; version?: number; wire_profile?: string; model_family?: string }
+export type ImageExecutionMode = 'single' | 'native_multi' | 'provider_async'
+export interface ImageExecutionConfig { mode?: ImageExecutionMode; max_output_images?: number; provider?: string }
+export interface AdapterConfig { size_mappings: SizeMapping[]; version?: number; wire_profile?: string; model_family?: string; execution?: ImageExecutionConfig; edit_execution?: ImageExecutionConfig }
 export interface Product {
   product_id: string; media_type: string; site_model: string; display_name: string
   upstream_model: string; enabled: boolean
@@ -65,7 +67,7 @@ export function draftInput(products: Product[]): { products: Product[] } {
   return { products: products.map(p => ({
     product_id: p.product_id, media_type: p.media_type, site_model: p.site_model,
     display_name: p.display_name, upstream_model: p.upstream_model, enabled: p.enabled,
-    adapter_config: { ...(p.adapter_config?.version ? { version: p.adapter_config.version } : {}), ...(p.adapter_config?.wire_profile ? { wire_profile: p.adapter_config.wire_profile } : {}), ...(p.adapter_config?.model_family ? { model_family: p.adapter_config.model_family } : {}), size_mappings: (p.adapter_config?.size_mappings ?? []).map(mapping => ({
+    adapter_config: { ...(p.adapter_config?.version ? { version: p.adapter_config.version } : {}), ...(p.adapter_config?.wire_profile ? { wire_profile: p.adapter_config.wire_profile } : {}), ...(p.adapter_config?.model_family ? { model_family: p.adapter_config.model_family } : {}), ...(p.adapter_config?.execution ? { execution: { ...(p.adapter_config.execution.mode ? { mode: p.adapter_config.execution.mode } : {}), ...(p.adapter_config.execution.max_output_images ? { max_output_images: p.adapter_config.execution.max_output_images } : {}), ...(p.adapter_config.execution.provider ? { provider: p.adapter_config.execution.provider } : {}) } } : {}), ...(p.adapter_config?.edit_execution ? { edit_execution: { ...(p.adapter_config.edit_execution.mode ? { mode: p.adapter_config.edit_execution.mode } : {}), ...(p.adapter_config.edit_execution.max_output_images ? { max_output_images: p.adapter_config.edit_execution.max_output_images } : {}), ...(p.adapter_config.edit_execution.provider ? { provider: p.adapter_config.edit_execution.provider } : {}) } } : {}), size_mappings: (p.adapter_config?.size_mappings ?? []).map(mapping => ({
       resolution: mapping.resolution, aspect_ratio: mapping.aspect_ratio, wire_size: mapping.wire_size
     })) },
     capabilities: {

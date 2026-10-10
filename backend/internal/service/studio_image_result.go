@@ -19,7 +19,11 @@ func validateStudioImageReceiptResult(r *StudioImageReceipt, body []byte) ([][]b
 	// Dispatch validates the frozen wire request before the sole POST. Recovery
 	// keeps its identity and quoted count, without reinterpreting old mappings or
 	// comparing delivered pixels with a requested size.
-	return ValidateStudioImageResult(body, r.Quote.Binding.Spec.Count)
+	count := r.Quote.Binding.Spec.Count
+	if r.Version == StudioImageMultiReceiptVersion && r.DeliveredCount > 0 {
+		count = r.DeliveredCount
+	}
+	return ValidateStudioImageResult(body, count)
 }
 
 // Bound V1 accepts complete inline image containers. An upstream URL or task ID

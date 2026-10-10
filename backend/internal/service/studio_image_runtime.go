@@ -132,6 +132,11 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
 	q := StudioImageQuote{Owner: owner, Binding: resolved, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
+	execution, err := mediaworkbench.PublishedImageExecution(resolved)
+	if err != nil || execution.Mode == mediaworkbench.ImageExecutionProviderAsync {
+		return "", mediaworkbench.ErrRuntimeBinding
+	}
+	q.Execution = &execution
 	q.ExpiresAt = q.CreatedAt.Add(2 * time.Minute)
 	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt)
 	if err != nil {
@@ -146,6 +151,9 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 }
 
 func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q StudioImageQuote, taskID, prompt string, references []string, key *APIKey) (*StudioImageReceipt, error) {
+	if q.Execution != nil {
+		return r.dispatchExecution(ctx, c, q, taskID, prompt, references, key)
+	}
 	if !r.Enabled() {
 		return nil, errors.New("published image paid gate off")
 	}
@@ -216,6 +224,9 @@ func (r *StudioImageRuntime) Recover(ctx context.Context, taskID string, owner S
 	if err != nil {
 		return nil, err
 	}
+	if receipt.Version == StudioImageMultiReceiptVersion {
+		return r.recoverExecution(ctx, receipt)
+	}
 	if receipt.ResultHash == "" {
 		data, e := os.ReadFile(r.Store.path("upstream", taskID))
 		if e != nil {
@@ -253,7 +264,7 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 		}
 		if result.Applied && receipt.Quote.SubscriptionID == nil && r.Core.userPlatformQuotaRepo != nil && r.Core.billingCacheService.HasUserPlatformQuotaLimit(ctx, receipt.Quote.Owner.UserID, PlatformOpenAI) {
 			// Reuse the existing native usage side effect; no Studio quota ledger.
-			_, total, _, e := studioImagePrices(receipt.Quote)
+			_, total, _, e := studioImageReceiptPrices(receipt)
 			if e != nil {
 				return receipt, e
 			}
@@ -277,6 +288,9 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 	}
 	receipt.BillingState = "billed"
 	receipt.Status = "completed"
+	if receipt.Version == StudioImageMultiReceiptVersion && receipt.DeliveredCount < receipt.ExpectedCount {
+		receipt.Status = "partial"
+	}
 	return receipt, r.Store.Save(receipt)
 }
 func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, c *gin.Context, a *Account, body []byte, endpoint string) ([]byte, string, error) {
@@ -304,7 +318,7 @@ func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, c *gin.Context, a
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, resp.Header.Get("x-request-id"), ErrStudioImageUnknown
+		return nil, resp.Header.Get("x-request-id"), &StudioImageUpstreamError{Status: resp.StatusCode, RequestID: resp.Header.Get("x-request-id")}
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, (32<<20)+1))
 	if err != nil || len(data) > 32<<20 {

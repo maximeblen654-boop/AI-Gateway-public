@@ -12,6 +12,8 @@ export interface StudioTask {
   id: string; kind: StudioKind; status: string; createdAt: string; expiresAt: string
   offerId: string; model: string; spec: Record<string, unknown>; price: StudioPrice; resultCount: number
   unitPrice?: StudioPrice; quantity?: number; totalPrice?: StudioPrice
+  expectedCount?: number; deliveredCount?: number; failedCount?: number; pendingCount?: number
+  execution?: Record<string, unknown>
 }
 export class StudioError extends Error {
   constructor(public code: string, public status = 0) { super(code) }
@@ -32,7 +34,7 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
   if (v.contract !== contract || typeof id !== 'string' || !(kind === 'image' ? /^img_[a-f0-9]{32}$/ : /^op_[a-f0-9]{64}$/).test(id) || typeof v.status !== 'string') throw new StudioError('studio_contract')
   const statuses: Record<string, string> = { intent: 'prepared', captured: 'completed', accepted: 'processing', dispatching: 'unknown', persisted: 'billing_pending' }
   const status = statuses[v.status] || v.status
-  if (!['prepared','completed','unknown','billing_pending','processing','queued','failed','released','reserve_pending','recovery_blocked'].includes(status)) throw new StudioError('studio_contract')
+  if (!['prepared','completed','partial','unknown','billing_pending','processing','queued','failed','released','reserve_pending','recovery_blocked'].includes(status)) throw new StudioError('studio_contract')
   const spec = record(v.spec)
   const totalPrice = studioPrice(v.total_price ?? v.sale_price)
   const unitPrice = v.unit_price === undefined ? (kind === 'video' ? totalPrice : undefined) : studioPrice(v.unit_price)
@@ -44,9 +46,14 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
     const units = (amount: string) => { const [whole, fraction = ''] = amount.split('.'); return BigInt(`${whole}${fraction.padEnd(8, '0')}`) }
     if (unitPrice.currency !== totalPrice.currency || units(unitPrice.amount) * BigInt(quantity) !== units(totalPrice.amount)) throw new StudioError('studio_contract')
   }
+  const deliveredCount = typeof v.delivered_count === 'number' && Number.isInteger(v.delivered_count) ? v.delivered_count : 0
+  const expectedCount = typeof v.expected_count === 'number' && Number.isInteger(v.expected_count) ? v.expected_count : quantity
+  const failedCount = typeof v.failed_count === 'number' && Number.isInteger(v.failed_count) ? v.failed_count : 0
+  const pendingCount = typeof v.pending_count === 'number' && Number.isInteger(v.pending_count) ? v.pending_count : 0
   return { id, kind, status, createdAt: typeof v.created_at === 'string' ? v.created_at : '', expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
     offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec, price: totalPrice, unitPrice, quantity, totalPrice,
-    resultCount: status !== 'completed' ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : 0 }
+    expectedCount, deliveredCount, failedCount, pendingCount, execution: v.execution && typeof v.execution === 'object' ? v.execution as Record<string, unknown> : undefined,
+    resultCount: !['completed','partial'].includes(status) ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : deliveredCount }
 }
 async function json(url: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(buildGatewayUrl(url), { signal: AbortSignal.timeout(60000), ...init, credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json', ...(init?.headers || {}) } })
@@ -112,7 +119,7 @@ export async function studioGenerate(task: StudioTask): Promise<StudioTask> {
   return studioTaskView(task.kind, await studioRequest(task.kind, 'tasks', task.kind === 'image' ? { task_id: task.id } : { operation_id: task.id }))
 }
 export function studioResultUrl(task: StudioTask, index = 0): string {
-  if (task.status !== 'completed' || !Number.isInteger(index) || index < 0 || index >= task.resultCount) throw new StudioError('result_unavailable')
+  if (!['completed','partial'].includes(task.status) || !Number.isInteger(index) || index < 0 || index >= task.resultCount) throw new StudioError('result_unavailable')
   return buildGatewayUrl(`/studio-v2/api/${task.kind}/${task.kind === 'image' ? `tasks/${task.id}/results/${index}` : `operations/${task.id}/original`}`)
 }
 export function studioErrorMessage(error: unknown): string {

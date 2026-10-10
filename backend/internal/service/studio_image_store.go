@@ -19,10 +19,11 @@ import (
 var ErrStudioImageUnknown = errors.New("original image dispatch outcome unknown; POST replay disabled")
 var ErrStudioImageConflict = errors.New("image task binding conflict")
 
-// StudioImageReceiptVersion retains the existing durable receipt format.
-// Readers accept historical v1 and v2 without rewriting their frozen identity.
+// StudioImageReceiptVersion retains the existing durable single-request format.
+// Readers accept historical v1/v2; v3 is reserved for multi-unit receipts.
 // Rollback executors must support the file version and the current relay policy.
 const StudioImageReceiptVersion = "published_image_receipt_v2"
+const StudioImageMultiReceiptVersion = "published_image_receipt_v3"
 
 type StudioImageOwner struct {
 	UserID   int64 `json:"user_id"`
@@ -46,23 +47,44 @@ type StudioImageQuote struct {
 	// UnitPrice, Quantity and TotalPrice are populated for new quotes. They are
 	// optional so receipts written before quantity pricing was introduced keep
 	// their original immutable sale_price semantics during recovery.
-	UnitPrice  *mediaworkbench.Price `json:"unit_price,omitempty"`
-	Quantity   int                   `json:"quantity,omitempty"`
-	TotalPrice *mediaworkbench.Price `json:"total_price,omitempty"`
+	UnitPrice  *mediaworkbench.Price              `json:"unit_price,omitempty"`
+	Quantity   int                                `json:"quantity,omitempty"`
+	TotalPrice *mediaworkbench.Price              `json:"total_price,omitempty"`
+	Execution  *mediaworkbench.ImageExecutionPlan `json:"execution,omitempty"`
+}
+
+type StudioImageUnitReceipt struct {
+	ID           string `json:"id"`
+	Index        int    `json:"index"`
+	OutputOffset int    `json:"output_offset"`
+	OutputCount  int    `json:"output_count"`
+	Endpoint     string `json:"endpoint"`
+	PayloadHash  string `json:"payload_hash"`
+	UpstreamID   string `json:"upstream_id,omitempty"`
+	ResultHash   string `json:"result_hash,omitempty"`
+	ActualCount  int    `json:"actual_count"`
+	Status       string `json:"status"`
+	Error        string `json:"error,omitempty"`
 }
 
 type StudioImageReceipt struct {
-	Version      string           `json:"version"`
-	TaskID       string           `json:"task_id"`
-	Quote        StudioImageQuote `json:"quote"`
-	Request      []byte           `json:"request"`
-	PayloadHash  string           `json:"payload_hash"`
-	RequestHash  string           `json:"request_hash"`
-	Endpoint     string           `json:"endpoint"`
-	UpstreamID   string           `json:"upstream_id,omitempty"`
-	ResultHash   string           `json:"result_hash,omitempty"`
-	Status       string           `json:"status"`
-	BillingState string           `json:"billing_state"`
+	Version        string                            `json:"version"`
+	TaskID         string                            `json:"task_id"`
+	Quote          StudioImageQuote                  `json:"quote"`
+	Request        []byte                            `json:"request"`
+	PayloadHash    string                            `json:"payload_hash"`
+	RequestHash    string                            `json:"request_hash"`
+	Endpoint       string                            `json:"endpoint"`
+	UpstreamID     string                            `json:"upstream_id,omitempty"`
+	ResultHash     string                            `json:"result_hash,omitempty"`
+	Status         string                            `json:"status"`
+	BillingState   string                            `json:"billing_state"`
+	Execution      mediaworkbench.ImageExecutionPlan `json:"execution,omitempty"`
+	Units          []StudioImageUnitReceipt          `json:"units,omitempty"`
+	ExpectedCount  int                               `json:"expected_count,omitempty"`
+	DeliveredCount int                               `json:"delivered_count,omitempty"`
+	FailedCount    int                               `json:"failed_count,omitempty"`
+	PendingCount   int                               `json:"pending_count,omitempty"`
 }
 
 // One receipt is both the authoritative task and receipt binding. The permanent
@@ -243,7 +265,7 @@ func (s *StudioImageStore) Claim(r StudioImageReceipt) (*StudioImageReceipt, boo
 	if err := s.init(); err != nil {
 		return nil, false, err
 	}
-	if r.TaskID == "" || r.Version != StudioImageReceiptVersion || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
+	if r.TaskID == "" || (r.Version != StudioImageReceiptVersion && r.Version != StudioImageMultiReceiptVersion) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil || HashUsageRequestPayload(r.Request) != r.PayloadHash {
 		return nil, false, ErrStudioImageConflict
 	}
 	path := s.path("task", r.TaskID)
@@ -286,7 +308,7 @@ func (s *StudioImageStore) Receipt(taskID string, owner StudioImageOwner) (*Stud
 	if err := studioRead(s.path("task", taskID), r); err != nil {
 		return nil, err
 	}
-	if r.TaskID != taskID || r.Quote.Owner != owner || (r.Version != mediaworkbench.ImageBindingVersion && r.Version != StudioImageReceiptVersion) || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
+	if r.TaskID != taskID || r.Quote.Owner != owner || (r.Version != mediaworkbench.ImageBindingVersion && r.Version != StudioImageReceiptVersion && r.Version != StudioImageMultiReceiptVersion) || r.PayloadHash != HashUsageRequestPayload(r.Request) || r.Quote.BindingHash != studioQuoteHash(r.Quote) || r.Quote.Accounting.Validate(r.Quote) != nil {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
 	return r, nil
@@ -304,6 +326,7 @@ func (s *StudioImageStore) PersistResult(r *StudioImageReceipt, data []byte) err
 	r.Status = "persisted"
 	return s.Save(r)
 }
+
 func (s *StudioImageStore) Result(r *StudioImageReceipt) ([]byte, error) {
 	// Read only the hashed original under the configured private root. Root
 	// confinement also rejects a result symlink that escapes that directory.

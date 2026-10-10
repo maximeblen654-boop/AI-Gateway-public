@@ -99,7 +99,12 @@ func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 			continue
 		}
 		d, ok := Descriptor(o.Adapter.Kind)
-		if !ok || d.Kind != "openai_images" || o.AccountID != a.ID || o.MediaType != "image" || d.Auth != "account_apikey" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateImageSalePrice(o.SalePrice) != nil {
+		config := o.ResolvedConfig
+		if s.Images > 0 {
+			config.Execution = config.EditExecution
+		}
+		exec, execErr := PlanImageExecution(config, 1)
+		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.Kind != "openai_images" || o.AccountID != a.ID || o.MediaType != "image" || d.Auth != "account_apikey" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateImageSalePrice(o.SalePrice) != nil {
 			return r, ErrRuntimeBinding
 		}
 		r = ResolvedImageOffer{ImageBindingVersion, a.Config.Published.Revision, a.Config.Published.Dependencies, o, s, h}
@@ -151,7 +156,16 @@ func (s *Service) ResolvePublishedImageOffer(ctx context.Context, offerID string
 }
 
 func CompilePublishedImagePlan(r ResolvedImageOffer, prompt string, references []string) (imageplan.Plan, error) {
+	return CompilePublishedImagePlanForCount(r, prompt, references, r.Spec.Count)
+}
+
+// CompilePublishedImagePlanForCount preserves the frozen binding while
+// changing only the upstream output count for one execution unit.
+func CompilePublishedImagePlanForCount(r ResolvedImageOffer, prompt string, references []string, count int) (imageplan.Plan, error) {
 	if r.Version != ImageBindingVersion || r.SpecHash != hash(r.Spec) || len(references) != r.Spec.Images || !r.Offer.Matches(r.Spec) || strings.TrimSpace(prompt) == "" {
+		return imageplan.Plan{}, ErrRuntimeBinding
+	}
+	if count < 1 || count > r.Spec.Count {
 		return imageplan.Plan{}, ErrRuntimeBinding
 	}
 	d, ok := Descriptor(r.Offer.Adapter.Kind)
@@ -161,7 +175,9 @@ func CompilePublishedImagePlan(r ResolvedImageOffer, prompt string, references [
 	// Use the validator's compiler to establish the same field mappings, then
 	// replace only prompt and reference asset slots before materialization.
 	p := Product{SiteModel: r.Offer.SiteModel, UpstreamModel: r.Offer.UpstreamModel, AdapterConfig: r.Offer.ResolvedConfig}
-	dry, err := compilePlan(p, r.Spec)
+	spec := r.Spec
+	spec.Count = count
+	dry, err := compilePlan(p, spec)
 	if err != nil {
 		return dry, err
 	}
@@ -182,4 +198,12 @@ func CompilePublishedImagePlan(r ResolvedImageOffer, prompt string, references [
 		return dry, err
 	}
 	return imageplan.CompileJSON(body, r.Offer.UpstreamModel, dry.Path)
+}
+
+func PublishedImageExecution(r ResolvedImageOffer) (ImageExecutionPlan, error) {
+	config := r.Offer.ResolvedConfig
+	if r.Spec.Images > 0 {
+		config.Execution = config.EditExecution
+	}
+	return PlanImageExecution(config, r.Spec.Count)
 }

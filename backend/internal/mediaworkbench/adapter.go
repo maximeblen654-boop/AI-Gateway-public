@@ -127,11 +127,101 @@ type SizeMapping struct {
 	WireSize    string `json:"wire_size"`
 }
 type ImageConfig struct {
-	Version      int           `json:"version,omitempty"`
-	SizeMappings []SizeMapping `json:"size_mappings"`
-	WireProfile  string        `json:"wire_profile,omitempty"`
-	ModelFamily  string        `json:"model_family,omitempty"`
+	Version       int                   `json:"version,omitempty"`
+	SizeMappings  []SizeMapping         `json:"size_mappings"`
+	WireProfile   string                `json:"wire_profile,omitempty"`
+	ModelFamily   string                `json:"model_family,omitempty"`
+	Execution     *ImageExecutionConfig `json:"execution,omitempty"`
+	EditExecution *ImageExecutionConfig `json:"edit_execution,omitempty"`
 }
+
+// ImageExecutionConfig records only capabilities that were explicitly
+// verified for the bound Account/model/interface. An omitted configuration is
+// deliberately conservative: one normal image per upstream request.
+type ImageExecutionMode string
+
+const (
+	ImageExecutionSingle        ImageExecutionMode = "single"
+	ImageExecutionNativeMulti   ImageExecutionMode = "native_multi"
+	ImageExecutionProviderAsync ImageExecutionMode = "provider_async"
+)
+
+type ImageExecutionConfig struct {
+	Mode            ImageExecutionMode `json:"mode,omitempty"`
+	MaxOutputImages int                `json:"max_output_images,omitempty"`
+	Provider        string             `json:"provider,omitempty"`
+}
+
+type ImageExecutionUnit struct {
+	Index        int                `json:"index"`
+	OutputOffset int                `json:"output_offset"`
+	OutputCount  int                `json:"output_count"`
+	Mode         ImageExecutionMode `json:"mode"`
+	Provider     string             `json:"provider,omitempty"`
+}
+
+type ImageExecutionPlan struct {
+	Mode            ImageExecutionMode   `json:"mode"`
+	Provider        string               `json:"provider,omitempty"`
+	MaxOutputImages int                  `json:"max_output_images"`
+	Units           []ImageExecutionUnit `json:"units"`
+}
+
+// PlanImageExecution turns a frozen customer quantity into durable upstream
+// units. It never infers capability from a model name, protocol shape or the
+// presence of an n field.
+func PlanImageExecution(config ImageConfig, quantity int) (ImageExecutionPlan, error) {
+	if quantity < 1 || quantity > 10 {
+		return ImageExecutionPlan{}, ErrRuntimeBinding
+	}
+	mode := ImageExecutionSingle
+	max := 1
+	provider := ""
+	if config.Execution != nil {
+		if config.Execution.MaxOutputImages < 0 {
+			return ImageExecutionPlan{}, ErrRuntimeBinding
+		}
+		if config.Execution.Mode != "" {
+			mode = config.Execution.Mode
+		}
+		if config.Execution.MaxOutputImages > 0 {
+			max = config.Execution.MaxOutputImages
+		}
+		provider = config.Execution.Provider
+	}
+	if mode != ImageExecutionProviderAsync && provider != "" {
+		return ImageExecutionPlan{}, ErrRuntimeBinding
+	}
+	switch mode {
+	case ImageExecutionSingle:
+		if max != 1 {
+			return ImageExecutionPlan{}, ErrRuntimeBinding
+		}
+	case ImageExecutionNativeMulti:
+		if max < 2 || max > 10 {
+			return ImageExecutionPlan{}, ErrRuntimeBinding
+		}
+	case ImageExecutionProviderAsync:
+		if provider != "gemini_api" && provider != "vertex" || max < 1 || max > 10 {
+			return ImageExecutionPlan{}, ErrRuntimeBinding
+		}
+	default:
+		return ImageExecutionPlan{}, ErrRuntimeBinding
+	}
+	units := make([]ImageExecutionUnit, 0, (quantity+max-1)/max)
+	remaining, offset := quantity, 0
+	for i := 0; remaining > 0; i++ {
+		count := remaining
+		if count > max {
+			count = max
+		}
+		units = append(units, ImageExecutionUnit{Index: i, OutputOffset: offset, OutputCount: count, Mode: mode, Provider: provider})
+		offset += count
+		remaining -= count
+	}
+	return ImageExecutionPlan{Mode: mode, Provider: provider, MaxOutputImages: max, Units: units}, nil
+}
+
 type Spec struct {
 	Resolution      string `json:"resolution"`
 	DurationSeconds int    `json:"duration_seconds"`
