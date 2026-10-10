@@ -86,6 +86,25 @@ describe('Reference asset input',()=>{
  })
 })
 describe('Published customer task confirmation and recovery',()=>{
+ it.each(['unknown','billing_pending'])('keeps %s pending and never infers a paid amount from the quote',async status=>{
+  const task={...prepared,kind:'image' as const,status,spec:{count:5},quantity:5,price:{amount:'3.50',currency:'CNY',billing_mode:'per_request'},billingState:'billing_unknown'};
+  api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises();
+  expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('待结算');expect(wrapper.get('[data-testid="studio-settlement"]').text()).not.toContain('3.50');
+  expect(wrapper.find('[data-testid="studio-new"]').exists()).toBe(false);expect(wrapper.find('[data-testid="studio-generate"]').exists()).toBe(false);
+  await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(api.generate).not.toHaveBeenCalled();
+ });
+ it('delivers a settled partial task without repricing or resubmission across refresh and remount',async()=>{
+  const task={...prepared,id:'img_'+'b'.repeat(32),kind:'image' as const,status:'partial',spec:{count:5},quantity:5,price:{amount:'3.50',currency:'CNY',billing_mode:'per_request'},unitPrice:{amount:'0.70',currency:'CNY',billing_mode:'per_request'},expectedCount:5,deliveredCount:2,failedCount:3,pendingCount:0,resultCount:2,billingState:'billed',settledPrice:{amount:'1.40',currency:'CNY',billing_mode:'per_request'}}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id,attempted:[]}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.get('[data-testid="studio-status"]').text()).toContain('部分完成')
+  expect(wrapper.get('[data-testid="studio-partial-counts"]').text()).toContain('已交付 2')
+  expect(wrapper.get('[data-testid="studio-price"]').text()).toContain('3.50 CNY')
+  expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('1.40 CNY')
+  expect(wrapper.findAll('[data-testid="studio-download"]')).toHaveLength(2)
+  await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();wrapper.unmount();wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.findAll('[data-testid="studio-download"]')).toHaveLength(2);expect(api.generate).not.toHaveBeenCalled()
+  await wrapper.get('[data-testid="studio-new"]').trigger('click');expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(api.generate).not.toHaveBeenCalled()
+ })
  it('shows unit price only when a historical receipt contains an explicit unit price',async()=>{
   const oldImage={...prepared,kind:'image' as const,spec:{count:4},quantity:4};api.history.mockResolvedValue([oldImage]);wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.get('[data-testid="studio-price"]').text()).not.toContain('×');wrapper.unmount()
   api.history.mockResolvedValue([{...oldImage,unitPrice:{amount:'0.20',currency:'CNY',billing_mode:'per_request'}}]);wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.get('[data-testid="studio-price"]').text()).toContain('0.20 × 4')

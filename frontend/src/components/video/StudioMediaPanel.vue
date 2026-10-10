@@ -42,17 +42,19 @@
     <p v-if="notice" role="status">{{ notice }}</p>
     <div v-if="active" class="mt-4 space-y-2" data-testid="studio-task">
       <p>已冻结：{{ taskModel(active) }} · {{ specText(active) }}</p>
-      <p data-testid="studio-price">本次报价：{{ active.price.amount }} {{ active.price.currency }}<span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} 份）</span></p>
+      <p data-testid="studio-price">冻结报价：{{ active.price.amount }} {{ active.price.currency }}<span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} 份）</span></p>
+      <p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p>
       <p v-if="active.status === 'prepared'">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
       <p data-testid="studio-task-id">任务：{{ active.id }}</p>
       <p data-testid="studio-status" aria-live="polite">{{ statusText(active.status) }}</p>
+      <p v-if="active.status === 'partial'" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
       <p v-if="active.status === 'unknown'">结果待确认。系统只查询原任务，不会自动再次生成或更换供应商。</p>
       <button v-if="active.status === 'prepared'" class="btn btn-primary" data-testid="studio-generate" :disabled="busy || !enabled || expired" @click="generate">确认报价并生成</button>
       <button class="btn btn-secondary" data-testid="studio-refresh" :disabled="querying || busy" @click="refresh">查询原任务</button>
-      <button v-if="['prepared','completed','failed','released'].includes(active.status)" class="btn btn-secondary" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '新建任务' }}</button>
-      <div v-if="active.status === 'completed'" class="grid gap-3" data-testid="studio-results">
+      <button v-if="['prepared','completed','partial','failed','released'].includes(active.status)" class="btn btn-secondary" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '新建任务' }}</button>
+      <div v-if="['completed','partial'].includes(active.status)" class="grid gap-3" data-testid="studio-results">
         <div v-for="i in active.resultCount" :key="`${active.id}-${i}`">
-          <img v-if="kind === 'image'" :src="studioResultUrl(active,i-1)" class="max-h-96 max-w-full" :alt="`生成图片 ${i}`" data-testid="studio-result-image" />
+          <img v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" class="max-h-96 max-w-full" :alt="`生成图片 ${i}`" data-testid="studio-result-image" />
           <video v-else :src="studioResultUrl(active,i-1)" class="max-h-96 max-w-full" controls preload="metadata" data-testid="studio-result-video" />
           <a :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" class="btn btn-secondary" data-testid="studio-download">下载原始结果 {{ i }}</a>
         </div>
@@ -83,14 +85,14 @@ const incompatible=computed(()=>!offer.value || ['image','video','audio'].some(k
 const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
 let generation=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
-const statuses:Record<string,string>={prepared:'报价已冻结，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
+const statuses:Record<string,string>={prepared:'报价已冻结，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
 const statusText=(status:string)=>statuses[status]||'结果待确认'
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||task.model||'已冻结的历史模型'
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}份`].filter(Boolean).join(' / ')
 function remember(){if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,id:active.value?.id,attempted:[...attempted]}))}
 function accepted(task:StudioTask){if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'};active.value=task;history.value=[task,...history.value.filter(t=>t.id!==task.id)];remember()}
 function selectOffer(){const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=s?.count.min||1;intent=undefined}
-function newTask(){if(busy.value || !active.value || !['prepared','completed','failed','released'].includes(active.value.status))return;active.value=null;intent=undefined;error.value='';notice.value='';remember()}
+function newTask(){if(busy.value || !active.value || !['prepared','completed','partial','failed','released'].includes(active.value.status))return;active.value=null;intent=undefined;error.value='';notice.value='';remember()}
 async function load(selectedId?:unknown){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;offers.value=[];history.value=[];try{
  const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
  if(epoch!==generation)return;

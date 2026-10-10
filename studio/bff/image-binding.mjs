@@ -105,19 +105,36 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
     if(!['unknown','persisted','completed','partial','failed'].includes(receipt.status) || !['pending','billing_unknown','billed','not_charged'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
-    const delivered=Number.isInteger(receipt.delivered_count)?receipt.delivered_count:task.quote.spec.count;
+    // The old HTTP adapter omitted a version and all multi-unit fields. Never
+    // infer a legacy success from v3 zero counters or partially present fields.
+    const receiptVersion=receipt.receipt_version ?? 'published_image_receipt_v2';
+    const expected=task.quote.spec.count;
+    let delivered=0,failed=0,pending=0;
+    if(receiptVersion==='published_image_receipt_v3') {
+      if(![receipt.expected_count,receipt.delivered_count,receipt.failed_count,receipt.pending_count].every(Number.isSafeInteger) || receipt.expected_count!==expected || [receipt.delivered_count,receipt.failed_count,receipt.pending_count].some(value=>value<0) || receipt.delivered_count+receipt.failed_count+receipt.pending_count!==expected) throw new Error('Receipt count mismatch');
+      delivered=receipt.delivered_count;failed=receipt.failed_count;pending=receipt.pending_count;
+      if(receipt.status==='completed' && (delivered!==expected || failed!==0 || pending!==0)) throw new Error('Receipt count mismatch');
+      if(receipt.status==='partial' && (delivered<1 || delivered>=expected || pending!==0 || failed!==expected-delivered)) throw new Error('Receipt count mismatch');
+      if(receipt.status==='failed' && delivered!==0) throw new Error('Receipt count mismatch');
+    } else if(receiptVersion==='published_image_receipt_v2' || receiptVersion===IMAGE_BINDING_CONTRACT) {
+      if(receipt.status==='partial') throw new Error('Receipt version/state mismatch');
+      if(['expected_count','delivered_count','failed_count','pending_count'].some(name=>Object.prototype.hasOwnProperty.call(receipt,name))) throw new Error('Receipt version/count mismatch');
+      delivered=(receipt.status==='completed' && receipt.billing_state==='billed' && receipt.result_available)?expected:0;
+    } else throw new Error('Receipt version mismatch');
+    const settled = receipt.settled_price === undefined ? undefined : receipt.settled_price;
+    if(settled !== undefined && (receipt.billing_state!=='billed' || !settled || typeof settled !== 'object' || typeof settled.amount !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(settled.amount) || settled.currency!=='CNY' || settled.billing_mode!=='per_request')) throw new Error('Receipt settlement mismatch');
     if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && receipt.result_available) {
       const payload=(await call(session,'GET',`tasks/${taskID}/result`,undefined,task.keyRef)).payload;
       if(!Array.isArray(payload?.data) || payload.data.length!==delivered)throw new Error('Result count mismatch');
       const saved=[];
       for(let i=0;i<payload.data.length;i++)saved.push(await results.saveResult(task.owner,taskID,i,payload.data[i]));
-      task.results=saved;task.status=receipt.status;task.delivered_count=delivered;task.failed_count=receipt.failed_count||0;task.pending_count=receipt.pending_count||0;write(location('task',identity),task);
+      task.results=saved;task.status=receipt.status;task.billing_state=receipt.billing_state;task.settled_price=settled;task.delivered_count=delivered;task.failed_count=failed;task.pending_count=pending;write(location('task',identity),task);
     } else if(task.status!=='completed') {
       // A concurrent recovery may have completed while this GET was in flight.
       const latest=read('task',identity);
       if(latest.status==='completed'||latest.status==='partial')return view(latest);
       task.status=receipt.status==='persisted'?'billing_pending':receipt.status==='failed'?'failed':'unknown';
-      task.delivered_count=delivered;task.failed_count=receipt.failed_count||0;task.pending_count=receipt.pending_count||0;write(location('task',identity),task);
+      task.billing_state=receipt.billing_state;task.settled_price=settled;task.delivered_count=delivered;task.failed_count=failed;task.pending_count=pending;write(location('task',identity),task);
     }
     return view(task);
   }
@@ -136,7 +153,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     return recover(session,task.task_id);
   }
   function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
-    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,execution:q.execution};}
+    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,billing_state:task.billing_state,settled_price:task.settled_price,execution:q.execution};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {

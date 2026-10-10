@@ -157,7 +157,20 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 	studioReceiptResponse(c, receipt)
 }
 func studioReceiptResponse(c *gin.Context, r *service.StudioImageReceipt) {
-	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "result_available": r.ResultHash != "", "expected_count": r.ExpectedCount, "delivered_count": r.DeliveredCount, "failed_count": r.FailedCount, "pending_count": r.PendingCount, "execution": r.Execution})
+	response := gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "receipt_version": r.Version, "result_available": r.ResultHash != "", "execution": r.Execution}
+	// v2 receipts predate per-unit accounting.  Do not serialize zero-valued
+	// v3 counters for them: an old completed receipt must retain its frozen
+	// total semantics at the BFF boundary.
+	if r.Version == service.StudioImageMultiReceiptVersion {
+		response["expected_count"] = r.ExpectedCount
+		response["delivered_count"] = r.DeliveredCount
+		response["failed_count"] = r.FailedCount
+		response["pending_count"] = r.PendingCount
+	}
+	if settled, err := service.StudioImageSettledPrice(r); err == nil {
+		response["settled_price"] = settled
+	}
+	c.JSON(http.StatusOK, response)
 }
 func (h *OpenAIGatewayHandler) StudioImageReceipt(c *gin.Context) {
 	owner, _, ok := h.studioOwner(c, true)

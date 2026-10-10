@@ -11,6 +11,42 @@ function freeze<T extends object>(value: T): T {
   return Object.freeze(value)
 }
 describe('media editors follow one-way props', () => {
+  it('preserves historical counts on read and only applies 1..10 to an explicit draft edit', async () => {
+    const product = copy(imageProduct)
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    expect(wrapper.text()).not.toContain('单次生成数量下限')
+    expect(wrapper.text()).not.toContain('单次生成数量上限')
+    expect(wrapper.emitted('update:product')).toBeUndefined()
+    await wrapper.get('[data-test="apply-system-count"]').trigger('click')
+    const latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.capabilities.count).toEqual({ min: 1, max: 10 })
+    expect(latest.pricing_rules).toEqual(product.pricing_rules)
+    expect(product.capabilities.count).toEqual({ min: 1, max: 1 })
+    latest.capabilities.references.image.max = 0
+    await wrapper.setProps({ product: latest })
+    expect(wrapper.find('[data-test="image-edit-execution-mode"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="image-execution-max"]').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+  it('uses the system quantity policy and keeps edit execution separate', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.count = { min: 1, max: 10 }
+    product.adapter_config.execution = { mode: 'native_multi', max_output_images: 2 }
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    expect(wrapper.get('[data-test="quantity-policy"]').text()).toContain('1～10')
+    expect(wrapper.find('[data-test="image-edit-execution-mode"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="image-edit-execution-max"]').element).toHaveProperty('disabled', true)
+    await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('native_multi')
+    let latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.adapter_config.execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
+    expect(latest.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
+    await wrapper.setProps({ product: latest })
+    await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('single')
+    latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.adapter_config.edit_execution?.max_output_images).toBe(1)
+    expect(latest.adapter_config.execution?.max_output_images).toBe(2)
+    wrapper.unmount()
+  })
   it('does not generate a price row for the denied 2K high combination', async () => {
     const product = copy(imageProduct)
     product.capabilities.resolutions = ['1K', '2K']

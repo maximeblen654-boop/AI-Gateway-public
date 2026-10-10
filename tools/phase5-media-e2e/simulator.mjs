@@ -15,13 +15,15 @@ https.createServer({key:fs.readFileSync(root+'/simulator-key.pem'),cert:fs.readF
  if(req.method==='POST'&&['/v1/images/generations','/v1/images/edits'].includes(url.pathname)){
    state.image_posts=(state.image_posts||0)+1;save();
    const v=JSON.parse(body);
-   if(!['phase5-native-image-v1','gpt-image-2'].includes(v.model)||typeof v.prompt!=='string'||v.n!==1||!/^\d+x\d+$/.test(v.size)||v.response_format!==undefined&&v.response_format!=='b64_json'||v.images!==undefined&&(!Array.isArray(v.images)||v.images.some(i=>typeof i.image_url!=='string'||!i.image_url.startsWith('data:image/'))))return reply(422,{error:'image_contract'});
+   if(!['phase5-native-image-v1','gpt-image-2'].includes(v.model)||typeof v.prompt!=='string'||!Number.isInteger(v.n)||v.n<1||v.n>10||!/^\d+x\d+$/.test(v.size)||v.response_format!==undefined&&v.response_format!=='b64_json'||v.images!==undefined&&(!Array.isArray(v.images)||v.images.some(i=>typeof i.image_url!=='string'||!i.image_url.startsWith('data:image/'))))return reply(422,{error:'image_contract'});
    if(url.pathname.endsWith('/edits')&&!v.images?.length||url.pathname.endsWith('/generations')&&v.images?.length)return reply(422,{error:'image_endpoint_contract'});
-   (state.image_requests||=[]).push({endpoint:url.pathname,model:v.model,size:v.size,n:v.n,images:v.images?.length||0,request_hash:crypto.createHash('sha256').update(body).digest('hex')});save();
+   const prompt_hash=crypto.createHash('sha256').update(v.prompt).digest('hex');
+   (state.image_requests||=[]).push({endpoint:url.pathname,model:v.model,size:v.size,n:v.n,images:v.images?.length||0,prompt_hash,request_hash:crypto.createHash('sha256').update(body).digest('hex')});save();
+   if(v.prompt.startsWith('CLOSEOUT_PARTIAL ')&&state.image_requests.filter(r=>r.prompt_hash===prompt_hash).length===2)return reply(422,{error:'synthetic_second_batch_rejection'});
    if(v.prompt.startsWith('READINESS_REJECT '))return reply(422,{error:'synthetic_rejection'});
    if(v.prompt.startsWith('READINESS_LOST ')){req.socket.destroy();return;}
    if(v.prompt.startsWith('READINESS_DELAY '))await new Promise(r=>setTimeout(r,2000));
-   return reply(200,{data:[{b64_json:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='}]});
+   return reply(200,{data:Array.from({length:v.n},()=>({b64_json:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='}))});
  }
  // Independent documented video contract: JSON submit, task poll, original bytes.
  if(req.method==='POST'&&url.pathname==='/v1/videos'){

@@ -90,7 +90,7 @@ export function useMediaWorkbench() {
     const id = `media-${crypto.randomUUID()}`
     products.value.push({ product_id: id, media_type: mediaType, site_model: selectedModel.value, display_name: selectedModel.value,
       upstream_model: selectedModel.value, enabled: true,
-      capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: { min: 1, max: 1 },
+      capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: mediaType === 'video' ? { min: 1, max: 1 } : { min: 1, max: 10 },
         references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] },
       pricing_rules: [], adapter_config: { size_mappings: [] } })
     selectedProduct.value = id

@@ -4,7 +4,7 @@
       <h3 data-test="upstream-model-name">{{ product.upstream_model }}</h3>
       <p class="mw-muted" data-test="internal-id">内部 ID: {{ product.site_model }}</p>
       <label class="mw-field">展示名称<input :value="product.display_name" class="input" data-test="display-name" data-field="display_name" @input="edit(next => { next.display_name = text($event) })" /></label>
-      <label class="mw-field">业务用途<select :value="product.media_type" class="input" data-field="media_type" @change="edit(next => { next.media_type = text($event); if (next.media_type === 'video') next.capabilities.count = { min: 1, max: 1 } })"><option v-for="type in mediaTypes" :key="type" :value="type">{{ type === 'image' ? '图片' : '视频' }}</option></select></label>
+      <label class="mw-field">业务用途<select :value="product.media_type" class="input" data-field="media_type" @change="edit(next => { next.media_type = text($event); next.capabilities.count = { min: 1, max: next.media_type === 'video' ? 1 : 10 } })"><option v-for="type in mediaTypes" :key="type" :value="type">{{ type === 'image' ? '图片' : '视频' }}</option></select></label>
       <label><input :checked="product.enabled" type="checkbox" @change="edit(next => { next.enabled = ($event.target as HTMLInputElement).checked })" /> 本站启用（发布后生效）</label>
       <details><summary>产品标识</summary>
         <label class="mw-field">产品 ID<input :value="product.product_id" class="input" data-field="product_id" @input="setIdentity" /></label>
@@ -18,8 +18,13 @@
         <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="setCapability('resolution', $event)" />
         <MediaTokensField label="比例" :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="setCapability('aspect_ratio', $event)" />
         <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric :presets="durationPresets" placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="setCapability('duration_seconds', $event)" />
-        <label class="mw-field">单次生成数量下限<input :value="product.media_type === 'video' ? 1 : product.capabilities.count.min" class="input" type="number" step="1" :disabled="disabled || product.media_type === 'video'" @input="edit(next => { next.capabilities.count.min = product.media_type === 'video' ? 1 : numeric($event) })" /><small>{{ product.media_type === 'video' ? '视频协议固定为 1 条。' : '图片是每次生成的张数。' }}</small></label>
-        <label class="mw-field">单次生成数量上限<input :value="product.media_type === 'video' ? 1 : product.capabilities.count.max" class="input" type="number" step="1" :disabled="disabled || product.media_type === 'video'" @input="edit(next => { next.capabilities.count.max = product.media_type === 'video' ? 1 : numeric($event) })" /><small>数量不会生成额外价格行。</small></label>
+        <div data-test="quantity-policy">
+          <p class="mw-muted">{{ product.media_type === 'video' ? '视频固定为 1 条。' : '系统图片购买范围为 1～10 张；上游请求由系统按接口能力分批。' }}</p>
+          <template v-if="product.media_type === 'image' && (product.capabilities.count.min !== 1 || product.capabilities.count.max !== 10)">
+            <p class="mw-muted">此历史草稿保留 {{ product.capabilities.count.min }}～{{ product.capabilities.count.max }} 张。应用系统范围后，仍须保存、校验并发布才会影响新报价；历史报价和任务不变。</p>
+            <button type="button" class="btn btn-secondary" data-test="apply-system-count" @click="edit(next => { next.capabilities.count = { min: 1, max: 10 } })">在草稿应用 1～10 张</button>
+          </template>
+        </div>
         <template v-for="kind in referenceKinds" :key="kind.key">
           <label class="mw-field">{{ kind.label }}下限<input :value="product.capabilities.references[kind.key].min" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].min = numeric($event) })" /></label>
           <label class="mw-field">{{ kind.label }}上限<input :value="product.capabilities.references[kind.key].max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].max = numeric($event) })" /></label>
@@ -50,16 +55,30 @@
         <option value="">请选择</option><option value="openai_json">OpenAI Images JSON</option>
       </select></label>
     </section>
-    <section v-if="product.media_type === 'image'" data-field="adapter_config.execution">
-      <h3>单请求产出能力</h3>
-      <p class="mw-muted">只填写已经核实的 Account、模型和接口能力；未知或没有多图证据时保持单图，客户多张会按批次执行。</p>
+    <details v-if="product.media_type === 'image'" data-test="image-execution-advanced">
+      <summary>高级技术配置：图片接口单请求能力</summary>
+      <p class="mw-muted">由管理员依据已确认的 Account、模型和接口能力配置；这不是系统实测结果。未确认多图时保留单图，无需为购买多张修改接口能力。</p>
+    <section data-field="adapter_config.execution">
+      <h3>文生图单请求产出能力</h3>
+      <p class="mw-muted">只填写已经核实的 Account、模型和接口能力；未知或没有多图证据时保持单图，客户 1～10 张会按批次执行。客户购买数量不在这里配置。</p>
       <div class="mw-field-grid">
         <label class="mw-field">执行方式<select :value="product.adapter_config.execution?.mode ?? 'single'" class="input" data-test="image-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.execution!.provider })">
           <option value="single">单图接口（未知能力也用此项）</option><option value="native_multi">已核实原生多图（使用 n）</option>
         </select></label>
-        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" type="number" min="1" max="10" step="1" @input="edit(next => { next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode: next.adapter_config.execution?.mode ?? 'single', max_output_images: numeric($event) } })" /><small>这是上游单请求上限，不是客户一次购买数量。</small></label>
+        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" type="number" :min="product.adapter_config.execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.execution?.mode ?? 'single'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>这是上游单请求上限，不是客户一次购买数量。</small></label>
       </div>
     </section>
+    <section v-if="product.capabilities.references.image.max > 0" data-field="adapter_config.edit_execution">
+      <h3>参考图编辑单请求产出能力</h3>
+      <p class="mw-muted">这是参考图编辑接口的独立管理员配置；未填写时按单图执行，不会继承文生图多图能力。这里只记录已确认能力，不代表系统已对供应商实测。</p>
+      <div class="mw-field-grid">
+        <label class="mw-field">编辑执行方式<select :value="product.adapter_config.edit_execution?.mode ?? 'single'" class="input" data-test="image-edit-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.edit_execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.edit_execution!.provider })">
+          <option value="single">单图接口（默认）</option><option value="native_multi">已核实原生多图（使用 n）</option>
+        </select></label>
+        <label class="mw-field">编辑单请求最多输出图片数<input :value="product.adapter_config.edit_execution?.max_output_images ?? 1" class="input" data-test="image-edit-execution-max" type="number" :min="product.adapter_config.edit_execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.edit_execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.edit_execution?.mode ?? 'single'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>客户购买数量仍由商品规格控制；没有编辑能力配置时每次只提交一张。</small></label>
+      </div>
+    </section>
+    </details>
     <section v-if="product.media_type === 'image'" data-field="adapter_config.size_mappings">
       <details data-test="size-mappings">
         <summary>供应商尺寸映射</summary>

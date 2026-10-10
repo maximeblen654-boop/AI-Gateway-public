@@ -13,6 +13,7 @@ export interface StudioTask {
   offerId: string; model: string; spec: Record<string, unknown>; price: StudioPrice; resultCount: number
   unitPrice?: StudioPrice; quantity?: number; totalPrice?: StudioPrice
   expectedCount?: number; deliveredCount?: number; failedCount?: number; pendingCount?: number
+  billingState?: string; settledPrice?: StudioPrice
   execution?: Record<string, unknown>
 }
 export class StudioError extends Error {
@@ -46,13 +47,16 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
     const units = (amount: string) => { const [whole, fraction = ''] = amount.split('.'); return BigInt(`${whole}${fraction.padEnd(8, '0')}`) }
     if (unitPrice.currency !== totalPrice.currency || units(unitPrice.amount) * BigInt(quantity) !== units(totalPrice.amount)) throw new StudioError('studio_contract')
   }
-  const deliveredCount = typeof v.delivered_count === 'number' && Number.isInteger(v.delivered_count) ? v.delivered_count : 0
-  const expectedCount = typeof v.expected_count === 'number' && Number.isInteger(v.expected_count) ? v.expected_count : quantity
-  const failedCount = typeof v.failed_count === 'number' && Number.isInteger(v.failed_count) ? v.failed_count : 0
-  const pendingCount = typeof v.pending_count === 'number' && Number.isInteger(v.pending_count) ? v.pending_count : 0
+  const count = (name: string, fallback: number) => typeof v[name] === 'number' && Number.isInteger(v[name]) && v[name] >= 0 ? v[name] as number : fallback
+  const deliveredCount = count('delivered_count', 0)
+  const expectedCount = count('expected_count', quantity)
+  const failedCount = count('failed_count', 0)
+  const pendingCount = count('pending_count', 0)
+  const settledPrice = v.settled_price === undefined ? undefined : studioPrice(v.settled_price)
   return { id, kind, status, createdAt: typeof v.created_at === 'string' ? v.created_at : '', expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
     offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec, price: totalPrice, unitPrice, quantity, totalPrice,
-    expectedCount, deliveredCount, failedCount, pendingCount, execution: v.execution && typeof v.execution === 'object' ? v.execution as Record<string, unknown> : undefined,
+    expectedCount, deliveredCount, failedCount, pendingCount, billingState: typeof v.billing_state === 'string' ? v.billing_state : undefined, settledPrice,
+    execution: v.execution && typeof v.execution === 'object' ? v.execution as Record<string, unknown> : undefined,
     resultCount: !['completed','partial'].includes(status) ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : deliveredCount }
 }
 async function json(url: string, init?: RequestInit): Promise<unknown> {

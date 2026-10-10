@@ -75,6 +75,21 @@ func StudioImagePrices(q StudioImageQuote) (mediaworkbench.Price, mediaworkbench
 	return studioImagePrices(q)
 }
 
+// StudioImageSettledPrice exposes the amount used by the already-applied
+// native billing transaction.  It is deliberately available only after the
+// durable receipt says billed; callers must never calculate a charge in the
+// browser from a frozen quote.
+func StudioImageSettledPrice(r *StudioImageReceipt) (mediaworkbench.Price, error) {
+	if r == nil || r.BillingState != "billed" {
+		return mediaworkbench.Price{}, mediaworkbench.ErrRuntimeBinding
+	}
+	_, total, _, err := studioImageReceiptPrices(r)
+	if err != nil {
+		return mediaworkbench.Price{}, err
+	}
+	return total, nil
+}
+
 func (m *UsageBillingExactAmounts) Validate() error {
 	if m == nil {
 		return nil

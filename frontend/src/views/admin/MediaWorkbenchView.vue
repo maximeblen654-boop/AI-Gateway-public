@@ -127,7 +127,7 @@
     </MediaDialog>
     <MediaDialog :show="publishDialog" title="发布这次修改？" :busy="pending === 'publish'" @close="publishDialog = false">
       <p>这次会发布当前 Account 下列产品的草稿：</p>
-      <ul class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
+      <ul class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</li></ul>
       <p>发布配置不会自动开启销售，已有订单不会改变，也不会发送真实生成请求。</p>
       <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish" @click="confirmPublish">确认发布配置</button></template>
     </MediaDialog>

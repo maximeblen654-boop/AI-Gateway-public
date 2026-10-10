@@ -19,6 +19,18 @@ async function start() {
 beforeEach(() => { vi.resetAllMocks(); api.detail.mockResolvedValue(supplier()); api.suppliers.mockResolvedValue([supplier(), supplier(44)]) })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
 describe('Media Workbench request lifecycle', () => {
+  it('creates images with system quantity 1..10 and videos with one while retaining old products', async () => {
+    await start()
+    const old = copy(state.products.value[0]!)
+    state.selectModel('new-model'); state.addProduct('image')
+    expect(state.product.value?.capabilities.count).toEqual({ min: 1, max: 10 })
+    expect(state.product.value?.adapter_config.execution).toBeUndefined()
+    state.addProduct('video')
+    expect(state.product.value?.capabilities.count).toEqual({ min: 1, max: 1 })
+    expect(state.products.value[0]).toEqual(old)
+    expect(state.config.value!.published!.products![0]!.capabilities.count).toEqual({ min: 1, max: 1 })
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  })
   it('renders server readiness and rejects stale validation revisions', async () => {
     await start(); expect(state.canPublish.value).toBe(true)
     state.config.value!.validation.draft_revision = 'old'; expect(state.canPublish.value).toBe(false)

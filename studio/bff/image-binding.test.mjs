@@ -23,7 +23,7 @@ test('browser restores a prepared image and confirms its stored identity without
   await assert.rejects(runtime.dispatch({ownerId:2},{task_id:prepared.task_id}));
   assert.equal(JSON.stringify(runtime.history(owner)).includes('quote_token'),false);
 });
-function fixture(t,{lost=false,count=1,frozen=false,totalOverride,partial=false}={}) {
+function fixture(t,{lost=false,count=1,frozen=false,totalOverride,partial=false,legacyV2=false}={}) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bound-image-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));let posts=0,gets=0;
   const call=async(session,method,operation,payload,key=0)=>{
     assert.equal(session.ownerId,1);
@@ -36,7 +36,7 @@ function fixture(t,{lost=false,count=1,frozen=false,totalOverride,partial=false}
     if(method==='POST') {posts++;assert.ok(fs.readdirSync(path.join(root,'journal')).some(x=>x.endsWith('.sync-dispatch')));if(lost)throw new Error('lost response');return {payload:{}};}
     gets++;
     if(operation.endsWith('/result'))return {payload:{data:Array.from({length:partial?2:count},()=>({b64_json:png}))}};
-    return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:operation.slice('tasks/'.length),status:partial?'partial':'completed',billing_state:'billed',result_available:true,expected_count:count,delivered_count:partial?2:count,failed_count:partial?count-2:0,pending_count:0}};
+    return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:operation.slice('tasks/'.length),status:partial?'partial':'completed',billing_state:'billed',receipt_version:legacyV2?'published_image_receipt_v2':'published_image_receipt_v3',result_available:true,settled_price:{amount:(partial?'1.60':(count*0.8).toFixed(2)),currency:'CNY',billing_mode:'per_request'},...(legacyV2?{}:{expected_count:count,delivered_count:partial?2:count,failed_count:partial?count-2:0,pending_count:0})}};
   };
   const results=createImageResultStore({rootDir:path.join(root,'results')});
   const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call,results});
@@ -51,6 +51,23 @@ test('partial upstream execution delivers and indexes only the frozen successful
   assert.equal(task.status,'partial');assert.equal(task.delivered_count,2);assert.equal(task.failed_count,3);assert.equal(task.results.length,2);
   assert.deepEqual(f.tasks.result(owner,task.task_id,1).data,Buffer.from(png,'base64'));
   assert.throws(()=>f.tasks.result(owner,task.task_id,2),/Image result unavailable/);
+  assert.equal(f.stats().posts,1);
+});
+test('legacy v2 completed receipts use frozen-total semantics without invented counters',async t=>{
+  const f=fixture(t,{legacyV2:true});await f.tasks.quote(owner,{offer_id:'legacy',spec:{count:1,images:0}});
+  const task=await f.tasks.dispatch(owner,f.input);
+  assert.equal(task.status,'completed');assert.equal(task.delivered_count,1);assert.equal(task.failed_count,0);assert.equal(task.pending_count,0);assert.equal(task.settled_price.amount,'0.80');
+});
+test('versioned receipt counters distinguish zero delivery from missing legacy fields',async t=>{
+  const f=fixture(t,{count:5,frozen:true,lost:true});await f.tasks.quote(owner,{offer_id:'multi',spec:{count:5,images:0}});
+  const id=f.tasks.prepare(owner,f.input).task.task_id;await assert.rejects(f.tasks.dispatch(owner,{task_id:id}));
+  const receipt={contract:IMAGE_BINDING_CONTRACT,receipt_version:'published_image_receipt_v3',task_id:id,status:'failed',billing_state:'not_charged',result_available:false,expected_count:5,delivered_count:0,failed_count:5,pending_count:0};
+  const runtime=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async(_s,method)=>{assert.equal(method,'GET');return {payload:receipt}}});
+  const zero=await runtime.recover(owner,id);assert.equal(zero.delivered_count,0);assert.equal(zero.results.length,0);assert.equal(zero.billing_state,'not_charged');
+  for(const change of [{status:'completed'},{status:'partial'},{delivered_count:undefined},{receipt_version:'published_image_receipt_v2'},{receipt_version:'invalid'}]) {
+    const invalid=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async()=>({payload:{...receipt,...change}})});
+    await assert.rejects(invalid.recover(owner,id),/Receipt/);
+  }
   assert.equal(f.stats().posts,1);
 });
 

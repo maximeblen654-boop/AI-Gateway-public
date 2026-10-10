@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -11,6 +12,42 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestStudioImageReceiptResponsePreservesV2TotalAndV3Counters(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	quote := service.StudioImageQuote{Binding: mediaworkbench.ResolvedImageOffer{Spec: mediaworkbench.Spec{Count: 1}, Offer: mediaworkbench.Offer{SalePrice: mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
+	for _, tc := range []struct {
+		name         string
+		version      string
+		wantCounters bool
+	}{
+		{name: "v2", version: service.StudioImageReceiptVersion},
+		{name: "v3", version: service.StudioImageMultiReceiptVersion, wantCounters: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &service.StudioImageReceipt{Version: tc.version, TaskID: "img_receipt", Quote: quote, Status: "completed", BillingState: "billed", ResultHash: "hash", ExpectedCount: 1, DeliveredCount: 1}
+			if tc.wantCounters {
+				r.Quote.Execution = &mediaworkbench.ImageExecutionPlan{Mode: mediaworkbench.ImageExecutionSingle, MaxOutputImages: 1}
+			}
+			if !tc.wantCounters {
+				r.DeliveredCount = 0
+			}
+			out := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(out)
+			studioReceiptResponse(c, r)
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(out.Body.Bytes(), &body))
+			require.Equal(t, tc.version, body["receipt_version"])
+			require.Equal(t, "0.80", body["settled_price"].(map[string]any)["amount"])
+			if tc.wantCounters {
+				require.Equal(t, float64(1), body["delivered_count"])
+			} else {
+				_, exists := body["delivered_count"]
+				require.False(t, exists)
+			}
+		})
+	}
+}
 
 func TestStudioImageUnknownReceiptRemainsReadableDuringGenerationPause(t *testing.T) {
 	gin.SetMode(gin.TestMode)
