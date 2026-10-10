@@ -8,8 +8,16 @@ export interface MatrixSpec {
 }
 
 const inside = (range: Range, value: number) => value >= range.min && value <= range.max
-const validStrings = (values: string[]) => new Set(values).size === values.length && values.every(value => value.length > 0 && value.trim() === value && value.length <= 128)
+const validStrings = (values: string[]) => values.length <= 32 && new Set(values).size === values.length && values.every(value => value.length > 0 && value.trim() === value && value.length <= 128)
 const validDurations = (values: number[]) => new Set(values).size === values.length && values.every(value => Number.isInteger(value) && value >= 1 && value <= 3600)
+const subset = <T>(part: T[], all: T[]) => new Set(part).size === part.length && part.every(value => all.includes(value))
+const insideRange = (range: Range, domain: Range) => Number.isInteger(range.min) && Number.isInteger(range.max) && range.min >= domain.min && range.max <= domain.max && range.max >= range.min
+function validMatch(match: Match, capabilities: Product['capabilities']): boolean {
+  if (!subset(match.resolution ?? [], capabilities.resolutions) || !subset(match.aspect_ratio ?? [], capabilities.aspect_ratios) || !subset(match.quality ?? [], capabilities.qualities) || !subset(match.duration_seconds ?? [], capabilities.durations_seconds)) return false
+  if (match.count && !insideRange(match.count, capabilities.count)) return false
+  const references = match.references
+  return !references || insideRange(references.image, capabilities.references.image) && insideRange(references.video, capabilities.references.video) && insideRange(references.audio, capabilities.references.audio) && references.total_max >= references.image.min + references.video.min + references.audio.min && references.total_max <= capabilities.references.total_max
+}
 export function matchesSpec(match: Match, spec: MatrixSpec): boolean {
   if (!pricingDimensions.every(key => !match[key]?.length || (match[key] as (string | number)[]).includes(spec[key]))) return false
   if (match.count && !inside(match.count, spec.count)) return false
@@ -23,6 +31,7 @@ export function allowedSpecs(c: Product['capabilities']): MatrixSpec[] | undefin
   if (ranges.some((r, i) => !Number.isInteger(r.min) || !Number.isInteger(r.max) || r.min < (i ? 0 : 1) || r.max < r.min || r.max > (i ? 16 : 10))) return undefined
   if (!Number.isInteger(c.references.total_max) || c.references.total_max > 16 || c.references.total_max < ranges.slice(1).reduce((sum, r) => sum + r.min, 0)) return undefined
   if (!validStrings(c.resolutions) || !validStrings(c.aspect_ratios) || !validStrings(c.qualities) || !validDurations(c.durations_seconds)) return undefined
+  if (c.durations_seconds.length > 32 || c.combination_rules.length > 100 || c.combination_rules.some(({ deny }) => !validMatch(deny, c))) return undefined
   // An empty deny is an unfinished editor row, rejected by the server too.
   if (c.combination_rules.some(({ deny }) => !pricingDimensions.some(key => deny[key]?.length) && !deny.count && !deny.references)) return undefined
   const choices = <T>(values: T[], empty: T) => values.length ? values : [empty]

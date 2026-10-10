@@ -36,4 +36,14 @@ describe('pricing matrix follows sellable combinations', () => {
     product.pricing_rules = [{ match: { resolution: ['1K'] }, sale_price: { amount: '0.20', currency: 'CNY', billing_mode: 'per_request' } }]
     expect(buildPricingRules(product, ['resolution'], allowedSpecs(product.capabilities)!).map(row => row.sale_price?.amount ?? null)).toEqual(['0.20', null])
   })
+
+  it('keeps legal rows when a nonpriced field has a partial deny', () => {
+    const product = copy(imageProduct)
+    product.capabilities.qualities = ['standard', 'high']
+    product.capabilities.combination_rules = [{ deny: { quality: ['high'] } }]
+    product.pricing_rules = [{ match: {}, sale_price: { amount: '0.18', currency: 'CNY', billing_mode: 'per_request' } }]
+    const rows = buildPricingRules(product, ['resolution'], allowedSpecs(product.capabilities)!)
+    expect(rows.map(row => row.match)).toEqual([{ resolution: ['1K'] }, { resolution: ['4K'] }])
+    expect(rows.every(row => row.sale_price?.amount === '0.18')).toBe(true)
+  })
 })

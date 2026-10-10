@@ -30,6 +30,46 @@ describe('media editors follow one-way props', () => {
     expect(latest.pricing_rules.every(rule => rule.sale_price === null)).toBe(true)
     wrapper.unmount()
   })
+  it('rebuilds prices when a deny rule changes and confirms lost prices', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.resolutions = ['1K', '4K']
+    product.capabilities.combination_rules = [{ deny: {} }]
+    product.pricing_rules = ['1K', '4K'].map((resolution, i) => ({ match: { resolution: [resolution] }, sale_price: { amount: String(i + 1), currency: 'CNY', billing_mode: 'per_request' } }))
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const matchEditor = wrapper.findComponent(MediaMatchEditor)
+    matchEditor.vm.$emit('update:modelValue', { resolution: ['4K'] })
+    await wrapper.vm.$nextTick()
+    expect(confirm).toHaveBeenCalled()
+    expect(wrapper.emitted('update:product')).toBeUndefined()
+    confirm.mockReturnValue(true)
+    matchEditor.vm.$emit('update:modelValue', { resolution: ['4K'] })
+    await wrapper.vm.$nextTick()
+    let latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.pricing_rules).toEqual([{ match: { resolution: ['1K'] }, sale_price: { amount: '1', currency: 'CNY', billing_mode: 'per_request' } }])
+    await wrapper.setProps({ product: latest })
+    const remove = wrapper.findAll('button').find(button => button.text().includes('移除此限制'))!
+    await remove.trigger('click')
+    latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.pricing_rules).toEqual([
+      { match: { resolution: ['1K'] }, sale_price: { amount: '1', currency: 'CNY', billing_mode: 'per_request' } },
+      { match: { resolution: ['4K'] }, sale_price: null }
+    ])
+    confirm.mockRestore(); wrapper.unmount()
+  })
+  it('does not preview a price for a denied specification', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.resolutions = ['1K', '2K']
+    product.capabilities.aspect_ratios = ['1:1', '16:9']
+    product.capabilities.combination_rules = [{ deny: { resolution: ['2K'], aspect_ratio: ['16:9'] } }]
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    await wrapper.get('[data-test="preview-resolution"]').setValue('2K')
+    await wrapper.get('[data-test="preview-aspect_ratio"]').setValue('16:9')
+    expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('当前组合价格待填写')
+    await wrapper.get('[data-test="preview-aspect_ratio"]').setValue('1:1')
+    expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('总价：0.18 CNY')
+    wrapper.unmount()
+  })
   it('emits nested product changes without mutating any incoming product field', async () => {
     const original = freeze(copy(imageProduct))
     const wrapper = mount(MediaProductEditor, { props: { product: original, mediaTypes: ['image', 'video'], disabled: false } })

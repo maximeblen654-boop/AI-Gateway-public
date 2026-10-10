@@ -30,8 +30,8 @@
       <details><summary>组合限制（可选）</summary>
         <p class="mw-muted">只录入已确认不可用的组合；没有规则时保持为空。</p>
         <div v-for="(rule, index) in product.capabilities.combination_rules" :key="index" class="mw-rule">
-          <p>禁止组合 {{ index + 1 }}</p><MediaMatchEditor :model-value="rule.deny" @update:model-value="edit(next => { next.capabilities.combination_rules[index]!.deny = $event })" />
-          <button type="button" class="btn btn-secondary" @click="edit(next => { next.capabilities.combination_rules.splice(index, 1) })">移除此限制</button>
+          <p>禁止组合 {{ index + 1 }}</p><MediaMatchEditor :model-value="rule.deny" @update:model-value="updateCombination(index, $event)" />
+          <button type="button" class="btn btn-secondary" @click="removeCombination(index)">移除此限制</button>
         </div>
         <button type="button" class="btn btn-secondary" @click="edit(next => { next.capabilities.combination_rules.push({ deny: {} }) })">添加禁止组合</button>
       </details>
@@ -103,7 +103,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import type { Product } from '@/api/admin/mediaWorkbench'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
-import { allowedSpecs, buildPricingRules, dimensionsFor, type PricingDimension } from './pricingMatrix'
+import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
@@ -149,28 +149,33 @@ function sellableSpecs(product: Product) {
   return allowedSpecs(capabilities)
 }
 const activePricingDimensions = computed<PricingDimension[]>(() => dimensionsFor(props.product))
-function pricesDiffer(rules: Product['pricing_rules']): boolean {
-  const amounts = new Set(rules.map(rule => JSON.stringify(rule.sale_price)))
-  return amounts.size > 1
+function losesPrices(previous: Product, nextRules: Product['pricing_rules'], specs: MatrixSpec[]): boolean {
+  return previous.pricing_rules.some(previousRule => previousRule.sale_price && !specs.some(spec => {
+    if (!matchesSpec(previousRule.match, spec)) return false
+    return nextRules.some(nextRule => matchesSpec(nextRule.match, spec) && JSON.stringify(nextRule.sale_price) === JSON.stringify(previousRule.sale_price))
+  }))
+}
+function editPricing(change: (value: Product) => void, dimensions = activePricingDimensions.value): boolean {
+  if (props.disabled) return false
+  const next: Product = JSON.parse(JSON.stringify(props.product))
+  change(next)
+  const specs = sellableSpecs(next)
+  if (specs) {
+    const rules = buildPricingRules(next, dimensions, specs)
+    if (losesPrices(props.product, rules, specs) && typeof window !== 'undefined' && !window.confirm('此修改会移除或合并已有售价，相关价格将变为“待填写”。是否继续？')) return false
+    next.pricing_rules = rules
+  }
+  emit('update:product', next)
+  return true
 }
 function togglePricingDimension(key: PricingDimension, event: Event) {
   const checked = (event.target as HTMLInputElement).checked
   const current = activePricingDimensions.value
   if (checked) {
-    edit(next => {
-      const specs = sellableSpecs(next)
-      if (specs) next.pricing_rules = buildPricingRules(next, [...current, key], specs)
-    })
+    editPricing(() => {}, [...current, key])
     return
   }
-  if (pricesDiffer(props.product.pricing_rules ?? []) && typeof window !== 'undefined' && !window.confirm('取消此定价选项后，存在不同价格的合并行将清空为“待填写”，相同价格保留。是否继续？')) {
-    (event.target as HTMLInputElement).checked = true
-    return
-  }
-  edit(next => {
-    const specs = sellableSpecs(next)
-    if (specs) next.pricing_rules = buildPricingRules(next, current.filter(item => item !== key), specs)
-  })
+  if (!editPricing(() => {}, current.filter(item => item !== key))) (event.target as HTMLInputElement).checked = true
 }
 function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
   const labels = pricingDimensionDefinitions.flatMap(({ key, label }) => {
@@ -203,16 +208,20 @@ function syncPreview(product: Product) {
 watch(() => props.product, syncPreview, { immediate: true })
 function previewValue(key: PricingDimension): string { return previewSelection[key] ?? dimensionValues(key)[0] ?? '' }
 function setCapability(key: PricingDimension, value: string[] | number[]) {
-  edit(next => {
+  const change = (next: Product) => {
     if (key === 'resolution') next.capabilities.resolutions = value.map(String)
     else if (key === 'aspect_ratio') next.capabilities.aspect_ratios = value.map(String)
     else if (key === 'quality') next.capabilities.qualities = value.map(String)
     else next.capabilities.durations_seconds = value.map(Number)
-    if (activePricingDimensions.value.length) {
-      const specs = sellableSpecs(next)
-      if (specs) next.pricing_rules = buildPricingRules(next, activePricingDimensions.value, specs)
-    }
-  })
+  }
+  if (activePricingDimensions.value.length) editPricing(change)
+  else edit(change)
+}
+function updateCombination(index: number, deny: Product['capabilities']['combination_rules'][number]['deny']) {
+  editPricing(next => { next.capabilities.combination_rules[index]!.deny = deny })
+}
+function removeCombination(index: number) {
+  editPricing(next => { next.capabilities.combination_rules.splice(index, 1) })
 }
 function multiplyDecimalText(left: string, right: number): string {
   if (!/^\d+(?:\.\d+)?$/.test(left) || !Number.isInteger(right) || right < 1) return left
@@ -226,10 +235,12 @@ function multiplyDecimalText(left: string, right: number): string {
 }
 const pricingPreview = computed(() => {
   const selected = previewDimensions.value.reduce<Record<string, string>>((result, { key }) => { result[key] = previewValue(key); return result }, {})
+  const specs = sellableSpecs(props.product)
+  const quantity = props.product.media_type === 'image' ? previewQuantity.value : 1
+  if (!specs || !specs.some(spec => spec.count === quantity && pricingDimensions.every(key => !selected[key] || String(spec[key]) === selected[key]))) return undefined
   const matching = priceRows.value.filter(item => activePricingDimensions.value.every(key => { const values = matchValues(item.match, key); return !values.length || values.includes(selected[key] ?? '') }))
   const rule = matching.length === 1 ? matching[0] : undefined
   if (!rule?.sale_price || rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return undefined
-  const quantity = props.product.media_type === 'image' ? previewQuantity.value : 1
   if (!Number.isInteger(quantity) || quantity < props.product.capabilities.count.min || quantity > props.product.capabilities.count.max) return undefined
   return { unit: rule.sale_price.amount, quantity, total: multiplyDecimalText(rule.sale_price.amount, quantity) }
 })
