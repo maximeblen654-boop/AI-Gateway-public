@@ -23,10 +23,11 @@ func http2KeepAliveTestPoolSettings() poolSettings {
 	}
 }
 
-// requireHTTP2Configured 断言标准库 HTTP/2 已显式挂到 http.Transport 上。
+// requireHTTP2Configured 断言 HTTP/2 已显式挂到 http.Transport 上。
 func requireHTTP2Configured(t *testing.T, tr *http.Transport, msg string) {
 	t.Helper()
-	require.NotNil(t, tr.HTTP2, msg)
+	require.NotNil(t, tr.Protocols, msg)
+	require.True(t, tr.Protocols.HTTP2(), msg)
 }
 
 // 长流 / OpenAI 上游改走 HTTP/2 后，池化连接被代理/NAT 静默掐断会成为“死连接”：
@@ -35,16 +36,24 @@ func requireHTTP2Configured(t *testing.T, tr *http.Transport, msg string) {
 // 必须显式启用主动 PING 探测，让死连接被提前剔除，而不是只靠 ResponseHeaderTimeout
 // 事后兜底。
 func TestEnableHTTP2KeepAlive_EnablesPingHealthCheck(t *testing.T) {
-	tr := &http.Transport{}
-
-	h2 := enableHTTP2KeepAlive(tr)
-	require.NotNil(t, h2, "必须返回已配置的 *http.HTTP2Config")
-
-	require.Positive(t, h2.SendPingTimeout, "必须启用空闲 PING 探测以剔除死连接")
-	require.Equal(t, longStreamHTTP2ReadIdleTimeout, h2.SendPingTimeout)
-	require.Equal(t, longStreamHTTP2PingTimeout, h2.PingTimeout, "PING 无响应必须有超时判定")
-	require.Same(t, h2, tr.HTTP2)
-	requireHTTP2Configured(t, tr, "http2 必须已挂到底层 http.Transport 上")
+	for _, tc := range []struct {
+		mode            string
+		readIdleTimeout time.Duration
+		pingTimeout     time.Duration
+	}{
+		{upstreamProtocolModeOpenAIH2, openAIHTTP2ReadIdleTimeout, openAIHTTP2PingTimeout},
+		{upstreamProtocolModeLongStreamH2, longStreamHTTP2ReadIdleTimeout, longStreamHTTP2PingTimeout},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			tr := &http.Transport{}
+			h2, err := enableHTTP2KeepAlive(tr, tc.mode)
+			require.NoError(t, err)
+			require.NotNil(t, h2, "必须返回已配置的 HTTP/2 transport")
+			require.Equal(t, tc.readIdleTimeout, h2.ReadIdleTimeout)
+			require.Equal(t, tc.pingTimeout, h2.PingTimeout, "各模式应使用独立的 PING 应答期限")
+			requireHTTP2Configured(t, tr, "http2 必须已挂到底层 http.Transport 上")
+		})
+	}
 }
 
 // long_stream_h2 模式构建的 Transport 必须带上 H2 PING 健康探测，从源头剔除死连接。
@@ -55,18 +64,20 @@ func TestBuildUpstreamTransport_LongStreamH2_EnablesPingHealthCheck(t *testing.T
 	requireHTTP2Configured(t, tr, "long_stream_h2 必须显式配置 http2 以启用 SendPingTimeout")
 }
 
-// 非 H2 模式（default/h1）不应因本次改动被误配置：default 走 Go 自动 H2（惰性配置，
-// 构建时 Protocols/TLSNextProto 仍为空），h1 模式显式禁用 H2。避免波及 Claude/Gemini 热路径。
-func TestBuildUpstreamTransport_NonLongStreamH2_NotEagerlyConfigured(t *testing.T) {
-	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, upstreamProtocolModeDefault)
-	require.NoError(t, err)
-	require.Nil(t, tr.Protocols, "default 模式不应在构建期主动配置 http2 keepalive")
-	require.Nil(t, tr.TLSNextProto["h2"], "default 模式不应在构建期主动配置 http2 keepalive")
+// 默认、Grok 和显式 H1 模式不应主动启用 HTTP/2 保活，避免影响其他平台的传输策略。
+func TestBuildUpstreamTransport_NonHTTP2_NotEagerlyConfigured(t *testing.T) {
+	for _, mode := range []string{upstreamProtocolModeDefault, upstreamProtocolModeGrok, upstreamProtocolModeOpenAIH1, upstreamProtocolModeOpenAIH1Fallback} {
+		t.Run(mode, func(t *testing.T) {
+			tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, mode)
+			require.NoError(t, err)
+			require.Nil(t, tr.Protocols, "非 H2 模式不应主动配置 http2 keepalive")
+			require.Nil(t, tr.TLSNextProto["h2"], "非 H2 模式不应主动配置 http2 keepalive")
+		})
+	}
 }
 
-// long_stream_h2 模式构建的 Transport 必须真正以 HTTP/2 与上游通信，PING 健康探测才有载体：
-// 自定义 DialContext 下 Go 不会自动启用 H2，全靠 enableHTTP2KeepAlive 的显式配置。
-func TestBuildUpstreamTransport_LongStreamH2_NegotiatesHTTP2(t *testing.T) {
+// 使用同时支持 H1/H2 的 TLS 上游核对实际协议，确保保活配置不会改变其他模式的协商行为。
+func TestBuildUpstreamTransport_NegotiatesExpectedProtocol(t *testing.T) {
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -92,13 +103,16 @@ func TestBuildUpstreamTransport_LongStreamH2_NegotiatesHTTP2(t *testing.T) {
 
 // 死连接在经 HTTP 代理（CONNECT 隧道）时最高发，这是带 proxy 账号的真实生产路径：
 // 显式 http2 配置须与 Transport.Proxy 同时正确生效，不能相互干扰。
-func TestBuildUpstreamTransport_LongStreamH2_WithHTTPProxy_EnablesKeepAlive(t *testing.T) {
+func TestBuildUpstreamTransport_HTTP2_WithHTTPProxy_EnablesKeepAlive(t *testing.T) {
 	proxyURL, err := url.Parse("http://127.0.0.1:8080")
 	require.NoError(t, err)
-
-	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), proxyURL, upstreamProtocolModeLongStreamH2)
-	require.NoError(t, err)
-	require.True(t, tr.ForceAttemptHTTP2)
-	requireHTTP2Configured(t, tr, "经代理的 long_stream_h2 也必须启用 http2 keepalive")
-	require.NotNil(t, tr.Proxy, "HTTP 代理仍须通过 Transport.Proxy 生效")
+	for _, mode := range []string{upstreamProtocolModeOpenAIH2, upstreamProtocolModeLongStreamH2} {
+		t.Run(mode, func(t *testing.T) {
+			tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), proxyURL, mode)
+			require.NoError(t, err)
+			require.True(t, tr.ForceAttemptHTTP2)
+			requireHTTP2Configured(t, tr, "经代理的 H2 模式也必须启用 http2 keepalive")
+			require.NotNil(t, tr.Proxy, "HTTP 代理仍须通过 Transport.Proxy 生效")
+		})
+	}
 }

@@ -201,14 +201,14 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 
 	if usageBillingPositive(cmd, "key_quota") {
 		exhausted, err := incrementUsageBillingAPIKeyQuota(ctx, tx, cmd.APIKeyID, usageBillingMoney(cmd, "key_quota"))
-		if err != nil {
+		if err != nil && !errors.Is(err, service.ErrAPIKeyNotFound) {
 			return err
 		}
 		result.APIKeyQuotaExhausted = exhausted
 	}
 
 	if usageBillingPositive(cmd, "key_rate") {
-		if err := incrementUsageBillingAPIKeyRateLimit(ctx, tx, cmd.APIKeyID, usageBillingMoney(cmd, "key_rate")); err != nil {
+		if err := incrementUsageBillingAPIKeyRateLimit(ctx, tx, cmd.APIKeyID, usageBillingMoney(cmd, "key_rate")); err != nil && !errors.Is(err, service.ErrAPIKeyNotFound) {
 			return err
 		}
 	}
