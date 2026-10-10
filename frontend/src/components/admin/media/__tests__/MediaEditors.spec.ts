@@ -11,6 +11,25 @@ function freeze<T extends object>(value: T): T {
   return Object.freeze(value)
 }
 describe('media editors follow one-way props', () => {
+  it('does not generate a price row for the denied 2K high combination', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.resolutions = ['1K', '2K']
+    product.capabilities.qualities = ['standard', 'high']
+    product.capabilities.combination_rules = [{ deny: { resolution: ['2K'], quality: ['high'] } }]
+    product.pricing_rules = []
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
+    await wrapper.setProps({ product: wrapper.emitted('update:product')!.at(-1)![0] as Product })
+    await wrapper.get('[data-test="pricing-dimension-quality"]').setValue(true)
+    const latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.pricing_rules.map(rule => rule.match)).toEqual([
+      { resolution: ['1K'], quality: ['standard'] },
+      { resolution: ['1K'], quality: ['high'] },
+      { resolution: ['2K'], quality: ['standard'] }
+    ])
+    expect(latest.pricing_rules.every(rule => rule.sale_price === null)).toBe(true)
+    wrapper.unmount()
+  })
   it('emits nested product changes without mutating any incoming product field', async () => {
     const original = freeze(copy(imageProduct))
     const wrapper = mount(MediaProductEditor, { props: { product: original, mediaTypes: ['image', 'video'], disabled: false } })
@@ -38,7 +57,7 @@ describe('media editors follow one-way props', () => {
     await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
     let latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
     expect(latest.pricing_rules).toHaveLength(2)
-    expect(latest.pricing_rules.every(rule => !rule.match.count && rule.sale_price === null)).toBe(true)
+    expect(latest.pricing_rules.every(rule => !rule.match.count && rule.sale_price?.amount === '0.18')).toBe(true)
     await wrapper.setProps({ product: latest })
     await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(true)
     latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
@@ -100,5 +119,15 @@ describe('media editors follow one-way props', () => {
     await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(false)
     expect((wrapper.emitted('update:product')!.at(-1)![0] as Product).pricing_rules).toEqual([{ match: {}, sale_price: null }])
     confirm.mockRestore(); wrapper.unmount()
+  })
+  it('keeps legacy rule values when a capability list is empty', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.resolutions = []
+    product.pricing_rules = [{ match: { resolution: ['1K'] }, sale_price: { amount: '0.20', currency: 'CNY', billing_mode: 'per_request' } }]
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    wrapper.findAllComponents(MediaTokensField)[0]!.vm.$emit('update:modelValue', [])
+    const latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.pricing_rules).toEqual([{ match: { resolution: ['1K'] }, sale_price: { amount: '0.20', currency: 'CNY', billing_mode: 'per_request' } }])
+    wrapper.unmount()
   })
 })

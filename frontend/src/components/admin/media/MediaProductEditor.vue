@@ -103,23 +103,23 @@ import { computed, reactive, ref, watch } from 'vue'
 import type { Product } from '@/api/admin/mediaWorkbench'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
+import { allowedSpecs, buildPricingRules, dimensionsFor, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const numeric = (event: Event) => Number(text(event))
-type PricingDimensionKey = 'resolution' | 'aspect_ratio' | 'quality' | 'duration_seconds'
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const durationPresets = ['5', '10', '15']
 const qualityPresets = ['standard', 'high', 'hd', 'ultra']
 const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
-const pricingDimensionDefinitions: { key: PricingDimensionKey; label: string }[] = [
+const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = [
   { key: 'resolution', label: '分辨率' },
   { key: 'aspect_ratio', label: '比例' },
   { key: 'quality', label: '画质' },
   { key: 'duration_seconds', label: '时长' }
 ]
 
-function valuesFor(product: Product, key: PricingDimensionKey): (string | number)[] {
+function valuesFor(product: Product, key: PricingDimension): (string | number)[] {
   const capability = key === 'resolution' ? product.capabilities.resolutions
     : key === 'aspect_ratio' ? product.capabilities.aspect_ratios
       : key === 'quality' ? product.capabilities.qualities
@@ -133,55 +133,44 @@ function valuesFor(product: Product, key: PricingDimensionKey): (string | number
   }
   return [...new Set(result.map(String))]
 }
-function dimensionValues(key: PricingDimensionKey): string[] { return valuesFor(props.product, key).map(String) }
-function matchValues(match: Product['pricing_rules'][number]['match'], key: PricingDimensionKey): string[] {
+function dimensionValues(key: PricingDimension): string[] { return valuesFor(props.product, key).map(String) }
+function matchValues(match: Product['pricing_rules'][number]['match'], key: PricingDimension): string[] {
   const values = match[key]
   return Array.isArray(values) ? values.map(String) : []
 }
-const activePricingDimensions = computed<PricingDimensionKey[]>(() => pricingDimensionDefinitions
-  .filter(({ key }) => (props.product.pricing_rules ?? []).some(rule => matchValues(rule.match, key).length > 0))
-  .map(({ key }) => key))
-
-function cartesian(values: string[][]): string[][] {
-  return values.reduce<string[][]>((rows, current) => rows.flatMap(row => current.map(value => [...row, value])), [[]])
-}
-function pricingMatch(key: PricingDimensionKey, value: string): Product['pricing_rules'][number]['match'] {
-  return key === 'resolution' ? { resolution: [value] }
-    : key === 'aspect_ratio' ? { aspect_ratio: [value] }
-      : key === 'quality' ? { quality: [value] }
-        : { duration_seconds: [Number(value)] }
-}
-function buildPricingRules(product: Product, dimensions: PricingDimensionKey[]): Product['pricing_rules'] {
-  const oldRules = product.pricing_rules ?? []
-  if (!dimensions.length) {
-    return [{ match: {}, sale_price: pricesDiffer(oldRules) ? null : oldRules[0]?.sale_price ?? null }]
+function sellableSpecs(product: Product) {
+  const capabilities = {
+    ...product.capabilities,
+    resolutions: product.capabilities.resolutions.length ? product.capabilities.resolutions : valuesFor(product, 'resolution').map(String),
+    aspect_ratios: product.capabilities.aspect_ratios.length ? product.capabilities.aspect_ratios : valuesFor(product, 'aspect_ratio').map(String),
+    qualities: product.capabilities.qualities.length ? product.capabilities.qualities : valuesFor(product, 'quality').map(String),
+    durations_seconds: product.capabilities.durations_seconds.length ? product.capabilities.durations_seconds : valuesFor(product, 'duration_seconds').map(Number)
   }
-  const combinations = cartesian(dimensions.map(key => valuesFor(product, key).map(String))).filter(row => row.length === dimensions.length)
-  return combinations.map(row => {
-    const match = dimensions.reduce<Product['pricing_rules'][number]['match']>((result, key, index) => Object.assign(result, pricingMatch(key, row[index]!)), {})
-    const existing = oldRules.filter(rule => dimensions.every((key, index) => {
-      const values = matchValues(rule.match, key)
-      return values.length === 1 && values[0] === row[index]
-    }))
-    return { match, sale_price: pricesDiffer(existing) ? null : existing[0]?.sale_price ?? null }
-  })
+  return allowedSpecs(capabilities)
 }
+const activePricingDimensions = computed<PricingDimension[]>(() => dimensionsFor(props.product))
 function pricesDiffer(rules: Product['pricing_rules']): boolean {
   const amounts = new Set(rules.map(rule => JSON.stringify(rule.sale_price)))
   return amounts.size > 1
 }
-function togglePricingDimension(key: PricingDimensionKey, event: Event) {
+function togglePricingDimension(key: PricingDimension, event: Event) {
   const checked = (event.target as HTMLInputElement).checked
   const current = activePricingDimensions.value
   if (checked) {
-    edit(next => { next.pricing_rules = buildPricingRules(next, [...current, key]) })
+    edit(next => {
+      const specs = sellableSpecs(next)
+      if (specs) next.pricing_rules = buildPricingRules(next, [...current, key], specs)
+    })
     return
   }
   if (pricesDiffer(props.product.pricing_rules ?? []) && typeof window !== 'undefined' && !window.confirm('取消此定价选项后，存在不同价格的合并行将清空为“待填写”，相同价格保留。是否继续？')) {
     (event.target as HTMLInputElement).checked = true
     return
   }
-  edit(next => { next.pricing_rules = buildPricingRules(next, current.filter(item => item !== key)) })
+  edit(next => {
+    const specs = sellableSpecs(next)
+    if (specs) next.pricing_rules = buildPricingRules(next, current.filter(item => item !== key), specs)
+  })
 }
 function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
   const labels = pricingDimensionDefinitions.flatMap(({ key, label }) => {
@@ -193,7 +182,7 @@ function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
 const filledPricingRows = computed(() => (props.product.pricing_rules ?? []).filter(rule => !!rule.sale_price?.amount).length)
 const priceRows = computed<Product['pricing_rules']>(() => props.product.pricing_rules?.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }])
 const unitLabel = computed(() => props.product.media_type === 'video' ? '条' : '张')
-const previewSelection = reactive<Partial<Record<PricingDimensionKey, string>>>({})
+const previewSelection = reactive<Partial<Record<PricingDimension, string>>>({})
 const previewQuantity = ref(1)
 const previewDimensions = computed(() => pricingDimensionDefinitions.filter(({ key }) => dimensionValues(key).length))
 const samePriceText = computed(() => {
@@ -212,14 +201,17 @@ function syncPreview(product: Product) {
   if (!Number.isInteger(previewQuantity.value) || previewQuantity.value < min || previewQuantity.value > max) previewQuantity.value = min
 }
 watch(() => props.product, syncPreview, { immediate: true })
-function previewValue(key: PricingDimensionKey): string { return previewSelection[key] ?? dimensionValues(key)[0] ?? '' }
-function setCapability(key: PricingDimensionKey, value: string[] | number[]) {
+function previewValue(key: PricingDimension): string { return previewSelection[key] ?? dimensionValues(key)[0] ?? '' }
+function setCapability(key: PricingDimension, value: string[] | number[]) {
   edit(next => {
     if (key === 'resolution') next.capabilities.resolutions = value.map(String)
     else if (key === 'aspect_ratio') next.capabilities.aspect_ratios = value.map(String)
     else if (key === 'quality') next.capabilities.qualities = value.map(String)
     else next.capabilities.durations_seconds = value.map(Number)
-    if (activePricingDimensions.value.length) next.pricing_rules = buildPricingRules(next, activePricingDimensions.value)
+    if (activePricingDimensions.value.length) {
+      const specs = sellableSpecs(next)
+      if (specs) next.pricing_rules = buildPricingRules(next, activePricingDimensions.value, specs)
+    }
   })
 }
 function multiplyDecimalText(left: string, right: number): string {

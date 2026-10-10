@@ -213,6 +213,42 @@ func TestCombinationRulesAndDeterministicMatchers(t *testing.T) {
 	}
 }
 
+func TestValidatorExcludesDeniedPricingCombination(t *testing.T) {
+	_, r := validatorFixture(t)
+	p := validProduct()
+	p.Capabilities.Resolutions = []string{"1K", "2K"}
+	p.Capabilities.Qualities = []string{"standard", "high"}
+	p.Capabilities.CombinationRules = []CombinationRule{{Deny: Match{Resolution: []string{"2K"}, Quality: []string{"high"}}}}
+	p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings,
+		SizeMapping{"2K", "1:1", "2048x2048"}, SizeMapping{"2K", "16:9", "2560x1440"})
+	p.PricingRules = []PricingRule{
+		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.10", Currency: "USD", BillingMode: "per_request"}},
+		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"high"}}, SalePrice: &Price{Amount: "0.20", Currency: "USD", BillingMode: "per_request"}},
+		{Match: Match{Resolution: []string{"2K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.30", Currency: "USD", BillingMode: "per_request"}},
+	}
+	v, offers := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
+	if !v.PublishReady || len(offers) != 3 {
+		t.Fatalf("denied combination changed validation: status=%s diagnostics=%+v offers=%d", v.Status, v.Diagnostics, len(offers))
+	}
+	for _, tc := range []struct {
+		resolution, quality string
+		want                  int
+	}{
+		{"1K", "standard", 1}, {"1K", "high", 1}, {"2K", "standard", 1}, {"2K", "high", 0},
+	} {
+		spec := Spec{Resolution: tc.resolution, Quality: tc.quality, AspectRatio: "1:1", Count: 1}
+		hits := 0
+		for _, offer := range offers {
+			if offer.Matches(spec) {
+				hits++
+			}
+		}
+		if hits != tc.want {
+			t.Fatalf("%s/%s matches=%d want=%d", tc.resolution, tc.quality, hits, tc.want)
+		}
+	}
+}
+
 func TestStaleDependenciesAndPublishedRuntimeGates(t *testing.T) {
 	s, r := validatorFixture(t)
 	ctx := context.Background()
