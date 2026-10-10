@@ -34,7 +34,8 @@ func studioResultN(t *testing.T, count int) []byte {
 
 func enableStudioNativeMulti(t *testing.T, r *StudioImageRuntime) StudioImageQuote {
 	t.Helper()
-	ma := r.Media.(*studioMediaFixture)
+	ma, ok := r.Media.(*studioMediaFixture)
+	require.True(t, ok)
 	admin := mediaworkbench.NewService(ma)
 	product := ma.a.Config.Draft.Products[0]
 	product.Capabilities.Count = mediaworkbench.Range{Min: 1, Max: 5}
@@ -51,7 +52,9 @@ func enableStudioNativeMulti(t *testing.T, r *StudioImageRuntime) StudioImageQuo
 	require.NoError(t, err)
 	key := &APIKey{ID: 2, UserID: 1, Quota: 100, RateLimit5h: 100, GroupID: new(int64), Group: &Group{ID: 3, AllowImageGeneration: true}}
 	*key.GroupID = 3
-	account := r.Core.accountRepo.(*studioAccountFixture).a
+	accountFixture, ok := r.Core.accountRepo.(*studioAccountFixture)
+	require.True(t, ok)
+	account := accountFixture.a
 	q := StudioImageQuote{Owner: StudioImageOwner{1, 2, 3}, Binding: binding, BaseURL: account.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(account), CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), KeyQuotaEnabled: true, KeyRateEnabled: true, AccountQuotaEnabled: account.HasAnyQuotaLimit()}
 	q.Accounting, err = ResolveStudioImageAccountCost(account, binding, studioAccountPrice("0.35"), q.CreatedAt)
 	require.NoError(t, err)
@@ -77,8 +80,10 @@ func TestStudioImageNativeMultiBatchesAndSettlesDeliveredQuantity(t *testing.T) 
 	r.network = func(_ context.Context, _ *gin.Context, _ *Account, body []byte, _ string) ([]byte, string, error) {
 		var fields map[string]any
 		require.NoError(t, json.Unmarshal(body, &fields))
-		counts = append(counts, int(fields["n"].(float64)))
-		return studioResultN(t, int(fields["n"].(float64))), "unit", nil
+		n, ok := fields["n"].(float64)
+		require.True(t, ok)
+		counts = append(counts, int(n))
+		return studioResultN(t, int(n)), "unit", nil
 	}
 	receipt, err := r.Dispatch(context.Background(), nil, q, "multi-native", "one prompt", nil, key)
 	require.NoError(t, err)
@@ -115,7 +120,9 @@ func TestStudioImageMultiKnownFailureChargesDeliveredOnly(t *testing.T) {
 		}
 		var fields map[string]any
 		require.NoError(t, json.Unmarshal(body, &fields))
-		return studioResultN(t, int(fields["n"].(float64))), "unit", nil
+		n, ok := fields["n"].(float64)
+		require.True(t, ok)
+		return studioResultN(t, int(n)), "unit", nil
 	}
 	receipt, err := r.Dispatch(context.Background(), nil, q, "multi-partial", "one prompt", nil, key)
 	require.NoError(t, err)
@@ -146,7 +153,9 @@ func TestStudioImageMultiUnknownOutcomeNeverReplaysChild(t *testing.T) {
 		}
 		var fields map[string]any
 		require.NoError(t, json.Unmarshal(body, &fields))
-		return studioResultN(t, int(fields["n"].(float64))), "unit", nil
+		n, ok := fields["n"].(float64)
+		require.True(t, ok)
+		return studioResultN(t, int(n)), "unit", nil
 	}
 	receipt, err := r.Dispatch(context.Background(), nil, q, "multi-unknown", "one prompt", nil, key)
 	require.ErrorIs(t, err, ErrStudioImageUnknown)
