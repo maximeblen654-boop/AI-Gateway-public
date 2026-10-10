@@ -232,7 +232,7 @@ func TestValidatorExcludesDeniedPricingCombination(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		resolution, quality string
-		want                  int
+		want                int
 	}{
 		{"1K", "standard", 1}, {"1K", "high", 1}, {"2K", "standard", 1}, {"2K", "high", 0},
 	} {
