@@ -41,3 +41,25 @@ func TestStudioSeedanceUsesNativeTaskLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"/api/v3/v1/videos/legacy-task"}, paths, "a Seedance-capable Account must not hijack generic video bindings")
 }
+
+func TestStudioSeedanceMaterializesContentFromRawStatus(t *testing.T) {
+	up := studioNativeHTTP{call: func(req *http.Request, id int64) (*http.Response, error) {
+		require.Equal(t, int64(9), id)
+		if req.URL.Host == "cdn.example" {
+			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{
+				"Content-Type": {"video/mp4"},
+			}, Body: io.NopCloser(strings.NewReader("video-bytes"))}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"task-seed","status":"succeeded","content":{"video_url":"https://cdn.example/video.mp4"}}`))}, nil
+	}}
+	core := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: up}
+	runtime := &StudioVideoRuntime{Core: core}
+	a := &Account{ID: 9, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{
+		"api_key": "synthetic", "base_url": "https://ark.example/api/v3", "openai_capabilities": []string{"seedance"},
+	}}
+	ctx := context.WithValue(context.Background(), videoAdapterContextKey{}, "seedance_video")
+	data, contentType, err := runtime.requestHTTP(ctx, a, http.MethodGet, "/videos/task-seed/content", nil)
+	require.NoError(t, err)
+	require.Equal(t, "video/mp4", contentType)
+	require.Equal(t, "video-bytes", string(data))
+}

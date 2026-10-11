@@ -133,7 +133,16 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 		if a.Config != nil {
 			if b, ok := a.Config.AdapterBindings[mediaType]; ok {
 				if b.Kind == "unbound_"+mediaType && nativeAdapterKind(a, mediaType) != "" {
-					continue
+					// An old draft may have recorded the temporary unbound marker
+					// before the Account's native adapter became available. Resolve
+					// that marker during the normal save/read path instead of
+					// dropping the media type from the returned binding map.
+					kind := nativeAdapterKind(a, mediaType)
+					d, known := Descriptor(kind)
+					if known {
+						out[mediaType] = AdapterBinding{Kind: d.Kind, Revision: d.Revision, Auth: d.Auth, TaskFlow: d.TaskFlow}
+						continue
+					}
 				}
 				if d, known := Descriptor(b.Kind); known {
 					b.Revision = d.Revision
@@ -160,6 +169,14 @@ func nativeAdapterKind(a *Account, mediaType string) string {
 	}
 	if mediaType == "video" && a.Platform == "openai" && a.Type == "apikey" && slices.Contains(a.EndpointCapabilities, "seedance") {
 		return "seedance_video"
+	}
+	if mediaType == "video" && a.Platform == "openai" && a.Type == "apikey" {
+		// The existing OpenAI-compatible video contract is selected by the
+		// Account's native platform/type. It is intentionally model-agnostic:
+		// the catalog and frozen upstream mapping still decide the model and
+		// accepted values, while the product draft must not require an operator
+		// to copy a wire profile from a prior Studio product.
+		return "laoli_video"
 	}
 	if mediaType == "image" {
 		switch a.Platform {
@@ -207,6 +224,19 @@ func inheritNativeProduct(a *Account, p *Product) {
 	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "seedance_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "seedance"
+	}
+	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "laoli_video" && p.AdapterConfig.WireProfile == "" {
+		// Keep the immutable legacy catalog contract for existing model IDs.
+		// New discovered IDs use the same compatible transport with a profile
+		// derived from their declared reference domain.
+		if legacy, ok := videoplan.Lookup(p.SiteModel); ok && legacy.Upstream == p.UpstreamModel {
+			return
+		}
+		profile := "images"
+		if p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0 {
+			profile = "inline_multimedia"
+		}
+		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, profile
 	}
 	if p.MediaType != "image" || p.AdapterConfig.ModelFamily != "" || p.AdapterConfig.WireProfile != "" {
 		return

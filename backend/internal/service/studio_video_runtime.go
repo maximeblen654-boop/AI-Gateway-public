@@ -512,6 +512,7 @@ func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner
 
 type videoIdempotencyContextKey struct{}
 type videoAdapterContextKey struct{}
+type seedanceRawStatusContextKey struct{}
 
 func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
 	if adapter, _ := ctx.Value(videoAdapterContextKey{}).(string); adapter == "seedance_video" {
@@ -582,7 +583,12 @@ func (r *StudioVideoRuntime) requestSeedance(ctx context.Context, a *Account, me
 		endpoint = SeedanceEndpointDelete
 	}
 	if strings.HasSuffix(path, "/content") {
-		status, _, err := r.requestSeedance(ctx, a, http.MethodGet, "/contents/generations/tasks/"+trimmed, nil)
+		// Content retrieval needs the native task payload, including its
+		// provider URL. The normal status path intentionally normalizes the
+		// response to id/status for polling, so use a scoped raw-status marker
+		// rather than trying to reconstruct the URL from that summary.
+		rawCtx := context.WithValue(ctx, seedanceRawStatusContextKey{}, true)
+		status, _, err := r.requestSeedance(rawCtx, a, http.MethodGet, "/contents/generations/tasks/"+trimmed, nil)
 		if err != nil {
 			return nil, "", err
 		}
@@ -612,6 +618,9 @@ func (r *StudioVideoRuntime) requestSeedance(ctx context.Context, a *Account, me
 		return nil, "", err
 	}
 	if endpoint == SeedanceEndpointStatus {
+		if raw, _ := ctx.Value(seedanceRawStatusContextKey{}).(bool); raw {
+			return data, "application/json", nil
+		}
 		status := strings.ToLower(firstNonEmptyString(gjson.GetBytes(data, "status").String(), gjson.GetBytes(data, "data.status").String()))
 		switch status {
 		case "succeeded", "completed", "success":

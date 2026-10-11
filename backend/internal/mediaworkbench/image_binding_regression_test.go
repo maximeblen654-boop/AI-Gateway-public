@@ -40,6 +40,8 @@ func TestImageBindingsForNewAndExistingAccounts(t *testing.T) {
 
 	t.Run("legacy unbound image is refreshed before save validation", func(t *testing.T) {
 		s, r := fixture()
+		r.a.BaseURL = "https://supplier.example/v1"
+		r.a.Catalog.Models = []string{"gpt-image-2"}
 		_, err := s.Initialize(context.Background(), 7, []string{"image"})
 		must(t, err)
 		// This is the placeholder persisted by an older configuration before a
