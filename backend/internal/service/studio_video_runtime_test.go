@@ -79,8 +79,6 @@ func videoRuntimeFixture(t *testing.T) (*StudioVideoRuntime, string, StudioVideo
 	svc := mediaworkbench.NewService(ma)
 	_, e := svc.Initialize(ctx, 7, []string{"video"})
 	require.NoError(t, e)
-	_, e = svc.BindVideoAdapter(ctx, 7, ma.a.Config.RecordVersion, "laoli_video")
-	require.NoError(t, e)
 	p := mediaworkbench.Product{ProductID: "video", MediaType: "video", SiteModel: "3.0", UpstreamModel: model.Upstream, Enabled: true,
 		Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5}, Count: mediaworkbench.Range{Min: 1, Max: 1}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 1}, TotalMax: 1}},
 		PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
