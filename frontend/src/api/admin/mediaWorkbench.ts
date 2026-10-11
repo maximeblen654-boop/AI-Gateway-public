@@ -30,7 +30,9 @@ export interface Validation {
   draft_revision: string; status: string; publish_ready: boolean; checked_at: string
   diagnostics: Diagnostic[]; previews?: unknown; adapter_registry_revision?: string
 }
+export interface AdapterBinding { kind: string; revision: string; auth: string; task_flow: string }
 export interface MediaConfig {
+  adapter_bindings?: Record<string, AdapterBinding>
   record_version: number; media_types: string[]
   sales: { enabled: boolean }
   draft: { revision: string; updated_at: string; products: Product[] }

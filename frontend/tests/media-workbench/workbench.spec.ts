@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 const themes = ['yellow', 'blue', 'pink', 'green', 'lavender']
 const viewports = [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]
 for (const width of [1440, 390]) {
-  test(`account navigation ${width}: grouping, search, filters and add selection`, async ({ page }, testInfo) => {
+  test(`account navigation ${width}: grouping, search, filters and dirty navigation`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
     await page.goto('/tests/media-workbench/index.html?scenario=NAVIGATION&mode=dark&theme=blue')
@@ -31,21 +31,13 @@ for (const width of [1440, 390]) {
     await expect(page.locator('.mw-supplier')).toHaveCount(46)
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
     await page.screenshot({ path: testInfo.outputPath('account-navigation.png'), fullPage: true })
-    await page.getByTestId('add-supplier').click()
-    await page.getByTestId('add-account-search').fill('#15')
-    await page.getByTestId('add-account-select').selectOption('15')
-    await expect(page.getByTestId('initialize')).toBeEnabled()
-    await page.getByTestId('add-account-search').fill('账号 25')
-    await expect(page.getByTestId('initialize')).toBeDisabled()
-    await page.getByTestId('add-account-select').selectOption('25')
-    await expect(page.getByTestId('initialize')).toBeEnabled()
-    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click()
     if (width === 1440) {
-      await page.getByTestId('source-source-1.example.invalid').locator('summary').click()
+      await page.getByTestId('account-search').fill('#5')
       await page.getByTestId('supplier-5').click()
+      await page.getByTestId('model-image-native-1').click()
+      await page.getByTestId('wizard-step-5').click()
       await page.getByTestId('display-name').fill('保留账号草稿')
-      await page.getByTestId('account-search').fill('#6')
-      await page.getByTestId('supplier-6').click()
+      await page.getByRole('button', { name: '← 返回模型列表' }).click()
       await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
       await page.keyboard.press('Escape')
       await expect(page.getByTestId('display-name')).toHaveValue('保留账号草稿')
@@ -55,18 +47,21 @@ for (const width of [1440, 390]) {
 async function openEditor(page: Page, query: string) {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
   await page.goto(`/tests/media-workbench/index.html?${query}`)
+  await page.getByTestId('account-search').fill('#77')
   await page.getByTestId('supplier-77').click()
-  if (page.viewportSize()!.width < 768) await page.getByTestId('model-image-native-1').click()
+  await page.getByTestId('model-image-native-1').click()
+  await page.getByTestId('wizard-step-5').click()
   await expect(page.getByTestId('display-name')).toBeVisible()
 }
 for (const theme of themes) for (const mode of ['light', 'dark']) for (const viewport of viewports) {
   test(`${theme} ${mode} ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     await page.setViewportSize(viewport); await openEditor(page, `theme=${theme}&mode=${mode}`)
-    await expect(page.getByTestId('publish')).toBeEnabled()
+    await expect(page.getByTestId('save')).toBeEnabled()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
     expect(overflow).toBe(false)
     if (viewport.width < 768) {
+      await page.getByTestId('save').scrollIntoViewIfNeeded()
       const save = await page.getByTestId('save').boundingBox()
       expect(save!.y + save!.height).toBeLessThanOrEqual(viewport.height)
       await expect(page.getByTestId('supplier-77')).toBeHidden()
@@ -75,7 +70,7 @@ for (const theme of themes) for (const mode of ['light', 'dark']) for (const vie
     const colors = await page.evaluate(() => ({ token: getComputedStyle(document.documentElement).getPropertyValue('--site-primary-700'), surface: getComputedStyle(document.querySelector('.media-workbench')!).getPropertyValue('--mw-surface') }))
     expect(colors.token.trim()).not.toBe(''); expect(colors.surface.trim()).not.toBe('')
     await page.getByTestId('display-name').fill('主题切换保留草稿')
-    await expect(page.getByTestId('publish')).toBeDisabled()
+    await expect(page.getByTestId('unsaved')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('editor.png'), fullPage: true })
     expect(errors).toEqual([])
   })
@@ -100,7 +95,7 @@ for (const scenario of ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'PAUSED', 
     if (scenario === 'DELETED' || scenario === 'STALE') {
       await page.getByTestId('save').click(); await expect(page.getByTestId('save')).toBeDisabled()
       await expect(page.getByTestId('banner')).toBeVisible()
-    } else if (scenario !== 'PAUSED') await expect(page.getByTestId('publish')).toBeDisabled()
+    } else if (scenario !== 'PAUSED') await expect(page.locator('.mw-validation')).toBeVisible()
     if (scenario === 'NEEDS_DEVELOPMENT') await expect(page.getByTestId('copy-codex')).toBeVisible()
     else await expect(page.getByTestId('copy-codex')).toHaveCount(0)
     await page.screenshot({ path: testInfo.outputPath('state.png'), fullPage: true })
@@ -108,6 +103,7 @@ for (const scenario of ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'PAUSED', 
 }
 test('native Publish dialog traps focus; Escape cancels without publishing', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 }); await openEditor(page, 'theme=lavender&mode=dark')
+  await page.getByTestId('return-models').click()
   await page.getByTestId('publish').click(); const dialog = page.getByRole('dialog', { name: '发布这次修改？' }); await expect(dialog).toBeVisible()
   for (let index = 0; index < 8; index++) { await page.keyboard.press('Tab'); expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true) }
   await page.screenshot({ path: testInfo.outputPath('publish-dialog.png'), fullPage: true })
@@ -119,7 +115,8 @@ for (const [state, label] of [
 ]) {
   test(`Phase-2A effective state ${state}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 }); await openEditor(page, `theme=green&scenario=${state}`)
-    await expect(page.locator('.mw-models')).toContainText(label!)
+    await page.getByTestId('return-models').click()
+    await expect(page.getByTestId('model-page')).toContainText(label!)
     await expect(page.locator('.media-workbench')).not.toContainText(state!)
   })
 }
@@ -130,6 +127,7 @@ test('mobile size mapping diagnostic locates an editable mapping and save preser
   await expect(page.getByTestId('mapping-resolution-0')).toBeFocused()
   await expect(page.getByTestId('mapping-size-0')).toHaveValue('2048x2048')
   await page.getByTestId('mapping-size-0').fill('1536x1536')
+  await page.getByTestId('wizard-step-5').click()
   await page.getByTestId('save').click()
   await expect(page.getByTestId('mapping-size-0')).toHaveValue('1536x1536')
   await expect(page.getByTestId('unsaved')).toHaveCount(0)

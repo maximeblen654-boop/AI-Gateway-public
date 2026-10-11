@@ -106,6 +106,8 @@ describe('Media Workbench page flow', () => {
   it('shows separate save, publish, and sales actions with account-wide publish scope', async () => {
     await openEditor()
     expect(wrapper.get('[data-test="save"]').text()).toContain('保存草稿')
+    expect(wrapper.find('[data-test="publish"]').exists()).toBe(false)
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="publish"]').text()).toContain('发布配置')
     expect(wrapper.get('[data-test="sales"]').text()).toContain('暂停销售')
     await wrapper.get('[data-test="publish"]').trigger('click'); await flushPromises()
@@ -114,12 +116,35 @@ describe('Media Workbench page flow', () => {
     expect(dialog.text()).toContain('不会自动开启销售')
   })
 
+  it('appends image and video drafts before the first save without discarding or initializing early', async () => {
+    const nil = supplier(); nil.media_workbench_v1 = null; nil.effective_state = 'NOT_INITIALIZED'; nil.effective_sales = false
+    api.detail.mockResolvedValue(nil)
+    await mountWorkbench(); await selectAccount()
+    await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="add-product-image"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="display-name"]').setValue('保留的图片草稿')
+    const append = wrapper.findAll('button').find(button => button.text() === '添加视频产品后一起保存')!
+    await append.trigger('click'); await flushPromises()
+    expect(wrapper.find('dialog[open]').exists()).toBe(false)
+    expect(api.initialize).not.toHaveBeenCalled()
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="display-name"]').setValue('视频草稿')
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    expect(api.saveDraft).toHaveBeenCalledWith(77, 0, [
+      expect.objectContaining({ media_type: 'image', display_name: '保留的图片草稿', capabilities: expect.objectContaining({ count: { min: 1, max: 10 } }) }),
+      expect.objectContaining({ media_type: 'video', display_name: '视频草稿', capabilities: expect.objectContaining({ count: { min: 1, max: 1 } }) })
+    ])
+  })
+
   it('lists only published products when confirming an account-wide sales change', async () => {
     const dto = supplier()
     dto.media_workbench_v1!.draft.products[0]!.display_name = '未发布草稿'
     dto.media_workbench_v1!.published!.products![0]!.display_name = '已发布产品'
     api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
     await openEditor()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="sales"]').trigger('click'); await flushPromises()
     const list = wrapper.get('[data-test="sales-products"]')
     expect(list.text()).toContain('已发布产品')
@@ -132,6 +157,7 @@ describe('Media Workbench page flow', () => {
     const dto = supplier(); dto.effective_state = state; dto.effective_sales = false; dto.media_workbench_v1!.sales.enabled = false
     api.detail.mockResolvedValue(dto); api.suppliers.mockResolvedValue([dto])
     await openEditor()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="sales-state"]').text()).toContain(label)
   })
 
@@ -160,6 +186,52 @@ describe('Media Workbench page flow', () => {
     expect(wrapper.find('dialog[open]').text()).toContain('有未保存修改')
     await wrapper.get('[data-test="discard-navigate"]').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="model-page"]').exists()).toBe(true)
+  })
+
+  it('requires a decision before changing products with unsaved edits', async () => {
+    const dto = supplier()
+    const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
+    second.product_id = 'canvas-2'; second.display_name = '第二商品'
+    dto.media_workbench_v1!.draft.products.push(second)
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="display-name"]').setValue('尚未保存')
+    await wrapper.get('[data-test="product-select"]').setValue('canvas-2'); await flushPromises()
+    expect(wrapper.get('dialog[open]').text()).toContain('有未保存修改')
+    expect(wrapper.get('[data-test="product-select"]').element).toHaveProperty('value', 'canvas-1')
+    expect(wrapper.get('[data-test="display-name"]').element).toHaveProperty('value', '尚未保存')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="discard-navigate"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="product-select"]').element).toHaveProperty('value', 'canvas-2')
+    expect(wrapper.get('[data-test="display-name"]').element).toHaveProperty('value', '第二商品')
+  })
+
+  it.each(['qualities', 'combination_rules'])('opens the target technical details itself for a %s diagnostic', async (field) => {
+    const dto = supplier(77, 'FAIL')
+    dto.media_workbench_v1!.validation.diagnostics[0]!.path = `draft.products[0].capabilities.${field}`
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="advanced-technical"]').attributes('open')).toBeDefined()
+    expect(wrapper.get(`[data-field="capabilities.${field}"]`).attributes('open')).toBeDefined()
+    expect(wrapper.get(`[data-field="capabilities.${field}"]`).element.contains(document.activeElement)).toBe(true)
+  })
+
+  it.each([
+    ['INVALID_REFERENCE_LIMIT', 100, 2],
+    ['VIDEO_REFERENCES_UNSUPPORTED', 4, 2],
+    ['INVALID_REFERENCE_LIMIT', 4, 1]
+  ] as const)('locates broad %s diagnostics using the actual reference error (%s)', async (code, max, step) => {
+    const dto = supplier(77, 'FAIL')
+    dto.media_workbench_v1!.draft.products[0]!.capabilities.references.image.max = max
+    Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, { code, path: 'capabilities', scope: 'canvas-1' })
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+    expect(wrapper.get(`[data-test="wizard-page-${step}"]`).isVisible()).toBe(true)
+    expect(wrapper.get(`[data-test="wizard-page-${step}"]`).element.contains(document.activeElement)).toBe(true)
   })
 
   it('allows route navigation after explicitly saving dirty changes', async () => {

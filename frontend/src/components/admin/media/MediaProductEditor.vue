@@ -1,16 +1,18 @@
 <template>
-  <fieldset :disabled="disabled" class="mw-product-fields">
-    <section data-field="model">
-      <h3 data-test="upstream-model-name">{{ product.upstream_model }}</h3>
-      <p class="mw-muted" data-test="internal-id">内部 ID: {{ product.site_model }}</p>
-      <label class="mw-field">展示名称<input :value="product.display_name" class="input" data-test="display-name" data-field="display_name" @input="edit(next => { next.display_name = text($event) })" /></label>
-      <label class="mw-field">业务用途<select :value="product.media_type" class="input" data-field="media_type" @change="edit(next => { next.media_type = text($event); next.capabilities.count = { min: 1, max: next.media_type === 'video' ? 1 : 10 } })"><option v-for="type in mediaTypes" :key="type" :value="type">{{ type === 'image' ? '图片' : '视频' }}</option></select></label>
-      <label><input :checked="product.enabled" type="checkbox" @change="edit(next => { next.enabled = ($event.target as HTMLInputElement).checked })" /> 本站启用（发布后生效）</label>
-      <details><summary>产品标识</summary>
-        <label class="mw-field">产品 ID<input :value="product.product_id" class="input" data-field="product_id" @input="setIdentity" /></label>
-        <label class="mw-field">本站模型 ID<input :value="product.site_model" class="input" data-field="site_model" @input="edit(next => { next.site_model = text($event) })" /></label>
-      </details>
-    </section>
+    <div class="mw-adapter-status" data-test="adapter-status">
+      <strong>{{ adapterStatus.title }}</strong><p class="mw-muted">{{ adapterStatus.description }}</p>
+      <p v-for="diagnostic in adapterDiagnostics" :key="diagnostic.code + diagnostic.path" class="mw-muted">{{ diagnostic.code }}：{{ diagnostic.message }} {{ diagnostic.action }}</p>
+    </div>
+  <fieldset ref="wizardElement" :disabled="disabled" class="mw-product-fields mw-wizard">
+    <nav class="mw-wizard-steps" aria-label="当前模型配置步骤">
+      <button v-for="(label, index) in stepLabels" :key="label" type="button" :data-test="`wizard-step-${index + 1}`" :aria-current="wizardStep === index + 1 ? 'step' : undefined" @click="goToStep(index + 1)"><span>{{ index + 1 }}</span><strong>{{ label }}</strong></button>
+    </nav>
+    <div ref="stepHeading" class="mw-wizard-heading" tabindex="-1">
+      <p class="mw-eyebrow">商品配置 · {{ wizardStep }} / 5</p><h3>{{ stepQuestions[wizardStep - 1] }}</h3>
+      <p class="mw-muted">{{ stepDescriptions[wizardStep - 1] }}</p>
+      <span class="mw-draft-state">{{ dirty ? '有未保存修改' : '正在查看草稿' }} · 切换步骤不会保存或发布</span>
+    </div>
+    <div v-show="wizardStep === 1" data-test="wizard-page-1">
     <section data-field="capabilities">
       <h3>规格</h3>
       <p class="mw-muted">按供应商实际能力填写，保存后由后台检查。</p>
@@ -25,95 +27,52 @@
             <button type="button" class="btn btn-secondary" data-test="apply-system-count" @click="edit(next => { next.capabilities.count = { min: 1, max: 10 } })">在草稿应用 1～10 张</button>
           </template>
         </div>
-        <template v-for="kind in referenceKinds" :key="kind.key">
-          <label class="mw-field">{{ kind.label }}下限<input :value="product.capabilities.references[kind.key].min" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].min = numeric($event) })" /></label>
-          <label class="mw-field">{{ kind.label }}上限<input :value="product.capabilities.references[kind.key].max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references[kind.key].max = numeric($event) })" /></label>
-        </template>
-        <label class="mw-field">参考素材合计上限<input :value="product.capabilities.references.total_max" class="input" type="number" step="1" @input="edit(next => { next.capabilities.references.total_max = numeric($event) })" /></label>
       </div>
-      <details><summary>可选画质</summary><MediaTokensField label="画质（仅填写已确认支持的值）" :presets="qualityPresets" placeholder="例如：standard, high" :model-value="product.capabilities.qualities" @update:model-value="setCapability('quality', $event)" /></details>
-      <details><summary>组合限制（可选）</summary>
-        <p class="mw-muted">只录入已确认不可用的组合；没有规则时保持为空。</p>
-        <div v-for="(rule, index) in product.capabilities.combination_rules" :key="index" class="mw-rule">
-          <p>禁止组合 {{ index + 1 }}</p><MediaMatchEditor :model-value="rule.deny" @update:model-value="updateCombination(index, $event)" />
-          <button type="button" class="btn btn-secondary" @click="removeCombination(index)">移除此限制</button>
-        </div>
-        <button type="button" class="btn btn-secondary" @click="edit(next => { next.capabilities.combination_rules.push({ deny: {} }) })">添加禁止组合</button>
-      </details>
+
     </section>
-    <section v-if="product.media_type === 'video'" data-field="adapter_config.wire_profile">
-      <h3>协议输入类型</h3>
-      <p class="mw-muted">仅选择受控适配器已实现的协议表达；不会开放任意请求模板。</p>
-      <label class="mw-field">素材协议<select :value="product.adapter_config.wire_profile ?? ''" class="input" data-test="wire-profile" @change="edit(next => { next.adapter_config.version = 1; next.adapter_config.wire_profile = text($event); delete next.adapter_config.model_family })">
-        <option value="">请选择</option><option value="images">内联图片</option><option value="inline_multimedia">内联图片/视频/音频</option><option value="references">Account 引用素材</option>
-      </select></label>
+
+    </div>
+    <section v-show="wizardStep === 2" data-field="capabilities.references" data-test="wizard-page-2">
+      <MediaReferenceEditor ref="referenceEditor" :model-value="product.capabilities.references" :media-type="product.media_type" @update:model-value="editPricing(next => { next.capabilities.references = $event })" />
     </section>
-    <section v-if="product.media_type === 'image'" data-field="adapter_config.model_family">
-      <h3>图片协议族</h3>
-      <p class="mw-muted">仅选择受控 JSON 图片适配器。</p>
-      <label class="mw-field">适配器族<select :value="product.adapter_config.model_family ?? ''" class="input" data-test="model-family" @change="edit(next => { next.adapter_config.version = 1; next.adapter_config.model_family = text($event); delete next.adapter_config.wire_profile })">
-        <option value="">请选择</option><option value="openai_json">OpenAI Images JSON</option>
-      </select></label>
-    </section>
-    <details v-if="product.media_type === 'image'" data-test="image-execution-advanced">
-      <summary>高级技术配置：图片接口单请求能力</summary>
-      <p class="mw-muted">由管理员依据已确认的 Account、模型和接口能力配置；这不是系统实测结果。未确认多图时保留单图，无需为购买多张修改接口能力。</p>
-    <section data-field="adapter_config.execution">
-      <h3>文生图单请求产出能力</h3>
-      <p class="mw-muted">只填写已经核实的 Account、模型和接口能力；未知或没有多图证据时保持单图，客户 1～10 张会按批次执行。客户购买数量不在这里配置。</p>
-      <div class="mw-field-grid">
-        <label class="mw-field">执行方式<select :value="product.adapter_config.execution?.mode ?? 'single'" class="input" data-test="image-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.execution!.provider })">
-          <option value="single">单图接口（未知能力也用此项）</option><option value="native_multi">已核实原生多图（使用 n）</option>
-        </select></label>
-        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" type="number" :min="product.adapter_config.execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.execution?.mode ?? 'single'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>这是上游单请求上限，不是客户一次购买数量。</small></label>
-      </div>
-    </section>
-    <section v-if="product.capabilities.references.image.max > 0" data-field="adapter_config.edit_execution">
-      <h3>参考图编辑单请求产出能力</h3>
-      <p class="mw-muted">这是参考图编辑接口的独立管理员配置；未填写时按单图执行，不会继承文生图多图能力。这里只记录已确认能力，不代表系统已对供应商实测。</p>
-      <div class="mw-field-grid">
-        <label class="mw-field">编辑执行方式<select :value="product.adapter_config.edit_execution?.mode ?? 'single'" class="input" data-test="image-edit-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.edit_execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.edit_execution!.provider })">
-          <option value="single">单图接口（默认）</option><option value="native_multi">已核实原生多图（使用 n）</option>
-        </select></label>
-        <label class="mw-field">编辑单请求最多输出图片数<input :value="product.adapter_config.edit_execution?.max_output_images ?? 1" class="input" data-test="image-edit-execution-max" type="number" :min="product.adapter_config.edit_execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.edit_execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.edit_execution?.mode ?? 'single'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>客户购买数量仍由商品规格控制；没有编辑能力配置时每次只提交一张。</small></label>
-      </div>
-    </section>
-    </details>
-    <section v-if="product.media_type === 'image'" data-field="adapter_config.size_mappings">
-      <details data-test="size-mappings">
-        <summary>供应商尺寸映射</summary>
-        <p class="mw-muted">填写本站分辨率、比例对应的供应商尺寸值。保存后由后台检查；不修改请求字段或连接设置。</p>
-        <div v-for="(mapping, index) in product.adapter_config.size_mappings" :key="index" class="mw-rule">
-          <div class="mw-field-grid">
-            <label class="mw-field">本站分辨率<input :value="mapping.resolution" class="input" :data-test="`mapping-resolution-${index}`" @input="edit(next => { next.adapter_config.size_mappings[index]!.resolution = text($event) })" /></label>
-            <label class="mw-field">本站比例<input :value="mapping.aspect_ratio" class="input" :data-test="`mapping-aspect-${index}`" @input="edit(next => { next.adapter_config.size_mappings[index]!.aspect_ratio = text($event) })" /></label>
-            <label class="mw-field">供应商尺寸值<input :value="mapping.wire_size" class="input" :data-test="`mapping-size-${index}`" @input="edit(next => { next.adapter_config.size_mappings[index]!.wire_size = text($event) })" /></label>
-          </div>
-          <button type="button" class="btn btn-secondary" :data-test="`remove-mapping-${index}`" @click="edit(next => { next.adapter_config.size_mappings.splice(index, 1) })">移除此映射</button>
-        </div>
-        <button type="button" class="btn btn-secondary" data-test="add-mapping" @click="edit(next => { next.adapter_config.size_mappings.push({ resolution: '', aspect_ratio: '', wire_size: '' }) })">添加尺寸映射</button>
-      </details>
-    </section>
-    <section data-field="pricing_rules">
-      <h3>哪些选项会改变单价？</h3>
+    <section v-show="wizardStep === 3" data-test="wizard-page-3">
+
       <p class="mw-muted">只为勾选的选项组合填写单{{ unitLabel }}价格。数量按单价 × 数量计算；视频时长只决定单条价格，不再乘秒数。</p>
       <div class="mw-pricing-dimensions" role="group" aria-label="会改变单价的规格">
-        <label v-for="dimension in pricingDimensionDefinitions" :key="dimension.key" class="mw-check-card">
+        <label v-for="dimension in availablePricingDimensions" :key="dimension.key" class="mw-check-card" :class="{ 'mw-check-card-selected': activePricingDimensions.includes(dimension.key) }">
           <input type="checkbox" :checked="activePricingDimensions.includes(dimension.key)" :disabled="disabled || !dimensionValues(dimension.key).length && !activePricingDimensions.includes(dimension.key)" :data-test="`pricing-dimension-${dimension.key}`" @change="togglePricingDimension(dimension.key, $event)" />
-          <span><strong>按{{ dimension.label }}分别定价</strong><small>{{ dimensionValues(dimension.key).length ? `${dimensionValues(dimension.key).length} 个可用值` : '先填写能力值' }}</small></span>
+          <span class="mw-check-content"><strong>{{ dimension.label }}不同，价格不同</strong><span class="mw-option-values">{{ dimensionValues(dimension.key).join(' · ') }}</span><span class="mw-check-state">{{ activePricingDimensions.includes(dimension.key) ? '已选择 · 分别定价' : '不区分 · 共享单价' }}</span><small>{{ activePricingDimensions.includes(dimension.key) ? '每个有效选项组合填写一个单价。' : '客户仍可选择这些规格，售价保持相同。' }}</small></span>
         </label>
       </div>
+      <p v-if="!availablePricingDimensions.length" class="mw-muted" data-test="no-pricing-dimensions">尚未配置可用于定价的规格。可使用统一售价，或返回规格页面配置。</p>
+      <p v-if="hiddenPricingDimensions.length" class="mw-banner" data-test="legacy-dimensions">已有价格包含当前规格页未配置的维度，已保留原规则。请先返回规格页核对，不能将其视为已确认能力。</p>
       <p class="mw-muted" data-test="same-price-specs">{{ samePriceText }}</p>
-      <div v-for="(rule, index) in priceRows" :key="index" class="mw-rule">
-        <strong>{{ pricingRuleLabel(rule) }}</strong>
-        <label class="mw-field">单{{ unitLabel }}价格（CNY）
-          <input class="input" inputmode="decimal" placeholder="待填写" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
-          <small :id="`media-price-hint-${index}`">{{ rule.sale_price == null ? '待填写：未配置售价' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费：0 元' : '已填写单价' }}</small>
-        </label>
-        <p v-if="rule.sale_price && (rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原价格使用 {{ rule.sale_price.currency }} / {{ rule.sale_price.billing_mode }}，重新填写后按 CNY / {{ unitLabel }}保存。</p>
-        <button v-if="rule.sale_price" type="button" class="btn btn-secondary" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button>
+      <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
+    </section>
+    <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
+      <p class="mw-muted">未填写表示价格未配置；只有明确填写 0 才表示免费。已有非标准价格规则继续保留，由服务端核验。</p>
+      <div class="mw-price-table" role="table" aria-label="商品单价表">
+        <div class="mw-price-table-head" role="row"><span role="columnheader">规格组合</span><span role="columnheader">单{{ unitLabel }}售价 · CNY</span><span role="columnheader">填写状态</span></div>
+        <div v-for="(rule, index) in priceRows" :key="index" class="mw-price-row" role="row">
+          <div role="cell" class="mw-price-spec"><span class="mw-row-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ pricingRuleLabel(rule) }}</strong></div>
+          <div role="cell"><label class="mw-field"><span class="mw-price-mobile-label">单{{ unitLabel }}售价 · CNY</span>
+            <input class="input" inputmode="decimal" placeholder="待填写" :aria-label="`${pricingRuleLabel(rule)} 单${unitLabel}价格（CNY）`" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-invalid="!!priceError(rule)" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
+          </label><p v-if="priceError(rule)" class="mw-field-error" role="alert">{{ priceError(rule) }}</p><p v-if="rule.sale_price && (rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原价格 {{ rule.sale_price.currency }} / {{ rule.sale_price.billing_mode }}；重新填写才改为 CNY / {{ unitLabel }}。</p></div>
+          <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费 · 0 元' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
+        </div>
       </div>
       <p class="mw-muted" data-test="pricing-row-summary">价格行：{{ priceRows.length }}，已填写 {{ filledPricingRows }}，待填写 {{ priceRows.length - filledPricingRows }}。</p>
+    </section>
+    <section v-show="wizardStep === 5" data-test="wizard-page-5">
+      <label class="mw-field">商品名称<input :value="product.display_name" class="input" data-test="display-name" data-field="display_name" @input="edit(next => { next.display_name = text($event) })" /></label>
+      <p class="mw-muted" data-field="model">{{ accountLabel || '当前 Account' }} · {{ product.upstream_model }}</p>
+      <div class="mw-review-block"><div class="mw-review-heading"><h3>客户可选规格</h3><button type="button" class="mw-link" @click="goToStep(1)">返回修改规格</button></div>
+        <dl class="mw-review-specs"><template v-for="dimension in availablePricingDimensions" :key="dimension.key"><dt>{{ dimension.label }}</dt><dd>{{ configuredValues(dimension.key).join(' / ') }}</dd></template><dt>购买数量</dt><dd>{{ product.media_type === 'video' ? '固定 1 条' : `${product.capabilities.count.min}～${product.capabilities.count.max} 张` }}</dd></dl>
+      </div>
+      <div class="mw-review-block"><div class="mw-review-heading"><h3>参考素材要求</h3><button type="button" class="mw-link" @click="goToStep(2)">返回修改素材</button></div><p class="mw-muted">{{ referenceSummary }}</p></div>
+      <div class="mw-review-block"><div class="mw-review-heading"><h3>价格档位</h3><button type="button" class="mw-link" @click="goToStep(3)">修改计费维度</button><button type="button" class="mw-link" @click="goToStep(4)">修改单价</button></div><p class="mw-muted">{{ samePriceText }}</p>
+        <dl class="mw-review-prices"><div v-for="(rule, index) in priceRows" :key="index"><dt>{{ pricingRuleLabel(rule) }}</dt><dd>{{ rule.sale_price ? `${rule.sale_price.amount} ${rule.sale_price.currency} / ${unitLabel}` : '待填写' }}</dd></div></dl>
+      </div>
       <div class="mw-price-preview" data-test="pricing-preview">
         <strong>客户报价预览</strong>
         <div class="mw-field-grid">
@@ -124,22 +83,25 @@
         <span v-else>当前组合价格待填写，或数量不在已配置范围内。</span>
         <small>仅预览当前草稿；实际报价由服务器核验并冻结，不保存或生成。</small>
       </div>
+      <slot name="review" />
+      <slot name="save" />
     </section>
+    <div class="mw-wizard-footer"><button v-if="wizardStep > 1" type="button" class="btn btn-secondary" data-test="wizard-back" @click="goToStep(wizardStep - 1)">← 上一步</button><span v-else class="mw-muted">仅编辑当前草稿</span><button v-if="wizardStep < 5" type="button" class="btn btn-primary" data-test="wizard-next" @click="goToStep(wizardStep + 1)">下一步：{{ stepLabels[wizardStep] }} →</button><span v-else class="mw-muted">保存不自动发布或启售。</span></div>
   </fieldset>
+  <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" @update:product="updateTechnical" @identity="emit('identity', $event)" />
 </template>
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import type { Product } from '@/api/admin/mediaWorkbench'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import type { AdapterBinding, Diagnostic, Product } from '@/api/admin/mediaWorkbench'
+import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
-import MediaMatchEditor from './MediaMatchEditor.vue'
+import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
-const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean }>()
+const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; diagnostics?: Diagnostic[]; accountLabel?: string }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
-const numeric = (event: Event) => Number(text(event))
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const durationPresets = ['5', '10', '15']
-const qualityPresets = ['standard', 'high', 'hd', 'ultra']
 const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
 const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = [
   { key: 'resolution', label: '分辨率' },
@@ -147,6 +109,38 @@ const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = 
   { key: 'quality', label: '画质' },
   { key: 'duration_seconds', label: '时长' }
 ]
+
+const stepLabels = ['可售规格', '参考素材', '计费维度', '填写单价', '确认保存']
+const stepQuestions = ['这个模型可以出售什么规格？', '客户可以上传什么参考素材？', '什么情况需要卖不同的价格？', '每个价格档位卖多少钱？', '确认商品配置并保存']
+const stepDescriptions = ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', '为每个有效组合填写人民币单价。空白是未配置，明确填写 0 才表示免费。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。']
+const wizardStep = ref(1)
+const stepHeading = ref<HTMLElement>()
+const wizardElement = ref<HTMLElement>()
+const referenceEditor = ref<InstanceType<typeof MediaReferenceEditor>>()
+async function goToStep(step: number) { wizardStep.value = step; await nextTick(); stepHeading.value?.focus({ preventScroll: true }); wizardElement.value?.scrollIntoView?.({ block: 'start' }) }
+function showField(path: string, code?: string) {
+  // Some Core capability diagnostics cover a whole section, not an exact field.
+  if (path.endsWith('capabilities') && (code === 'VIDEO_REFERENCES_UNSUPPORTED' || code === 'INVALID_REFERENCE_LIMIT' && referenceEditor.value?.error)) path += '.references'
+  wizardStep.value = path.includes('pricing_rules') ? 4 : path.includes('references') ? 2 : path.includes('display_name') ? 5 : 1
+  return path
+}
+defineExpose({ showField })
+const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
+const adapterStatus = computed(() => {
+  if (adapterDiagnostics.value.length) return { title: '当前工作台适配尚未接通', description: '上次服务端校验发现以下适配缺口。请交由技术维护者处理；填写协议名称不能使未实现的接口获得支持。' }
+  if (!props.binding || props.binding.kind.startsWith('unbound')) return { title: '适配器能力待确认', description: '可以整理商品草稿，接口是否可用由后台校验；未确认前不能发布。' }
+  return { title: '接口配置已记录，可继续整理商品', description: '保存草稿后请查看后台校验结果；这不代表供应商已实测。技术维护入口位于向导外。' }
+})
+function configuredValues(key: PricingDimension): (string | number)[] {
+  const c = props.product.capabilities
+  return key === 'resolution' ? c.resolutions : key === 'aspect_ratio' ? c.aspect_ratios : key === 'quality' ? c.qualities : c.durations_seconds
+}
+const availablePricingDimensions = computed(() => pricingDimensionDefinitions.filter(({ key }) => (key !== 'duration_seconds' || props.product.media_type === 'video') && configuredValues(key).length))
+const hiddenPricingDimensions = computed(() => activePricingDimensions.value.filter(key => !availablePricingDimensions.value.some(item => item.key === key)))
+const expectedPriceCount = computed(() => {
+  const specs = allowedSpecs(props.product.capabilities)
+  return specs ? buildPricingRules(props.product, activePricingDimensions.value, specs).length : undefined
+})
 
 function valuesFor(product: Product, key: PricingDimension): (string | number)[] {
   const capability = key === 'resolution' ? product.capabilities.resolutions
@@ -179,10 +173,17 @@ function sellableSpecs(product: Product) {
 }
 const activePricingDimensions = computed<PricingDimension[]>(() => dimensionsFor(props.product))
 function losesPrices(previous: Product, nextRules: Product['pricing_rules'], specs: MatrixSpec[]): boolean {
-  return previous.pricing_rules.some(previousRule => previousRule.sale_price && !specs.some(spec => {
-    if (!matchesSpec(previousRule.match, spec)) return false
-    return nextRules.some(nextRule => matchesSpec(nextRule.match, spec) && JSON.stringify(nextRule.sale_price) === JSON.stringify(previousRule.sale_price))
-  }))
+  const previousSpecs = sellableSpecs(previous)
+  if (!previousSpecs) return previous.pricing_rules.some(rule => rule.sale_price != null)
+  const nextSpecs = new Set(specs.map(spec => JSON.stringify(spec)))
+  if (previous.pricing_rules.some(rule => rule.sale_price &&
+    !previousSpecs.some(spec => matchesSpec(rule.match, spec)) &&
+    !nextRules.some(next => JSON.stringify(next) === JSON.stringify(rule)))) return true
+  // Check every formerly priced combination, not merely one surviving value per rule.
+  return previousSpecs.some(spec => previous.pricing_rules.some(rule => rule.sale_price && matchesSpec(rule.match, spec) && (
+    !nextSpecs.has(JSON.stringify(spec)) ||
+    !nextRules.some(next => matchesSpec(next.match, spec) && JSON.stringify(next.sale_price) === JSON.stringify(rule.sale_price))
+  )))
 }
 function editPricing(change: (value: Product) => void, dimensions = activePricingDimensions.value): boolean {
   if (props.disabled) return false
@@ -191,7 +192,7 @@ function editPricing(change: (value: Product) => void, dimensions = activePricin
   const specs = sellableSpecs(next)
   if (specs) {
     const rules = buildPricingRules(next, dimensions, specs)
-    if (losesPrices(props.product, rules, specs) && typeof window !== 'undefined' && !window.confirm('此修改会移除或合并已有售价，相关价格将变为“待填写”。是否继续？')) return false
+    if (losesPrices(props.product, rules, specs) && typeof window !== 'undefined' && !window.confirm('此修改会移除已有价格覆盖的规格，或合并不同售价。仍然一致的价格会保留，冲突价格会变为“待填写”。确认修改当前草稿？')) return false
     next.pricing_rules = rules
   }
   emit('update:product', next)
@@ -200,8 +201,9 @@ function editPricing(change: (value: Product) => void, dimensions = activePricin
 function togglePricingDimension(key: PricingDimension, event: Event) {
   const checked = (event.target as HTMLInputElement).checked
   const current = activePricingDimensions.value
+  if (!availablePricingDimensions.value.some(item => item.key === key)) return
   if (checked) {
-    editPricing(() => {}, [...current, key])
+    if (!editPricing(() => {}, [...current, key])) (event.target as HTMLInputElement).checked = false
     return
   }
   if (!editPricing(() => {}, current.filter(item => item !== key))) (event.target as HTMLInputElement).checked = true
@@ -243,15 +245,17 @@ function setCapability(key: PricingDimension, value: string[] | number[]) {
     else if (key === 'quality') next.capabilities.qualities = value.map(String)
     else next.capabilities.durations_seconds = value.map(Number)
   }
-  if (activePricingDimensions.value.length) editPricing(change)
-  else edit(change)
+  editPricing(change)
 }
-function updateCombination(index: number, deny: Product['capabilities']['combination_rules'][number]['deny']) {
-  editPricing(next => { next.capabilities.combination_rules[index]!.deny = deny })
+function updateTechnical(value: Product) {
+  if (JSON.stringify(value.capabilities) !== JSON.stringify(props.product.capabilities)) editPricing(next => Object.assign(next, value))
+  else emit('update:product', value)
 }
-function removeCombination(index: number) {
-  editPricing(next => { next.capabilities.combination_rules.splice(index, 1) })
-}
+const referenceSummary = computed(() => {
+  const refs = props.product.capabilities.references
+  if (refs.total_max === 0) return '不允许上传素材（合计上限为 0，保留原语义）。'
+  return (['image', 'video', 'audio'] as const).filter(key => refs[key].max > 0).map(key => `${({ image: '图片', video: '视频', audio: '音频' })[key]}：${refs[key].min > 0 ? `必填 ${refs[key].min}～` : '可选，最多 '}${Math.min(refs[key].max, refs.total_max)} 份`).join('；') + `。合计最多 ${refs.total_max} 份。`
+})
 function multiplyDecimalText(left: string, right: number): string {
   if (!/^\d+(?:\.\d+)?$/.test(left) || !Number.isInteger(right) || right < 1) return left
   const [whole, fraction = ''] = left.split('.')
@@ -279,14 +283,7 @@ function edit(change: (value: Product) => void) {
   change(next)
   emit('update:product', next)
 }
-function setIdentity(event: Event) {
-  const id = text(event)
-  edit(next => { next.product_id = id })
-  emit('identity', id)
-}
-const referenceKinds = computed(() => props.product.media_type === 'video'
-  ? [{ key: 'image', label: '参考图片' }, { key: 'video', label: '参考视频' }, { key: 'audio', label: '参考音频' }] as const
-  : [{ key: 'image', label: '参考图片' }] as const)
+function priceError(rule: Product['pricing_rules'][number]): string { return rule.sale_price && !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount) ? '请输入非负金额，最多 8 位小数；免费请明确填写 0。' : '' }
 function setAmount(index: number, event: Event) {
   edit(next => {
     if (!next.pricing_rules?.length) next.pricing_rules = [{ match: {}, sale_price: null }]

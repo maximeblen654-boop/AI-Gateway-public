@@ -9,13 +9,16 @@
   </label>
 </template>
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, nextTick, useId } from 'vue'
 const props = defineProps<{ label: string; modelValue: string[] | number[]; numeric?: boolean; disabled?: boolean; presets?: string[]; placeholder?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string[] | number[]] }>()
 const hintId = `media-tokens-${useId()}`
-function change(event: Event) {
-  const values = (event.target as HTMLInputElement).value.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+async function change(event: Event) {
+  const target = event.target as HTMLInputElement
+  const values = target.value.split(/[,，]/).map(s => s.trim()).filter(Boolean)
   emit('update:modelValue', props.numeric ? values.map(Number) : values)
+  await nextTick()
+  target.value = props.modelValue.join(', ')
 }
 const values = computed(() => props.modelValue.map(String))
 function toggle(value: string) {

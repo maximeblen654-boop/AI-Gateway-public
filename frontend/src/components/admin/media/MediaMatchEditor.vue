@@ -20,22 +20,29 @@
   </div>
 </template>
 <script setup lang="ts">
+import { nextTick } from 'vue'
 import type { Match } from '@/api/admin/mediaWorkbench'
 import MediaTokensField from './MediaTokensField.vue'
 const props = defineProps<{ modelValue: Match }>()
 const emit = defineEmits<{ 'update:modelValue': [value: Match] }>()
 const kinds = [{ key: 'image', label: '图片' }, { key: 'video', label: '视频' }, { key: 'audio', label: '音频' }] as const
 const numeric = (event: Event) => Number((event.target as HTMLInputElement).value)
-function setCount(key: 'min' | 'max', event: Event) {
+async function setCount(key: 'min' | 'max', event: Event) {
   if (props.modelValue.count) emit('update:modelValue', { ...props.modelValue, count: { ...props.modelValue.count, [key]: numeric(event) } })
+  await nextTick()
+  ;(event.target as HTMLInputElement).value = String(props.modelValue.count?.[key] ?? '')
 }
-function setReference(kind: 'image' | 'video' | 'audio', key: 'min' | 'max', event: Event) {
+async function setReference(kind: 'image' | 'video' | 'audio', key: 'min' | 'max', event: Event) {
   const refs = props.modelValue.references
   if (refs) emit('update:modelValue', { ...props.modelValue, references: { ...refs, [kind]: { ...refs[kind], [key]: numeric(event) } } })
+  await nextTick()
+  ;(event.target as HTMLInputElement).value = String(props.modelValue.references?.[kind][key] ?? '')
 }
-function setReferenceTotal(event: Event) {
+async function setReferenceTotal(event: Event) {
   const refs = props.modelValue.references
   if (refs) emit('update:modelValue', { ...props.modelValue, references: { ...refs, total_max: numeric(event) } })
+  await nextTick()
+  ;(event.target as HTMLInputElement).value = String(props.modelValue.references?.total_max ?? '')
 }
 function set(key: keyof Match, value: string[] | number[]) {
   const next = { ...props.modelValue }
@@ -43,16 +50,20 @@ function set(key: keyof Match, value: string[] | number[]) {
   else delete next[key]
   emit('update:modelValue', next)
 }
-function toggleCount(event: Event) {
+async function toggleCount(event: Event) {
   const next = { ...props.modelValue }
   if ((event.target as HTMLInputElement).checked) next.count = { min: 1, max: 1 }
   else delete next.count
   emit('update:modelValue', next)
+  await nextTick()
+  ;(event.target as HTMLInputElement).checked = !!props.modelValue.count
 }
-function toggleReferences(event: Event) {
+async function toggleReferences(event: Event) {
   const next = { ...props.modelValue }
   if ((event.target as HTMLInputElement).checked) next.references = { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }
   else delete next.references
   emit('update:modelValue', next)
+  await nextTick()
+  ;(event.target as HTMLInputElement).checked = !!props.modelValue.references
 }
 </script>

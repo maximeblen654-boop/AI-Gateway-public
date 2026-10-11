@@ -5,16 +5,16 @@
         <div>
           <p class="mw-eyebrow">MEDIA WORKBENCH</p>
           <h1>媒体工作台</h1>
-          <p class="mw-muted">按“来源与账号 → 模型 → 完整配置”完成媒体产品设置。</p>
+          <p v-if="step !== 'editor'" class="mw-muted">按“来源与账号 → 模型 → 完整配置”完成媒体产品设置。</p>
         </div>
-        <nav class="mw-steps" aria-label="配置步骤">
-          <span :class="{ 'mw-step-current': step === 'suppliers' }">1 来源与账号</span>
-          <span :class="{ 'mw-step-current': step === 'models' }">2 选择模型</span>
-          <span :class="{ 'mw-step-current': step === 'editor' }">3 配置产品</span>
+        <nav class="mw-steps" aria-label="工作台导航">
+          <span :class="{ 'mw-step-current': step === 'suppliers' }">来源与账号</span>
+          <span :class="{ 'mw-step-current': step === 'models' }">选择模型</span>
+          <span :class="{ 'mw-step-current': step === 'editor' }">配置商品</span>
         </nav>
       </header>
 
-      <div class="mw-statistics">
+      <div v-if="step === 'suppliers'" class="mw-statistics">
         <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
         <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
         <div><span>待配置模型</span><strong>{{ suppliers.reduce((n, s) => n + s.pending_count, 0) }}</strong></div>
@@ -32,7 +32,7 @@
       <main class="mw-flow">
         <section v-if="step === 'suppliers'" class="mw-page mw-panel" aria-label="来源与账号导航" data-test="account-page">
           <div class="mw-page-heading">
-            <div><p class="mw-eyebrow">第 1 步</p><h2>先选择来源与 Account</h2><p class="mw-muted">来源域名默认折叠。搜索支持数字 Account ID、名称、域名和平台。</p></div>
+            <div><p class="mw-eyebrow">选择 Account</p><h2>先选择来源与 Account</h2><p class="mw-muted">来源域名默认折叠。搜索支持数字 Account ID、名称、域名和平台。</p></div>
             <span class="mw-badge">{{ visibleAccountCount }} / {{ suppliers.length }} 个账号</span>
           </div>
           <div class="mw-toolbar">
@@ -61,7 +61,7 @@
         <section v-else-if="step === 'models'" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
           <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 返回来源与账号</button>
           <div v-if="detail" class="mw-page-heading mw-account-context">
-            <div><p class="mw-eyebrow">第 2 步 · 已选择 Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
+            <div><p class="mw-eyebrow">模型管理 · Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
             <div class="mw-selection-feedback" data-test="selected-account-summary"><strong>已选择账号</strong><span>#{{ detail.id }} · {{ detail.name }}</span></div>
           </div>
           <div v-if="detail" class="mw-model-toolbar">
@@ -80,26 +80,6 @@
               <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
             </button>
           </div>
-        </section>
-
-        <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page">
-          <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
-          <div v-if="detail" class="mw-page-heading mw-account-context">
-            <div><p class="mw-eyebrow">第 3 步 · Account #{{ detail.id }}</p><h2>配置当前媒体模型</h2><p class="mw-muted">账号：{{ detail.name }} · {{ sourceHost(detail) || '未识别来源' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">在这里设置客户可选规格、哪些规格影响定价、保存、发布与销售状态。</p></div>
-            <div class="mw-selection-feedback" data-test="selected-model-summary"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span><small>{{ selectedRow?.state ? modelLabel(selectedRow.state) : '待配置' }}</small></div>
-          </div>
-          <template v-if="detail && selectedModel">
-            <p class="mw-model-id">{{ selectedModel }}</p>
-            <p class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
-            <div v-if="!product" class="mw-start-product mw-banner">
-              <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
-              <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
-            </div>
-            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select v-model="selectedProduct" class="input" data-test="product-select" :disabled="busy"><option v-for="p in modelProducts" :key="p.product_id" :value="p.product_id">{{ p.display_name }} · {{ p.product_id }}</option></select></label></div>
-            <MediaProductEditor v-if="product" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" @identity="selectedProduct = $event" />
-            <div v-if="product && !config && addablePreInitTypes.length" class="mw-product-type-actions"><button v-for="type in addablePreInitTypes" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品后一起保存</button></div>
-            <div v-if="product && config" class="mw-product-type-actions"><button v-for="type in config.media_types" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品</button></div>
-
             <section class="mw-sales-card" data-test="sales-state">
               <div><p class="mw-eyebrow">销售状态</p><strong>{{ salesLabel }}</strong><p class="mw-muted">发布配置与开启销售是两个独立动作；发布不会自动启用销售。</p></div>
               <button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="busy || deleted || conflict || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button>
@@ -107,14 +87,43 @@
             </section>
             <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
 
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
-            <details v-if="config"><summary>技术详情</summary><dl><dt>草稿版本</dt><dd>{{ config.draft.revision }}</dd><dt>发布版本</dt><dd>{{ config.published?.revision || '尚未发布' }}</dd><dt>适配器版本</dt><dd>{{ config.validation.adapter_registry_revision || '后台未提供' }}</dd></dl></details>
-            <div class="mw-action-card">
-              <div><strong>保存、发布、销售</strong><p class="mw-muted">先保存草稿，后台检查通过后才能发布；发布不会改变销售开关。</p></div>
-              <div class="mw-publish-bar"><small>{{ saveState === 'unconfirmed' ? '保存结果未确认' : dirty ? '未保存修改' : '服务器草稿' }}<span v-if="config"> · {{ config.draft.updated_at }}</span></small><div><button class="btn btn-primary" data-test="save" :disabled="busy || deleted || conflict || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button><button class="btn btn-primary" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button></div></div>
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+          <div class="mw-action-card" data-test="account-publication">
+            <strong>Account 级发布与销售</strong><p class="mw-muted">发布会包含此 Account 的所有草稿商品；销售开关影响全部已发布商品。两者都需要单独确认。</p>
+            <button class="btn btn-secondary" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+          </div>
+        </section>
+
+        <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page">
+          <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
+          <div v-if="detail" class="mw-page-heading mw-account-context mw-product-context">
+            <div><p class="mw-eyebrow">配置商品 · {{ product?.media_type === 'video' ? '视频' : '图片' }}</p><h2>{{ product?.display_name || selectedModel || '选择商品类型' }}</h2><p class="mw-muted">Account #{{ detail.id }} · {{ detail.name }}</p></div>
+            <div class="mw-selection-feedback" data-test="selected-model-summary"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span></div>
+          </div>
+          <template v-if="detail && selectedModel">
+            <p v-if="selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING'" class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
+            <div v-if="!product" class="mw-start-product mw-banner">
+              <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
+              <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
             </div>
-            <p v-if="!config" class="mw-muted">完成规格和售价后，点击“保存草稿”完成首次初始化。</p>
-            <p v-else-if="!canPublish" class="mw-muted">保存最新草稿后，后台检查确认可发布时启用“发布配置”。</p>
+            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="p in modelProducts" :key="p.product_id" :value="p.product_id">{{ p.display_name }} · {{ p.product_id }}</option></select></label></div>
+            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :binding="config?.adapter_bindings?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" @identity="selectedProduct = $event" :account-label="`Account #${detail.id} · ${detail.name}`">
+              <template #review>
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+              </template>
+              <template #save>
+                <div class="mw-save-draft">
+                  <p class="mw-muted">保存本 Account 的草稿（共 {{ products.length }} 个商品），由后台检查。不会发布、启售或发起生成。</p>
+                  <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
+                  <button class="btn btn-primary" data-test="save" :disabled="busy || deleted || conflict || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
+                  <button v-if="!dirty && config" type="button" class="btn btn-secondary" data-test="return-models" @click="backToModels">返回模型管理</button>
+                  <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果未确认，请重新读取后核对，不要重复发布。</p>
+                </div>
+              </template>
+            </MediaProductEditor>
+            <div v-if="product && !config && addablePreInitTypes.length" class="mw-product-type-actions"><button v-for="type in addablePreInitTypes" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品后一起保存</button></div>
+            <div v-if="product && config" class="mw-product-type-actions"><button v-for="type in config.media_types" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品（保留当前草稿）</button></div>
+
           </template>
           <p v-else class="mw-muted">请先从模型列表选择一个模型。</p>
         </section>
@@ -164,6 +173,7 @@ const step = ref('suppliers')
 const search = ref('')
 const filter = ref('')
 const editorElement = ref<HTMLElement>()
+const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
 const modelsScrollPosition = ref({ top: 0, left: 0 })
 const publishDialog = ref(false)
@@ -234,6 +244,12 @@ function modelLabel(state: string) { return ({ PENDING: '待配置', PUBLISHED: 
 function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
+function changeProduct(event: Event) {
+  const target = event.target as HTMLSelectElement
+  const id = target.value
+  target.value = selectedProduct.value
+  navigate(() => { selectedProduct.value = id })
+}
 function updateProduct(value: Product) { const index = products.value.findIndex(p => p.product_id === selectedProduct.value); if (index >= 0) products.value[index] = value }
 function navigate(action: () => void | Promise<void>) { if (busy.value) return; if (dirty.value) nextNavigation.value = action; else void action() }
 async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) step.value = 'models' }
@@ -287,7 +303,34 @@ async function reload() {
   step.value = previousStep === 'editor' && !selectedModel.value ? 'models' : previousStep
 }
 async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers() }
-async function locate({ path, scope }: Diagnostic) { const productIndex = /products(?:\[|\.)(\d+)/.exec(path)?.[1]; const productTarget = products.value.find(p => p.product_id === scope) ?? (productIndex !== undefined ? products.value[Number(productIndex)] : undefined); if (productTarget) { selectedModel.value = productTarget.upstream_model; selectedProduct.value = productTarget.product_id; step.value = 'editor'; await nextTick() } const field = ['adapter_config.size_mappings', 'pricing_rules', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => path.includes(key)) ?? 'model'; const section = editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`); section?.querySelectorAll('details').forEach(node => { node.open = true }); const target = section?.matches('input,select') ? section : section?.querySelector<HTMLElement>('input,select,button'); target?.focus(); section?.scrollIntoView?.({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }) }
+async function locate(diagnostic: Diagnostic) {
+  const { path, scope } = diagnostic
+  const productIndex = /products(?:\[|\.)(\d+)/.exec(path)?.[1]
+  const productTarget = products.value.find(p => p.product_id === scope) ?? (productIndex !== undefined ? products.value[Number(productIndex)] : undefined)
+  if (productTarget && productTarget.product_id !== selectedProduct.value && dirty.value) {
+    navigate(() => locate(diagnostic))
+    return
+  }
+  if (productTarget) {
+    selectedModel.value = productTarget.upstream_model
+    selectedProduct.value = productTarget.product_id
+    step.value = 'editor'
+    await nextTick()
+  }
+  const fieldPath = productEditor.value?.showField(path, diagnostic.code) ?? path
+  await nextTick()
+  const field = ['adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
+  const section = editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)
+  section?.querySelectorAll('details').forEach(node => { node.open = true })
+  let ancestor = section
+  while (ancestor && ancestor !== editorElement.value) {
+    if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
+    ancestor = ancestor.parentElement ?? undefined
+  }
+  const target = section?.matches('input,select') ? section : section?.querySelector<HTMLElement>('input,select,button')
+  target?.focus()
+  section?.scrollIntoView?.({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+}
 function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || pending.value) { event.preventDefault(); event.returnValue = '' } }
 watch(sourceGroups, groups => {
   if (!groups.length) return

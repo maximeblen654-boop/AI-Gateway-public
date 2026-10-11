@@ -16,6 +16,27 @@ import '@/styles/site-theme.css'
 const query = new URLSearchParams(location.search)
 const scenario = query.get('scenario') ?? 'PASS'
 const dto = supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+const fixtureCalls: { method: string; url: string; input: unknown }[] = []
+Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
+if (scenario.startsWith('WIZARD')) {
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
+  dto.media_workbench_v1!.sales.enabled = false
+  dto.media_workbench_v1!.adapter_bindings = { image: { kind: 'openai_images', revision: 'openai_images_v1', auth: 'account_apikey', task_flow: 'sync' } }
+  product.display_name = '晴空创作图片'
+  product.capabilities.resolutions = ['1K', '2K', '4K']
+  product.capabilities.count = { min: 1, max: 10 }
+  product.capabilities.references.image = { min: 0, max: scenario === 'WIZARD_ZERO' ? 4 : 0 }
+  product.capabilities.references.total_max = 0
+  product.pricing_rules = []
+  product.adapter_config = { version: 1, model_family: 'openai_json', execution: { mode: 'native_multi', max_output_images: 2 }, edit_execution: { mode: 'single', max_output_images: 1 }, size_mappings: ['1K', '2K', '4K'].flatMap((resolution, i) => ['1:1', '16:9'].map(aspect_ratio => ({ resolution, aspect_ratio, wire_size: aspect_ratio === '1:1' ? `${1024 * (i + 1)}x${1024 * (i + 1)}` : `${1024 * (i + 1)}x${576 * (i + 1)}` }))) }
+  if (scenario === 'WIZARD_DENY') product.capabilities.combination_rules = [{ deny: { resolution: ['4K'], aspect_ratio: ['16:9'] } }]
+  if (scenario === 'WIZARD_UNSUPPORTED') {
+    dto.platform = 'grok'
+    dto.media_workbench_v1!.adapter_bindings.image!.kind = 'unbound_image'
+    dto.media_workbench_v1!.validation = { ...dto.media_workbench_v1!.validation, status: 'FAIL', publish_ready: false, diagnostics: [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'BUILDER_REFACTOR_REQUIRED', scope: product.product_id, path: 'draft.products[0].adapter_config', message: '当前 Account 没有可用图片适配器', action: '需要技术适配，不能通过填写协议名称启用' }] }
+  }
+}
 const navigationAccounts = Array.from({ length: 46 }, (_, index) => {
   const account = supplier(index + 1)
   account.name = `账号 ${account.id}`
@@ -38,6 +59,7 @@ if (scenario === 'VALUE_MAPPING') Object.assign(dto.media_workbench_v1!.validati
 apiClient.defaults.adapter = async config => {
   const url = config.url ?? ''
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+  fixtureCalls.push({ method: config.method ?? 'get', url, input })
   let data: unknown = {}
   if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), supplier(44)]
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
@@ -48,6 +70,14 @@ apiClient.defaults.adapter = async config => {
     if (url.endsWith('/draft')) {
       dto.media_workbench_v1!.draft.products = input.draft.products
       dto.media_workbench_v1!.record_version++
+      dto.media_workbench_v1!.draft.revision = `fixture_${dto.media_workbench_v1!.record_version}`
+      dto.media_workbench_v1!.validation.draft_revision = dto.media_workbench_v1!.draft.revision
+      // Deterministic UI fixture only. Real validation is covered separately by Core tests.
+      if (scenario.startsWith('WIZARD') && scenario !== 'WIZARD_UNSUPPORTED') {
+        const complete = dto.media_workbench_v1!.draft.products.every(product => product.pricing_rules.length && product.pricing_rules.every(rule => rule.sale_price != null))
+        dto.media_workbench_v1!.validation.status = complete ? 'PASS' : 'FAIL'
+        dto.media_workbench_v1!.validation.publish_ready = complete
+      }
     }
     if (url.endsWith('/sales')) { dto.media_workbench_v1!.sales.enabled = input.enabled; dto.effective_sales = input.enabled; dto.media_workbench_v1!.record_version++ }
     data = scenario === 'NAVIGATION' ? copy(navigationAccounts.find(account => account.id === Number(url.split('/')[4]))) : copy(dto)

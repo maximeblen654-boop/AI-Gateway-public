@@ -68,6 +68,20 @@ jobs:
       - name: Frontend typecheck and critical vitest
         run: make test-frontend
 
+      - name: Isolated product wizard browser acceptance
+        working-directory: frontend
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts
+
+      - name: Upload isolated wizard screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-wizard-browser-evidence
+          path: frontend/test-results/media-workbench/
+          retention-days: 14
+
       - name: Synthetic usage display fixture regression
         working-directory: frontend
         run: pnpm exec vitest run src/__tests__/integration/usage-reasoning-effort.spec.ts
