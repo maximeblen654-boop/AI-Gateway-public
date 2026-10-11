@@ -46,8 +46,8 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 	if a.Config == nil || a.Config.SchemaVersion != 1 {
 		add("UI_FIXABLE", "INVALID_SCHEMA", "", "schema_version", "Unsupported media configuration schema")
 	}
-	if a.Type != "apikey" {
-		add("NEEDS_DEVELOPMENT", "AUTH_FLOW_UNSUPPORTED", "", "account", "This flow requires an API-key Account")
+	if !SupportsAccount(a) {
+		add("NEEDS_DEVELOPMENT", "AUTH_FLOW_UNSUPPORTED", "", "account", "This Account authentication type has no native media adapter")
 	}
 	if !ValidateRouting(a) {
 		add("UI_FIXABLE", "ACCOUNT_ENDPOINT_INVALID", "", "account", "Configure a valid HTTPS supplier endpoint in Account settings")
@@ -120,20 +120,27 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			if binding.Revision != descriptor.Revision {
 				add("NEEDS_DEVELOPMENT", "ADAPTER_REVISION_UNSUPPORTED", pid, "adapter_bindings", "Adapter binding requires an unavailable builder revision")
 			}
-			if p.MediaType != descriptor.MediaType || a.Platform != "openai" {
+			if p.MediaType != descriptor.MediaType || !adapterOwnsPlatform(binding.Kind, a.Platform) {
 				add("NEEDS_DEVELOPMENT", "ADAPTER_UNKNOWN", pid, "adapter_bindings", "The Account platform does not own this builder")
 			}
 			if p.MediaType == "image" {
-				configuredProfile := p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == "openai_json" && p.AdapterConfig.WireProfile == ""
-				legacyProfile := p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)
-				if !configuredProfile && !legacyProfile {
-					add("NEEDS_DEVELOPMENT", "VALUE_HARDCODED", pid, "upstream_model", "Core Images currently accepts only its coded image-model families or the configured OpenAI Images JSON family")
+				configuredProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == "openai_json" && p.AdapterConfig.WireProfile == ""
+				legacyProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)
+				inheritedProfile := p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && nativeAdapterKind(a, "image") == "openai_images"
+				nativeProfile := p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == nativeAdapterKind(a, "image") && binding.Kind != "openai_images"
+				if !configuredProfile && !legacyProfile && !nativeProfile && !inheritedProfile {
+					add("NEEDS_DEVELOPMENT", "VALUE_HARDCODED", pid, "upstream_model", "Product technical fields conflict with the native Account media adapter")
 				}
 			}
 			if p.MediaType == "image" && (len(p.Capabilities.DurationsSeconds) > 0 || p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0) {
 				add("NEEDS_DEVELOPMENT", "PARAMETER_TYPE_UNSUPPORTED", pid, "capabilities", "This image builder cannot express duration, video or audio references")
 			}
 			if p.MediaType == "image" {
+				if binding.Kind == "gemini_images" && (len(p.Capabilities.Qualities) > 0 ||
+					(p.AdapterConfig.Execution != nil && p.AdapterConfig.Execution.Mode != ImageExecutionSingle) ||
+					(p.AdapterConfig.EditExecution != nil && p.AdapterConfig.EditExecution.Mode != ImageExecutionSingle)) {
+					add("NEEDS_DEVELOPMENT", "NATIVE_IMAGE_PARAMETER_UNSUPPORTED", pid, "adapter_config.execution", "Native generateContent uses one output per execution unit and has no quality field")
+				}
 				if _, err := PlanImageExecution(p.AdapterConfig, 1); err != nil {
 					add("NEEDS_DEVELOPMENT", "IMAGE_EXECUTION_CAPABILITY_INVALID", pid, "adapter_config.execution", "Execution mode must declare a verified single-request output limit")
 				} else if p.AdapterConfig.Execution != nil && p.AdapterConfig.Execution.Mode == ImageExecutionProviderAsync {
@@ -184,6 +191,9 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			continue
 		}
 		if known {
+			if p.Capabilities.References.TotalMax > descriptor.MaxReferences || p.Capabilities.References.Image.Max > descriptor.MaxReferences {
+				add("UI_FIXABLE", "REFERENCE_LIMIT_EXCEEDED", pid, "capabilities.references", "Reference count exceeds the native adapter limit")
+			}
 			for _, m := range p.AdapterConfig.SizeMappings {
 				if !dimensionPattern.MatchString(m.WireSize) && m.WireSize != "auto" {
 					add("UI_FIXABLE", "INVALID_VALUE_MAPPING", pid, "adapter_config.size_mappings", "Wire size must be auto or positive width x height")

@@ -14,6 +14,7 @@ import (
 )
 
 const Revision = "laoli_video_json_v136_r1"
+const GrokRevision = "core_grok_video_r1"
 
 //go:embed contract.json
 var contract []byte
@@ -144,10 +145,14 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 		return p, ErrPlan
 	}
 	p = Plan{Version: "video_wire_plan_v1", AdapterRevision: Revision, ContractRevision: registry.Revision, Method: "POST", Path: "/v1/videos", Body: append([]byte(nil), body...), RequestHash: digest(body)}
+	if m.Mode == "grok" {
+		p.AdapterRevision, p.Path = GrokRevision, "/v1/videos/generations"
+	}
 	return p, nil
 }
 func (p Plan) Materialize() ([]byte, string, error) {
-	if p.Version != "video_wire_plan_v1" || p.AdapterRevision != Revision || p.Method != "POST" || p.Path != "/v1/videos" || !json.Valid(p.Body) || digest(p.Body) != p.RequestHash {
+	validPath := p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations"
+	if p.Version != "video_wire_plan_v1" || !validPath || p.Method != "POST" || !json.Valid(p.Body) || digest(p.Body) != p.RequestHash {
 		return nil, "", ErrPlan
 	}
 	return append([]byte(nil), p.Body...), p.RequestHash, nil

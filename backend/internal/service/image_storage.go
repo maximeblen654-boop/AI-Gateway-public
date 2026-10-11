@@ -37,6 +37,48 @@ type ImageResultUploader struct {
 	maxDownloadBytes int64
 }
 
+// Inline uses the same bounded decoder/downloader as asynchronous image tasks.
+// Callers with an existing durable receipt store can persist this envelope
+// there, without requiring S3 or changing historical result URLs.
+func (u *ImageResultUploader) Inline(ctx context.Context, result json.RawMessage) (json.RawMessage, error) {
+	var payload map[string]json.RawMessage
+	if len(result) > 32<<20 || json.Unmarshal(result, &payload) != nil {
+		return nil, errors.New("invalid image response")
+	}
+	var items []map[string]json.RawMessage
+	if json.Unmarshal(payload["data"], &items) != nil || len(items) == 0 || len(items) > 10 {
+		return nil, errors.New("invalid image response data")
+	}
+	changed := false
+	encodedSize := len(result)
+	for _, item := range items {
+		var inline string
+		_ = json.Unmarshal(item["b64_json"], &inline)
+		if inline != "" {
+			continue
+		}
+		data, contentType, err := u.fetchImageBytes(ctx, item)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) == 0 {
+			return nil, errors.New("image result has no bytes")
+		}
+		encodedSize += base64.StdEncoding.EncodedLen(len(data))
+		if encodedSize > 32<<20 {
+			return nil, errors.New("image response exceeds inline limit")
+		}
+		item["b64_json"], _ = json.Marshal(base64.StdEncoding.EncodeToString(data))
+		item["mime_type"], _ = json.Marshal(contentType)
+		changed = true
+	}
+	if !changed {
+		return result, nil
+	}
+	payload["data"], _ = json.Marshal(items)
+	return json.Marshal(payload)
+}
+
 // NewImageResultUploader 构造一个 uploader；storage 为 nil 时 Rewrite 直接透传。
 func NewImageResultUploader(storage ImageStorage, prefix string, maxDownloadBytes int64, httpClient *http.Client) *ImageResultUploader {
 	if httpClient == nil {

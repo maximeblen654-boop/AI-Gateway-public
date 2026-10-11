@@ -65,7 +65,10 @@ func (r SQLImageCredentialReader) resolve(ctx context.Context, user, group, keyI
 		keyGate = "k.status IN ('active','expired','quota_exhausted')"
 		imageGate = "" // generation pause does not revoke original result ownership
 	}
-	err := r.DB.QueryRowContext(ctx, `SELECT k.id,k.key FROM api_keys k JOIN users u ON u.id=k.user_id JOIN groups g ON g.id=k.group_id WHERE k.user_id=$1 AND k.group_id=$2 AND ($3=0 OR k.id=$3) AND k.deleted_at IS NULL AND u.deleted_at IS NULL AND g.deleted_at IS NULL AND `+keyGate+` AND u.status='active' AND g.status='active'`+imageGate+` AND g.platform='openai' ORDER BY k.id LIMIT 1`, user, group, keyID).Scan(&k.ID, &k.Key)
+	// The native Core resolves the exact Account and media adapter. A platform
+	// allowlist here would reject legitimate Gemini/Grok/composite Groups before
+	// Core can apply its existing permissions and frozen-offer checks.
+	err := r.DB.QueryRowContext(ctx, `SELECT k.id,k.key FROM api_keys k JOIN users u ON u.id=k.user_id JOIN groups g ON g.id=k.group_id WHERE k.user_id=$1 AND k.group_id=$2 AND ($3=0 OR k.id=$3) AND k.deleted_at IS NULL AND u.deleted_at IS NULL AND g.deleted_at IS NULL AND `+keyGate+` AND u.status='active' AND g.status='active'`+imageGate+` ORDER BY k.id LIMIT 1`, user, group, keyID).Scan(&k.ID, &k.Key)
 	if err != nil || k.ID <= 0 || k.Key == "" {
 		return ImageCredential{}, errors.New("image customer key unavailable")
 	}

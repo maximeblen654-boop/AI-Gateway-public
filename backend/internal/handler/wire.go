@@ -128,6 +128,7 @@ func ProvideGatewayHandler(
 
 func ProvideOpenAIGatewayHandler(
 	videoOrders service.StudioVideoOrderRepository,
+	geminiCompatService *service.GeminiMessagesCompatService,
 	mediaRepository mediaworkbench.Repository,
 	gatewayService *service.OpenAIGatewayService,
 	pluginManager *service.PluginManager,
@@ -150,6 +151,7 @@ func ProvideOpenAIGatewayHandler(
 	h.securityAuditCoordinator = coordinator
 	h.grokMediaEligibilityProber = grokQuotaService
 	h.studioImage = service.NewStudioImageRuntime(gatewayService, mediaRepository)
+	h.studioImage.Gemini = geminiCompatService
 	h.studioImage.APIKeys = apiKeyService
 	h.studioVideo = service.NewStudioVideoRuntime(gatewayService, mediaRepository, videoOrders)
 	h.studioVideo.APIKeys = apiKeyService

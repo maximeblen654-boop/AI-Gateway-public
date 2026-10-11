@@ -324,7 +324,7 @@ func TestInitializeBoundaries(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	r.a.Type = "oauth"
+	r.a.Type = "unsupported"
 	if _, err := s.Initialize(ctx, 7, []string{"image"}); !errors.Is(err, ErrUnsupported) {
 		t.Fatal(err)
 	}

@@ -25,6 +25,8 @@ const mediaAccountProjection = `SELECT id, name, platform, type, status, schedul
  extra->'upstream_model_catalog_snapshot', extra->'media_workbench_v1',
  jsonb_build_object('model_mapping', credentials->'model_mapping',
  'has_key', length(COALESCE(credentials->>'api_key',''))>0,
+ 'has_token', length(COALESCE(credentials->>'access_token',''))>0,
+ 'has_service_account', length(COALESCE(credentials->>'service_account_json',''))>0,
  'expires_at', expires_at, 'auto_pause_on_expired', auto_pause_on_expired,
  'rate_limit_reset_at', rate_limit_reset_at, 'overload_until', overload_until,
  'temp_unschedulable_until', temp_unschedulable_until, 'parent_account_id', parent_account_id,
@@ -60,16 +62,18 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		}
 	}
 	var local struct {
-		Mapping   map[string]any `json:"model_mapping"`
-		HasKey    bool           `json:"has_key"`
-		ExpiresAt *time.Time     `json:"expires_at"`
-		AutoPause bool           `json:"auto_pause_on_expired"`
-		RateLimit *time.Time     `json:"rate_limit_reset_at"`
-		Overload  *time.Time     `json:"overload_until"`
-		Temporary *time.Time     `json:"temp_unschedulable_until"`
-		Parent    *int64         `json:"parent_account_id"`
-		Proxy     *int64         `json:"proxy_id"`
-		Quota     map[string]any `json:"quota"`
+		Mapping           map[string]any `json:"model_mapping"`
+		HasKey            bool           `json:"has_key"`
+		HasToken          bool           `json:"has_token"`
+		HasServiceAccount bool           `json:"has_service_account"`
+		ExpiresAt         *time.Time     `json:"expires_at"`
+		AutoPause         bool           `json:"auto_pause_on_expired"`
+		RateLimit         *time.Time     `json:"rate_limit_reset_at"`
+		Overload          *time.Time     `json:"overload_until"`
+		Temporary         *time.Time     `json:"temp_unschedulable_until"`
+		Parent            *int64         `json:"parent_account_id"`
+		Proxy             *int64         `json:"proxy_id"`
+		Quota             map[string]any `json:"quota"`
 	}
 	if err := json.Unmarshal(routing, &local); err != nil {
 		return nil, fmt.Errorf("invalid local Account routing projection")
@@ -92,7 +96,8 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 	}
 	// A shadow Account has no independent credential owner in this phase.
 	// Reuse the native cooldown/expiry/quota gate without exposing its inputs.
-	a.RuntimeReady = local.HasKey && local.Parent == nil && account.IsSchedulable() && mediaworkbench.ValidateRouting(a)
+	hasCredential := local.HasKey && a.Type == service.AccountTypeAPIKey || local.HasToken && (a.Type == service.AccountTypeOAuth || a.Type == service.AccountTypeSetupToken) || local.HasServiceAccount && a.Type == service.AccountTypeServiceAccount
+	a.RuntimeReady = hasCredential && local.Parent == nil && account.IsSchedulable() && mediaworkbench.ValidateRouting(a)
 	routeBytes, _ := json.Marshal(struct{ Parent, Proxy *int64 }{local.Parent, local.Proxy})
 	a.RoutingFingerprint = string(routeBytes)
 	return a, nil
@@ -171,7 +176,7 @@ func (r *mediaConfigRepository) Get(ctx context.Context, id int64) (_ *mediawork
 	return scanMediaAccount(rows)
 }
 func (r *mediaConfigRepository) List(ctx context.Context) (_ []mediaworkbench.Account, err error) {
-	rows, err := r.db.QueryContext(ctx, mediaAccountProjection+`WHERE deleted_at IS NULL AND type='apikey' ORDER BY id`)
+	rows, err := r.db.QueryContext(ctx, mediaAccountProjection+`WHERE deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account'))) ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +194,7 @@ func (r *mediaConfigRepository) List(ctx context.Context) (_ []mediaworkbench.Ac
 
 const mediaConfigCAS = `UPDATE accounts SET extra=jsonb_set(COALESCE(extra, '{}'::jsonb),
  '{media_workbench_v1}', $1::jsonb, true), updated_at=NOW()
- WHERE id=$2 AND deleted_at IS NULL AND type='apikey'
+ WHERE id=$2 AND deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account')))
  AND (($3::bigint=0 AND (extra->'media_workbench_v1' IS NULL OR extra->'media_workbench_v1'='null'::jsonb))
  OR ($3::bigint>0 AND extra->'media_workbench_v1'->>'schema_version'='1'
  AND extra->'media_workbench_v1'->>'record_version'=$3::text))`

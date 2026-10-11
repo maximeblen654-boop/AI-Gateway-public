@@ -1,0 +1,4 @@
+import http from 'node:http';
+const ports={front:28180,media:28183,ticket:28182};
+function forward(port){return (req,res)=>{const u=http.request({hostname:'127.0.0.1',port,path:req.url,method:req.method,headers:{...req.headers,host:`127.0.0.1:${port}`}},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res)});u.on('error',()=>{if(!res.headersSent){res.writeHead(502);res.end('proxy unavailable')}});req.pipe(u)}}
+const server=http.createServer((req,res)=>{let route='front';if(req.url.split('?')[0]==='/api/v1/auth/studio-media-ticket'){route='ticket';req.url=req.url.replace('/api/v1/auth/studio-media-ticket','/api/v1/auth/studio-ticket')}else if(req.url.split('?')[0].startsWith('/studio-v2/api/'))route='media';else if(req.url.split('?')[0]==='/studio-v2'||req.url.split('?')[0].startsWith('/studio-v2/')){res.writeHead(404);return res.end()}return forward(ports[route])(req,res)});server.listen(28100,'127.0.0.1',()=>console.log('closeout same-origin proxy 28100'));

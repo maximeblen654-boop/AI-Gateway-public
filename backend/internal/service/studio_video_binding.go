@@ -13,6 +13,8 @@ const StudioVideoBindingVersion = "account_video_v1"
 // Private server snapshot. It contains no credentials and is never reconstructed
 // from a slot, the live catalog or the customer's request during recovery.
 type StudioVideoBinding struct {
+	AccountType           string                    `json:"account_type,omitempty"`
+	Platform              string                    `json:"platform,omitempty"`
 	Version               string                    `json:"version"`
 	QuoteID               string                    `json:"quote_id"`
 	Owner                 StudioImageOwner          `json:"owner"`
@@ -40,7 +42,7 @@ func (b *StudioVideoBinding) Validate() error {
 		b.Owner.UserID <= 0 || b.Owner.APIKeyID <= 0 || b.Owner.GroupID <= 0 || b.Offer.AccountID <= 0 ||
 		b.PublishedRevision == "" || b.Offer.OfferID == "" || b.Offer.MediaType != "video" ||
 		b.Offer.SiteModel == "" || b.Offer.UpstreamModel == "" ||
-		b.Offer.Adapter != (mediaworkbench.AdapterBinding{Kind: "laoli_video", Revision: "laoli_video_json_v136_r1", Auth: "account_apikey", TaskFlow: "async"}) ||
+		!mediaworkbench.ValidVideoBinding(b.Offer.Adapter) ||
 		b.Spec.Count != 1 || b.Spec.DurationSeconds <= 0 || !b.Offer.Matches(b.Spec) ||
 		b.SpecHash != studioHash(b.Spec) || !videoDigest(b.PlanHash) || !videoDigest(b.RequestHash) ||
 		!strings.HasPrefix(b.BaseURL, "https://") || !videoDigest(b.CredentialFingerprint) ||
@@ -114,7 +116,7 @@ func VideoAccountBillingCommand(childID string, b *StudioVideoBinding, finalFing
 	}
 	c := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("account-video:" + childID)), APIKeyID: b.Owner.APIKeyID,
 		RequestFingerprint: finalFingerprint, RequestPayloadHash: b.RequestHash, UserID: b.Owner.UserID, AccountID: b.Offer.AccountID,
-		AccountType: AccountTypeAPIKey, Model: b.Offer.SiteModel, MediaType: "video", ExactAmounts: m}
+		AccountType: firstNonEmptyString(b.AccountType, AccountTypeAPIKey), Model: b.Offer.SiteModel, MediaType: "video", ExactAmounts: m}
 	return c, m.Validate()
 }
 

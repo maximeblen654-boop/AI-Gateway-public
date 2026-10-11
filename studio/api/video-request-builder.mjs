@@ -84,8 +84,8 @@ function inlineMedia(assets, mode) {
   for (const asset of assets) {
     const payload = receiptPayloads.get(asset);
     if (!payload.bytes) fail('Inline model requires verified bytes');
-    if (mode === 'images' && asset.type !== 'image') fail('Image-only model rejects video and audio');
-    if (mode === 'inline_multimedia' || mode === 'images') {
+    if ((mode === 'images' || mode === 'grok') && asset.type !== 'image') fail('Image-only model rejects video and audio');
+    if (mode === 'inline_multimedia' || mode === 'images' || mode === 'grok') {
       if (asset.size > 50 * 1024 * 1024) fail('Inline asset exceeds 50 MiB');
       if (asset.type === 'image') imageBytes += asset.size;
       else avBytes += asset.size;
@@ -173,8 +173,8 @@ function compile(input, modelOverride) {
   const bytes = Buffer.from(JSON.stringify(body), 'utf8');
   if (bytes.byteLength > 128 * 1024 * 1024) fail('Video JSON exceeds 128 MiB');
   const plan = {
-    version: 'video_json_plan_v1', adapterRevision: 'laoli_video_json_v136_r1',
-    method: 'POST', path: '/v1/videos', encoding: 'application/json',
+    version: 'video_json_plan_v1', adapterRevision: model.inputMode === 'grok' ? 'core_grok_video_r1' : 'laoli_video_json_v136_r1',
+    method: 'POST', path: model.inputMode === 'grok' ? '/v1/videos/generations' : '/v1/videos', encoding: 'application/json',
     contractRevision: catalog.revision, fields: body,
   };
   const snapshot = JSON.parse(JSON.stringify(plan));
@@ -191,8 +191,9 @@ function planHash(plan) {
 // accidental mutation; authorization still belongs to the opaque server quote.
 export function Materialize(plan) {
   if (!plan || plan.version !== 'video_json_plan_v1' ||
-      plan.adapterRevision !== 'laoli_video_json_v136_r1' ||
-      plan.method !== 'POST' || plan.path !== '/v1/videos' ||
+      !((plan.adapterRevision === 'laoli_video_json_v136_r1' && plan.path === '/v1/videos') ||
+        (plan.adapterRevision === 'core_grok_video_r1' && plan.path === '/v1/videos/generations')) ||
+      plan.method !== 'POST' ||
       plan.encoding !== 'application/json' || planHash(plan) !== plan.planHash) {
     fail('Unsupported or changed frozen video plan');
   }

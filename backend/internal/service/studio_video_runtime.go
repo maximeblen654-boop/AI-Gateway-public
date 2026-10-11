@@ -91,11 +91,24 @@ func videoCredentialFingerprint(a *Account) string {
 	if a.Proxy != nil {
 		proxy = a.Proxy.URL()
 	}
+	credential := a.GetOpenAIProtocolAPIKey()
+	if a.IsGrokOAuth() {
+		credential = a.GetGrokAccessToken()
+	}
+	if a.Platform == PlatformGrok {
+		return studioHash(struct {
+			Credential string
+			ProxyID    *int64
+			Proxy      string
+			Headers    map[string]string
+			Standard   bool
+		}{credential, a.ProxyID, proxy, a.GetHeaderOverrides(), a.UsesStandardGrokVideoAPI()})
+	}
 	return studioHash(struct {
 		Key     string
 		ProxyID *int64
 		Proxy   string
-	}{a.GetOpenAIProtocolAPIKey(), a.ProxyID, proxy})
+	}{credential, a.ProxyID, proxy})
 }
 func videoOwnerKey(owner StudioImageOwner, key *APIKey) bool {
 	return key != nil && key.Group != nil && key.GroupID != nil && key.ID == owner.APIKeyID && key.UserID == owner.UserID && *key.GroupID == owner.GroupID && !key.Group.IsSubscriptionType()
@@ -185,7 +198,7 @@ func (r *StudioVideoRuntime) IssueWithPreparation(ctx context.Context, owner Stu
 	}
 	b := StudioVideoBinding{Version: StudioVideoBindingVersion, QuoteID: id, Owner: owner, PublishedRevision: resolved.PublishedRevision,
 		Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash, PlanHash: studioHash(plan), RequestHash: plan.RequestHash,
-		BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: videoCredentialFingerprint(a), KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), CreatedAt: now, ExpiresAt: now.Add(2 * time.Minute)}
+		AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: videoCredentialFingerprint(a), KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), CreatedAt: now, ExpiresAt: now.Add(2 * time.Minute)}
 	var channel *Channel
 	if r.Core.channelService != nil && r.Core.channelService.repo != nil {
 		cid, err := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
@@ -234,7 +247,7 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		return fail()
 	}
 	a, e := r.Core.accountRepo.GetByID(ctx, b.Offer.AccountID)
-	if e != nil || a == nil || a.ID != b.Offer.AccountID || !a.IsActive() || a.Type != AccountTypeAPIKey || a.Platform != PlatformOpenAI || a.ParentAccountID != nil || !slices.Contains(a.GroupIDs, b.Owner.GroupID) || a.GetOpenAIBaseURL() != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint || a.GetOpenAIProtocolAPIKey() == "" {
+	if e != nil || a == nil || a.ID != b.Offer.AccountID || !a.IsActive() || a.Type != firstNonEmptyString(b.AccountType, AccountTypeAPIKey) || a.Platform != firstNonEmptyString(b.Platform, PlatformOpenAI) || a.ParentAccountID != nil || !slices.Contains(a.GroupIDs, b.Owner.GroupID) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
 		return fail()
 	}
 	if a.ProxyID != nil && (a.Proxy == nil || a.Proxy.ID != *a.ProxyID) {
@@ -244,15 +257,20 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		return fail()
 	}
 	if admission {
+		if a.Platform == PlatformGrok {
+			if eligible, _ := a.GrokMediaGenerationEligibility(); !eligible {
+				return fail()
+			}
+		}
 		if !a.IsSchedulable() || a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
 			return fail()
 		}
 		gid := b.Owner.GroupID
 		ctx = r.Core.withOpenAIQuotaAutoPauseContext(ctx)
-		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, PlatformOpenAI, b.Offer.SiteModel, false, "")
+		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, b.Offer.SiteModel, false, "")
 		checker := defaultOpenAIAccountScheduler{service: r.Core}
-		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: PlatformOpenAI, RequestedModel: b.Offer.SiteModel, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
-		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, b.Offer.SiteModel) || a.GetOpenAIBaseURL() != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
+		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: b.Platform, RequestedModel: b.Offer.SiteModel, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
+		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, b.Offer.SiteModel) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
 			return fail()
 		}
 		ma, e := r.Media.Get(ctx, a.ID)
@@ -351,7 +369,7 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	if e != nil {
 		return videoState(t, "", "unknown"), e
 	}
-	data, _, e := r.request(context.WithValue(ctx, videoIdempotencyContextKey{}, id), a, http.MethodPost, "/videos", body)
+	data, _, e := r.request(context.WithValue(ctx, videoIdempotencyContextKey{}, id), a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
 	if e != nil {
 		return videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
@@ -487,6 +505,9 @@ func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner
 type videoIdempotencyContextKey struct{}
 
 func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
+	if a.Platform == PlatformGrok {
+		return r.requestGrok(ctx, a, method, path, body)
+	}
 	root := strings.TrimRight(a.GetOpenAIBaseURL(), "/")
 	if !strings.HasSuffix(root, "/v1") {
 		root += "/v1"

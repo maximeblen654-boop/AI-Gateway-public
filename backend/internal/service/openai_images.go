@@ -103,6 +103,8 @@ type OpenAIImagesRequest struct {
 	MaskUpload         *OpenAIImagesUpload
 	Body               []byte
 	bodyHash           string
+	// Set only by the server-side published-plan compiler, never JSON input.
+	publishedUpstreamModel string
 }
 
 func (r *OpenAIImagesRequest) ModerationBody() []byte {
@@ -220,7 +222,11 @@ func (s *OpenAIGatewayService) ParsePublishedImagePlan(plan imageplan.Plan) (*Op
 		(plan.Path != imageplan.Generations && plan.Path != imageplan.Edits) {
 		return nil, fmt.Errorf("invalid compiled image plan")
 	}
-	return parseOpenAIImagesRequest(plan.Path, plan.Encoding, plan.MaterializeJSON())
+	parsed, err := parseOpenAIImagesRequest(plan.Path, plan.Encoding, plan.MaterializeJSON())
+	if err == nil {
+		parsed.publishedUpstreamModel = parsed.Model
+	}
+	return parsed, err
 }
 
 func parseOpenAIImagesRequest(endpoint, contentType string, body []byte) (*OpenAIImagesRequest, error) {
@@ -576,12 +582,18 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
 		requestModel = mapped
 	}
-	if err := validateCompatibleImagesModel(requestModel); err != nil {
-		return nil, err
-	}
 	upstreamModel := account.GetMappedModel(requestModel)
-	if err := validateCompatibleImagesModel(upstreamModel); err != nil {
-		return nil, err
+	if parsed.publishedUpstreamModel != "" && isStudioNativeExecution(ctx) {
+		// Published plans already froze and checked the exact Account mapping.
+		// Applying it twice can route an alias to a different purchased model.
+		upstreamModel = parsed.publishedUpstreamModel
+	} else {
+		if err := validateCompatibleImagesModel(requestModel); err != nil {
+			return nil, err
+		}
+		if err := validateCompatibleImagesModel(upstreamModel); err != nil {
+			return nil, err
+		}
 	}
 	SetOpsUpstreamModel(c, upstreamModel)
 	logger.LegacyPrintf(

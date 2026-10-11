@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,14 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imageplan"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 type StudioImageRuntime struct {
 	Core    *OpenAIGatewayService
+	Gemini  *GeminiMessagesCompatService
 	Media   mediaworkbench.Repository
 	Store   *StudioImageStore
 	APIKeys *APIKeyService
@@ -131,7 +133,7 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	if err != nil || a == nil {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
-	q := StudioImageQuote{Owner: owner, Binding: resolved, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
+	q := StudioImageQuote{Owner: owner, Binding: resolved, QuotaPlatform: QuotaPlatform(ctx, key), AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
 	execution, err := mediaworkbench.PublishedImageExecution(resolved)
 	if err != nil || execution.Mode == mediaworkbench.ImageExecutionProviderAsync {
 		return "", mediaworkbench.ErrRuntimeBinding
@@ -142,7 +144,7 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	if err != nil {
 		return "", err
 	}
-	if _, release, e := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, false); e != nil {
+	if _, release, e := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, false, r.Gemini); e != nil {
 		return "", e
 	} else {
 		release()
@@ -186,7 +188,7 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	if (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
-	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true)
+	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true, r.Gemini)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +215,10 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	if err = r.Store.write(r.Store.path("upstream", taskID), data, false); err != nil {
 		return persisted, err
 	}
+	data, err = r.materializeResult(ctx, q, taskID, data)
+	if err != nil {
+		return persisted, err
+	}
 	if err = r.Store.PersistResult(persisted, data); err != nil {
 		return persisted, err
 	}
@@ -231,6 +237,10 @@ func (r *StudioImageRuntime) Recover(ctx context.Context, taskID string, owner S
 		data, e := os.ReadFile(r.Store.path("upstream", taskID))
 		if e != nil {
 			return receipt, ErrStudioImageUnknown
+		}
+		data, e = r.materializeResult(ctx, receipt.Quote, taskID, data)
+		if e != nil {
+			return receipt, e
 		}
 		if e = r.Store.PersistResult(receipt, data); e != nil {
 			return receipt, e
@@ -257,22 +267,26 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 		return receipt, err
 	}
 	if r.Core.billingCacheService != nil {
+		platform := receipt.Quote.QuotaPlatform
+		if platform == "" && receipt.Quote.AccountType == "" {
+			platform = PlatformOpenAI
+		}
 		_ = r.Core.billingCacheService.InvalidateUserBalance(ctx, receipt.Quote.Owner.UserID)
 		_ = r.Core.billingCacheService.InvalidateAPIKeyRateLimit(ctx, receipt.Quote.Owner.APIKeyID)
 		if receipt.Quote.SubscriptionID != nil {
 			_ = r.Core.billingCacheService.InvalidateSubscription(ctx, receipt.Quote.Owner.UserID, receipt.Quote.Owner.GroupID)
 		}
-		if result.Applied && receipt.Quote.SubscriptionID == nil && r.Core.userPlatformQuotaRepo != nil && r.Core.billingCacheService.HasUserPlatformQuotaLimit(ctx, receipt.Quote.Owner.UserID, PlatformOpenAI) {
+		if result.Applied && receipt.Quote.SubscriptionID == nil && r.Core.userPlatformQuotaRepo != nil && r.Core.billingCacheService.HasUserPlatformQuotaLimit(ctx, receipt.Quote.Owner.UserID, platform) {
 			// Reuse the existing native usage side effect; no Studio quota ledger.
 			_, total, _, e := studioImageReceiptPrices(receipt)
 			if e != nil {
 				return receipt, e
 			}
 			n, _ := mediaworkbench.DecimalAmount(total.Amount)
-			r.Core.billingCacheService.IncrementUserPlatformQuotaUsage(receipt.Quote.Owner.UserID, PlatformOpenAI, n.InexactFloat64())
+			r.Core.billingCacheService.IncrementUserPlatformQuotaUsage(receipt.Quote.Owner.UserID, platform, n.InexactFloat64())
 			// Preserve native flusher ownership and its non-flusher DB fallback.
 			if r.Core.cfg == nil || !r.Core.cfg.Database.UserPlatformQuotaFlusherEnabled {
-				if err := r.Core.userPlatformQuotaRepo.IncrementUsageWithReset(ctx, receipt.Quote.Owner.UserID, PlatformOpenAI, n.InexactFloat64(), time.Now().UTC()); err != nil {
+				if err := r.Core.userPlatformQuotaRepo.IncrementUsageWithReset(ctx, receipt.Quote.Owner.UserID, platform, n.InexactFloat64(), time.Now().UTC()); err != nil {
 					// Keep the existing native best-effort quota/cache semantics.
 					userPlatformQuotaDBIncrErrorTotal.Add(1)
 					logger.LegacyPrintf("service.studio_images", "ALERT: native user platform quota persistence failed user=%d: %v", receipt.Quote.Owner.UserID, err)
@@ -293,36 +307,29 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 	}
 	return receipt, r.Store.Save(receipt)
 }
-func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, c *gin.Context, a *Account, body []byte, endpoint string) ([]byte, string, error) {
-	ctx, release := detachUpstreamContext(ctx)
+func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, _ *gin.Context, a *Account, body []byte, endpoint string) ([]byte, string, error) {
+	plan, err := imageplan.CompileJSON(body, gjson.GetBytes(body, "model").String(), endpoint)
+	if err != nil {
+		return nil, "", err
+	}
+	parsed, err := r.Core.ParsePublishedImagePlan(plan)
+	if err != nil {
+		return nil, "", err
+	}
+	upstreamCtx, release := detachUpstreamContext(ctx)
 	defer release()
-	token, _, err := r.Core.GetAccessToken(ctx, a)
-	if err != nil {
-		return nil, "", err
+	c, capture := newStudioNativeContext(upstreamCtx, http.MethodPost, endpoint, body, 32<<20)
+	if a.Platform == PlatformGemini {
+		return r.forwardGeminiImage(c, capture, a, parsed, body)
 	}
-	req, err := r.Core.buildOpenAIImagesRequest(ctx, c, a, body, "application/json", token, endpoint)
-	if err != nil {
-		return nil, "", err
+	if a.Platform == PlatformGrok {
+		operation := GrokMediaEndpointImagesGenerations
+		if parsed.IsEdits() {
+			operation = GrokMediaEndpointImagesEdits
+		}
+		result, err := r.Core.ForwardGrokMedia(c.Request.Context(), c, a, operation, "", body, "application/json")
+		return studioNativeResult(capture, result, err)
 	}
-	req = req.WithContext(WithHTTPUpstreamRedirectsDisabled(req.Context()))
-	req.GetBody = nil
-	req.Header.Del("Idempotency-Key")
-	req.Header.Del("X-Idempotency-Key")
-	proxy := ""
-	if a.Proxy != nil {
-		proxy = a.Proxy.URL()
-	}
-	resp, err := r.Core.httpUpstream.Do(req, proxy, a.ID, a.Concurrency)
-	if err != nil {
-		return nil, "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.Header.Get("x-request-id"), &StudioImageUpstreamError{Status: resp.StatusCode, RequestID: resp.Header.Get("x-request-id")}
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, (32<<20)+1))
-	if err != nil || len(data) > 32<<20 {
-		return nil, "", ErrStudioImageUnknown
-	}
-	return data, resp.Header.Get("x-request-id"), nil
+	result, err := r.Core.ForwardImages(c.Request.Context(), c, a, body, parsed, "")
+	return studioNativeResult(capture, result, err)
 }

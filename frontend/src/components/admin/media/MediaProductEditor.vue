@@ -33,7 +33,7 @@
 
     </div>
     <section v-show="wizardStep === 2" data-field="capabilities.references" data-test="wizard-page-2">
-      <MediaReferenceEditor ref="referenceEditor" :model-value="product.capabilities.references" :media-type="product.media_type" @update:model-value="editPricing(next => { next.capabilities.references = $event })" />
+      <MediaReferenceEditor ref="referenceEditor" :model-value="product.capabilities.references" :media-type="product.media_type" :max-references="nativeAdapter?.max_references" @update:model-value="editPricing(next => { next.capabilities.references = $event })" />
     </section>
     <section v-show="wizardStep === 3" data-test="wizard-page-3">
 
@@ -88,16 +88,16 @@
     </section>
     <div class="mw-wizard-footer"><button v-if="wizardStep > 1" type="button" class="btn btn-secondary" data-test="wizard-back" @click="goToStep(wizardStep - 1)">← 上一步</button><span v-else class="mw-muted">仅编辑当前草稿</span><button v-if="wizardStep < 5" type="button" class="btn btn-primary" data-test="wizard-next" @click="goToStep(wizardStep + 1)">下一步：{{ stepLabels[wizardStep] }} →</button><span v-else class="mw-muted">保存不自动发布或启售。</span></div>
   </fieldset>
-  <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" @update:product="updateTechnical" @identity="emit('identity', $event)" />
+  <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" :native-adapter="nativeAdapter" @update:product="updateTechnical" @identity="emit('identity', $event)" />
 </template>
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import type { AdapterBinding, Diagnostic, Product } from '@/api/admin/mediaWorkbench'
+import type { NativeAdapter, AdapterBinding, Diagnostic, Product } from '@/api/admin/mediaWorkbench'
 import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
-const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; diagnostics?: Diagnostic[]; accountLabel?: string }>()
+const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
@@ -128,6 +128,7 @@ defineExpose({ showField })
 const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
 const adapterStatus = computed(() => {
   if (adapterDiagnostics.value.length) return { title: '当前工作台适配尚未接通', description: '上次服务端校验发现以下适配缺口。请交由技术维护者处理；填写协议名称不能使未实现的接口获得支持。' }
+  if (props.nativeAdapter) return { title: '已接入 Sub2API 原生媒体执行', description: '调用合同、认证和模型映射由现有账号提供，无需选择协议。请配置准备出售的规格和售价；保存时由服务端校验，接入状态不代表供应商已实测。' }
   if (!props.binding || props.binding.kind.startsWith('unbound')) return { title: '适配器能力待确认', description: '可以整理商品草稿，接口是否可用由后台校验；未确认前不能发布。' }
   return { title: '接口配置已记录，可继续整理商品', description: '保存草稿后请查看后台校验结果；这不代表供应商已实测。技术维护入口位于向导外。' }
 })

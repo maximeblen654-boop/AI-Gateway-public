@@ -138,11 +138,6 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 		{"precision", "INVALID_PRICE", "UI_FIXABLE", func(_ *Account, p *Product) { p.PricingRules[0].SalePrice.Amount = "1e-9" }},
 		{"negative", "INVALID_PRICE", "UI_FIXABLE", func(_ *Account, p *Product) { p.PricingRules[0].SalePrice.Amount = "-1" }},
 		{"unsupported duration", "PARAMETER_TYPE_UNSUPPORTED", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) { p.Capabilities.DurationsSeconds = []int{15} }},
-		{"coded model", "VALUE_HARDCODED", "NEEDS_DEVELOPMENT", func(a *Account, p *Product) {
-			p.SiteModel = "custom-image"
-			p.UpstreamModel = p.SiteModel
-			a.Catalog.Models = append(a.Catalog.Models, p.SiteModel)
-		}},
 		{"missing size map", "MISSING_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) { p.AdapterConfig.SizeMappings = p.AdapterConfig.SizeMappings[:1] }},
 		{"duplicate map", "DUPLICATE_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) {
 			p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings, p.AdapterConfig.SizeMappings[0])

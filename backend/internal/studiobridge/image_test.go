@@ -29,9 +29,9 @@ func TestImageSQLCredentialRecoveryScope(t *testing.T) {
 		if receipt {
 			gate = "k.status IN ('active','expired','quota_exhausted')"
 		}
-		groupGate := "g.status='active' AND g.allow_image_generation=TRUE AND g.platform='openai'"
+		groupGate := "g.status='active' AND g.allow_image_generation=TRUE ORDER BY"
 		if receipt {
-			groupGate = "g.status='active' AND g.platform='openai'"
+			groupGate = "g.status='active' ORDER BY"
 		}
 		mock.ExpectQuery("SELECT k.id,k.key .*"+regexp.QuoteMeta(gate)+".*u.status='active'.*"+regexp.QuoteMeta(groupGate)).WithArgs(int64(1), int64(3), int64(42)).WillReturnRows(sqlmock.NewRows([]string{"id", "key"}).AddRow(42, "synthetic-only"))
 		var k ImageCredential

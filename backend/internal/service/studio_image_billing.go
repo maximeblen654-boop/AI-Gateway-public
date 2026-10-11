@@ -199,7 +199,7 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 		fingerprint = studioHash([]any{fingerprint, quantity, receipt.ResultHash})
 	}
 	// Native request_id is VARCHAR(64); opaque task identifiers are hashed.
-	cmd := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("studio-image:" + taskID)), RequestFingerprint: fingerprint, RequestPayloadHash: payloadHash, UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, SubscriptionID: subscriptionID, AccountType: AccountTypeAPIKey, Model: q.Binding.Offer.SiteModel, MediaType: "image", ImageCount: quantity, ExactAmounts: m, QuotedImage: receipt}
+	cmd := &UsageBillingCommand{RequestID: HashUsageRequestPayload([]byte("studio-image:" + taskID)), RequestFingerprint: fingerprint, RequestPayloadHash: payloadHash, UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, SubscriptionID: subscriptionID, AccountType: firstNonEmptyString(q.AccountType, AccountTypeAPIKey), Model: q.Binding.Offer.SiteModel, MediaType: "image", ImageCount: quantity, ExactAmounts: m, QuotedImage: receipt}
 	if subscriptionID != nil {
 		cmd.BillingType = BillingTypeSubscription
 	}

@@ -1,0 +1,53 @@
+name: Native media candidate (no deployment)
+
+on:
+  push:
+    branches: [codex/studio-native-media]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-media-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: >-
+      github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
+      github.ref == 'refs/heads/codex/studio-native-media' &&
+      (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[native-media-candidate]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+      - uses: docker/setup-buildx-action@v3
+      - name: Build only this commit, using existing component recipes
+        run: node tools/native-media-e2e/candidate.mjs build
+      - name: Install browser test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Real candidate startup and non-paid business acceptance
+        run: node tools/native-media-e2e/candidate.mjs verify
+      - name: Export verified images and exact identities
+        run: node tools/native-media-e2e/candidate.mjs export
+      - name: Save final candidate and non-secret evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-media-candidate-${{ github.sha }}
+          retention-days: 14
+          compression-level: 0
+          path: |
+            ${{ runner.temp }}/native-candidate-output/*

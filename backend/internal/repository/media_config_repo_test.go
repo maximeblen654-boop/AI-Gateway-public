@@ -68,7 +68,7 @@ func TestMediaReadProjection(t *testing.T) {
 		}
 	})
 	r := NewMediaConfigRepository(db)
-	mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE deleted_at IS NULL AND type='apikey' ORDER BY id`)).WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(7, "supplier", "openai", "apikey", "inactive", false, "https://user:secret@example.com/private?key=secret", `{"models":["m"],"synced_at":"now","api_key":"secret"}`, nil, `{"has_key":true}`))
+	mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account'))) ORDER BY id`)).WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(7, "supplier", "openai", "apikey", "inactive", false, "https://user:secret@example.com/private?key=secret", `{"models":["m"],"synced_at":"now","api_key":"secret"}`, nil, `{"has_key":true}`))
 	d, err := mediaworkbench.NewService(r).Suppliers(context.Background())
 	if err != nil {
 		t.Fatal(err)

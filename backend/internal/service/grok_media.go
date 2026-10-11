@@ -716,13 +716,17 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	if err != nil {
 		return nil, err
 	}
+	frozenModel := gjson.GetBytes(body, "model").String()
 	body, contentType, err = normalizeGrokMediaForwardBody(endpoint, body, contentType)
+	if err == nil && isStudioNativeExecution(ctx) && frozenModel != "" {
+		body, err = sjson.SetBytes(body, "model", frozenModel)
+	}
 	if err != nil {
 		return nil, err
 	}
 	requestInfo := ParseGrokMediaRequest(contentType, body)
 	upstreamModel := requestInfo.Model
-	if endpoint.RequiresRequestBody() && gjson.ValidBytes(body) {
+	if !isStudioNativeExecution(ctx) && endpoint.RequiresRequestBody() && gjson.ValidBytes(body) {
 		if mappedModel := strings.TrimSpace(account.GetMappedModel(requestInfo.Model)); mappedModel != "" {
 			upstreamModel = mappedModel
 		}
@@ -773,6 +777,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		proxyURL = account.Proxy.URL()
 	}
 	upstreamStart := time.Now()
+	prepareStudioNativeRequest(upstreamReq)
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {

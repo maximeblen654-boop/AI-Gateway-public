@@ -97,7 +97,7 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 	if !time.Now().Before(q.ExpiresAt) || time.Now().Before(q.CreatedAt) || (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
-	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true)
+	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true, r.Gemini)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +129,9 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 		}
 		if err = r.Store.writeUnitOutcome(u, state, data, id); err != nil {
 			return receipt, err
+		}
+		if state == "response" {
+			data, _ = r.materializeResult(ctx, q, u.ID, data)
 		}
 		_, count, validationErr := studioExecutionResult(data, u.OutputCount)
 		if state != "response" || validationErr != nil || count != u.OutputCount {
@@ -197,6 +200,12 @@ func (r *StudioImageRuntime) recoverExecution(ctx context.Context, receipt *Stud
 			u.Status, u.Error = "failed", outcome.State
 			receipt.FailedCount += u.OutputCount
 		case "response":
+			outcome.Data, err = r.materializeResult(ctx, receipt.Quote, u.ID, outcome.Data)
+			if err != nil {
+				u.Status, u.Error = "unknown", "result_unavailable"
+				receipt.PendingCount += u.OutputCount
+				continue
+			}
 			items, count, e := studioExecutionResult(outcome.Data, u.OutputCount)
 			if e != nil {
 				u.Status, u.Error = "unknown", "invalid_result"

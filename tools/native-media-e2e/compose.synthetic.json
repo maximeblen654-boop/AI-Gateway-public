@@ -1,0 +1,227 @@
+{
+  "services": {
+    "postgres": {
+      "image": "postgres:18-alpine",
+      "container_name": "ai-gateway-native-postgres-20261012",
+      "environment": {
+        "POSTGRES_USER": "native",
+        "POSTGRES_PASSWORD": "native-pass",
+        "POSTGRES_DB": "sub2api"
+      },
+      "volumes": [
+        "native_pg_20261012:/var/lib/postgresql"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U native -d sub2api"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 30
+      },
+      "networks": [
+        "native"
+      ]
+    },
+    "redis": {
+      "image": "redis:8-alpine",
+      "container_name": "ai-gateway-native-redis-20261012",
+      "command": [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 30
+      },
+      "networks": [
+        "native"
+      ]
+    },
+    "core": {
+      "image": "native-candidate-core:SOURCE_SHA",
+      "container_name": "ai-gateway-native-core-20261012",
+      "environment": {
+        "AUTO_SETUP": "true",
+        "SERVER_HOST": "0.0.0.0",
+        "SERVER_PORT": "8080",
+        "SERVER_MODE": "release",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_PORT": "5432",
+        "DATABASE_USER": "native",
+        "DATABASE_PASSWORD": "native-pass",
+        "DATABASE_DBNAME": "sub2api",
+        "DATABASE_SSLMODE": "disable",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "REDIS_DB": "0",
+        "ADMIN_EMAIL": "native-admin@example.invalid",
+        "ADMIN_PASSWORD": "Native-Synthetic-Only-20261012",
+        "JWT_SECRET": "synthetic-native-candidate-jwt-20261012",
+        "SETUP_MIGRATION_TIMEOUT_SECONDS": "120",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "true",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "true",
+        "STUDIO_BRIDGE_SERVICE_TOKEN": "native-bridge-token-20261012-0123456789abcdef",
+        "SSL_CERT_FILE": "/app/data/simulator-ca.crt",
+        "PRICING_AUTO_SYNC_ENABLED": "false"
+      },
+      "ports": [
+        "127.0.0.1:28180:8080",
+        "127.0.0.1:28182:8091",
+        "127.0.0.1:28183:4173"
+      ],
+      "volumes": [
+        "native_core_20261012:/app/data",
+        "./evidence/simulator-ca.crt:/app/data/simulator-ca.crt:ro"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "wget",
+          "-q",
+          "-T",
+          "5",
+          "-O",
+          "/dev/null",
+          "http://localhost:8080/health"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 30,
+        "start_period": "20s"
+      },
+      "networks": [
+        "native"
+      ]
+    },
+    "simulator": {
+      "image": "node:22-alpine",
+      "container_name": "ai-gateway-native-simulator-20261012",
+      "network_mode": "service:core",
+      "environment": {},
+      "volumes": [
+        "./evidence:/evidence",
+        "./runtime:/native:ro"
+      ],
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      },
+      "command": [
+        "node",
+        "/native/simulator.mjs"
+      ]
+    },
+    "bridge": {
+      "image": "native-candidate-bridge:SOURCE_SHA",
+      "container_name": "ai-gateway-native-bridge-20261012",
+      "network_mode": "service:core",
+      "user": "1000:1000",
+      "environment": {
+        "DATABASE_HOST": "postgres",
+        "DATABASE_PORT": "5432",
+        "DATABASE_USER": "native",
+        "DATABASE_PASSWORD": "native-pass",
+        "DATABASE_DBNAME": "sub2api",
+        "DATABASE_SSLMODE": "disable",
+        "REDIS_HOST": "redis",
+        "REDIS_PORT": "6379",
+        "STUDIO_BRIDGE_SERVICE_TOKEN": "native-bridge-token-20261012-0123456789abcdef",
+        "STUDIO_IMAGE_CORE_URL": "http://127.0.0.1:8080",
+        "STUDIO_BRIDGE_LISTEN_ADDR": "0.0.0.0:8091",
+        "STUDIO_IMAGE_GROUP_ID": "2",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "true",
+        "STUDIO_VIDEO_GROUP_ID": "3",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "true"
+      },
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -T 5 -O /dev/null http://localhost:8091/health || exit 1"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 30
+      },
+      "volumes": [
+        "native_core_20261012:/app/data:ro"
+      ]
+    },
+    "bff": {
+      "image": "native-candidate-bff:SOURCE_SHA",
+      "container_name": "ai-gateway-native-bff-20261012",
+      "network_mode": "service:core",
+      "user": "1000:1000",
+      "environment": {
+        "STUDIO_BRIDGE_URL": "http://127.0.0.1:8091",
+        "STUDIO_BRIDGE_SERVICE_TOKEN": "native-bridge-token-20261012-0123456789abcdef",
+        "STUDIO_PUBLIC_ORIGIN": "http://127.0.0.1:28100",
+        "STUDIO_IMAGE_BFF_HOST": "0.0.0.0",
+        "STUDIO_IMAGE_BFF_PORT": "4173",
+        "STUDIO_ASSET_ROOT": "/state/assets",
+        "STUDIO_IMAGE_DATA_ROOT": "/state/images",
+        "STUDIO_VIDEO_DATA_ROOT": "/state/videos",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "true",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "true",
+        "STUDIO_LEGACY_VIDEO_RECOVERY": "false"
+      },
+      "volumes": [
+        "native_assets_20261012:/state/assets",
+        "native_images_20261012:/state/images",
+        "native_videos_20261012:/state/videos"
+      ],
+      "depends_on": {
+        "bridge": {
+          "condition": "service_started"
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4173/health').then(async r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 30
+      }
+    }
+  },
+  "networks": {
+    "native": {
+      "name": "ai-gateway-native-net-20261012"
+    }
+  },
+  "volumes": {
+    "native_pg_20261012": null,
+    "native_core_20261012": null,
+    "native_assets_20261012": null,
+    "native_images_20261012": null,
+    "native_videos_20261012": null
+  }
+}

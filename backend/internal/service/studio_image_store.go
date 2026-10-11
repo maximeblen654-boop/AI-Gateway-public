@@ -31,6 +31,9 @@ type StudioImageOwner struct {
 	GroupID  int64 `json:"group_id"`
 }
 type StudioImageQuote struct {
+	QuotaPlatform         string                            `json:"quota_platform,omitempty"`
+	AccountType           string                            `json:"account_type,omitempty"`
+	Platform              string                            `json:"platform,omitempty"`
 	ID                    string                            `json:"id"`
 	Owner                 StudioImageOwner                  `json:"owner"`
 	Binding               mediaworkbench.ResolvedImageOffer `json:"binding"`

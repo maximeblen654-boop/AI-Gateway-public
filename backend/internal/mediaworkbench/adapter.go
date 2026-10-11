@@ -26,6 +26,9 @@ func VideoProfileModel(p Product) (videoplan.Model, bool) {
 	if p.AdapterConfig.Version != 1 || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
 		return videoplan.Model{}, false
 	}
+	if profile == "grok" && (p.Capabilities.References.Image.Max > 1 || p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0) {
+		return videoplan.Model{}, false
+	}
 	m := videoplan.Model{ID: p.SiteModel, Upstream: p.UpstreamModel, Status: "enabled", Mode: profile, PromptMax: 6000,
 		Durations: append([]int(nil), p.Capabilities.DurationsSeconds...), Resolutions: append([]string(nil), p.Capabilities.Resolutions...), Ratios: append([]string(nil), p.Capabilities.AspectRatios...)}
 	m.Limits.Image = p.Capabilities.References.Image.Max
@@ -72,9 +75,30 @@ type AdapterBinding struct {
 	TaskFlow string `json:"task_flow"`
 }
 
-// This registry describes the selected base commit, not the unmerged Studio
-// candidate. An unsupported profile remains explicit and cannot publish.
+// Descriptors expose the installed native adapters, not supplier-tested model
+// capabilities. Unsupported contracts remain explicit and cannot publish.
 func Descriptor(kind string) (AdapterDescriptor, bool) {
+	if kind == "grok_video" {
+		d, _ := Descriptor("laoli_video")
+		d.Kind, d.Revision, d.Auth, d.MaxReferences = kind, videoplan.GrokRevision, "account_native", 1
+		return d, true
+	}
+	if kind == "grok_images" || kind == "gemini_images" || kind == "openai_images_oauth" {
+		d, _ := Descriptor("openai_images")
+		d.Kind, d.Revision, d.Auth = kind, "core_"+kind+"_r1", "account_native"
+		if kind == "grok_images" {
+			d.MaxReferences = 3
+			d.Parameters["resolution"] = Parameter{Mode: Passthrough, WireField: "resolution"}
+			d.Parameters["aspect_ratio"] = Parameter{Mode: Passthrough, WireField: "aspect_ratio"}
+		} // native Grok edit parser limit
+		if kind == "gemini_images" {
+			d.Parameters["resolution"] = Parameter{Mode: Passthrough, WireField: "generationConfig.imageConfig.imageSize"}
+			d.Parameters["aspect_ratio"] = Parameter{Mode: Passthrough, WireField: "generationConfig.imageConfig.aspectRatio"}
+			d.Parameters["quality"] = Parameter{Mode: Unsupported}
+			d.Parameters["count"] = Parameter{Mode: FixedByModel, ValueType: "one"}
+		}
+		return d, true
+	}
 	if kind == "laoli_video" {
 		return AdapterDescriptor{Kind: kind, Revision: videoplan.Revision, MediaType: "video", Auth: "account_apikey", Transport: "https_json", TaskFlow: "async", MaxReferences: 16, Parameters: map[string]Parameter{
 			"model": {Mode: CodeEnum, ValueType: "video_contract_model"}, "resolution": {Mode: CodeEnum}, "aspect_ratio": {Mode: CodeEnum}, "duration_seconds": {Mode: CodeEnum}, "count": {Mode: FixedByModel, ValueType: "one"}, "quality": {Mode: Unsupported}, "reference_images": {Mode: Derived}, "reference_video": {Mode: Derived}, "reference_audio": {Mode: Derived},
@@ -101,7 +125,7 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 		// Preserve explicit internal bindings; never infer a supplier's flow from
 		// its host, model name or public docs.
 		if a.Config != nil {
-			if b, ok := a.Config.AdapterBindings[mediaType]; ok {
+			if b, ok := a.Config.AdapterBindings[mediaType]; ok && !(b.Kind == "unbound_"+mediaType && nativeAdapterKind(a, mediaType) != "") {
 				if d, known := Descriptor(b.Kind); known {
 					b.Revision = d.Revision
 				}
@@ -109,14 +133,76 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 				continue
 			}
 		}
-		if mediaType == "image" && a.Platform == "openai" {
-			d, _ := Descriptor("openai_images")
+		if kind := nativeAdapterKind(a, mediaType); kind != "" {
+			d, _ := Descriptor(kind)
 			out[mediaType] = AdapterBinding{Kind: d.Kind, Revision: d.Revision, Auth: d.Auth, TaskFlow: d.TaskFlow}
 		} else {
 			out[mediaType] = AdapterBinding{Kind: "unbound_" + mediaType, Auth: "account_apikey"}
 		}
 	}
 	return out
+}
+
+// Account platform/type already selects the native gateway protocol. This is
+// a local adapter inventory, not a claim that a supplier/model was probed.
+func nativeAdapterKind(a *Account, mediaType string) string {
+	if mediaType == "video" && a.Platform == "grok" && (a.Type == "apikey" || a.Type == "oauth") {
+		return "grok_video"
+	}
+	if mediaType == "image" {
+		switch a.Platform {
+		case "openai":
+			if a.Type == "apikey" {
+				return "openai_images"
+			}
+			if a.Type == "oauth" || a.Type == "setup-token" {
+				return "openai_images_oauth"
+			}
+		case "grok":
+			if a.Type == "apikey" || a.Type == "oauth" {
+				return "grok_images"
+			}
+		case "gemini":
+			if a.Type == "apikey" || a.Type == "oauth" || a.Type == "service_account" {
+				return "gemini_images"
+			}
+		}
+	}
+	return ""
+}
+
+func SupportsAccount(a *Account) bool {
+	return a.Type == "apikey" || nativeAdapterKind(a, "image") != ""
+}
+
+func adapterOwnsPlatform(kind, platform string) bool {
+	switch kind {
+	case "openai_images", "openai_images_oauth", "laoli_video":
+		return platform == "openai"
+	case "grok_images", "grok_video":
+		return platform == "grok"
+	case "gemini_images":
+		return platform == "gemini"
+	}
+	return false
+}
+
+// Only explicit draft saves acquire defaults. Published products and historical
+// quotes retain their original configuration and hashes.
+func inheritNativeProduct(a *Account, p *Product) {
+	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "grok_video" && p.AdapterConfig.WireProfile == "" {
+		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "grok"
+	}
+	if p.MediaType != "image" || p.AdapterConfig.ModelFamily != "" || p.AdapterConfig.WireProfile != "" {
+		return
+	}
+	switch nativeAdapterKind(a, "image") {
+	case "openai_images":
+		// The native Account adapter is authoritative; no protocol selection or
+		// synthetic model-family value is needed in an ordinary product draft.
+	case "grok_images", "gemini_images", "openai_images_oauth":
+		p.AdapterConfig.Version, p.AdapterConfig.ModelFamily = 1, nativeAdapterKind(a, "image")
+	}
 }
 
 // Only business value mappings are accepted from Draft input. No arbitrary
@@ -257,7 +343,21 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 	}
 
 	fields := map[string]any{"model": p.SiteModel, "prompt": "<dry-run-prompt>", "n": spec.Count}
-	if spec.Resolution != "" || spec.AspectRatio != "" {
+	if p.AdapterConfig.ModelFamily == "gemini_images" {
+		if spec.Resolution != "" {
+			fields["image_size"] = spec.Resolution
+		}
+		if spec.AspectRatio != "" {
+			fields["aspect_ratio"] = spec.AspectRatio
+		}
+	} else if p.AdapterConfig.ModelFamily == "grok_images" {
+		if spec.Resolution != "" {
+			fields["resolution"] = spec.Resolution
+		}
+		if spec.AspectRatio != "" {
+			fields["aspect_ratio"] = spec.AspectRatio
+		}
+	} else if spec.Resolution != "" || spec.AspectRatio != "" {
 		size, _, _, err := ImageDimensions(p.AdapterConfig, spec)
 		if err != nil {
 			return imageplan.Plan{}, err
@@ -316,7 +416,7 @@ func publishedRevision(p *Published) string {
 	}{p.SourceDraftRevision, p.Products, p.Offers, p.Dependencies})
 }
 func publishedReady(a *Account) bool {
-	if a.Type != "apikey" || a.Status != "active" || !a.Schedulable || !a.RuntimeReady || a.Config == nil {
+	if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady || a.Config == nil {
 		return false
 	}
 	p := a.Config.Published

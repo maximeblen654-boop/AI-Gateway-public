@@ -72,7 +72,7 @@ func resolveStudioAccountCost(a *Account, binding mediaworkbench.ResolvedImageOf
 			if !slices.Contains(rule.AccountIDs, a.ID) {
 				continue
 			}
-			p := findPricingForModel(rule.Pricing, PlatformOpenAI, strings.ToLower(binding.Offer.UpstreamModel))
+			p := findPricingForModel(rule.Pricing, firstNonEmptyString(a.Platform, PlatformOpenAI), strings.ToLower(binding.Offer.UpstreamModel))
 			if p == nil {
 				continue
 			}

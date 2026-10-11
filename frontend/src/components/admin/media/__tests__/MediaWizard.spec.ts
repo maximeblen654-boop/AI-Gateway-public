@@ -26,7 +26,9 @@ describe('five-step product wizard', () => {
       expect(wrapper.get(`[data-test="wizard-step-${step}"]`).attributes('aria-current')).toBe('step')
     }
     expect(wrapper.emitted('update:product')).toBeUndefined()
-    expect(wrapper.get('[data-test="model-family"]').isVisible()).toBe(false)
+    expect(wrapper.find('[data-test="model-family"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="wire-profile"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="native-contract"]').text()).toContain('继承 Sub2API Account')
     expect(wrapper.get('[data-test="quality-options"] input').attributes('placeholder')).toContain('留空')
     expect(wrapper.find('[data-test="pricing-dimension-quality"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="pricing-dimension-duration_seconds"]').exists()).toBe(false)

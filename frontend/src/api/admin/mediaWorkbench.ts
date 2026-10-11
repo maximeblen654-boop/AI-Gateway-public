@@ -31,6 +31,7 @@ export interface Validation {
   diagnostics: Diagnostic[]; previews?: unknown; adapter_registry_revision?: string
 }
 export interface AdapterBinding { kind: string; revision: string; auth: string; task_flow: string }
+export interface NativeAdapter extends AdapterBinding { media_type: string; max_references: number; parameters: Record<string, { mode: string; wire_field?: string; value_type?: string }> }
 export interface MediaConfig {
   adapter_bindings?: Record<string, AdapterBinding>
   record_version: number; media_types: string[]
@@ -41,6 +42,7 @@ export interface MediaConfig {
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
 }
 export interface SupplierDetail {
+  native_adapters?: Record<string, NativeAdapter>
   id: number; name: string; host: string; platform: string; type: string; status: string; schedulable: boolean
   effective_sales: boolean; effective_state: string; sales_resume_ready?: boolean
   model_catalog: { source: string; synced_at: string; models: string[] } | null

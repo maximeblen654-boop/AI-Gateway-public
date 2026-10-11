@@ -104,7 +104,7 @@ func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 			config.Execution = config.EditExecution
 		}
 		exec, execErr := PlanImageExecution(config, 1)
-		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.Kind != "openai_images" || o.AccountID != a.ID || o.MediaType != "image" || d.Auth != "account_apikey" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateImageSalePrice(o.SalePrice) != nil {
+		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.MediaType != "image" || o.AccountID != a.ID || o.MediaType != "image" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateImageSalePrice(o.SalePrice) != nil {
 			return r, ErrRuntimeBinding
 		}
 		r = ResolvedImageOffer{ImageBindingVersion, a.Config.Published.Revision, a.Config.Published.Dependencies, o, s, h}
@@ -169,7 +169,7 @@ func CompilePublishedImagePlanForCount(r ResolvedImageOffer, prompt string, refe
 		return imageplan.Plan{}, ErrRuntimeBinding
 	}
 	d, ok := Descriptor(r.Offer.Adapter.Kind)
-	if !ok || d.Kind != "openai_images" || r.Offer.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) {
+	if !ok || d.MediaType != "image" || r.Offer.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) {
 		return imageplan.Plan{}, ErrRuntimeBinding
 	}
 	// Use the validator's compiler to establish the same field mappings, then

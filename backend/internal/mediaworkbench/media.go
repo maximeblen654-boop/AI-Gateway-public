@@ -196,14 +196,15 @@ type ModelState struct {
 }
 type Detail struct {
 	*Account
-	Host           string       `json:"host"`
-	EffectiveSales bool         `json:"effective_sales"`
-	EffectiveState string       `json:"effective_state"`
-	Models         []ModelState `json:"models"`
-	Discovered     int          `json:"discovered_count"`
-	Configured     int          `json:"configured_count"`
-	Pending        int          `json:"pending_count"`
-	Problems       int          `json:"problem_count"`
+	NativeAdapters map[string]AdapterDescriptor `json:"native_adapters"`
+	Host           string                       `json:"host"`
+	EffectiveSales bool                         `json:"effective_sales"`
+	EffectiveState string                       `json:"effective_state"`
+	Models         []ModelState                 `json:"models"`
+	Discovered     int                          `json:"discovered_count"`
+	Configured     int                          `json:"configured_count"`
+	Pending        int                          `json:"pending_count"`
+	Problems       int                          `json:"problem_count"`
 }
 type Repository interface {
 	Get(context.Context, int64) (*Account, error)
@@ -236,6 +237,12 @@ func (s *Service) Suppliers(ctx context.Context) ([]Detail, error) {
 }
 func describe(a *Account) *Detail {
 	d := &Detail{Account: a, Models: []ModelState{}, EffectiveState: "NOT_INITIALIZED"}
+	d.NativeAdapters = map[string]AdapterDescriptor{}
+	for _, mediaType := range []string{"image", "video"} {
+		if descriptor, ok := Descriptor(nativeAdapterKind(a, mediaType)); ok {
+			d.NativeAdapters[mediaType] = descriptor
+		}
+	}
 	if u, err := url.Parse(a.BaseURL); err == nil && (u.Scheme == "https" || u.Scheme == "http") {
 		d.Host = u.Hostname()
 	}
@@ -302,7 +309,7 @@ func describe(a *Account) *Detail {
 			}
 		}
 	}
-	if a.Type != "apikey" {
+	if !SupportsAccount(a) {
 		d.EffectiveState = "UNSUPPORTED_ACCOUNT_TYPE"
 	} else if a.Status != "active" {
 		d.EffectiveState = "ACCOUNT_INACTIVE"
@@ -311,7 +318,7 @@ func describe(a *Account) *Detail {
 	} else if !a.RuntimeReady {
 		d.EffectiveState = "ACCOUNT_RUNTIME_BLOCKED"
 	}
-	if a.Type != "apikey" || a.Status != "active" || !a.Schedulable || !a.RuntimeReady {
+	if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady {
 		d.EffectiveSales = false
 	}
 	for m, state := range states {
@@ -349,7 +356,7 @@ func (s *Service) Initialize(ctx context.Context, id int64, mediaTypes []string)
 	if err != nil {
 		return nil, err
 	}
-	if a.Type != "apikey" {
+	if !SupportsAccount(a) {
 		return nil, ErrUnsupported
 	}
 	if a.Config != nil {
@@ -387,7 +394,7 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		if err != nil {
 			return nil, err
 		}
-		if a.Type != "apikey" {
+		if !SupportsAccount(a) {
 			return nil, ErrUnsupported
 		}
 		if a.Config != nil {
@@ -428,6 +435,9 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		basedOn = c.Published.Revision
 	}
 	now := time.Now().UTC()
+	for i := range input.Products {
+		inheritNativeProduct(a, &input.Products[i])
+	}
 	c.Draft = makeDraft(input, basedOn, now)
 	c.AdapterBindings = bindingsFor(a, c.MediaTypes)
 	c.AdapterBinding = nil
@@ -549,7 +559,7 @@ func (s *Service) mutable(ctx context.Context, id, expected int64) (*Account, er
 	if err != nil {
 		return nil, err
 	}
-	if a.Type != "apikey" {
+	if !SupportsAccount(a) {
 		return nil, ErrUnsupported
 	}
 	if a.Config == nil {

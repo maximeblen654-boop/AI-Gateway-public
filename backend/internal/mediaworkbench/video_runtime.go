@@ -55,7 +55,7 @@ func PublishedVideoOffers(a *Account) []Offer {
 	}
 	out := []Offer{}
 	for _, o := range a.Config.Published.Offers {
-		if o.MediaType == "video" && o.Adapter.Kind == "laoli_video" && ValidateVideoSalePrice(o.SalePrice) == nil {
+		if o.MediaType == "video" && validVideoBinding(o.Adapter) && ValidateVideoSalePrice(o.SalePrice) == nil {
 			out = append(out, o)
 		}
 	}
@@ -71,7 +71,7 @@ func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (Resolved
 		if o.OfferID != offerID {
 			continue
 		}
-		if o.MediaType != "video" || o.AccountID != a.ID || o.Adapter != (AdapterBinding{"laoli_video", videoplan.Revision, "account_apikey", "async"}) || !o.Matches(spec) || ValidateVideoSalePrice(o.SalePrice) != nil {
+		if o.MediaType != "video" || o.AccountID != a.ID || !validVideoBinding(o.Adapter) || !adapterOwnsPlatform(o.Adapter.Kind, a.Platform) || !o.Matches(spec) || ValidateVideoSalePrice(o.SalePrice) != nil {
 			return r, ErrRuntimeBinding
 		}
 		n, e := DecimalAmount(o.SalePrice.Amount)
@@ -82,6 +82,12 @@ func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (Resolved
 	}
 	return r, ErrRuntimeBinding
 }
+
+func validVideoBinding(b AdapterBinding) bool {
+	d, ok := Descriptor(b.Kind)
+	return ok && d.MediaType == "video" && b == (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow})
+}
+func ValidVideoBinding(b AdapterBinding) bool { return validVideoBinding(b) }
 
 func (s *Service) ResolvePublishedVideoOffer(ctx context.Context, id string, spec Spec, allowed func(int64) bool) (ResolvedVideoOffer, error) {
 	rows, e := s.repo.List(ctx)
