@@ -106,6 +106,13 @@ test('late pending recovery cannot overwrite completed originals',async t=>{
 test('expected count follows immutable quote rather than historical 1/4 assumptions',async t=>{
   const f=fixture(t,{count:2,frozen:true});await f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}});const task=await f.tasks.dispatch(owner,f.input);assert.equal(task.results.length,2);assert.equal(task.unit_price.amount,'0.80');assert.equal(task.total_price.amount,'1.60');assert.equal(task.quantity,2);
 });
+test('native multi output settles the frozen total once for one upstream POST',async t=>{
+  const f=fixture(t,{count:2,frozen:true});await f.tasks.quote(owner,{offer_id:'native-multi',spec:{count:2,images:0}});
+  const task=await f.tasks.dispatch(owner,f.input);
+  assert.equal(task.status,'completed');assert.equal(task.results.length,2);assert.equal(task.delivered_count,2);
+  assert.equal(task.settled_price.amount,'1.60');assert.equal(task.settled_price.currency,'CNY');assert.equal(f.stats().posts,1);
+  await f.tasks.dispatch(owner,{task_id:task.task_id});assert.equal(f.stats().posts,1);
+});
 test('rejects an inconsistent frozen total while retaining legacy sale_price quotes',async t=>{
   const f=fixture(t,{count:2,frozen:true,totalOverride:'1.61'});
   await assert.rejects(f.tasks.quote(owner,{offer_id:'two',spec:{count:2,images:0}}),/Invalid Published quote response/);

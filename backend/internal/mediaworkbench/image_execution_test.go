@@ -46,6 +46,13 @@ func TestSystemTenImagesUsesSeparateGenerationAndEditLimits(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("refs=%d got=%v want=%v", refs, got, want)
 		}
+		wantMode := ImageExecutionNativeMulti
+		if refs > 0 {
+			wantMode = ImageExecutionSingle
+		}
+		if p.Mode != wantMode {
+			t.Fatalf("refs=%d mode=%s want=%s", refs, p.Mode, wantMode)
+		}
 	}
 }
 
