@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
@@ -83,6 +84,11 @@ func Descriptor(kind string) (AdapterDescriptor, bool) {
 		d.Kind, d.Revision, d.Auth, d.MaxReferences = kind, videoplan.GrokRevision, "account_native", 1
 		return d, true
 	}
+	if kind == "seedance_video" {
+		return AdapterDescriptor{Kind: kind, Revision: "core_seedance_video_r1", MediaType: "video", Auth: "account_native", Transport: "https_json", TaskFlow: "async", MaxReferences: 16, Parameters: map[string]Parameter{
+			"model": {Mode: CodeEnum, ValueType: "account_model_mapping"}, "resolution": {Mode: Passthrough, WireField: "resolution"}, "aspect_ratio": {Mode: Passthrough, WireField: "aspect_ratio"}, "duration_seconds": {Mode: Passthrough, WireField: "duration"}, "count": {Mode: FixedByModel, ValueType: "one"}, "reference_images": {Mode: Derived, WireField: "content[].image_url"}, "reference_video": {Mode: Unsupported}, "reference_audio": {Mode: Derived, WireField: "content[].audio_url"},
+		}}, true
+	}
 	if kind == "grok_images" || kind == "gemini_images" || kind == "openai_images_oauth" {
 		d, _ := Descriptor("openai_images")
 		d.Kind, d.Revision, d.Auth = kind, "core_"+kind+"_r1", "account_native"
@@ -125,7 +131,10 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 		// Preserve explicit internal bindings; never infer a supplier's flow from
 		// its host, model name or public docs.
 		if a.Config != nil {
-			if b, ok := a.Config.AdapterBindings[mediaType]; ok && !(b.Kind == "unbound_"+mediaType && nativeAdapterKind(a, mediaType) != "") {
+			if b, ok := a.Config.AdapterBindings[mediaType]; ok {
+				if b.Kind == "unbound_"+mediaType && nativeAdapterKind(a, mediaType) != "" {
+					continue
+				}
 				if d, known := Descriptor(b.Kind); known {
 					b.Revision = d.Revision
 				}
@@ -148,6 +157,9 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 func nativeAdapterKind(a *Account, mediaType string) string {
 	if mediaType == "video" && a.Platform == "grok" && (a.Type == "apikey" || a.Type == "oauth") {
 		return "grok_video"
+	}
+	if mediaType == "video" && a.Platform == "openai" && a.Type == "apikey" && slices.Contains(a.EndpointCapabilities, "seedance") {
+		return "seedance_video"
 	}
 	if mediaType == "image" {
 		switch a.Platform {
@@ -172,12 +184,12 @@ func nativeAdapterKind(a *Account, mediaType string) string {
 }
 
 func SupportsAccount(a *Account) bool {
-	return a.Type == "apikey" || nativeAdapterKind(a, "image") != ""
+	return a.Type == "apikey" || nativeAdapterKind(a, "image") != "" || nativeAdapterKind(a, "video") != ""
 }
 
 func adapterOwnsPlatform(kind, platform string) bool {
 	switch kind {
-	case "openai_images", "openai_images_oauth", "laoli_video":
+	case "openai_images", "openai_images_oauth", "laoli_video", "seedance_video":
 		return platform == "openai"
 	case "grok_images", "grok_video":
 		return platform == "grok"
@@ -192,6 +204,9 @@ func adapterOwnsPlatform(kind, platform string) bool {
 func inheritNativeProduct(a *Account, p *Product) {
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "grok_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "grok"
+	}
+	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "seedance_video" && p.AdapterConfig.WireProfile == "" {
+		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "seedance"
 	}
 	if p.MediaType != "image" || p.AdapterConfig.ModelFamily != "" || p.AdapterConfig.WireProfile != "" {
 		return

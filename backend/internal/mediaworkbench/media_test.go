@@ -27,6 +27,7 @@ func (r *memoryRepo) Get(_ context.Context, id int64) (*Account, error) {
 	_ = json.Unmarshal(b, &a)
 	a.BaseURL = r.a.BaseURL
 	a.ModelMapping = r.a.ModelMapping
+	a.EndpointCapabilities = r.a.EndpointCapabilities
 	a.ResolvedModels = r.a.ResolvedModels
 	a.RoutingFingerprint = r.a.RoutingFingerprint
 	return &a, nil

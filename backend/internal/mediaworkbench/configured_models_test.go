@@ -99,3 +99,37 @@ func TestConfiguredProfileSafety(t *testing.T) {
 		t.Fatal("paused automatically opened")
 	}
 }
+
+func TestSeedanceNativeAdapterAndPlan(t *testing.T) {
+	a := &Account{Platform: "openai", Type: "apikey", EndpointCapabilities: []string{"seedance"}}
+	if got := nativeAdapterKind(a, "video"); got != "seedance_video" {
+		t.Fatalf("native adapter = %q", got)
+	}
+	d, ok := Descriptor("seedance_video")
+	if !ok || d.Revision != "core_seedance_video_r1" || d.TaskFlow != "async" {
+		t.Fatalf("descriptor = %+v, ok=%v", d, ok)
+	}
+	p := Product{MediaType: "video", SiteModel: "site-video", UpstreamModel: "ep-video", AdapterConfig: ImageConfig{}, Capabilities: Capabilities{
+		Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5},
+		References: References{Image: Range{0, 1}, Audio: Range{0, 1}, TotalMax: 2},
+	}}
+	inheritNativeProduct(a, &p)
+	if p.AdapterConfig.Version != 1 || p.AdapterConfig.WireProfile != "seedance" {
+		t.Fatalf("inherited adapter config = %+v", p.AdapterConfig)
+	}
+	m, ok := VideoProfileModel(p)
+	if !ok {
+		t.Fatal("seedance video profile was not accepted")
+	}
+	preview, err := videoplan.PreviewWithModel(m, "ep-video", "720p", "16:9", 5, 1, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := videoplan.CompilePlanForModel(m, "ep-video", preview.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compiled.AdapterRevision != "core_seedance_video_r1" || compiled.Path != "/v1/contents/generations/tasks" {
+		t.Fatalf("compiled plan = %+v", compiled)
+	}
+}

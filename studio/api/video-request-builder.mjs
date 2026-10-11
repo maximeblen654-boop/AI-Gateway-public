@@ -157,6 +157,21 @@ function compile(input, modelOverride) {
   }
   const counts = assertAssets(assets, ownerId, model);
   assertPromptReferences(prompt, counts);
+  if (model.inputMode === 'seedance') {
+    const content = [{ type: 'text', text: prompt }];
+    for (const asset of assets) {
+      const payload = receiptPayloads.get(asset);
+      if (!payload?.source || (asset.type !== 'image' && asset.type !== 'audio')) fail('Seedance requires verified image/audio source');
+      content.push(asset.type === 'image'
+        ? { type: 'image_url', image_url: { url: payload.source } }
+        : { type: 'audio_url', audio_url: { url: payload.source } });
+    }
+    const body = { model: model.upstreamModelId || modelId, content, duration, resolution, aspect_ratio: ratio };
+    const bytes = Buffer.from(JSON.stringify(body), 'utf8');
+    if (bytes.byteLength > 128 * 1024 * 1024) fail('Video JSON exceeds 128 MiB');
+    const plan = { version: 'video_json_plan_v1', adapterRevision: 'core_seedance_video_r1', method: 'POST', path: '/v1/contents/generations/tasks', encoding: 'application/json', contractRevision: catalog.revision, fields: body };
+    const snapshot = JSON.parse(JSON.stringify(plan)); snapshot.planHash = planHash(snapshot); return snapshot;
+  }
   const inline = model.inputMode !== 'references';
   const wire = catalog.wireProfiles[model.inputMode];
   if (!wire) fail('Unsupported wire profile');
@@ -192,7 +207,8 @@ function planHash(plan) {
 export function Materialize(plan) {
   if (!plan || plan.version !== 'video_json_plan_v1' ||
       !((plan.adapterRevision === 'laoli_video_json_v136_r1' && plan.path === '/v1/videos') ||
-        (plan.adapterRevision === 'core_grok_video_r1' && plan.path === '/v1/videos/generations')) ||
+      (plan.adapterRevision === 'core_grok_video_r1' && plan.path === '/v1/videos/generations') ||
+      (plan.adapterRevision === 'core_seedance_video_r1' && plan.path === '/v1/contents/generations/tasks')) ||
       plan.method !== 'POST' ||
       plan.encoding !== 'application/json' || planHash(plan) !== plan.planHash) {
     fail('Unsupported or changed frozen video plan');

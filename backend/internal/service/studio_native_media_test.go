@@ -41,7 +41,8 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				a.Extra = map[string]any{"quota_limit": 100.0}
 				upstreamModel := map[string]string{PlatformOpenAI: "gemini-3.1-flash-image", PlatformGrok: "grok-imagine-image", PlatformGemini: "gemini-3.1-flash-image"}[platform]
 				a.Credentials["model_mapping"] = map[string]any{"gpt-image-2": upstreamModel, upstreamModel: "must-not-map-twice"}
-				ma := r.Media.(*studioMediaFixture)
+				ma, ok := r.Media.(*studioMediaFixture)
+				require.True(t, ok)
 				ma.a.Platform = platform
 				ma.a.ModelMapping = map[string]string{"gpt-image-2": upstreamModel, upstreamModel: "must-not-map-twice"}
 				ma.a.Catalog.Models = []string{upstreamModel}
@@ -182,7 +183,8 @@ func TestStudioNativeVideoParity(t *testing.T) {
 				a.Extra[GrokVideoAPIStyleExtraKey] = "standard"
 			}
 			a.Credentials["model_mapping"] = map[string]any{"video-alias": "grok-imagine-video", "grok-imagine-video": "must-not-map-twice"}
-			ma := r.Media.(*studioMediaFixture)
+			ma, ok := r.Media.(*studioMediaFixture)
+			require.True(t, ok)
 			ma.a.Platform = PlatformGrok
 			ma.a.Config = nil
 			ma.a.ModelMapping = map[string]string{"video-alias": "grok-imagine-video", "grok-imagine-video": "must-not-map-twice"}

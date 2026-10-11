@@ -176,19 +176,20 @@ type ProcurementEntry struct {
 
 // Account is a narrow repository projection, never the generic Account DTO.
 type Account struct {
-	ID                 int64             `json:"id"`
-	Name               string            `json:"name"`
-	Platform           string            `json:"platform"`
-	Type               string            `json:"type"`
-	Status             string            `json:"status"`
-	Schedulable        bool              `json:"schedulable"`
-	BaseURL            string            `json:"-"`
-	Catalog            *Catalog          `json:"model_catalog"`
-	Config             *Config           `json:"media_workbench_v1"`
-	ModelMapping       map[string]string `json:"-"`
-	ResolvedModels     map[string]string `json:"-"`
-	RuntimeReady       bool              `json:"runtime_ready"`
-	RoutingFingerprint string            `json:"-"`
+	ID                   int64             `json:"id"`
+	Name                 string            `json:"name"`
+	Platform             string            `json:"platform"`
+	Type                 string            `json:"type"`
+	Status               string            `json:"status"`
+	Schedulable          bool              `json:"schedulable"`
+	BaseURL              string            `json:"-"`
+	Catalog              *Catalog          `json:"model_catalog"`
+	Config               *Config           `json:"media_workbench_v1"`
+	ModelMapping         map[string]string `json:"-"`
+	EndpointCapabilities []string          `json:"-"`
+	ResolvedModels       map[string]string `json:"-"`
+	RuntimeReady         bool              `json:"runtime_ready"`
+	RoutingFingerprint   string            `json:"-"`
 }
 type ModelState struct {
 	ModelID string `json:"model_id"`

@@ -41,7 +41,7 @@ func TestMediaCASNoSchedulerSideEffects(t *testing.T) {
 			if tc.affected == 0 {
 				rows := sqlmock.NewRows(mediaColumns)
 				if !tc.deleted {
-					rows.AddRow(7, "supplier", "openai", "apikey", "active", true, "https://example.com", nil, nil, `{"has_key":true}`)
+					rows.AddRow(7, "supplier", "openai", "apikey", "active", true, "https://example.com", nil, nil, `{"has_key":true,"endpoint_capabilities":[]}`)
 				}
 				mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE id=$1 AND deleted_at IS NULL`)).WithArgs(int64(7)).WillReturnRows(rows)
 			}
@@ -68,7 +68,7 @@ func TestMediaReadProjection(t *testing.T) {
 		}
 	})
 	r := NewMediaConfigRepository(db)
-	mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account'))) ORDER BY id`)).WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(7, "supplier", "openai", "apikey", "inactive", false, "https://user:secret@example.com/private?key=secret", `{"models":["m"],"synced_at":"now","api_key":"secret"}`, nil, `{"has_key":true}`))
+	mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account'))) ORDER BY id`)).WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(7, "supplier", "openai", "apikey", "inactive", false, "https://user:secret@example.com/private?key=secret", `{"models":["m"],"synced_at":"now","api_key":"secret"}`, nil, `{"has_key":true,"endpoint_capabilities":["seedance"]}`))
 	d, err := mediaworkbench.NewService(r).Suppliers(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +76,9 @@ func TestMediaReadProjection(t *testing.T) {
 	b, _ := json.Marshal(d)
 	if strings.Contains(string(b), "secret") || strings.Contains(string(b), "api_key") || d[0].EffectiveState != "ACCOUNT_INACTIVE" {
 		t.Fatal(string(b))
+	}
+	if got := d[0].NativeAdapters["video"].Kind; got != "seedance_video" {
+		t.Fatalf("native video adapter = %q", got)
 	}
 	if err = mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

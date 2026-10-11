@@ -1198,6 +1198,12 @@
     "openapi": "c81af1a6c85c6226a26bd11cfc144c09e507aacbdd77ba734a8817a06d957d45"
   },
   "wireProfiles": {
+    "seedance": {
+      "duration": "duration",
+      "aspectRatio": "aspect_ratio",
+      "references": "content",
+      "fixed": {}
+    },
     "grok": {
       "duration": "duration",
       "aspectRatio": "aspect_ratio",

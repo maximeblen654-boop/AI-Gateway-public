@@ -101,6 +101,9 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 	if m.Status != "enabled" || m.Upstream != upstream || len(body) > 128*1024*1024 {
 		return p, ErrPlan
 	}
+	if m.Mode == "seedance" {
+		return compileSeedancePlan(m, upstream, body)
+	}
 	w, ok := registry.Profiles[m.Mode]
 	if !ok {
 		return p, ErrPlan
@@ -150,8 +153,59 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 	}
 	return p, nil
 }
+
+func compileSeedancePlan(m Model, upstream string, body []byte) (Plan, error) {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil {
+		return Plan{}, ErrPlan
+	}
+	allowed := map[string]bool{"model": true, "content": true, "duration": true, "resolution": true, "aspect_ratio": true, "generate_audio": true}
+	for key := range fields {
+		if !allowed[key] {
+			return Plan{}, ErrPlan
+		}
+	}
+	var model, prompt, resolution, ratio string
+	var duration int
+	if json.Unmarshal(fields["model"], &model) != nil || model != upstream ||
+		json.Unmarshal(fields["content"], &[]any{}) != nil ||
+		json.Unmarshal(fields["duration"], &duration) != nil ||
+		json.Unmarshal(fields["resolution"], &resolution) != nil ||
+		json.Unmarshal(fields["aspect_ratio"], &ratio) != nil ||
+		!slices.Contains(m.Durations, duration) || !slices.Contains(m.Resolutions, resolution) || !slices.Contains(m.Ratios, ratio) {
+		return Plan{}, ErrPlan
+	}
+	var content []struct {
+		Type     string `json:"type"`
+		Text     string `json:"text"`
+		ImageURL any    `json:"image_url"`
+		AudioURL any    `json:"audio_url"`
+	}
+	if json.Unmarshal(fields["content"], &content) != nil || len(content) == 0 {
+		return Plan{}, ErrPlan
+	}
+	images, audio := 0, 0
+	for _, item := range content {
+		switch item.Type {
+		case "text":
+			if strings.TrimSpace(item.Text) != "" {
+				prompt = strings.TrimSpace(item.Text)
+			}
+		case "image_url":
+			images++
+		case "audio_url":
+			audio++
+		default:
+			return Plan{}, ErrPlan
+		}
+	}
+	if prompt == "" || (m.PromptMax > 0 && len([]rune(prompt)) > m.PromptMax) || images > m.Limits.Image || audio > m.Limits.Audio || images+audio > m.Limits.Total {
+		return Plan{}, ErrPlan
+	}
+	return Plan{Version: "video_wire_plan_v1", AdapterRevision: "core_seedance_video_r1", ContractRevision: registry.Revision, Method: "POST", Path: "/v1/contents/generations/tasks", Body: append([]byte(nil), body...), RequestHash: digest(body)}, nil
+}
 func (p Plan) Materialize() ([]byte, string, error) {
-	validPath := p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations"
+	validPath := p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations" || p.AdapterRevision == "core_seedance_video_r1" && p.Path == "/v1/contents/generations/tasks"
 	if p.Version != "video_wire_plan_v1" || !validPath || p.Method != "POST" || !json.Valid(p.Body) || digest(p.Body) != p.RequestHash {
 		return nil, "", ErrPlan
 	}
@@ -173,6 +227,20 @@ func PreviewWithMedia(modelID, upstream, resolution, ratio string, duration, ima
 func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
 	if m.Status != "enabled" || m.Upstream != upstream || !ValidWireProfile(m.Mode) {
 		return Plan{}, ErrPlan
+	}
+	if m.Mode == "seedance" {
+		content := []map[string]any{{"type": "text", "text": "<dry-run-prompt>"}}
+		for i := 0; i < images; i++ {
+			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]string{"url": "https://example.invalid/verified-reference"}})
+		}
+		for i := 0; i < audio; i++ {
+			content = append(content, map[string]any{"type": "audio_url", "audio_url": map[string]string{"url": "https://example.invalid/verified-reference"}})
+		}
+		body, err := json.Marshal(map[string]any{"model": upstream, "content": content, "duration": duration, "resolution": resolution, "aspect_ratio": ratio})
+		if err != nil {
+			return Plan{}, err
+		}
+		return CompilePlanForModel(m, upstream, body)
 	}
 	w := registry.Profiles[m.Mode]
 	f := map[string]any{"model": upstream, "prompt": "<dry-run-prompt>", "resolution": resolution, w.Duration: duration, w.Ratio: ratio}
@@ -217,6 +285,34 @@ func Inspect(modelID string, body []byte) (resolution, ratio string, duration, i
 func InspectForModel(m Model, body []byte) (resolution, ratio string, duration, images, videos, audio int, err error) {
 	if m.Status != "enabled" || !ValidWireProfile(m.Mode) {
 		err = ErrPlan
+		return
+	}
+	if m.Mode == "seedance" {
+		var fields struct {
+			Resolution string `json:"resolution"`
+			Ratio      string `json:"aspect_ratio"`
+			Duration   int    `json:"duration"`
+			Content    []struct {
+				Type string `json:"type"`
+			} `json:"content"`
+		}
+		if json.Unmarshal(body, &fields) != nil || len(fields.Content) == 0 {
+			err = ErrPlan
+			return
+		}
+		resolution, ratio, duration = fields.Resolution, fields.Ratio, fields.Duration
+		for _, item := range fields.Content {
+			switch item.Type {
+			case "image_url":
+				images++
+			case "audio_url":
+				audio++
+			case "text":
+			default:
+				err = ErrPlan
+				return
+			}
+		}
 		return
 	}
 	w := registry.Profiles[m.Mode]

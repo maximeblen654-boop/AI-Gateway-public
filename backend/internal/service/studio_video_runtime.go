@@ -269,7 +269,11 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		ctx = r.Core.withOpenAIQuotaAutoPauseContext(ctx)
 		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, b.Offer.SiteModel, false, "")
 		checker := defaultOpenAIAccountScheduler{service: r.Core}
-		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: b.Platform, RequestedModel: b.Offer.SiteModel, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
+		requiredCapability := OpenAIEndpointCapability("")
+		if b.Offer.Adapter.Kind == "seedance_video" {
+			requiredCapability = OpenAIEndpointCapabilitySeedance
+		}
+		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: b.Platform, RequestedModel: b.Offer.SiteModel, RequiredCapability: requiredCapability, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
 		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, b.Offer.SiteModel) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
 			return fail()
 		}
@@ -369,7 +373,9 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	if e != nil {
 		return videoState(t, "", "unknown"), e
 	}
-	data, _, e := r.request(context.WithValue(ctx, videoIdempotencyContextKey{}, id), a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
+	dispatchCtx := context.WithValue(ctx, videoIdempotencyContextKey{}, id)
+	dispatchCtx = context.WithValue(dispatchCtx, videoAdapterContextKey{}, q.Binding.Offer.Adapter.Kind)
+	data, _, e := r.request(dispatchCtx, a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
 	if e != nil {
 		return videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
@@ -428,7 +434,8 @@ func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner
 		return videoState(t, upstream, "recovery_blocked"), e
 	}
 	defer release()
-	body, _, e := r.request(ctx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream), nil)
+	requestCtx := context.WithValue(ctx, videoAdapterContextKey{}, t.Quote.Binding.Offer.Adapter.Kind)
+	body, _, e := r.request(requestCtx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream), nil)
 	if e != nil {
 		return videoState(t, upstream, "unknown"), e
 	}
@@ -463,7 +470,8 @@ func (r *StudioVideoRuntime) Original(ctx context.Context, owner StudioImageOwne
 		return nil, "", e
 	}
 	defer release()
-	return r.request(ctx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream)+"/content", nil)
+	requestCtx := context.WithValue(ctx, videoAdapterContextKey{}, t.Quote.Binding.Offer.Adapter.Kind)
+	return r.request(requestCtx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream)+"/content", nil)
 }
 
 // Only the authenticated internal delivery adapter calls this after its durable
@@ -503,8 +511,12 @@ func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner
 }
 
 type videoIdempotencyContextKey struct{}
+type videoAdapterContextKey struct{}
 
 func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
+	if adapter, _ := ctx.Value(videoAdapterContextKey{}).(string); adapter == "seedance_video" {
+		return r.requestSeedance(ctx, a, method, path, body)
+	}
 	if a.Platform == PlatformGrok {
 		return r.requestGrok(ctx, a, method, path, body)
 	}
@@ -549,6 +561,72 @@ func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method
 		return nil, "", ErrStudioVideoUnknown
 	}
 	return data, resp.Header.Get("Content-Type"), nil
+}
+
+func (r *StudioVideoRuntime) requestSeedance(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
+	trimmed := strings.TrimPrefix(path, "/contents/generations/tasks/")
+	if strings.HasPrefix(path, "/videos/") {
+		trimmed = strings.TrimPrefix(path, "/videos/")
+	}
+	trimmed = strings.TrimSuffix(trimmed, "/content")
+	if trimmed == "" || strings.ContainsAny(trimmed, "/?#") {
+		if method != http.MethodPost || path != "/contents/generations/tasks" {
+			return nil, "", ErrStudioVideoConflict
+		}
+	}
+	endpoint := SeedanceEndpointCreate
+	if method == http.MethodGet {
+		endpoint = SeedanceEndpointStatus
+	}
+	if method == http.MethodDelete {
+		endpoint = SeedanceEndpointDelete
+	}
+	if strings.HasSuffix(path, "/content") {
+		status, _, err := r.requestSeedance(ctx, a, http.MethodGet, "/contents/generations/tasks/"+trimmed, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		urlValue := firstNonEmptyString(gjson.GetBytes(status, "content.video_url").String(), gjson.GetBytes(status, "data.content.video_url").String(), gjson.GetBytes(status, "video_url").String(), gjson.GetBytes(status, "data.video_url").String())
+		if urlValue == "" {
+			return nil, "", ErrStudioVideoUnknown
+		}
+		client := &http.Client{Transport: studioImageDownloadTransport{r.Core, a}, Timeout: 60 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		resp, err := client.Get(urlValue)
+		if err != nil {
+			return nil, "", ErrStudioVideoUnknown
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Range") != "" || (resp.Header.Get("Content-Type") != "video/mp4" && resp.Header.Get("Content-Type") != "video/webm") {
+			return nil, "", ErrStudioVideoUnknown
+		}
+		data, err := io.ReadAll(io.LimitReader(resp.Body, 100_000_001))
+		if err != nil || len(data) > 100_000_000 {
+			return nil, "", ErrStudioVideoUnknown
+		}
+		return data, resp.Header.Get("Content-Type"), nil
+	}
+	c, capture := newStudioNativeContext(ctx, method, "/api/v3/contents/generations/tasks", body, 2<<20)
+	result, err := r.Core.ForwardSeedance(c.Request.Context(), c, a, endpoint, trimmed, body)
+	data, _, err := studioNativeResult(capture, result, err)
+	if err != nil {
+		return nil, "", err
+	}
+	if endpoint == SeedanceEndpointStatus {
+		status := strings.ToLower(firstNonEmptyString(gjson.GetBytes(data, "status").String(), gjson.GetBytes(data, "data.status").String()))
+		switch status {
+		case "succeeded", "completed", "success":
+			status = "completed"
+		case "running", "processing", "in_progress":
+			status = "processing"
+		case "failed", "cancelled", "canceled", "expired":
+			status = "failed"
+		default:
+			status = "queued"
+		}
+		normalized, marshalErr := json.Marshal(map[string]string{"id": trimmed, "status": status})
+		return normalized, "application/json", marshalErr
+	}
+	return data, "application/json", nil
 }
 
 // Release requires a verified terminal failure. Unknown POSTs stay held; no

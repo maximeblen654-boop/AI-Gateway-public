@@ -24,6 +24,7 @@ const mediaAccountProjection = `SELECT id, name, platform, type, status, schedul
  COALESCE(credentials->>'base_url', ''),
  extra->'upstream_model_catalog_snapshot', extra->'media_workbench_v1',
  jsonb_build_object('model_mapping', credentials->'model_mapping',
+ 'endpoint_capabilities', COALESCE(credentials->'openai_capabilities', '[]'::jsonb),
  'has_key', length(COALESCE(credentials->>'api_key',''))>0,
  'has_token', length(COALESCE(credentials->>'access_token',''))>0,
  'has_service_account', length(COALESCE(credentials->>'service_account_json',''))>0,
@@ -62,24 +63,26 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		}
 	}
 	var local struct {
-		Mapping           map[string]any `json:"model_mapping"`
-		HasKey            bool           `json:"has_key"`
-		HasToken          bool           `json:"has_token"`
-		HasServiceAccount bool           `json:"has_service_account"`
-		ExpiresAt         *time.Time     `json:"expires_at"`
-		AutoPause         bool           `json:"auto_pause_on_expired"`
-		RateLimit         *time.Time     `json:"rate_limit_reset_at"`
-		Overload          *time.Time     `json:"overload_until"`
-		Temporary         *time.Time     `json:"temp_unschedulable_until"`
-		Parent            *int64         `json:"parent_account_id"`
-		Proxy             *int64         `json:"proxy_id"`
-		Quota             map[string]any `json:"quota"`
+		Mapping              map[string]any `json:"model_mapping"`
+		EndpointCapabilities []string       `json:"endpoint_capabilities"`
+		HasKey               bool           `json:"has_key"`
+		HasToken             bool           `json:"has_token"`
+		HasServiceAccount    bool           `json:"has_service_account"`
+		ExpiresAt            *time.Time     `json:"expires_at"`
+		AutoPause            bool           `json:"auto_pause_on_expired"`
+		RateLimit            *time.Time     `json:"rate_limit_reset_at"`
+		Overload             *time.Time     `json:"overload_until"`
+		Temporary            *time.Time     `json:"temp_unschedulable_until"`
+		Parent               *int64         `json:"parent_account_id"`
+		Proxy                *int64         `json:"proxy_id"`
+		Quota                map[string]any `json:"quota"`
 	}
 	if err := json.Unmarshal(routing, &local); err != nil {
 		return nil, fmt.Errorf("invalid local Account routing projection")
 	}
 	account := service.Account{ID: a.ID, Platform: a.Platform, Type: a.Type, Status: a.Status, Schedulable: a.Schedulable, Credentials: map[string]any{"model_mapping": local.Mapping}, Extra: local.Quota, ExpiresAt: local.ExpiresAt, AutoPauseOnExpired: local.AutoPause, RateLimitResetAt: local.RateLimit, OverloadUntil: local.Overload, TempUnschedulableUntil: local.Temporary}
 	a.ModelMapping = account.GetModelMapping()
+	a.EndpointCapabilities = append([]string(nil), local.EndpointCapabilities...)
 	a.ResolvedModels = map[string]string{}
 	if a.Config != nil {
 		products := append([]mediaworkbench.Product(nil), a.Config.Draft.Products...)

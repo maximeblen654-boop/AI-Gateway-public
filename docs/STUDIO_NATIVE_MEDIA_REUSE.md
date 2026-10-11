@@ -14,6 +14,7 @@ specifications → reference assets → price dimensions → unit prices → dra
 | Gemini ordinary images / reference edits | Convert the existing Studio spec and private reference bytes to `contents` / `generationConfig` | `GeminiMessagesCompatService.ForwardNative`; native inline-image accounting helpers |
 | Grok images / edits | Pass the frozen model and spec to the existing media operation | `OpenAIGatewayService.ForwardGrokMedia` |
 | Grok single video | Use native create, status and original-content operations, including native/standard Account API style | `ForwardGrokMedia`, `IsGrokVideoStatusBillable`, native content retrieval |
+| OpenAI API-key Accounts with the existing `seedance` endpoint capability | Compile the frozen Seedance content request, then use native task create/status/delete and original-content retrieval | `ParseSeedanceRequest`, `ForwardSeedance`, `SeedanceEndpoint*` |
 | Previously published generic single-video contracts | Preserve the existing frozen contract and recovery | Existing Studio video request path |
 
 The native service is called directly, not its public HTTP handler: the latter
@@ -49,8 +50,11 @@ execution limits remain separate from the customer's 1–10 image quantity. Miss
 multi-image evidence means one image per unit; Gemini ordinary generation is likewise
 one image per unit. Reference-edit execution limits are independent.
 
-Unsupported native Account contracts remain diagnosable rather than being assigned
-`openai_json`. No Midjourney adapter, provider-async batch product, multi-video flow,
+The Seedance binding is selected only from the Account's persisted endpoint capability;
+it is not inferred from a display name, host or model ID. Its task path remains
+single-output and uses `content` references for image/audio inputs. Unsupported
+native Account contracts remain diagnosable rather than being assigned `openai_json`.
+No Midjourney adapter, provider-async batch product, multi-video flow,
 new account store, wallet, ledger or general task scheduler is introduced.
 
 ## Billing and failure ownership
@@ -72,7 +76,13 @@ using the same synthetic Accounts, model mappings and upstream responses. Covera
 includes API-key images/editing across three platforms; OAuth direct and Responses
 paths; Grok native/standard single-video lifecycle; URL/Base64/data-URL delivery;
 partial results; repeated submission/recovery; exact Account cost; no retry after
-unknown responses; and private/excess-result rejection.
+unknown responses; and private/excess-result rejection. `studio_seedance_test.go`
+additionally verifies the Studio Seedance create/status lifecycle, model mapping,
+task path and normalized terminal status without a supplier call. The adapter and
+video-plan tests verify that an Account capability, rather than a model display
+name, is what enables the Seedance binding. A full browser/customer Seedance fixture
+is not claimed by the existing dated evidence; it remains a direct synthetic
+service/plan integration check until a separate isolated fixture is run.
 
 The local `tools/native-media-e2e` harness uses real Core, Bridge, BFF, PostgreSQL,
 Redis and a closed synthetic HTTPS supplier. It does not intercept browser API
