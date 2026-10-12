@@ -25,6 +25,8 @@ const fixture = { groups: {}, accounts: {} }
 const groups = await api('/admin/groups/all')
 const channels = await api('/admin/channels?page=1&page_size=100')
 let videoBridgeGroupID = 0
+let videoCostChannel = null
+const videoCostAccounts = []
 const definitions = [
   { key: 'gemini', name: 'Synthetic gemini', platform: 'gemini', model: 'gemini-3.1-flash-image' },
   { key: 'grok', name: 'Synthetic grok', platform: 'grok', model: 'grok-imagine-video' },
@@ -45,8 +47,20 @@ for (const definition of definitions) {
   const account = existing.items.find(a => a.name === name) || await api('/admin/accounts', 'POST', { name, platform, type: 'apikey', credentials, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: accountGroupIDs, upstream_billing_probe_enabled: false })
   fixture.groups[key] = group.id; fixture.accounts[key] = account.id
   const sync = await api(`/admin/accounts/${account.id}/models/sync-upstream`, 'POST', {})
-  if (!channels.items.some(c => c.name === `${name} cost`)) await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: accountGroupIDs, account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
+  if (key === 'grok') {
+    videoCostAccounts.push({ key, accountID: account.id, platform })
+    if (!channels.items.some(c => c.name === `${name} cost`)) videoCostChannel = await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: accountGroupIDs, account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
+    else videoCostChannel = channels.items.find(c => c.name === `${name} cost`)
+  } else if (key === 'compatible' || key === 'seedance') {
+    videoCostAccounts.push({ key, accountID: account.id, platform })
+  } else if (!channels.items.some(c => c.name === `${name} cost`)) {
+    await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: accountGroupIDs, account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
+  }
   console.log(JSON.stringify({ key, platform, group: group.id, account: account.id, sync }))
+}
+if (videoCostChannel && videoCostAccounts.length > 1) {
+  const rules = videoCostAccounts.map(({ key, accountID, platform }) => ({ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [accountID], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }))
+  await api(`/admin/channels/${videoCostChannel.id}`, 'PUT', { account_stats_pricing_rules: rules })
 }
 const customer = await api('/admin/users', 'POST', { email: 'native-customer@example.invalid', password: 'Native-Customer-Only-20261012', balance: 100, concurrency: 5, allowed_groups: Object.values(fixture.groups) })
 fixture.customer = customer.id
