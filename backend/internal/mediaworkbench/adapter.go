@@ -219,6 +219,13 @@ func adapterOwnsPlatform(kind, platform string) bool {
 // Only explicit draft saves acquire defaults. Published products and historical
 // quotes retain their original configuration and hashes.
 func inheritNativeProduct(a *Account, p *Product) {
+	// Older Studio drafts could accidentally persist the generated product ID
+	// as site_model. Keep that legacy draft readable, but stop carrying the
+	// internal product identity into the model contract on the next explicit
+	// save. Real Account aliases remain untouched.
+	if p != nil && p.UpstreamModel != "" && strings.HasPrefix(p.SiteModel, "media-") && p.SiteModel == p.ProductID {
+		p.SiteModel = p.UpstreamModel
+	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "grok_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "grok"
 	}

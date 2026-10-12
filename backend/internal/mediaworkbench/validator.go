@@ -98,7 +98,6 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		return v, nil
 	}
 	ids := map[string]bool{}
-	siteModels := map[string]bool{}
 	enabled := 0
 	for _, p := range d.Products {
 		if !p.Enabled {
@@ -116,11 +115,6 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			add("UI_FIXABLE", "DUPLICATE_PRODUCT", pid, "product_id", "Product IDs must be unique")
 		}
 		ids[pid] = true
-		key := p.MediaType + "\x00" + p.SiteModel
-		if siteModels[key] {
-			add("UI_FIXABLE", "DUPLICATE_SITE_MODEL", pid, "site_model", "Enabled products cannot share a media type and site model")
-		}
-		siteModels[key] = true
 		if a.Config == nil || !slices.Contains(a.Config.MediaTypes, p.MediaType) {
 			add("UI_FIXABLE", "INVALID_MEDIA_TYPE", pid, "media_type", "Select an initialized media type")
 		}

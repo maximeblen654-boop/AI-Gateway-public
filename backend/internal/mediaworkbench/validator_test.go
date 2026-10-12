@@ -216,6 +216,41 @@ func TestSaveDraftAndPublishDirectCanonicalAccountModel(t *testing.T) {
 	}
 }
 
+func TestSaveDraftNormalizesLegacyProductIDModelIdentity(t *testing.T) {
+	s, _ := validatorFixture(t)
+	p := validProduct()
+	p.ProductID = "media-290f101c-2d8b-4f21-8b85-legacy"
+	p.SiteModel = p.ProductID
+	d, err := s.SaveDraft(t.Context(), 7, 1, DraftInput{Products: []Product{p}})
+	if err != nil || d.Config.Validation.Status != "PASS" || !d.Config.Validation.PublishReady {
+		t.Fatalf("legacy internal product identity was not normalized: err=%v validation=%+v", err, d.Config.Validation)
+	}
+	if got := d.Config.Draft.Products[0].SiteModel; got != p.UpstreamModel {
+		t.Fatalf("site_model = %q, want canonical upstream model %q", got, p.UpstreamModel)
+	}
+	if strings.Contains(d.Config.Draft.Products[0].SiteModel, "media-") {
+		t.Fatal("internal product identity leaked back into the saved model field")
+	}
+}
+
+func TestMultipleProductsMayShareCanonicalAccountModel(t *testing.T) {
+	_, r := validatorFixture(t)
+	first := validProduct()
+	second := validProduct()
+	second.ProductID = "p-hd"
+	second.DisplayName = "GPT Image 2 高清版"
+	second.Capabilities.Resolutions = []string{"2K"}
+	second.Capabilities.AspectRatios = []string{"1:1"}
+	second.Capabilities.Count = Range{1, 1}
+	second.Capabilities.References = References{Image: Range{0, 0}, TotalMax: 0}
+	second.AdapterConfig.SizeMappings = []SizeMapping{{"2K", "1:1", "2048x2048"}}
+	second.PricingRules = []PricingRule{{Match: Match{References: &References{TotalMax: 0}}, SalePrice: &Price{Amount: "0.20", Currency: "CNY", BillingMode: "per_request"}}}
+	v, offers := Validate(&r.a, Draft{Revision: "r", Products: []Product{first, second}}, time.Now())
+	if !v.PublishReady || v.Status != "PASS" || len(offers) != 3 {
+		t.Fatalf("shared canonical model products were rejected: status=%s ready=%t offers=%d diagnostics=%+v", v.Status, v.PublishReady, len(offers), v.Diagnostics)
+	}
+}
+
 func TestCombinationRulesAndDeterministicMatchers(t *testing.T) {
 	_, r := validatorFixture(t)
 	p := validProduct()
