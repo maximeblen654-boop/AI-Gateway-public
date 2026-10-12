@@ -32,6 +32,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await page.goto(base+'/video-studio')
     await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
+    await expect(page.getByTestId('studio-offer-select')).toBeEnabled()
     if ((await page.getByTestId('studio-kind').inputValue()) !== kind) await page.getByTestId('studio-kind').selectOption(kind)
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
     if (recover) {
