@@ -174,6 +174,48 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 	}
 }
 
+func TestValidateUsesAccountCatalogForDirectCanonicalModel(t *testing.T) {
+	_, r := validatorFixture(t)
+	r.a.ID = 77
+	r.a.BaseURL = "https://api.image2pro.top"
+	// This mirrors the production Account shape: the synced catalog exposes
+	// gpt-image-2 directly, while credentials.model_mapping contains aliases
+	// for other models and has no gpt-image-2 entry.
+	r.a.ModelMapping = map[string]string{
+		"canvas-image-01": "无限制-Seedream-5-Pro",
+		"canvas-image-02": "国内Seedream-5-Pro",
+		"canvas-image-03": "无限制-NovelAI-V5",
+		"canvas-image-06": "Grok-image-2.0",
+		"canvas-image-08": "GPT-Image-2.5-1K",
+		"canvas-image-09": "GPT-Image-2.5-4K",
+		"canvas-image-10": "GPT-Image-2.5-flare-1K",
+		"canvas-image-11": "GPT-Image-2.5-flare-4K",
+		"canvas-image-12": "GPT-Image-2-1K",
+		"canvas-image-13": "GPT-Image-2-4K",
+		"canvas-image-14": "Banana-2-Pro",
+	}
+	p := validProduct()
+	v, offers := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
+	if !v.PublishReady || v.Status != "PASS" || len(offers) == 0 || hasCode(v, "MODEL_MAPPING_MISMATCH", "UI_FIXABLE") {
+		t.Fatalf("direct canonical catalog model was rejected: status=%s ready=%t diagnostics=%+v", v.Status, v.PublishReady, v.Diagnostics)
+	}
+}
+
+func TestSaveDraftAndPublishDirectCanonicalAccountModel(t *testing.T) {
+	s, r := validatorFixture(t)
+	r.a.BaseURL = "https://api.image2pro.top"
+	r.a.ModelMapping = map[string]string{"canvas-image-12": "GPT-Image-2-1K"}
+	p := validProduct()
+	d, err := s.SaveDraft(t.Context(), 7, 1, DraftInput{Products: []Product{p}})
+	if err != nil || d.Config.Validation.Status != "PASS" || !d.Config.Validation.PublishReady {
+		t.Fatalf("direct canonical draft was rejected: err=%v validation=%+v", err, d.Config.Validation)
+	}
+	d, err = s.Publish(t.Context(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	if err != nil || d.Config.Published == nil || len(d.Config.Published.Offers) == 0 {
+		t.Fatalf("direct canonical product did not publish: err=%v config=%+v", err, d.Config)
+	}
+}
+
 func TestCombinationRulesAndDeterministicMatchers(t *testing.T) {
 	_, r := validatorFixture(t)
 	p := validProduct()

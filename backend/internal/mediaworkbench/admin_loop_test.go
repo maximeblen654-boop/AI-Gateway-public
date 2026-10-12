@@ -22,7 +22,6 @@ func TestAdminVideoSaveValidateReadbackPublishLoop(t *testing.T) {
 	s, r := fixture()
 	r.a.BaseURL = "https://supplier.example/v1"
 	r.a.ModelMapping = map[string]string{"3.0": representativeUpstreamModel}
-	r.a.ResolvedModels = map[string]string{"3.0": representativeUpstreamModel}
 	r.a.Catalog.Models = []string{representativeUpstreamModel, "3.0-native"}
 	d, err := s.Initialize(ctx, 7, []string{"video"})
 	if err != nil {

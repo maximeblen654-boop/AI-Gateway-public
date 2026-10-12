@@ -60,10 +60,16 @@ type DraftInput struct {
 	Products []Product `json:"products"`
 }
 type Product struct {
-	ProductID     string        `json:"product_id"`
-	MediaType     string        `json:"media_type"`
-	SiteModel     string        `json:"site_model"`
-	DisplayName   string        `json:"display_name"`
+	ProductID string `json:"product_id"`
+	MediaType string `json:"media_type"`
+	// SiteModel is the customer-facing requested model/alias for this offer;
+	// it is not an Account model mapping and is never used as a second mapping
+	// store. Multiple products may carry different offer identities while
+	// resolving through the same Account mapping.
+	SiteModel   string `json:"site_model"`
+	DisplayName string `json:"display_name"`
+	// UpstreamModel is the canonical Account catalog model captured by the
+	// product snapshot. Mapping ownership remains with the Account.
 	UpstreamModel string        `json:"upstream_model"`
 	Enabled       bool          `json:"enabled"`
 	Capabilities  Capabilities  `json:"capabilities"`
@@ -187,7 +193,6 @@ type Account struct {
 	Config               *Config           `json:"media_workbench_v1"`
 	ModelMapping         map[string]string `json:"-"`
 	EndpointCapabilities []string          `json:"-"`
-	ResolvedModels       map[string]string `json:"-"`
 	RuntimeReady         bool              `json:"runtime_ready"`
 	RoutingFingerprint   string            `json:"-"`
 }

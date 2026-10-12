@@ -180,6 +180,20 @@ describe('Media Workbench page flow', () => {
     expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-2')
   })
 
+  it('keeps internal product identities out of model and product selection UI', async () => {
+    const dto = supplier()
+    const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
+    second.product_id = 'media-290f101c-internal'
+    second.display_name = '高清商品'
+    dto.media_workbench_v1!.draft.products.push(second)
+    api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="model-image-native-1"]').text()).not.toContain('media-290f101c-internal')
+    await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="product-select"]').text()).not.toContain('media-290f101c-internal')
+  })
+
   it('keeps dirty navigation protected inside the page flow', async () => {
     await openEditor(); await wrapper.get('[data-test="display-name"]').setValue('本地修改')
     await wrapper.get('.mw-back').trigger('click'); await flushPromises()

@@ -83,20 +83,6 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 	account := service.Account{ID: a.ID, Platform: a.Platform, Type: a.Type, Status: a.Status, Schedulable: a.Schedulable, Credentials: map[string]any{"model_mapping": local.Mapping}, Extra: local.Quota, ExpiresAt: local.ExpiresAt, AutoPauseOnExpired: local.AutoPause, RateLimitResetAt: local.RateLimit, OverloadUntil: local.Overload, TempUnschedulableUntil: local.Temporary}
 	a.ModelMapping = account.GetModelMapping()
 	a.EndpointCapabilities = append([]string(nil), local.EndpointCapabilities...)
-	a.ResolvedModels = map[string]string{}
-	if a.Config != nil {
-		products := append([]mediaworkbench.Product(nil), a.Config.Draft.Products...)
-		if a.Config.Published != nil {
-			products = append(products, a.Config.Published.Products...)
-		}
-		for _, p := range products {
-			if !account.IsModelSupported(p.SiteModel) {
-				a.ResolvedModels[p.SiteModel] = ""
-			} else {
-				a.ResolvedModels[p.SiteModel] = account.GetMappedModel(p.SiteModel)
-			}
-		}
-	}
 	// A shadow Account has no independent credential owner in this phase.
 	// Reuse the native cooldown/expiry/quota gate without exposing its inputs.
 	hasCredential := local.HasKey && a.Type == service.AccountTypeAPIKey || local.HasToken && (a.Type == service.AccountTypeOAuth || a.Type == service.AccountTypeSetupToken) || local.HasServiceAccount && a.Type == service.AccountTypeServiceAccount

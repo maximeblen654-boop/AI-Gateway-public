@@ -3,7 +3,7 @@
     <details class="mw-technical" data-test="advanced-technical">
       <summary>高级技术配置 · 接口、画质与执行能力</summary>
       <p class="mw-muted">供维护 Account 接口的管理员使用。依据已确认的接口合同填写，不代表系统已对供应商实测；保存和发布继续接受服务端适配校验。</p>
-      <p v-if="binding" class="mw-muted">Account 适配绑定：{{ binding.kind }} · {{ binding.revision }} · {{ binding.task_flow }}。绑定由现有服务端适配器维护。</p>
+      <p v-if="binding" class="mw-muted">当前 Account 已接入媒体调用合同；绑定由 Sub2API 服务端维护，商品配置无需选择协议或适配器。</p>
       <details v-if="nativeAdapter?.parameters.quality?.mode !== 'unsupported' || product.capabilities.qualities.length" data-test="quality-options" data-field="capabilities.qualities"><summary>接口独立画质字段（仅在已确认支持时配置）</summary><MediaTokensField label="已确认的实际画质值" placeholder="留空表示不发送 quality 字段" :model-value="product.capabilities.qualities" @update:model-value="edit(next => { next.capabilities.qualities = $event.map(String) })" /><p class="mw-muted">分辨率不等于画质。不提供通用画质预设，也不会按模型名称推断。</p></details>
     <p class="mw-muted" data-test="native-contract">调用合同、认证与模型映射继承 Sub2API Account；商品不需要选择协议。已保存的内部技术字段保留兼容，服务端负责校验。</p>
     <details v-if="product.media_type === 'image'" data-test="image-execution-advanced">
@@ -54,8 +54,8 @@
         <button type="button" class="btn btn-secondary" @click="edit(next => { next.capabilities.combination_rules.push({ deny: {} }) })">添加禁止组合</button>
       </details>
       <details><summary>产品标识与用途</summary>
-        <label class="mw-field">产品 ID<input :value="product.product_id" class="input" data-field="product_id" @change="setIdentity" /></label>
-        <label class="mw-field">本站模型 ID<input :value="product.site_model" class="input" data-field="site_model" @input="edit(next => { next.site_model = text($event) })" /></label>
+        <p class="mw-muted">商品身份由系统生成；模型选择和 Account 的 canonical model mapping 统一来自当前 Account，不在商品层重复填写。</p>
+        <p class="mw-muted" data-field="site_model">当前上游模型：{{ product.upstream_model }}。模型身份由 Account 的 canonical mapping 管理。</p>
         <label class="mw-field">业务用途<select :value="product.media_type" class="input" data-field="media_type" @change="setMediaType"><option v-for="type in mediaTypes" :key="type" :value="type">{{ type === 'image' ? '图片' : '视频' }}</option></select></label>
         <label><input :checked="product.enabled" type="checkbox" @change="edit(next => { next.enabled = ($event.target as HTMLInputElement).checked })" /> 商品启用（发布后生效，不改变 Account 销售开关）</label>
       </details>
@@ -68,7 +68,7 @@ import type { AdapterBinding, NativeAdapter, Product } from '@/api/admin/mediaWo
 import MediaTokensField from './MediaTokensField.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter }>()
-const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
+const emit = defineEmits<{ 'update:product': [value: Product] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const numeric = (event: Event) => Number(text(event))
 function edit(change: (next: Product) => void) {
@@ -82,5 +82,4 @@ async function setMediaType(event: Event) {
   await nextTick()
   ;(event.target as HTMLSelectElement).value = props.product.media_type
 }
-function setIdentity(event: Event) { const id = text(event); edit(next => { next.product_id = id }); emit('identity', id) }
 </script>

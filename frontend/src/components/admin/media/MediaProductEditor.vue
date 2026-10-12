@@ -88,7 +88,7 @@
     </section>
     <div class="mw-wizard-footer"><button v-if="wizardStep > 1" type="button" class="btn btn-secondary" data-test="wizard-back" @click="goToStep(wizardStep - 1)">← 上一步</button><span v-else class="mw-muted">仅编辑当前草稿</span><button v-if="wizardStep < 5" type="button" class="btn btn-primary" data-test="wizard-next" @click="goToStep(wizardStep + 1)">下一步：{{ stepLabels[wizardStep] }} →</button><span v-else class="mw-muted">保存不自动发布或启售。</span></div>
   </fieldset>
-  <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" :native-adapter="nativeAdapter" @update:product="updateTechnical" @identity="emit('identity', $event)" />
+  <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" :native-adapter="nativeAdapter" @update:product="updateTechnical" />
 </template>
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
@@ -98,7 +98,7 @@ import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string }>()
-const emit = defineEmits<{ 'update:product': [value: Product]; identity: [value: string] }>()
+const emit = defineEmits<{ 'update:product': [value: Product] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const durationPresets = ['5', '10', '15']

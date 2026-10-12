@@ -20,6 +20,42 @@ var amountPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)(\.[0-9]+)?$`)
 var dimensionPattern = regexp.MustCompile(`^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$`)
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
+// resolveAccountModel is the workbench's read-only view of the Account's
+// canonical model mapping. It deliberately does not cache a product-derived
+// mapping: an exact/wildcard Account mapping wins, while a model present in
+// the last successful Account catalog is already canonical and can pass
+// through unchanged. The latter is what lets a directly exposed upstream
+// model (for example Account #77's gpt-image-2) work without a duplicate
+// alias entry in credentials.model_mapping.
+func resolveAccountModel(a *Account, requested string) (mapped string, mappingMatched bool, catalogMatched bool) {
+	if a != nil {
+		bestPattern := ""
+		for pattern, target := range a.ModelMapping {
+			if strings.TrimSpace(target) == "" || !modelPatternMatches(pattern, requested) {
+				continue
+			}
+			if len(pattern) > len(bestPattern) || (len(pattern) == len(bestPattern) && pattern < bestPattern) {
+				bestPattern = pattern
+				mapped = target
+			}
+		}
+		if bestPattern != "" {
+			return mapped, true, false
+		}
+		if a.Catalog != nil && slices.Contains(a.Catalog.Models, requested) {
+			return requested, false, true
+		}
+	}
+	return "", false, false
+}
+
+func modelPatternMatches(pattern, requested string) bool {
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(requested, strings.TrimSuffix(pattern, "*"))
+	}
+	return pattern == requested
+}
+
 func diagnostic(class, code, scope, path, message string) Diagnostic {
 	action := "Edit the indicated Draft field and save again"
 	if class == "NEEDS_DEVELOPMENT" {
@@ -91,16 +127,11 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		if a.Catalog != nil && !slices.Contains(a.Catalog.Models, p.UpstreamModel) {
 			add("UI_FIXABLE", "MODEL_NOT_DISCOVERED", pid, "upstream_model", "Upstream model is absent from the last successful snapshot")
 		}
-		mapped := p.SiteModel
-		if m, ok := a.ResolvedModels[p.SiteModel]; ok {
-			mapped = m
-		} else if m, ok := a.ModelMapping[p.SiteModel]; ok {
-			mapped = m
-		}
+		mapped, mappingMatched, catalogMatched := resolveAccountModel(a, p.SiteModel)
 		if mapped != p.UpstreamModel {
 			add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "upstream_model", "Account model mapping differs from the selected upstream model")
 		}
-		if len(a.ModelMapping) > 0 && mapped == p.SiteModel && p.SiteModel != p.UpstreamModel {
+		if p.SiteModel != p.UpstreamModel && !mappingMatched && !catalogMatched {
 			add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "site_model", "Configure the Account model mapping")
 		}
 		binding := AdapterBinding{}
