@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
+	"github.com/Wei-Shaw/sub2api/internal/modelmapping"
 )
 
 const maxCases = 32768
@@ -21,39 +22,21 @@ var dimensionPattern = regexp.MustCompile(`^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$`)
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
 // resolveAccountModel is the workbench's read-only view of the Account's
-// canonical model mapping. It deliberately does not cache a product-derived
-// mapping: an exact/wildcard Account mapping wins, while a model present in
-// the last successful Account catalog is already canonical and can pass
-// through unchanged. The latter is what lets a directly exposed upstream
-// model (for example Account #77's gpt-image-2) work without a duplicate
-// alias entry in credentials.model_mapping.
+// canonical model mapping. The exact/wildcard precedence is delegated to the
+// same shared resolver used by the native Account service; a model present in
+// the last successful Account catalog can pass through unchanged when there
+// is no matching mapping entry.
 func resolveAccountModel(a *Account, requested string) (mapped string, mappingMatched bool, catalogMatched bool) {
-	if a != nil {
-		bestPattern := ""
-		for pattern, target := range a.ModelMapping {
-			if strings.TrimSpace(target) == "" || !modelPatternMatches(pattern, requested) {
-				continue
-			}
-			if len(pattern) > len(bestPattern) || (len(pattern) == len(bestPattern) && pattern < bestPattern) {
-				bestPattern = pattern
-				mapped = target
-			}
-		}
-		if bestPattern != "" {
-			return mapped, true, false
-		}
-		if a.Catalog != nil && slices.Contains(a.Catalog.Models, requested) {
-			return requested, false, true
-		}
+	if a == nil {
+		return "", false, false
+	}
+	if mapped, matched := modelmapping.ResolveRequestedModel(a.ModelMapping, requested); matched {
+		return mapped, true, false
+	}
+	if a.Catalog != nil && slices.Contains(a.Catalog.Models, requested) {
+		return requested, false, true
 	}
 	return "", false, false
-}
-
-func modelPatternMatches(pattern, requested string) bool {
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(requested, strings.TrimSuffix(pattern, "*"))
-	}
-	return pattern == requested
 }
 
 func diagnostic(class, code, scope, path, message string) Diagnostic {

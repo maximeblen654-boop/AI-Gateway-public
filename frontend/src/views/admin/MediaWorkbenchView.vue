@@ -105,7 +105,7 @@
               <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
               <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
             </div>
-            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="p in modelProducts" :key="p.product_id" :value="p.product_id">{{ p.display_name || '未命名商品' }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</option></select></label></div>
+            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label></div>
             <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
@@ -205,6 +205,14 @@ const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.s
 const filteredModels = computed(() => detail.value?.models.filter(m => (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value))
+const productOptionSignatures = computed(() => {
+  const counts = new Map<string, number>()
+  for (const item of modelProducts.value) {
+    const signature = productOptionSignature(item)
+    counts.set(signature, (counts.get(signature) ?? 0) + 1)
+  }
+  return counts
+})
 const addablePreInitTypes = computed(() => {
   const selectedProducts = products.value.filter(item => item.upstream_model === selectedModel.value)
   return ['image', 'video'].filter(type => !selectedProducts.some(item => item.media_type === type))
@@ -243,6 +251,31 @@ function modelLabel(state: string) { return ({ PENDING: '待配置', PUBLISHED: 
 function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
+function productOptionSignature(p: Product) {
+  return JSON.stringify({
+    display_name: p.display_name?.trim() ?? '',
+    media_type: p.media_type,
+    resolutions: p.capabilities.resolutions,
+    aspect_ratios: p.capabilities.aspect_ratios,
+    durations_seconds: p.capabilities.durations_seconds,
+    count: p.capabilities.count,
+    references: p.capabilities.references,
+    pricing_rules: p.pricing_rules.map(rule => ({ match: rule.match, sale_price: rule.sale_price })),
+    enabled: p.enabled
+  })
+}
+function productOptionLabel(p: Product, index: number) {
+  const title = p.display_name?.trim() || `${p.media_type === 'video' ? '视频' : '图片'}商品`
+  const specs = p.media_type === 'video'
+    ? [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/'), p.capabilities.durations_seconds?.map(value => `${value}s`).join('/')]
+    : [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/')]
+  const specText = specs.filter(Boolean).join(' · ') || '规格未配置'
+  const quantityText = p.media_type === 'video' ? '固定 1 条' : `${p.capabilities.count.min}～${p.capabilities.count.max} 张`
+  const status = p.enabled ? '已启用' : '已停用'
+  const parts = [title, `规格 ${specText}`, `数量 ${quantityText}`, priceLabel(p), status]
+  if ((productOptionSignatures.value.get(productOptionSignature(p)) ?? 0) > 1) parts.push(`商品 ${index + 1}`)
+  return parts.join(' · ')
+}
 function changeProduct(event: Event) {
   const target = event.target as HTMLSelectElement
   const id = target.value

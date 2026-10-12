@@ -201,6 +201,20 @@ func TestValidateUsesAccountCatalogForDirectCanonicalModel(t *testing.T) {
 	}
 }
 
+func TestResolveAccountModelUsesNativeExactBeforeWildcardPrecedence(t *testing.T) {
+	a := &Account{
+		ModelMapping: map[string]string{
+			"gpt-image-2": "exact-target",
+			"gpt-image-*": "wildcard-target",
+		},
+		Catalog: &Catalog{Models: []string{"exact-target", "wildcard-target"}},
+	}
+	mapped, mappingMatched, catalogMatched := resolveAccountModel(a, "gpt-image-2")
+	if mapped != "exact-target" || !mappingMatched || catalogMatched {
+		t.Fatalf("resolveAccountModel() = (%q, %v, %v), want (exact-target, true, false)", mapped, mappingMatched, catalogMatched)
+	}
+}
+
 func TestSaveDraftAndPublishDirectCanonicalAccountModel(t *testing.T) {
 	s, r := validatorFixture(t)
 	r.a.BaseURL = "https://api.image2pro.top"

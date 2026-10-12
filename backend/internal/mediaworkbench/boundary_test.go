@@ -16,6 +16,9 @@ func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 		"context": true, "embed": true, "reflect": true, "crypto/sha256": true, "encoding/json": true, "errors": true, "fmt": true, "net/url": true, "regexp": true, "slices": true, "sort": true, "strings": true, "time": true,
 		"github.com/Wei-Shaw/sub2api/internal/pkg/errors": true,
 		"github.com/Wei-Shaw/sub2api/internal/imageplan":  true,
+		// Pure mapping precedence shared with the native Account service; no
+		// transport, credentials or persistence dependency.
+		"github.com/Wei-Shaw/sub2api/internal/modelmapping": true,
 		"github.com/Wei-Shaw/sub2api/internal/videoplan":  true,
 		"github.com/tidwall/gjson":                        true, "github.com/tidwall/sjson": true,
 		// Pure decimal arithmetic for the CNY runtime contract; no transport,

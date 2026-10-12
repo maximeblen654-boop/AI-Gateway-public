@@ -529,6 +529,18 @@ func TestAccountResolveMappedModel(t *testing.T) {
 			expectedMatch:  true,
 		},
 		{
+			name: "exact mapping wins over wildcard mapping",
+			credentials: map[string]any{
+				"model_mapping": map[string]any{
+					"gpt-image-2": "exact-target",
+					"gpt-image-*": "wildcard-target",
+				},
+			},
+			requestedModel: "gpt-image-2",
+			expectedModel:  "exact-target",
+			expectedMatch:  true,
+		},
+		{
 			name: "wildcard passthrough mapping still counts as matched",
 			credentials: map[string]any{
 				"model_mapping": map[string]any{

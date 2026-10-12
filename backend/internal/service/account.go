@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
+	"github.com/Wei-Shaw/sub2api/internal/modelmapping"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
@@ -834,28 +835,12 @@ func normalizeRequestedModelForLookup(platform, requestedModel string) string {
 }
 
 func mappingSupportsRequestedModel(mapping map[string]string, requestedModel string) bool {
-	if requestedModel == "" {
-		return false
-	}
-	if _, exists := mapping[requestedModel]; exists {
-		return true
-	}
-	for pattern := range mapping {
-		if matchWildcard(pattern, requestedModel) {
-			return true
-		}
-	}
-	return false
+	_, matched := modelmapping.ResolveRequestedModel(mapping, requestedModel)
+	return matched
 }
 
 func resolveRequestedModelInMapping(mapping map[string]string, requestedModel string) (mappedModel string, matched bool) {
-	if requestedModel == "" {
-		return "", false
-	}
-	if mappedModel, exists := mapping[requestedModel]; exists {
-		return mappedModel, true
-	}
-	return matchWildcardMappingResult(mapping, requestedModel)
+	return modelmapping.ResolveRequestedModel(mapping, requestedModel)
 }
 
 // IsModelSupported 检查模型是否在 model_mapping 中（支持通配符）
@@ -1081,11 +1066,7 @@ func (a *Account) GetClaudeUserID() string {
 // matchAntigravityWildcard 通配符匹配（仅支持末尾 *）
 // 用于 model_mapping 的通配符匹配
 func matchAntigravityWildcard(pattern, str string) bool {
-	if strings.HasSuffix(pattern, "*") {
-		prefix := pattern[:len(pattern)-1]
-		return strings.HasPrefix(str, prefix)
-	}
-	return pattern == str
+	return modelmapping.MatchPattern(pattern, str)
 }
 
 // matchWildcard 通用通配符匹配（仅支持末尾 *）
@@ -1095,32 +1076,7 @@ func matchWildcard(pattern, str string) bool {
 }
 
 func matchWildcardMappingResult(mapping map[string]string, requestedModel string) (string, bool) {
-	// 收集所有匹配的 pattern，按长度降序排序（最长优先）
-	type patternMatch struct {
-		pattern string
-		target  string
-	}
-	var matches []patternMatch
-
-	for pattern, target := range mapping {
-		if matchWildcard(pattern, requestedModel) {
-			matches = append(matches, patternMatch{pattern, target})
-		}
-	}
-
-	if len(matches) == 0 {
-		return requestedModel, false // 无匹配，返回原始模型名
-	}
-
-	// 按 pattern 长度降序排序
-	sort.Slice(matches, func(i, j int) bool {
-		if len(matches[i].pattern) != len(matches[j].pattern) {
-			return len(matches[i].pattern) > len(matches[j].pattern)
-		}
-		return matches[i].pattern < matches[j].pattern
-	})
-
-	return matches[0].target, true
+	return modelmapping.ResolveRequestedModel(mapping, requestedModel)
 }
 
 func (a *Account) IsCustomErrorCodesEnabled() bool {

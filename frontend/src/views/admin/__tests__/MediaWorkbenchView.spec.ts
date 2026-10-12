@@ -194,6 +194,23 @@ describe('Media Workbench page flow', () => {
     expect(wrapper.get('[data-test="product-select"]').text()).not.toContain('media-290f101c-internal')
   })
 
+  it('distinguishes identical product names with readable business details and stable ordinals', async () => {
+    const dto = supplier()
+    const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
+    second.product_id = 'media-second-internal'
+    dto.media_workbench_v1!.draft.products.push(second)
+    api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
+    await openEditor()
+    const options = wrapper.get('[data-test="product-select"]').findAll('option').map(option => option.text())
+    expect(options[0]).toContain('画布图片')
+    expect(options[0]).toContain('规格 1K/4K · 1:1/16:9')
+    expect(options[0]).toContain('CNY 0.18')
+    expect(options[0]).toContain('商品 1')
+    expect(options[1]).toContain('商品 2')
+    expect(options[0]).not.toContain('media-')
+    expect(options[1]).not.toContain('media-')
+  })
+
   it('keeps dirty navigation protected inside the page flow', async () => {
     await openEditor(); await wrapper.get('[data-test="display-name"]').setValue('本地修改')
     await wrapper.get('.mw-back').trigger('click'); await flushPromises()

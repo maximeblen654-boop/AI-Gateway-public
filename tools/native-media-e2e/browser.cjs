@@ -66,10 +66,40 @@ const report = { cases: [], http: [] }
     assert.equal(report.validation.publish_ready, true, JSON.stringify(report.validation.diagnostics))
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
     report.product = detail.media_workbench_v1.draft.products[0]
+
+    // Exercise the product selector with two business-equivalent offers that
+    // share one canonical upstream model. The duplicate is created through
+    // the real admin draft endpoint in the isolated database; no browser
+    // fixture intercepts the save or validation response.
+    const duplicate = JSON.parse(JSON.stringify(report.product))
+    duplicate.product_id = `${report.product.product_id}-same-model`
+    const duplicateDraft = [...detail.media_workbench_v1.draft.products, duplicate]
+    const duplicateResponse = await page.evaluate(async ({ accountId, version, products }) => {
+      const response = await fetch(`/api/v1/admin/media-workbench/accounts/${accountId}/draft`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-UI-Request': '1' },
+        body: JSON.stringify({ expected_record_version: version, draft: { products } })
+      })
+      return { status: response.status, data: await response.json() }
+    }, { accountId, version: detail.media_workbench_v1.record_version, products: duplicateDraft })
+    assert.equal(duplicateResponse.status, 200, JSON.stringify(duplicateResponse.data))
+    const duplicateDetail = duplicateResponse.data.data
+    assert.equal(duplicateDetail.media_workbench_v1.validation.publish_ready, true, JSON.stringify(duplicateDetail.media_workbench_v1.validation.diagnostics))
+    report.duplicate_product = duplicate
+    report.cases.push('Two same-model products saved through the real draft endpoint')
+
     await page.reload()
     await w('source-localhost').locator('summary').click()
     await w(`supplier-${accountId}`).click()
     await w(`model-${model}`).click()
+    await expect(w('product-select')).toHaveCount(1)
+    const productOptions = await w('product-select').locator('option').allTextContents()
+    assert.equal(productOptions.length, 2, JSON.stringify(productOptions))
+    assert(productOptions.every(option => !option.includes('media-')), JSON.stringify(productOptions))
+    assert(productOptions.some(option => option.includes('商品 1')) && productOptions.some(option => option.includes('商品 2')), JSON.stringify(productOptions))
+    report.product_options = productOptions
+    await page.screenshot({ path: `${root}/evidence/${prefix}-same-product-selector.png`, fullPage: true })
+    report.cases.push('Same-name same-type product selector shows stable business distinction without internal IDs')
     await w('wizard-step-5').click()
     await expect(w('display-name')).toHaveValue(name)
     await page.screenshot({ path: `${root}/evidence/${prefix}-review-desktop.png`, fullPage: true })
