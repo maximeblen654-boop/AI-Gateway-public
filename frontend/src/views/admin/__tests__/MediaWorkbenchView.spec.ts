@@ -184,7 +184,7 @@ describe('Media Workbench page flow', () => {
     const dto = supplier()
     const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
     second.product_id = 'media-290f101c-internal'
-    second.display_name = '高清商品'
+    second.display_name = '高清商品 · media-290f101c-internal'
     dto.media_workbench_v1!.draft.products.push(second)
     api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
     await openEditor()

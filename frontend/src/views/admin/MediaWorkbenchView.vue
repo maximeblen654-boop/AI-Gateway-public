@@ -74,7 +74,7 @@
           <div class="mw-model-list">
             <button v-for="row in filteredModels" :key="row.model_id" class="mw-model-row" :class="{ 'mw-selected': selectedModel === row.model_id }" :aria-pressed="selectedModel === row.model_id" :disabled="busy" :data-test="`model-${row.model_id}`" @click="navigate(() => openEditor(row.model_id))">
               <span class="mw-model-row-main"><strong>{{ row.model_id }}</strong><span class="mw-badge" :data-state="row.state">● {{ modelLabel(row.state) }}</span></span>
-              <span v-if="rowProduct(row.model_id)">{{ rowProduct(row.model_id)?.display_name }} · {{ rowProduct(row.model_id)?.media_type === 'video' ? '视频' : '图片' }}</span>
+              <span v-if="rowProduct(row.model_id)">{{ productDisplayTitle(rowProduct(row.model_id)!) }} · {{ rowProduct(row.model_id)?.media_type === 'video' ? '视频' : '图片' }}</span>
               <small v-if="rowProduct(row.model_id)">{{ (rowProduct(row.model_id)?.capabilities.resolutions ?? []).join(' / ') }} · {{ priceLabel(rowProduct(row.model_id)) }}</small>
               <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
             </button>
@@ -135,13 +135,13 @@
     </MediaDialog>
     <MediaDialog :show="publishDialog" title="发布这次修改？" :busy="pending === 'publish'" @close="publishDialog = false">
       <p>这次会发布当前 Account 下列产品的草稿：</p>
-      <ul class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</li></ul>
+      <ul class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ productDisplayTitle(p) }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</li></ul>
       <p>发布配置不会自动开启销售，已有订单不会改变，也不会发送真实生成请求。</p>
       <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish" @click="confirmPublish">确认发布配置</button></template>
     </MediaDialog>
     <MediaDialog :show="salesDialog" :title="config?.sales.enabled ? '暂停媒体销售？' : '开启媒体销售？'" :busy="pending === 'sales'" @close="salesDialog = false">
       <p>下列已发布产品将一起受到 Account 级销售开关影响：</p>
-      <ul class="mw-dialog-list" data-test="sales-products"><li v-for="p in config?.published?.products ?? []" :key="p.product_id">{{ p.display_name || p.upstream_model }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
+      <ul class="mw-dialog-list" data-test="sales-products"><li v-for="p in config?.published?.products ?? []" :key="p.product_id">{{ productDisplayTitle(p) }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
       <p v-if="!config?.published?.products?.length">暂无已发布产品。</p>
       <p>{{ config?.sales.enabled ? '暂停后停止新的媒体报价和新提交；已经提交的任务和历史订单不会被修改。' : '后台会核验已发布产品的销售条件；未发布草稿不会随销售开关生效。' }}</p>
       <template #actions><button class="btn" :class="config?.sales.enabled ? 'mw-danger' : 'btn-primary'" data-test="confirm-sales" :disabled="busy" @click="confirmSales">确认{{ config?.sales.enabled ? '暂停' : '开启' }}</button></template>
@@ -251,9 +251,17 @@ function modelLabel(state: string) { return ({ PENDING: '待配置', PUBLISHED: 
 function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
+function productDisplayTitle(p: Product) {
+  const fallback = `${p.media_type === 'video' ? '视频' : '图片'}商品`
+  const raw = p.display_name?.trim() ?? ''
+  if (!raw) return p.upstream_model?.trim() || fallback
+  const withoutInternalSuffix = raw.replace(/\s*[·|•]\s*media-[a-z0-9-]{4,}$/i, '').trim()
+  if (!withoutInternalSuffix || /^media-[a-z0-9-]{4,}$/i.test(withoutInternalSuffix)) return p.upstream_model?.trim() || fallback
+  return withoutInternalSuffix
+}
 function productOptionSignature(p: Product) {
   return JSON.stringify({
-    display_name: p.display_name?.trim() ?? '',
+    display_name: productDisplayTitle(p),
     media_type: p.media_type,
     resolutions: p.capabilities.resolutions,
     aspect_ratios: p.capabilities.aspect_ratios,
@@ -265,7 +273,7 @@ function productOptionSignature(p: Product) {
   })
 }
 function productOptionLabel(p: Product, index: number) {
-  const title = p.display_name?.trim() || `${p.media_type === 'video' ? '视频' : '图片'}商品`
+  const title = productDisplayTitle(p)
   const specs = p.media_type === 'video'
     ? [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/'), p.capabilities.durations_seconds?.map(value => `${value}s`).join('/')]
     : [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/')]
