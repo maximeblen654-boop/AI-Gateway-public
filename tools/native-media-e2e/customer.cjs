@@ -93,7 +93,10 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       assert.equal(creates[0].auth, 'bearer')
       assert.equal(creates[0].body.duration, 5)
       assert.equal(creates[0].body.resolution, '720p')
-      assert.equal(creates[0].body[videoMode === 'seedance' ? 'aspect_ratio' : 'ratio'], '16:9')
+      // The wire profile is the source of truth: Grok and Seedance use
+      // aspect_ratio, while generic compatible video uses ratio.
+      const ratioField = videoMode === 'compatible' ? 'ratio' : 'aspect_ratio'
+      assert.equal(creates[0].body[ratioField], '16:9')
       report.actual_submit = creates[0]
     }
     await page.reload(); await expect(page.getByTestId('studio-task-id')).toContainText(report.id)
