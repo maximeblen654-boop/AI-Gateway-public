@@ -45,7 +45,7 @@ for (const definition of definitions) {
   const account = existing.items.find(a => a.name === name) || await api('/admin/accounts', 'POST', { name, platform, type: 'apikey', credentials, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: accountGroupIDs, upstream_billing_probe_enabled: false })
   fixture.groups[key] = group.id; fixture.accounts[key] = account.id
   const sync = await api(`/admin/accounts/${account.id}/models/sync-upstream`, 'POST', {})
-  if (!channels.items.some(c => c.name === `${name} cost`)) await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: [group.id], account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
+  if (!channels.items.some(c => c.name === `${name} cost`)) await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: accountGroupIDs, account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
   console.log(JSON.stringify({ key, platform, group: group.id, account: account.id, sync }))
 }
 const customer = await api('/admin/users', 'POST', { email: 'native-customer@example.invalid', password: 'Native-Customer-Only-20261012', balance: 100, concurrency: 5, allowed_groups: Object.values(fixture.groups) })
