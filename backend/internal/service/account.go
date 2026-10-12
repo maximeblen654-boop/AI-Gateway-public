@@ -835,7 +835,7 @@ func normalizeRequestedModelForLookup(platform, requestedModel string) string {
 }
 
 func mappingSupportsRequestedModel(mapping map[string]string, requestedModel string) bool {
-	_, matched := modelmapping.ResolveRequestedModel(mapping, requestedModel)
+	_, matched := matchWildcardMappingResult(mapping, requestedModel)
 	return matched
 }
 

@@ -75,9 +75,14 @@ const report = { cases: [], http: [] }
     duplicate.product_id = `${report.product.product_id}-same-model`
     const duplicateDraft = [...detail.media_workbench_v1.draft.products, duplicate]
     const duplicateResponse = await page.evaluate(async ({ accountId, version, products }) => {
+      const token = localStorage.getItem('auth_token')
       const response = await fetch(`/api/v1/admin/media-workbench/accounts/${accountId}/draft`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-UI-Request': '1' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-UI-Request': '1',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ expected_record_version: version, draft: { products } })
       })
       return { status: response.status, data: await response.json() }

@@ -19,8 +19,8 @@ func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 		// Pure mapping precedence shared with the native Account service; no
 		// transport, credentials or persistence dependency.
 		"github.com/Wei-Shaw/sub2api/internal/modelmapping": true,
-		"github.com/Wei-Shaw/sub2api/internal/videoplan":  true,
-		"github.com/tidwall/gjson":                        true, "github.com/tidwall/sjson": true,
+		"github.com/Wei-Shaw/sub2api/internal/videoplan":    true,
+		"github.com/tidwall/gjson":                          true, "github.com/tidwall/sjson": true,
 		// Pure decimal arithmetic for the CNY runtime contract; no transport,
 		// credential, database, scheduler or billing-service dependency is admitted.
 		"github.com/shopspring/decimal": true,
