@@ -60,7 +60,7 @@ try {
   run('sudo', ['nsenter', '-t', corePID, '-n', 'ip', 'addr', 'add', `${resultIP}/32`, 'dev', 'lo'])
   const resultRoute = capture('sudo', ['nsenter', '-t', corePID, '-n', 'ip', 'route', 'get', resultIP])
   assert.match(resultRoute, /local 203\.0\.113\.10 dev lo/, 'synthetic result host must remain local')
-  fs.writeFileSync(path.join(out, 'synthetic-result-network.json'), JSON.stringify({ address: resultIP, route: resultRoute, docker_network_internal: true }))
+  fs.writeFileSync(path.join(out, 'synthetic-result-network.json'), JSON.stringify({ address: resultIP, route: resultRoute, simulator_external_forwarding: false }))
   run('docker', ['exec', '-i', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-v', 'ON_ERROR_STOP=1'], { input: fs.readFileSync('backend/internal/repository/testdata/studio_video_orders_legacy.sql'), stdio: ['pipe', 'inherit', 'inherit'] })
   dc(['run', '--rm', '--no-deps', '--user', '0', '--entrypoint', 'sh', 'bff', '-c', 'chown -R 1000:1000 /state && chmod 700 /state/assets /state/images /state/videos'])
   dc(['up', '-d', '--wait', '--wait-timeout', '180'])

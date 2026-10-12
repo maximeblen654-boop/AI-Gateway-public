@@ -29,17 +29,25 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
   try {
     await page.goto(base+'/login'); await page.getByLabel('邮箱').fill('native-customer@example.invalid'); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
     await page.getByRole('button', { name: '登录', exact: true }).click(); await page.waitForURL('**/dashboard')
+    const loadedHistory = video ? page.waitForResponse(r => r.url().endsWith('/studio-v2/api/video/operations') && r.request().method() === 'GET') : null
     await page.goto(base+'/video-studio')
+    const existingTasks = loadedHistory ? await (await loadedHistory).json() : []
     await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
-    await expect(page.getByTestId('studio-offer-select')).toBeEnabled()
     if ((await page.getByTestId('studio-kind').inputValue()) !== kind) await page.getByTestId('studio-kind').selectOption(kind)
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
     if (recover) {
       await page.locator(`[data-task-id="${report.id}"]`).click()
       report.recovered = true
     } else {
-    if (await page.getByTestId('studio-new').isVisible()) await page.getByTestId('studio-new').click()
+    if (video && existingTasks.length) {
+      // The page restores the last server task before enabling a new one.
+      // Wait for that recovery to finish, then use the visible New Task action.
+      await expect(page.getByTestId('studio-status')).toContainText('生成完成')
+      await expect(page.getByTestId('studio-refresh')).toBeEnabled()
+      await page.getByTestId('studio-new').click()
+    } else if (await page.getByTestId('studio-new').isVisible()) await page.getByTestId('studio-new').click()
+    await expect(page.getByTestId('studio-offer-select')).toBeEnabled()
     const catalog = await page.evaluate(async kind => (await fetch(`/studio-v2/api/${kind}/catalog`, { headers: { 'X-Studio-Request': `${kind}-binding-v1` } })).json(), kind)
     report.catalog = catalog
     const offerModel = video ? videoModel : 'gemini-3.1-flash-image'
@@ -85,12 +93,16 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       assert.equal(creates[0].auth, 'bearer')
       assert.equal(creates[0].body.duration, 5)
       assert.equal(creates[0].body.resolution, '720p')
-      assert.equal(creates[0].body.ratio, '16:9')
+      assert.equal(creates[0].body[videoMode === 'seedance' ? 'aspect_ratio' : 'ratio'], '16:9')
       report.actual_submit = creates[0]
     }
     await page.reload(); await expect(page.getByTestId('studio-task-id')).toContainText(report.id)
     await expect(page.getByTestId('studio-status')).toContainText('生成完成')
     if (video) {
+      const queried = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/video/operations/${report.id}`) && r.request().method() === 'GET')
+      await page.getByTestId('studio-refresh').click()
+      assert.equal((await queried).status(), 200)
+      await expect(page.getByTestId('studio-refresh')).toBeEnabled()
       // Reload restores and queries the original task. Download that persisted
       // result again; neither operation may generate or settle another task.
       const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').click(); const download = await pending
