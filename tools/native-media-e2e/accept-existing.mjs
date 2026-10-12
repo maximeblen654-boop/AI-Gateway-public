@@ -49,6 +49,7 @@ run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '
 fs.copyFileSync(path.join(evidence, 'simulator-cert.pem'), path.join(evidence, 'simulator-ca.crt'))
 run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(evidence, 'synthetic-original.mp4')])
 let proxy
+let acceptanceError
 try {
   dc(['up', '-d', '--wait', '--wait-timeout', '180', 'core'])
   run('docker', ['exec', '-i', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-v', 'ON_ERROR_STOP=1'], { input: fs.readFileSync('backend/internal/repository/testdata/studio_video_orders_legacy.sql'), stdio: ['pipe', 'inherit', 'inherit'] })
@@ -75,9 +76,16 @@ try {
   assert.equal(containers[1].HostConfig.NetworkMode, `container:${containers[0].Id}`)
   assert.equal(containers[2].HostConfig.NetworkMode, `container:${containers[0].Id}`)
   fs.writeFileSync(path.join(out, 'acceptance-existing.json'), JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha, candidate_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), scenarios: reports.map(r => ({ scenario: r.scenario, task_id: r.id, quote: r.quote.sale_price, request_count: r.after.supplier.video_posts - r.before.supplier.video_posts, downloads: r.downloads, ledger_before: r.before.ledger, ledger_after: r.after.ledger, http: r.http, upstream: state.requests.filter(request => request.body?.model === (r.scenario === 'video-compatible' ? 'synthetic-compatible-video' : 'synthetic-seedance-video') || request.path.includes(r.scenario === 'video-compatible' ? '/v1/videos' : '/api/v3/contents/generations/tasks')) })), containers: containers.map(c => ({ name: c.Name, image: c.Config.Image, image_id: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode })) }, null, 2))
+} catch (error) {
+  acceptanceError = error
+  try {
+    fs.writeFileSync(path.join(out, 'compose-logs-failure.txt'), capture('docker', ['compose', '-p', 'ai-gateway-native-20261012', '-f', path.join(root, 'compose.json'), 'logs', '--no-color', '--tail', '250', 'core', 'bridge', 'bff']))
+  } catch {}
+  throw error
 } finally {
   if (proxy) proxy.kill()
   for (const name of fs.readdirSync(evidence).filter(n => /^native-(video-(compatible|seedance)-browser|customer-video-(compatible|seedance)|supplier-state|browser|customer-video-(compatible|seedance)).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
   try { dc(['down', '-v', '--remove-orphans']) } catch {}
 }
-console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))
+if (acceptanceError) process.exitCode = 1
+else console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))
