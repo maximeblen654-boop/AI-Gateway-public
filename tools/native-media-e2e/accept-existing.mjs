@@ -46,7 +46,6 @@ for (const image of manifest.images) compose.services[image.component].image = i
 // TEST-NET-3 is documentation-only; no request is sent to an external supplier.
 const resultIP = '203.0.113.10'
 compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = `https://${resultIP}:19090`
-compose.networks.native.internal = true
 fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
 fs.mkdirSync(path.join(root, 'runtime'), { recursive: true })
 fs.copyFileSync('tools/native-media-e2e/simulator.mjs', path.join(root, 'runtime/simulator.mjs'))
@@ -65,12 +64,17 @@ try {
   run('docker', ['exec', '-i', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-v', 'ON_ERROR_STOP=1'], { input: fs.readFileSync('backend/internal/repository/testdata/studio_video_orders_legacy.sql'), stdio: ['pipe', 'inherit', 'inherit'] })
   dc(['run', '--rm', '--no-deps', '--user', '0', '--entrypoint', 'sh', 'bff', '-c', 'chown -R 1000:1000 /state && chmod 700 /state/assets /state/images /state/videos'])
   dc(['up', '-d', '--wait', '--wait-timeout', '180'])
-  proxy = spawn(process.execPath, ['tools/native-media-e2e/proxy.mjs'], { stdio: 'inherit' })
-  for (let i = 0; i < 30; i++) {
+  const directHealth = await fetch('http://127.0.0.1:28180/health').then(r => r.status).catch(() => 0)
+  assert.equal(directHealth, 200, `candidate frontend health unavailable: ${directHealth}`)
+  proxy = spawn(process.execPath, ['tools/native-media-e2e/proxy.mjs'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let proxyOutput = ''
+  proxy.stdout.on('data', chunk => { proxyOutput += chunk.toString() })
+  proxy.stderr.on('data', chunk => { proxyOutput += chunk.toString() })
+  for (let i = 0; i < 60; i++) {
     if (await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false)) break
     await new Promise(resolve => setTimeout(resolve, 500))
   }
-  assert(await fetch('http://127.0.0.1:28100/health').then(r => r.ok), 'same-origin proxy did not become healthy')
+  assert(await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false), `same-origin proxy did not become healthy: ${proxyOutput}`)
   run(process.execPath, ['tools/native-media-e2e/seed.mjs', root])
   run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
   run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video-compatible'])
