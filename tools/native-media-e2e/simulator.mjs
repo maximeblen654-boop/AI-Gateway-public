@@ -38,7 +38,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     }
     if (req.method === 'POST' && url.pathname === '/api/v3/contents/generations/tasks') {
       state.video_posts++
-      assert.equal(auth, 'bearer'); assert.equal(body.model, 'synthetic-seedance-upstream')
+      assert.equal(auth, 'bearer'); assert.equal(body.model, 'synthetic-seedance-video')
       assert(Array.isArray(body.content) && body.content.some(item => item.type === 'text'))
       const id = `seedance-task-${state.video_posts}`
       state.tasks[id] = { id, polls: 0, kind: 'seedance' }; save()
@@ -46,7 +46,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     }
     if (req.method === 'POST' && ['/v1/videos', '/v1/videos/generations'].includes(url.pathname)) {
       state.video_posts++
-      assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-upstream'].includes(body.model))
+      assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-video'].includes(body.model))
       const id = `native-video-${state.video_posts}`
       state.tasks[id] = { id, polls: 0 }; save()
       return reply(200, { id, request_id: id, status: 'pending' })
@@ -55,7 +55,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     if (req.method === 'GET' && seedance && state.tasks[seedance[1]]) {
       const task = state.tasks[seedance[1]]
       task.polls++; save()
-      return reply(200, { id: task.id, status: 'succeeded', model: 'synthetic-seedance-upstream', usage: { completion_tokens: 1 }, content: { video_url: `https://localhost:19090/v1/videos/${task.id}/content` } })
+      return reply(200, { id: task.id, status: 'succeeded', model: 'synthetic-seedance-video', usage: { completion_tokens: 1 }, content: { video_url: `https://localhost:19090/v1/videos/${task.id}/content` } })
     }
     const match = /^\/v1\/videos\/(native-video-\d+)(\/content)?$/.exec(url.pathname)
     if (req.method === 'GET' && match && state.tasks[match[1]]) {

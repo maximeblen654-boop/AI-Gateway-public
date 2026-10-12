@@ -28,8 +28,12 @@ const definitions = [
   { key: 'gemini', name: 'Synthetic gemini', platform: 'gemini', model: 'gemini-3.1-flash-image' },
   { key: 'grok', name: 'Synthetic grok', platform: 'grok', model: 'grok-imagine-video' },
   { key: 'openai', name: 'Synthetic openai', platform: 'openai', model: 'native-openai-image' },
-  { key: 'compatible', name: 'Synthetic compatible', platform: 'openai', model: 'synthetic-compatible-video', mapping: { 'synthetic-compatible-video': 'synthetic-compatible-upstream' } },
-  { key: 'seedance', name: 'Synthetic seedance', platform: 'openai', model: 'synthetic-seedance-video', mapping: { 'synthetic-seedance-video': 'synthetic-seedance-upstream' }, capabilities: ['seedance'] },
+  // The wizard selects a model from the synced upstream catalog. Keep the
+  // account mapping explicit but identity-preserving so the validator sees
+  // the same model the administrator selected; the simulator still records
+  // the exact wire model sent by the native executor.
+  { key: 'compatible', name: 'Synthetic compatible', platform: 'openai', model: 'synthetic-compatible-video', mapping: { 'synthetic-compatible-video': 'synthetic-compatible-video' } },
+  { key: 'seedance', name: 'Synthetic seedance', platform: 'openai', model: 'synthetic-seedance-video', mapping: { 'synthetic-seedance-video': 'synthetic-seedance-video' }, capabilities: ['seedance'] },
 ]
 for (const definition of definitions) {
   const { key, name, platform, mapping, capabilities } = definition
