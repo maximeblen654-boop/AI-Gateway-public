@@ -20,7 +20,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     const auth = req.headers.authorization === 'Bearer synthetic-native-only' ? 'bearer' : req.headers['x-goog-api-key'] === 'synthetic-native-only' ? 'gemini-key' : 'missing'
     state.requests.push({ method: req.method, path: url.pathname, auth, body }); save()
     if (auth === 'missing') return reply(401, { error: 'synthetic_auth' })
-    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['grok-imagine-image', 'grok-imagine-video', 'native-openai-image'].map(id => ({ id, object: 'model' })) })
+    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream'].map(id => ({ id, object: 'model' })) })
     if (req.method === 'GET' && url.pathname === '/v1beta/models') return reply(200, { models: [{ name: 'models/gemini-3.1-flash-image', displayName: 'Synthetic Gemini Image', supportedGenerationMethods: ['generateContent'] }] })
     if (req.method === 'POST' && url.pathname.endsWith(':generateContent')) {
       state.image_posts++; save()
@@ -36,17 +36,36 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
       if (body.prompt.startsWith('SYNTHETIC_PARTIAL') && calls.length === 2) return reply(422, { error: 'synthetic_second_batch_rejected' })
       return reply(200, { data: Array.from({ length: body.n }, () => ({ b64_json: png })) })
     }
+    if (req.method === 'POST' && url.pathname === '/api/v3/contents/generations/tasks') {
+      state.video_posts++
+      assert.equal(auth, 'bearer'); assert.equal(body.model, 'synthetic-seedance-upstream')
+      assert(Array.isArray(body.content) && body.content.some(item => item.type === 'text'))
+      const id = `seedance-task-${state.video_posts}`
+      state.tasks[id] = { id, polls: 0, kind: 'seedance' }; save()
+      return reply(200, { id, status: 'queued', model: body.model })
+    }
     if (req.method === 'POST' && ['/v1/videos', '/v1/videos/generations'].includes(url.pathname)) {
       state.video_posts++
-      assert.equal(auth, 'bearer'); assert.equal(body.model, 'grok-imagine-video')
+      assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-upstream'].includes(body.model))
       const id = `native-video-${state.video_posts}`
       state.tasks[id] = { id, polls: 0 }; save()
       return reply(200, { id, request_id: id, status: 'pending' })
+    }
+    const seedance = /^\/api\/v3\/contents\/generations\/tasks\/(seedance-task-\d+)$/.exec(url.pathname)
+    if (req.method === 'GET' && seedance && state.tasks[seedance[1]]) {
+      const task = state.tasks[seedance[1]]
+      task.polls++; save()
+      return reply(200, { id: task.id, status: 'succeeded', model: 'synthetic-seedance-upstream', usage: { completion_tokens: 1 }, content: { video_url: `https://localhost:19090/v1/videos/${task.id}/content` } })
     }
     const match = /^\/v1\/videos\/(native-video-\d+)(\/content)?$/.exec(url.pathname)
     if (req.method === 'GET' && match && state.tasks[match[1]]) {
       const task = state.tasks[match[1]]
       if (!match[2]) { task.polls++; save(); return reply(200, { id: task.id, status: 'done', video: { url: `https://localhost:19090/v1/videos/${task.id}/content` } }) }
+      const bytes = fs.readFileSync(path.join(root, 'synthetic-original.mp4'))
+      res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': bytes.length }); return res.end(bytes)
+    }
+    const seedanceContent = /^\/v1\/videos\/(seedance-task-\d+)\/content$/.exec(url.pathname)
+    if (req.method === 'GET' && seedanceContent && state.tasks[seedanceContent[1]]) {
       const bytes = fs.readFileSync(path.join(root, 'synthetic-original.mp4'))
       res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': bytes.length }); return res.end(bytes)
     }

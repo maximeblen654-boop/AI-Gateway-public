@@ -7,8 +7,10 @@ const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const base = 'http://127.0.0.1:28100'
 const scenario = process.argv[3] || 'image'
-assert(['image', 'edit', 'video'].includes(scenario))
-const video = scenario === 'video'; const kind = video ? 'video' : 'image'; const count = video ? 1 : scenario === 'edit' ? 2 : 3
+assert(['image', 'edit', 'video', 'video-compatible', 'video-seedance'].includes(scenario))
+const videoMode = scenario === 'video-seedance' ? 'seedance' : scenario === 'video-compatible' ? 'compatible' : scenario === 'video' ? 'grok' : null
+const video = Boolean(videoMode); const kind = video ? 'video' : 'image'; const count = video ? 1 : scenario === 'edit' ? 2 : 3
+const videoModel = ({ grok: 'grok-imagine-video', compatible: 'synthetic-compatible-video', seedance: 'synthetic-seedance-video' })[videoMode]
 const docker = (...args) => execFileSync('docker', [...(process.platform === 'win32' ? ['--context', 'desktop-linux'] : []), ...args], { windowsHide: true, encoding: 'utf8' })
 const stats = () => JSON.parse(fs.readFileSync(`${root}/evidence/native-supplier-state.json`, 'utf8'))
 const ledger = () => JSON.parse(docker('exec', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-At', '-c', "select json_build_object('balance',balance,'frozen_balance',frozen_balance,'usage',(select count(*) from usage_logs where user_id=2),'video_captured',(select count(*) from studio_video_orders where user_id=2 and state='CAPTURED')) from users where id=2"))
@@ -39,7 +41,8 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     if (await page.getByTestId('studio-new').isVisible()) await page.getByTestId('studio-new').click()
     const catalog = await page.evaluate(async kind => (await fetch(`/studio-v2/api/${kind}/catalog`, { headers: { 'X-Studio-Request': `${kind}-binding-v1` } })).json(), kind)
     report.catalog = catalog
-    const offer = catalog.offers?.find(o => o.upstream_model === (video ? 'grok-imagine-video' : 'gemini-3.1-flash-image') || o.model === (video ? 'grok-imagine-video' : 'gemini-3.1-flash-image'))
+    const offerModel = video ? videoModel : 'gemini-3.1-flash-image'
+    const offer = catalog.offers?.find(o => o.upstream_model === offerModel || o.model === offerModel)
     assert(offer, JSON.stringify(catalog))
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
     if (!video) await page.getByTestId('studio-count').fill(String(count))

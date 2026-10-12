@@ -24,13 +24,22 @@ assert(existing.items.every(a => a.name.startsWith('Synthetic ')), 'unexpected A
 const fixture = { groups: {}, accounts: {} }
 const groups = await api('/admin/groups/all')
 const channels = await api('/admin/channels?page=1&page_size=100')
-for (const platform of ['gemini', 'grok', 'openai']) {
-  const group = groups.find(g => g.name === `Synthetic ${platform}`) || await api('/admin/groups', 'POST', { name: `Synthetic ${platform}`, platform, rate_multiplier: 1, subscription_type: 'standard', allow_image_generation: true })
-  const account = existing.items.find(a => a.name === `Synthetic ${platform}`) || await api('/admin/accounts', 'POST', { name: `Synthetic ${platform}`, platform, type: 'apikey', credentials: { api_key: 'synthetic-native-only', base_url: 'https://localhost:19090' }, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: [group.id], upstream_billing_probe_enabled: false })
-  fixture.groups[platform] = group.id; fixture.accounts[platform] = account.id
+const definitions = [
+  { key: 'gemini', name: 'Synthetic gemini', platform: 'gemini', model: 'gemini-3.1-flash-image' },
+  { key: 'grok', name: 'Synthetic grok', platform: 'grok', model: 'grok-imagine-video' },
+  { key: 'openai', name: 'Synthetic openai', platform: 'openai', model: 'native-openai-image' },
+  { key: 'compatible', name: 'Synthetic compatible', platform: 'openai', model: 'synthetic-compatible-video', mapping: { 'synthetic-compatible-video': 'synthetic-compatible-upstream' } },
+  { key: 'seedance', name: 'Synthetic seedance', platform: 'openai', model: 'synthetic-seedance-video', mapping: { 'synthetic-seedance-video': 'synthetic-seedance-upstream' }, capabilities: ['seedance'] },
+]
+for (const definition of definitions) {
+  const { key, name, platform, mapping, capabilities } = definition
+  const group = groups.find(g => g.name === name) || await api('/admin/groups', 'POST', { name, platform, rate_multiplier: 1, subscription_type: 'standard', allow_image_generation: true })
+  const credentials = { api_key: 'synthetic-native-only', base_url: 'https://localhost:19090', ...(mapping ? { model_mapping: mapping } : {}), ...(capabilities ? { openai_capabilities: capabilities } : {}) }
+  const account = existing.items.find(a => a.name === name) || await api('/admin/accounts', 'POST', { name, platform, type: 'apikey', credentials, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: [group.id], upstream_billing_probe_enabled: false })
+  fixture.groups[key] = group.id; fixture.accounts[key] = account.id
   const sync = await api(`/admin/accounts/${account.id}/models/sync-upstream`, 'POST', {})
-  if (!channels.items.some(c => c.name === `Synthetic ${platform} cost`)) await api('/admin/channels', 'POST', { name: `Synthetic ${platform} cost`, group_ids: [group.id], account_stats_pricing_rules: [{ name: 'Synthetic exact Account cost', group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
-  console.log(JSON.stringify({ platform, group: group.id, account: account.id, sync }))
+  if (!channels.items.some(c => c.name === `${name} cost`)) await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: [group.id], account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
+  console.log(JSON.stringify({ key, platform, group: group.id, account: account.id, sync }))
 }
 const customer = await api('/admin/users', 'POST', { email: 'native-customer@example.invalid', password: 'Native-Customer-Only-20261012', balance: 100, concurrency: 5, allowed_groups: Object.values(fixture.groups) })
 fixture.customer = customer.id

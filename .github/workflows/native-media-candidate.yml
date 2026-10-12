@@ -4,9 +4,29 @@ on:
   push:
     branches: [codex/studio-native-media]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'build a new candidate or accept an existing candidate artifact'
+        required: true
+        default: build
+        type: choice
+        options: [build, accept-existing]
+      candidate_run_id:
+        description: 'existing candidate run id (accept-existing only)'
+        required: false
+        default: '38183650939'
+      candidate_artifact_name:
+        description: 'existing candidate artifact name (accept-existing only)'
+        required: false
+        default: native-media-candidate-64d9b523520f087cea31a216e7db65e64605ff7b
+      candidate_source_sha:
+        description: 'source SHA embedded in the existing candidate'
+        required: false
+        default: 64d9b523520f087cea31a216e7db65e64605ff7b
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: native-media-candidate
@@ -17,6 +37,7 @@ jobs:
     if: >-
       github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
       github.ref == 'refs/heads/codex/studio-native-media' &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.mode != 'accept-existing') &&
       (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[native-media-candidate]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -51,3 +72,50 @@ jobs:
           compression-level: 0
           path: |
             ${{ runner.temp }}/native-candidate-output/*
+
+  accept-existing:
+    if: >-
+      github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
+      github.ref == 'refs/heads/codex/studio-native-media' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.mode == 'accept-existing'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+      - uses: docker/setup-buildx-action@v3
+      - name: Download the exact existing candidate artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/native-existing-artifact"
+          gh run download "${{ github.event.inputs.candidate_run_id }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "${{ github.event.inputs.candidate_artifact_name }}" \
+            --dir "$RUNNER_TEMP/native-existing-artifact"
+      - name: Install browser test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Accept the existing candidate without rebuilding
+        env:
+          NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
+        run: node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
+      - name: Save small video acceptance evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-media-existing-acceptance-${{ github.sha }}
+          retention-days: 14
+          compression-level: 6
+          path: |
+            ${{ runner.temp }}/native-existing-acceptance-output/*
