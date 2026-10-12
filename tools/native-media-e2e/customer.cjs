@@ -64,24 +64,46 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await expect(page.getByTestId('studio-status')).toContainText('生成完成', { timeout: 60000 })
     await expect(page.getByTestId(video ? 'studio-result-video' : 'studio-result-image')).toHaveCount(count)
     report.downloads = []
+    if (video) report.original_sha256 = createHash('sha256').update(fs.readFileSync(`${root}/evidence/synthetic-original.mp4`)).digest('hex')
     for (let i = 0; i < count; i++) {
       const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').nth(i).click(); const download = await pending
       assert.equal(await download.failure(), null); const bytes = fs.readFileSync(await download.path())
       report.downloads.push({ bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') })
       assert(bytes.length > 0)
+      if (video) assert.equal(report.downloads[i].sha256, report.original_sha256, 'download must match the simulator original')
     }
     report.after = { supplier: stats(), ledger: ledger() }
     assert.equal(report.after.supplier[`${kind}_posts`] - report.before.supplier[`${kind}_posts`], count)
     assert.equal(Math.round((report.before.ledger.balance - report.after.ledger.balance) * 100), video ? 200 : count * 70)
     assert.equal(report.after.ledger.usage - report.before.ledger.usage, 1)
+    if (video) {
+      assert.equal(report.after.ledger.video_captured - report.before.ledger.video_captured, 1)
+      assert.equal(report.after.ledger.frozen_balance, 0)
+      const creates = report.after.supplier.requests.slice(report.before.supplier.requests.length).filter(r => r.method === 'POST' && r.body.model === videoModel)
+      assert.equal(creates.length, 1)
+      assert.equal(creates[0].auth, 'bearer')
+      assert.equal(creates[0].body.duration, 5)
+      assert.equal(creates[0].body.resolution, '720p')
+      assert.equal(creates[0].body.ratio, '16:9')
+      report.actual_submit = creates[0]
+    }
     await page.reload(); await expect(page.getByTestId('studio-task-id')).toContainText(report.id)
     await expect(page.getByTestId('studio-status')).toContainText('生成完成')
+    if (video) {
+      // Reload restores and queries the original task. Download that persisted
+      // result again; neither operation may generate or settle another task.
+      const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').click(); const download = await pending
+      assert.equal(await download.failure(), null)
+      report.repeat_download_sha256 = createHash('sha256').update(fs.readFileSync(await download.path())).digest('hex')
+      assert.equal(report.repeat_download_sha256, report.original_sha256)
+    }
     assert.equal(stats()[`${kind}_posts`], report.after.supplier[`${kind}_posts`])
     assert.deepEqual(ledger(), report.after.ledger)
+    report.after_refresh_download = { supplier: stats(), ledger: ledger() }
     await page.getByTestId('studio-media-panel').screenshot({ path: `${root}/evidence/native-customer-${scenario}.png` })
     report.pass = true
     delete report.error
-  } catch (error) { report.error = error.message; await page.screenshot({ path: `${root}/evidence/native-customer-${scenario}-failure.png`, fullPage: true }); throw error }
+  } catch (error) { report.error = error.message; report.failure_state = { supplier: stats(), ledger: ledger() }; await page.screenshot({ path: `${root}/evidence/native-customer-${scenario}-failure.png`, fullPage: true }); throw error }
   finally { fs.writeFileSync(`${root}/evidence/native-customer-${scenario}.json`, JSON.stringify(report, null, 2)); await browser.close() }
   console.log(JSON.stringify({ scenario, pass: true, id: report.id, delivered: count }))
 })().catch(error => { console.error(error.message); process.exitCode = 1 })

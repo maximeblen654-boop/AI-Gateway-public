@@ -42,16 +42,26 @@ for (const image of manifest.images) {
 }
 const compose = JSON.parse(fs.readFileSync('tools/native-media-e2e/compose.synthetic.json', 'utf8'))
 for (const image of manifest.images) compose.services[image.component].image = image.tag
+// Model a public result host entirely inside this runner's network namespace.
+// TEST-NET-3 is documentation-only; no request is sent to an external supplier.
+const resultIP = '203.0.113.10'
+compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = `https://${resultIP}:19090`
+compose.networks.native.internal = true
 fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
 fs.mkdirSync(path.join(root, 'runtime'), { recursive: true })
 fs.copyFileSync('tools/native-media-e2e/simulator.mjs', path.join(root, 'runtime/simulator.mjs'))
-run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
+run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=localhost', '-addext', `subjectAltName=DNS:localhost,IP:${resultIP}`, '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
 fs.copyFileSync(path.join(evidence, 'simulator-cert.pem'), path.join(evidence, 'simulator-ca.crt'))
 run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(evidence, 'synthetic-original.mp4')])
 let proxy
-let acceptanceError
 try {
   dc(['up', '-d', '--wait', '--wait-timeout', '180', 'core'])
+  const corePID = capture('docker', ['inspect', '--format', '{{.State.Pid}}', 'ai-gateway-native-core-20261012'])
+  assert.match(corePID, /^[1-9][0-9]*$/)
+  run('sudo', ['nsenter', '-t', corePID, '-n', 'ip', 'addr', 'add', `${resultIP}/32`, 'dev', 'lo'])
+  const resultRoute = capture('sudo', ['nsenter', '-t', corePID, '-n', 'ip', 'route', 'get', resultIP])
+  assert.match(resultRoute, /local 203\.0\.113\.10 dev lo/, 'synthetic result host must remain local')
+  fs.writeFileSync(path.join(out, 'synthetic-result-network.json'), JSON.stringify({ address: resultIP, route: resultRoute, docker_network_internal: true }))
   run('docker', ['exec', '-i', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-v', 'ON_ERROR_STOP=1'], { input: fs.readFileSync('backend/internal/repository/testdata/studio_video_orders_legacy.sql'), stdio: ['pipe', 'inherit', 'inherit'] })
   dc(['run', '--rm', '--no-deps', '--user', '0', '--entrypoint', 'sh', 'bff', '-c', 'chown -R 1000:1000 /state && chmod 700 /state/assets /state/images /state/videos'])
   dc(['up', '-d', '--wait', '--wait-timeout', '180'])
@@ -77,15 +87,13 @@ try {
   assert.equal(containers[2].HostConfig.NetworkMode, `container:${containers[0].Id}`)
   fs.writeFileSync(path.join(out, 'acceptance-existing.json'), JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha, candidate_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), scenarios: reports.map(r => ({ scenario: r.scenario, task_id: r.id, quote: r.quote.sale_price, request_count: r.after.supplier.video_posts - r.before.supplier.video_posts, downloads: r.downloads, ledger_before: r.before.ledger, ledger_after: r.after.ledger, http: r.http, upstream: state.requests.filter(request => request.body?.model === (r.scenario === 'video-compatible' ? 'synthetic-compatible-video' : 'synthetic-seedance-video') || request.path.includes(r.scenario === 'video-compatible' ? '/v1/videos' : '/api/v3/contents/generations/tasks')) })), containers: containers.map(c => ({ name: c.Name, image: c.Config.Image, image_id: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode })) }, null, 2))
 } catch (error) {
-  acceptanceError = error
   try {
     fs.writeFileSync(path.join(out, 'compose-logs-failure.txt'), capture('docker', ['compose', '-p', 'ai-gateway-native-20261012', '-f', path.join(root, 'compose.json'), 'logs', '--no-color', '--tail', '250', 'core', 'bridge', 'bff']))
   } catch {}
   throw error
 } finally {
   if (proxy) proxy.kill()
-  for (const name of fs.readdirSync(evidence).filter(n => /^native-(video-(compatible|seedance)-browser|customer-video-(compatible|seedance)|supplier-state|browser|customer-video-(compatible|seedance)).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
+  for (const name of fs.readdirSync(evidence).filter(n => /^native-(video-(compatible|seedance)|customer-video-(compatible|seedance)|supplier-state|browser).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
   try { dc(['down', '-v', '--remove-orphans']) } catch {}
 }
-if (acceptanceError) process.exitCode = 1
-else console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))
+console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))

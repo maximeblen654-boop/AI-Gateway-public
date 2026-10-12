@@ -19,7 +19,9 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     const body = raw ? JSON.parse(raw) : {}
     const auth = req.headers.authorization === 'Bearer synthetic-native-only' ? 'bearer' : req.headers['x-goog-api-key'] === 'synthetic-native-only' ? 'gemini-key' : 'missing'
     state.requests.push({ method: req.method, path: url.pathname, auth, body }); save()
-    if (auth === 'missing') return reply(401, { error: 'synthetic_auth' })
+    const signedResult = req.method === 'GET' && /^\/v1\/videos\/seedance-task-\d+\/content$/.test(url.pathname) && url.searchParams.get('signature') === 'synthetic-result-only'
+    if (signedResult) assert.equal(auth, 'missing', 'result download must not forward supplier credentials')
+    if (auth === 'missing' && !signedResult) return reply(401, { error: 'synthetic_auth' })
     if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream'].map(id => ({ id, object: 'model' })) })
     if (req.method === 'GET' && url.pathname === '/v1beta/models') return reply(200, { models: [{ name: 'models/gemini-3.1-flash-image', displayName: 'Synthetic Gemini Image', supportedGenerationMethods: ['generateContent'] }] })
     if (req.method === 'POST' && url.pathname.endsWith(':generateContent')) {
@@ -55,7 +57,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     if (req.method === 'GET' && seedance && state.tasks[seedance[1]]) {
       const task = state.tasks[seedance[1]]
       task.polls++; save()
-      return reply(200, { id: task.id, status: 'succeeded', model: 'synthetic-seedance-video', usage: { completion_tokens: 1 }, content: { video_url: `https://localhost:19090/v1/videos/${task.id}/content` } })
+      return reply(200, { id: task.id, status: 'succeeded', model: 'synthetic-seedance-video', usage: { completion_tokens: 1 }, content: { video_url: `${process.env.NATIVE_RESULT_ORIGIN || 'https://localhost:19090'}/v1/videos/${task.id}/content?signature=synthetic-result-only` } })
     }
     const match = /^\/v1\/videos\/(native-video-\d+)(\/content)?$/.exec(url.pathname)
     if (req.method === 'GET' && match && state.tasks[match[1]]) {
