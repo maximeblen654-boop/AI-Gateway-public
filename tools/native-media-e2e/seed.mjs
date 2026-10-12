@@ -24,6 +24,7 @@ assert(existing.items.every(a => a.name.startsWith('Synthetic ')), 'unexpected A
 const fixture = { groups: {}, accounts: {} }
 const groups = await api('/admin/groups/all')
 const channels = await api('/admin/channels?page=1&page_size=100')
+let videoBridgeGroupID = 0
 const definitions = [
   { key: 'gemini', name: 'Synthetic gemini', platform: 'gemini', model: 'gemini-3.1-flash-image' },
   { key: 'grok', name: 'Synthetic grok', platform: 'grok', model: 'grok-imagine-video' },
@@ -39,7 +40,9 @@ for (const definition of definitions) {
   const { key, name, platform, mapping, capabilities } = definition
   const group = groups.find(g => g.name === name) || await api('/admin/groups', 'POST', { name, platform, rate_multiplier: 1, subscription_type: 'standard', allow_image_generation: true })
   const credentials = { api_key: 'synthetic-native-only', base_url: 'https://localhost:19090', ...(mapping ? { model_mapping: mapping } : {}), ...(capabilities ? { openai_capabilities: capabilities } : {}) }
-  const account = existing.items.find(a => a.name === name) || await api('/admin/accounts', 'POST', { name, platform, type: 'apikey', credentials, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: [group.id], upstream_billing_probe_enabled: false })
+  if (key === 'grok') videoBridgeGroupID = group.id
+  const accountGroupIDs = videoBridgeGroupID && (key === 'compatible' || key === 'seedance') ? [videoBridgeGroupID, group.id] : [group.id]
+  const account = existing.items.find(a => a.name === name) || await api('/admin/accounts', 'POST', { name, platform, type: 'apikey', credentials, extra: { quota_limit: 100 }, concurrency: 5, priority: 1, group_ids: accountGroupIDs, upstream_billing_probe_enabled: false })
   fixture.groups[key] = group.id; fixture.accounts[key] = account.id
   const sync = await api(`/admin/accounts/${account.id}/models/sync-upstream`, 'POST', {})
   if (!channels.items.some(c => c.name === `${name} cost`)) await api('/admin/channels', 'POST', { name: `${name} cost`, group_ids: [group.id], account_stats_pricing_rules: [{ name: `Synthetic exact ${key} Account cost`, group_ids: [], account_ids: [account.id], pricing: [{ platform, models: ['*'], billing_mode: 'per_request', per_request_price: 0.35 }] }] })
