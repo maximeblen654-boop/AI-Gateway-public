@@ -48,7 +48,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
       state.video_posts++
       assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-video'].includes(body.model))
       const id = `native-video-${state.video_posts}`
-      state.tasks[id] = { id, polls: 0 }; save()
+      state.tasks[id] = { id, polls: 0, kind: body.model === 'grok-imagine-video' ? 'grok' : 'compatible' }; save()
       return reply(200, { id, request_id: id, status: 'pending' })
     }
     const seedance = /^\/api\/v3\/contents\/generations\/tasks\/(seedance-task-\d+)$/.exec(url.pathname)
@@ -60,7 +60,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     const match = /^\/v1\/videos\/(native-video-\d+)(\/content)?$/.exec(url.pathname)
     if (req.method === 'GET' && match && state.tasks[match[1]]) {
       const task = state.tasks[match[1]]
-      if (!match[2]) { task.polls++; save(); return reply(200, { id: task.id, status: 'done', video: { url: `https://localhost:19090/v1/videos/${task.id}/content` } }) }
+      if (!match[2]) { task.polls++; save(); return reply(200, { id: task.id, status: task.kind === 'grok' ? 'done' : 'completed', video: { url: `https://localhost:19090/v1/videos/${task.id}/content` } }) }
       const bytes = fs.readFileSync(path.join(root, 'synthetic-original.mp4'))
       res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Length': bytes.length }); return res.end(bytes)
     }
