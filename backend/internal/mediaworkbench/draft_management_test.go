@@ -126,7 +126,7 @@ func TestDraftRemovalRejectsProtectedAndMalformedChanges(t *testing.T) {
 }
 func TestLastBlankCanBeRemovedAndFrozenImageBindingIsUnaffected(t *testing.T) {
 	ctx := context.Background()
-	s, r := fixture()
+	s, _ := fixture()
 	d, err := s.SaveDraft(ctx, 7, 0, DraftInput{Products: []Product{blankManagementProduct("only", "video")}})
 	must(t, err)
 	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{}, RemoveProductIDs: []string{"only"}})
