@@ -84,6 +84,8 @@ if (mode === 'build') {
     for (const script of ['seed.mjs', 'customer-keys.mjs', 'browser.cjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])
     run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video'])
     for (const scenario of ['image', 'edit', 'video']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
+    run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--image-geometry'])
+    for (const scenario of ['image-geometry-1k','image-geometry-2k','image-geometry-4k','edit-geometry-1k','edit-geometry-2k','edit-geometry-4k','image-geometry-independent']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
     const containers = JSON.parse(capture('docker', ['inspect', ...components.map(c => `ai-gateway-native-${c}-20261012`)]))
     for (const container of containers) {
       assert.equal(container.State.Health.Status, 'healthy')

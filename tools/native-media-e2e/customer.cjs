@@ -7,9 +7,19 @@ const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const base = 'http://127.0.0.1:28100'
 const scenario = process.argv[3] || 'image'
-assert(['image', 'edit', 'video', 'video-compatible', 'video-seedance'].includes(scenario))
+const geometryCases = {
+  'image-geometry-1k': { resolution:'1K', ratio:'1:1', cents:70, count:3 },
+  'image-geometry-2k': { resolution:'2K', ratio:'3:2', cents:90, count:1 },
+  'image-geometry-4k': { resolution:'4K', ratio:'16:9', cents:110, count:1 },
+  'edit-geometry-1k': { resolution:'1K', ratio:'1:1', cents:70, count:1, edit:true },
+  'edit-geometry-2k': { resolution:'2K', ratio:'3:2', cents:90, count:2, edit:true },
+  'edit-geometry-4k': { resolution:'4K', ratio:'16:9', cents:110, count:1, edit:true },
+  'image-geometry-independent': { resolution:'2K', ratio:'3:2', cents:130, count:1, independent:true }
+}
+const geometry = geometryCases[scenario]
+assert(geometry || ['image', 'edit', 'video', 'video-compatible', 'video-seedance'].includes(scenario))
 const videoMode = scenario === 'video-seedance' ? 'seedance' : scenario === 'video-compatible' ? 'compatible' : scenario === 'video' ? 'grok' : null
-const video = Boolean(videoMode); const kind = video ? 'video' : 'image'; const count = video ? 1 : scenario === 'edit' ? 2 : 3
+const video = Boolean(videoMode); const kind = video ? 'video' : 'image'; const count = geometry ? geometry.count : video ? 1 : scenario === 'edit' ? 2 : 3
 const videoModel = ({ grok: 'grok-imagine-video', compatible: 'synthetic-compatible-video', seedance: 'synthetic-seedance-video' })[videoMode]
 const docker = (...args) => execFileSync('docker', [...(process.platform === 'win32' ? ['--context', 'desktop-linux'] : []), ...args], { windowsHide: true, encoding: 'utf8' })
 const stats = () => JSON.parse(fs.readFileSync(`${root}/evidence/native-supplier-state.json`, 'utf8'))
@@ -50,12 +60,16 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await expect(page.getByTestId('studio-offer-select')).toBeEnabled()
     const catalog = await page.evaluate(async kind => (await fetch(`/studio-v2/api/${kind}/catalog`, { headers: { 'X-Studio-Request': `${kind}-binding-v1` } })).json(), kind)
     report.catalog = catalog
-    const offerModel = video ? videoModel : 'gemini-3.1-flash-image'
-    const offer = catalog.offers?.find(o => o.upstream_model === offerModel || o.model === offerModel)
+    const offerModel = video ? videoModel : geometry ? 'gpt-image-2' : 'gemini-3.1-flash-image'
+    const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.display_name === (geometry.independent ? 'Synthetic geometry independent price' : 'Synthetic geometry image') && o.spec.resolution.includes(geometry.resolution))))
     assert(offer, JSON.stringify(catalog))
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
     if (!video) await page.getByTestId('studio-count').fill(String(count))
-    if (scenario === 'edit') {
+    if (geometry) {
+      await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
+      await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
+    }
+    if (scenario === 'edit' || geometry?.edit) {
       await page.getByTestId('studio-asset-input').setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') })
       await expect(page.getByTestId('studio-kind')).toBeEnabled()
     }
@@ -65,7 +79,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await page.getByTestId('studio-quote').click(); const response = await quote
     report.quote = await response.json(); assert.equal(response.status(), 200, JSON.stringify(report.quote))
     report.id = report.quote.task_id || report.quote.operation_id
-    assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * 70)
+    assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents || 70))
     const submitted = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/tasks`) && r.request().method() === 'POST')
     await page.getByTestId('studio-generate').click(); const submit = await submitted
     report.submit = { status: submit.status(), body: await submit.json() }
@@ -83,8 +97,24 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     report.after = { supplier: stats(), ledger: ledger() }
     assert.equal(report.after.supplier[`${kind}_posts`] - report.before.supplier[`${kind}_posts`], count)
-    assert.equal(Math.round((report.before.ledger.balance - report.after.ledger.balance) * 100), video ? 200 : count * 70)
+    assert.equal(Math.round((report.before.ledger.balance - report.after.ledger.balance) * 100), video ? 200 : count * (geometry?.cents || 70))
     assert.equal(report.after.ledger.usage - report.before.ledger.usage, 1)
+    if (geometry) {
+      const posts = report.after.supplier.requests.slice(report.before.supplier.requests.length).filter(r=>r.method==='POST')
+      assert.equal(posts.length,count)
+      for (const r of posts) {
+        assert.equal(r.path, geometry.edit ? '/v1/images/edits' : '/v1/images/generations')
+        assert.equal(r.auth,'bearer'); assert.equal(r.body.model,'gpt-image-2')
+        assert.equal(r.body.resolution,geometry.resolution); assert.equal(r.body.aspect_ratio,geometry.ratio)
+        assert.equal(r.body.size,undefined); assert.equal(r.body.n,1)
+        assert.equal(r.body.images?.length || 0,geometry.edit ? 1 : 0)
+      }
+      const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64')
+      report.original_sha256 = createHash('sha256').update(png).digest('hex')
+      for (const d of report.downloads) assert.equal(d.sha256,report.original_sha256)
+      report.actual_submits = posts
+      report.expected_spec = geometry
+    }
     if (video) {
       assert.equal(report.after.ledger.video_captured - report.before.ledger.video_captured, 1)
       assert.equal(report.after.ledger.frozen_balance, 0)
@@ -101,14 +131,14 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     await page.reload(); await expect(page.getByTestId('studio-task-id')).toContainText(report.id)
     await expect(page.getByTestId('studio-status')).toContainText('生成完成')
-    if (video) {
-      const queried = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/video/operations/${report.id}`) && r.request().method() === 'GET')
+    if (video || geometry) {
+      const queried = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/${video ? 'operations' : 'tasks'}/${report.id}`) && r.request().method() === 'GET')
       await page.getByTestId('studio-refresh').click()
       assert.equal((await queried).status(), 200)
       await expect(page.getByTestId('studio-refresh')).toBeEnabled()
       // Reload restores and queries the original task. Download that persisted
       // result again; neither operation may generate or settle another task.
-      const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').click(); const download = await pending
+      const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').first().click(); const download = await pending
       assert.equal(await download.failure(), null)
       report.repeat_download_sha256 = createHash('sha256').update(fs.readFileSync(await download.path())).digest('hex')
       assert.equal(report.repeat_download_sha256, report.original_sha256)

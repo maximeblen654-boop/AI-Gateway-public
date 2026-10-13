@@ -151,7 +151,14 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 		{"unknown provider still needs development", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) {
 			p.AdapterConfig.EditExecution = &ImageExecutionConfig{Mode: ImageExecutionProviderAsync, Provider: "other", MaxOutputImages: 1}
 		}},
-		{"missing size map", "MISSING_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) { p.AdapterConfig.SizeMappings = p.AdapterConfig.SizeMappings[:1] }},
+		{"pixel-only OAuth missing size map", "MISSING_VALUE_MAPPING", "UI_FIXABLE", func(a *Account, p *Product) {
+			a.Type = "oauth"
+			d, _ := Descriptor("openai_images_oauth")
+			a.Config.AdapterBindings["image"] = AdapterBinding{Kind: d.Kind, Revision: d.Revision, Auth: d.Auth, TaskFlow: d.TaskFlow}
+			p.AdapterConfig.Version = 1
+			p.AdapterConfig.ModelFamily = "openai_images_oauth"
+			p.AdapterConfig.SizeMappings = p.AdapterConfig.SizeMappings[:1]
+		}},
 		{"duplicate map", "DUPLICATE_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) {
 			p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings, p.AdapterConfig.SizeMappings[0])
 		}},
@@ -545,7 +552,7 @@ func TestRegistryModesAndNewModelReuse(t *testing.T) {
 		t.Fatalf("same-flow new model: %+v", v)
 	}
 	d, ok := Descriptor("openai_images")
-	if !ok || d.Parameters["resolution"].Mode != ConfigMap || d.Parameters["quality"].Mode != Passthrough || d.Parameters["reference_images"].Mode != Derived || d.Parameters["model"].Mode != CodeEnum || d.Parameters["duration_seconds"].Mode != Unsupported {
+	if !ok || d.Parameters["resolution"].Mode != Passthrough || d.Parameters["quality"].Mode != Passthrough || d.Parameters["reference_images"].Mode != Derived || d.Parameters["model"].Mode != CodeEnum || d.Parameters["duration_seconds"].Mode != Unsupported {
 		t.Fatal("descriptor does not reflect builder")
 	}
 	// Stored bindings track the current registered builder on revalidation.

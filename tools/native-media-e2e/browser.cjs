@@ -9,11 +9,12 @@ const fixture = JSON.parse(fs.readFileSync(`${root}/evidence/fixture.json`, 'utf
 const base = 'http://127.0.0.1:28100'
 const videoMode = process.argv.includes('--video-seedance') ? 'seedance' : process.argv.includes('--video-compatible') ? 'compatible' : process.argv.includes('--video') ? 'grok' : null
 const video = Boolean(videoMode)
-const platform = video ? videoMode : 'gemini'
+const geometry = process.argv.includes('--image-geometry')
+const platform = video ? videoMode : geometry ? 'openai' : 'gemini'
 const accountId = fixture.accounts[platform]
-const model = video ? ({ grok: 'grok-imagine-video', compatible: 'synthetic-compatible-video', seedance: 'synthetic-seedance-video' })[videoMode] : 'gemini-3.1-flash-image'
-const name = video ? ({ grok: 'Synthetic native Grok video', compatible: 'Synthetic native compatible video', seedance: 'Synthetic native Seedance video' })[videoMode] : 'Synthetic native Gemini image'
-const prefix = video ? `native-video-${videoMode}` : 'native'
+const model = video ? ({ grok: 'grok-imagine-video', compatible: 'synthetic-compatible-video', seedance: 'synthetic-seedance-video' })[videoMode] : geometry ? 'gpt-image-2' : 'gemini-3.1-flash-image'
+const name = video ? ({ grok: 'Synthetic native Grok video', compatible: 'Synthetic native compatible video', seedance: 'Synthetic native Seedance video' })[videoMode] : geometry ? 'Synthetic geometry image' : 'Synthetic native Gemini image'
+const prefix = video ? `native-video-${videoMode}` : geometry ? 'native-geometry' : 'native'
 const report = { cases: [], http: [] }
 ;(async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -38,7 +39,7 @@ const report = { cases: [], http: [] }
     await expect(w('adapter-status')).toContainText('已接入')
     assert.equal(await w('model-family').count(), 0)
     assert.equal(await w('wire-profile').count(), 0)
-    for (const value of video ? ['720p', '5', '16:9'] : ['1K', '2K', '4K', '1:1', '16:9']) {
+    for (const value of video ? ['720p', '5', '16:9'] : ['1K', '2K', '4K', '1:1', ...(geometry ? ['3:2'] : []), '16:9']) {
       const button = w('wizard-page-1').locator('button.mw-token-chip').filter({ hasText: new RegExp(`^${value}$`) })
       if (!(await button.getAttribute('class')).includes('mw-token-chip-selected')) await button.click()
     }
@@ -52,7 +53,7 @@ const report = { cases: [], http: [] }
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-dimensions-desktop.png`, fullPage: true, animations: 'disabled' })
     await w('wizard-next').click()
-    for (let i = 0; i < (video ? 1 : 3); i++) await w(`price-${i}`).fill(video ? '2.00' : '0.70')
+    for (let i = 0; i < (video ? 1 : 3); i++) await w(`price-${i}`).fill(video ? '2.00' : geometry ? ['0.70','0.90','1.10'][i] : '0.70')
     await page.waitForTimeout(500)
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-prices-desktop.png`, fullPage: true })
@@ -67,6 +68,35 @@ const report = { cases: [], http: [] }
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
     report.product = detail.media_workbench_v1.draft.products[0]
 
+    if (geometry) {
+      const assertNoMappings = products => { for (const p of products) assert.equal(p.adapter_config.size_mappings?.length || 0, 0, 'UI must not prefill technical size mappings') }
+      assertNoMappings([report.product])
+      report.first_save_request_products = response.request().postDataJSON().draft.products
+      assertNoMappings(report.first_save_request_products)
+      const first = structuredClone(report.product)
+      // Configure the second independent product through the same UI.
+      await page.getByRole('button', { name: '添加图片产品（保留当前草稿）', exact: true }).click()
+      for (const value of ['2K', '3:2']) {
+        const button = w('wizard-page-1').locator('button.mw-token-chip').filter({ hasText: new RegExp('^'+value+'$') })
+        if (!(await button.getAttribute('class')).includes('mw-token-chip-selected')) await button.click()
+      }
+      await w('wizard-next').click()
+      await w('reference-image-mode').selectOption('optional'); await w('reference-image-max').fill('2')
+      await w('wizard-next').click(); await w('wizard-next').click()
+      await expect(w('price-0')).toHaveValue('')
+      await w('price-0').fill('1.30')
+      await w('wizard-next').click(); await w('display-name').fill('Synthetic geometry independent price')
+      const saveSecond = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith('/accounts/'+accountId+'/draft'))
+      await w('save').click(); const result = await saveSecond
+      report.save_request_products = result.request().postDataJSON().draft.products
+      const resultBody = (await result.json()).data.media_workbench_v1
+      assert.equal(result.status(),200); assert.equal(resultBody.validation.publish_ready,true,JSON.stringify(resultBody.validation.diagnostics))
+      assert.equal(resultBody.draft.products.length,2); assertNoMappings(resultBody.draft.products)
+      assertNoMappings(report.save_request_products)
+      assert.deepEqual(resultBody.draft.products.find(p=>p.product_id===first.product_id),first,'second product must not overwrite first')
+      report.products = resultBody.draft.products
+      report.cases.push('Two independently priced products configured by five-step UI without technical size mappings')
+    } else {
     // Exercise the product selector with two business-equivalent offers that
     // share one canonical upstream model. The duplicate is created through
     // the real admin draft endpoint in the isolated database; no browser
@@ -92,6 +122,7 @@ const report = { cases: [], http: [] }
     assert.equal(duplicateDetail.media_workbench_v1.validation.publish_ready, true, JSON.stringify(duplicateDetail.media_workbench_v1.validation.diagnostics))
     report.duplicate_product = duplicate
     report.cases.push('Two same-model products saved through the real draft endpoint')
+    }
 
     await page.reload()
     await w('source-localhost').locator('summary').click()
@@ -101,7 +132,15 @@ const report = { cases: [], http: [] }
     const productOptions = await w('product-select').locator('option').allTextContents()
     assert.equal(productOptions.length, 2, JSON.stringify(productOptions))
     assert(productOptions.every(option => !option.includes('media-')), JSON.stringify(productOptions))
-    assert(productOptions.some(option => option.includes('商品 1')) && productOptions.some(option => option.includes('商品 2')), JSON.stringify(productOptions))
+    if (!geometry) assert(productOptions.some(option => option.includes('商品 1')) && productOptions.some(option => option.includes('商品 2')), JSON.stringify(productOptions))
+    if (geometry) {
+      for (const p of report.products) {
+        await w('product-select').selectOption(p.product_id)
+        await w('wizard-step-4').click()
+        await expect.poll(async () => Number(await w('price-0').inputValue())).toBe(Number(p.pricing_rules[0].sale_price.amount))
+      }
+      await w('product-select').selectOption(report.product.product_id)
+    }
     report.product_options = productOptions
     await page.screenshot({ path: `${root}/evidence/${prefix}-same-product-selector.png`, fullPage: true })
     report.cases.push('Same-name same-type product selector shows stable business distinction without internal IDs')

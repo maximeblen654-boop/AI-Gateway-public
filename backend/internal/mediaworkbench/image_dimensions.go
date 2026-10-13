@@ -61,5 +61,12 @@ func ImageDimensions(config ImageConfig, spec Spec) (wire string, width, height 
 			return m.WireSize, width, height, err
 		}
 	}
+	// An explicit pixel choice already is the native size; use the same safety
+	// and ratio checks as a historical mapping, without inventing a K grid.
+	if pixelLabelPattern.MatchString(spec.Resolution) {
+		m := SizeMapping{Resolution: spec.Resolution, AspectRatio: spec.AspectRatio, WireSize: spec.Resolution}
+		width, height, err = validateImageMapping(m)
+		return m.WireSize, width, height, err
+	}
 	return "", 0, 0, errMissingMapping
 }

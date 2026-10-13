@@ -52,7 +52,7 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				cost.AccountStatsPricingRules[0].Pricing[0].Models = []string{upstreamModel}
 				r.Core.channelService = &ChannelService{repo: &studioChannelFixture{channel: cost}}
 				p := mediaworkbench.Product{ProductID: "native", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: upstreamModel, Enabled: true,
-					Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 10}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 1}, TotalMax: 1}},
+					Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"2K"}, AspectRatios: []string{"3:2"}, Count: mediaworkbench.Range{Min: 1, Max: 10}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 1}, TotalMax: 1}},
 					PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}}}}
 				admin := mediaworkbench.NewService(ma)
 				d, err := admin.SaveDraft(ctx, 7, 0, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
@@ -87,7 +87,7 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				r.network = r.dispatchHTTP
 				r.Core.cfg = &config.Config{}
 				r.Gemini = &GeminiMessagesCompatService{cfg: &config.Config{}, httpUpstream: up}
-				spec := mediaworkbench.Spec{Count: 1}
+				spec := mediaworkbench.Spec{Resolution: "2K", AspectRatio: "3:2", Count: 1}
 				refs := []string{}
 				if edit {
 					spec.Images = 1
@@ -114,6 +114,14 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, requests, 1)
 				require.Equal(t, 1, billing.applied)
+				if platform == PlatformGemini {
+					require.Equal(t, "2K", gjson.GetBytes(requests[0], "generationConfig.imageConfig.imageSize").String())
+					require.Equal(t, "3:2", gjson.GetBytes(requests[0], "generationConfig.imageConfig.aspectRatio").String())
+				} else {
+					require.Equal(t, "2k", strings.ToLower(gjson.GetBytes(requests[0], "resolution").String()))
+					require.Equal(t, "3:2", gjson.GetBytes(requests[0], "aspect_ratio").String())
+					require.False(t, gjson.GetBytes(requests[0], "size").Exists())
+				}
 				// Compare with the actual native service using the same Account and
 				// equivalent public request, not a second Studio implementation.
 				c, _ := gin.CreateTestContext(httptest.NewRecorder())

@@ -69,6 +69,15 @@ jobs:
         run: node tools/native-media-e2e/candidate.mjs verify
       - name: Export verified images and exact identities
         run: node tools/native-media-e2e/candidate.mjs export
+      - name: Save small reports and screenshots separately
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-media-evidence-${{ github.sha }}
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/native-candidate-output/*.json
+            ${{ runner.temp }}/native-candidate-output/*.png
       - name: Save final candidate and non-secret evidence only
         if: always()
         uses: actions/upload-artifact@v4

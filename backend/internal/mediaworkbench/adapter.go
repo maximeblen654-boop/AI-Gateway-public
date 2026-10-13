@@ -103,6 +103,11 @@ func Descriptor(kind string) (AdapterDescriptor, bool) {
 			d.Parameters["quality"] = Parameter{Mode: Unsupported}
 			d.Parameters["count"] = Parameter{Mode: FixedByModel, ValueType: "one"}
 		}
+		if kind == "openai_images_oauth" {
+			// Native direct-images/Responses consume pixel size, not these JSON extensions.
+			d.Parameters["resolution"] = Parameter{Mode: ConfigMap, WireField: "size"}
+			d.Parameters["aspect_ratio"] = Parameter{Mode: ConfigMap, WireField: "size"}
+		}
 		return d, true
 	}
 	if kind == "laoli_video" {
@@ -116,8 +121,8 @@ func Descriptor(kind string) (AdapterDescriptor, bool) {
 	return AdapterDescriptor{Kind: kind, Revision: "core_openai_images_json_r1", MediaType: "image", Auth: "account_apikey", Transport: "https_json", TaskFlow: "sync", MaxReferences: 16,
 		Parameters: map[string]Parameter{
 			"model":            {Mode: CodeEnum, WireField: "model", ValueType: "core_image_model_family"},
-			"resolution":       {Mode: ConfigMap, WireField: "size", ValueType: "string"},
-			"aspect_ratio":     {Mode: ConfigMap, WireField: "size", ValueType: "string"},
+			"resolution":       {Mode: Passthrough, WireField: "resolution", ValueType: "string"},
+			"aspect_ratio":     {Mode: Passthrough, WireField: "aspect_ratio", ValueType: "string"},
 			"quality":          {Mode: Passthrough, WireField: "quality", ValueType: "string"},
 			"count":            {Mode: Passthrough, WireField: "n", ValueType: "integer"},
 			"reference_images": {Mode: Derived, WireField: "images[].image_url", ValueType: "asset_list"},
@@ -411,10 +416,21 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 		}
 	} else if spec.Resolution != "" || spec.AspectRatio != "" {
 		size, _, _, err := ImageDimensions(p.AdapterConfig, spec)
-		if err != nil {
+		if err == nil {
+			fields["size"] = size
+		} else if errors.Is(err, errMissingMapping) && p.AdapterConfig.ModelFamily != "openai_images_oauth" {
+			// ForwardImages API-key JSON preserves these native request fields.
+			// Keep the sold specification verbatim; do not guess K-to-pixel sizes.
+			// Explicit historical mappings still take precedence above.
+			if spec.Resolution != "" {
+				fields["resolution"] = spec.Resolution
+			}
+			if spec.AspectRatio != "" {
+				fields["aspect_ratio"] = spec.AspectRatio
+			}
+		} else {
 			return imageplan.Plan{}, err
 		}
-		fields["size"] = size
 	}
 	if spec.Quality != "" {
 		fields["quality"] = spec.Quality
