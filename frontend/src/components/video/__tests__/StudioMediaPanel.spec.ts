@@ -1,6 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import StudioMediaPanel from '../StudioMediaPanel.vue'
+import StudioSpecPicker from '../StudioSpecPicker.vue'
 import type { StudioTask } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 
@@ -9,6 +10,8 @@ vi.mock('@/api/studioMedia', async original => ({ ...await original<typeof impor
 const prepared:StudioTask={id:'op_'+'a'.repeat(64),kind:'video',status:'prepared',createdAt:'2026-01-01',expiresAt:'2099-01-01',offerId:'offer',model:'synthetic-video',spec:{resolution:'720p',duration_seconds:5,count:1},price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},resultCount:0}
 const offer={offer_id:'offer',model:'synthetic-video',display_name:'合成视频模型',upstream_model:'synthetic-video',spec:{resolution:['720p'],duration_seconds:[5],aspect_ratio:['16:9'],count:{min:1,max:1},references:{image:{min:0,max:1},video:{min:0,max:0},audio:{min:0,max:0},total_max:1}}}
 let wrapper:ReturnType<typeof mount>
+async function quantityChoices() { if(wrapper.get('[data-testid="studio-count"]').attributes('aria-expanded') !== 'true') await wrapper.get('[data-testid="studio-count"]').trigger('click'); return wrapper.findAll('#studio-count-menu [data-value]') }
+async function chooseQuantity(value: number) { await quantityChoices(); await wrapper.get(`#studio-count-menu [data-value="${value}"]`).trigger('click') }
 beforeEach(()=>{vi.clearAllMocks();sessionStorage.clear();sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video'}));if(typeof URL.createObjectURL!=='function')Object.defineProperty(URL,'createObjectURL',{configurable:true,value:vi.fn(()=>`blob:studio-asset`)});if(typeof URL.revokeObjectURL!=='function')Object.defineProperty(URL,'revokeObjectURL',{configurable:true,value:vi.fn()});api.session.mockResolvedValue({owner_id:1});api.catalog.mockResolvedValue([offer]);api.history.mockResolvedValue([prepared]);api.request.mockResolvedValue({paid_enabled:true});api.task.mockImplementation(async t=>t);api.upload.mockImplementation(async (file:File,kind:string)=>({asset_ref:`asset_${'a'.repeat(8)}-0000-0000-0000-000000000000`,kind,mime_type:file.type,size:file.size,duration_seconds:null}))})
 afterEach(()=>{wrapper?.unmount();document.body.innerHTML='';vi.useRealTimers()})
 
@@ -157,10 +160,10 @@ describe('Customer image purchase quantity',()=>{
   await wrapper.get('[data-testid="studio-prompt"]').setValue('morning light');api.request.mockClear()
  }
  it.each(['0','11','1000000','1.5',''])('blocks invalid quantity %s before requesting a quote',async value=>{
-  await imageSetup();const control=wrapper.get('[data-testid="studio-count"]')
-  // Injecting an option checks the action guard independently of the selector.
-  if(control.element instanceof HTMLSelectElement)control.element.add(new Option(value,value))
-  await control.setValue(value)
+  await imageSetup()
+  // Bypass the picker to verify the quote action guard independently of its options.
+  wrapper.findAllComponents(StudioSpecPicker).find(c=>c.props('id')==='studio-count')!.vm.$emit('update:modelValue',Number(value))
+  await flushPromises()
   expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined()
   expect(wrapper.get('[data-testid="studio-count-error"]').text()).toContain('数量')
   // Even if a caller bypasses the disabled button, no invalid quote is sent.
@@ -169,17 +172,17 @@ describe('Customer image purchase quantity',()=>{
   expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
  })
  it('offers only 1 to 10 and preserves a lower published product limit',async()=>{
-  await imageSetup();expect(wrapper.get('[data-testid="studio-count"]').findAll('option').map(o=>o.attributes('value'))).toEqual(Array.from({length:10},(_,i)=>String(i+1)))
-  await wrapper.get('[data-testid="studio-count"]').setValue('10');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
+  await imageSetup();expect((await quantityChoices()).map(o=>o.attributes('data-value'))).toEqual(Array.from({length:10},(_,i)=>String(i+1)))
+  await chooseQuantity(10);expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
   wrapper.unmount();await imageSetup({min:1,max:3})
-  expect(wrapper.get('[data-testid="studio-count"]').findAll('option').map(o=>o.attributes('value'))).toEqual(['1','2','3'])
+  expect((await quantityChoices()).map(o=>o.attributes('data-value'))).toEqual(['1','2','3'])
  })
  it('does not present an invalid catalog range as purchasable',async()=>{
-  await imageSetup({min:1,max:100});expect(wrapper.get('[data-testid="studio-count"]').findAll('option')).toHaveLength(0)
+  await imageSetup({min:1,max:100});expect(await quantityChoices()).toHaveLength(0)
   expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();expect(api.request).not.toHaveBeenCalled()
  })
  it('sends selected image quantity to the existing server quote endpoint',async()=>{
-  await imageSetup();await wrapper.get('[data-testid="studio-count"]').setValue('10')
+  await imageSetup();await chooseQuantity(10)
   api.request.mockRejectedValueOnce(new Error('stop after inspecting quote'))
   await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
   expect(api.request).toHaveBeenCalledTimes(1);expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:10})}));expect(api.generate).not.toHaveBeenCalled()
@@ -196,9 +199,9 @@ describe('Customer image purchase quantity',()=>{
 
 describe('Artwork desk navigation',()=>{
  async function setup(){sessionStorage.clear();api.history.mockResolvedValue([]);api.catalog.mockResolvedValue([{...offer,display_name:'图片商品',spec:{...offer.spec,count:{min:1,max:10}}}]);wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises()}
- it('starts with text-to-image, a bounded quantity and no attachment button',async()=>{await setup();expect(wrapper.get('[data-testid="studio-mode-text"]').attributes('aria-pressed')).toBe('true');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.get('[data-testid="studio-quote"]').text()).toContain('开始生成');expect(wrapper.findAll('[data-testid="studio-count"] option')).toHaveLength(10);expect(wrapper.findAll('svg.studio-mark')).toHaveLength(2)})
- it('requires a reference for edit while preserving independent output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await wrapper.get('[data-testid="studio-count"]').setValue('5');await wrapper.get('[data-testid="studio-prompt"]').setValue('change background');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();await pick([imageFile()]);api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:1})}));expect(api.generate).not.toHaveBeenCalled()})
- it('switching explicitly to text removes references but preserves prompt and output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await wrapper.get('[data-testid="studio-count"]').setValue('5');await wrapper.get('[data-testid="studio-prompt"]').setValue('keep this prompt');await pick([imageFile()]);await wrapper.get('[data-testid="studio-mode-text"]').trigger('click');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.find('[data-testid="studio-asset-success"]').exists()).toBe(false);expect((wrapper.get('[data-testid="studio-prompt"]').element as HTMLTextAreaElement).value).toBe('keep this prompt');expect((wrapper.get('[data-testid="studio-count"]').element as HTMLSelectElement).value).toBe('5');api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:0})}));expect(api.generate).not.toHaveBeenCalled()})
+ it('starts with text-to-image, a bounded quantity and no attachment button',async()=>{await setup();expect(wrapper.get('[data-testid="studio-mode-text"]').attributes('aria-pressed')).toBe('true');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.get('[data-testid="studio-quote"]').text()).toContain('开始生成');expect(await quantityChoices()).toHaveLength(10);expect(wrapper.findAll('svg.studio-mark')).toHaveLength(2)})
+ it('requires a reference for edit while preserving independent output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await chooseQuantity(5);await wrapper.get('[data-testid="studio-prompt"]').setValue('change background');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();await pick([imageFile()]);api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:1})}));expect(api.generate).not.toHaveBeenCalled()})
+ it('switching explicitly to text removes references but preserves prompt and output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await chooseQuantity(5);await wrapper.get('[data-testid="studio-prompt"]').setValue('keep this prompt');await pick([imageFile()]);await wrapper.get('[data-testid="studio-mode-text"]').trigger('click');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.find('[data-testid="studio-asset-success"]').exists()).toBe(false);expect((wrapper.get('[data-testid="studio-prompt"]').element as HTMLTextAreaElement).value).toBe('keep this prompt');expect(wrapper.get('[data-testid="studio-count"]').text()).toContain('5 张');api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:0})}));expect(api.generate).not.toHaveBeenCalled()})
  it('keeps model selection within offered reference capabilities',async()=>{sessionStorage.clear();api.history.mockResolvedValue([]);api.catalog.mockResolvedValue([{...offer,offer_id:'text-only',spec:{...offer.spec,references:{...offer.spec.references,image:{min:0,max:0},total_max:0}}},{...offer,offer_id:'edit-required',spec:{...offer.spec,references:{...offer.spec.references,image:{min:1,max:2},total_max:2}}}]);wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.findAll('#studio-offer option').map(o=>o.attributes('value'))).toEqual(['text-only']);await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');expect(wrapper.findAll('#studio-offer option').map(o=>o.attributes('value'))).toEqual(['edit-required']);expect(api.generate).not.toHaveBeenCalled()})
  it('shows saved works without locking a new visit to a completed task',async()=>{sessionStorage.clear();api.history.mockResolvedValue([{...prepared,kind:'image',status:'completed',resultCount:1}]);wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(wrapper.findAll('[data-task-id]')).toHaveLength(1);expect(api.task).not.toHaveBeenCalled()})
  it('opens and closes the ratio selector using Escape and restores focus',async()=>{await setup();await wrapper.get('[data-testid="studio-ratio-toggle"]').trigger('click');expect(wrapper.find('#studio-ratio-menu').exists()).toBe(true);await wrapper.get('#studio-ratio-menu button').trigger('keydown',{key:'Escape'});await flushPromises();expect(wrapper.get('[data-testid="studio-ratio-toggle"]').attributes('aria-expanded')).toBe('false');expect(document.activeElement).toBe(wrapper.get('[data-testid="studio-ratio-toggle"]').element)})

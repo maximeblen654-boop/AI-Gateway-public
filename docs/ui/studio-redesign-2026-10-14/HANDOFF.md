@@ -130,3 +130,17 @@
 可复现预览：在 frontend 运行 `node node_modules/vite/bin/vite.js --config tests/studio-workspace/vite.config.ts`，打开 `http://127.0.0.1:4295/tests/studio-workspace/index.html`。截图：`node frontend/tests/studio-workspace/capture.mjs`。功能测试从 frontend 执行 `node node_modules/@playwright/test/cli.js test --config playwright.studio.config.ts`。预览仅为隔离 UI fixture；云端真实栈已结束，不能把 runner 地址当作仍可访问的环境。
 
 本轮最终状态为**源码和隔离联调完成，未部署**。若后续批准准备运行候选，前端资源变化需要重建包含它的 Core；Bridge/BFF 运行源码没有变化，可以沿现有流程判断精确复用。不能拿本轮前端预览或旧 b2 镜像宣称新版工作台已上线。
+
+
+## 阶段二追加：收敛过长的规格下拉（2026-10-14）
+
+用户在当前本地预览指出数量 1～10 的原生下拉过长，并要求检查其他同类控件。本次保留作品桌方向及全部业务合同，只调整规格选择方式：
+
+- 数量改为 5 列 × 2 行数字点选；仅显示当前商品允许范围。选中后收起，触发按钮显示数量与单位。
+- 分辨率、画质、视频时长复用同一个轻量规格控件，两列选项，内容区最高 210px，超出时内部滚动。真实值仍来自服务端目录，不扩展或猜测能力。
+- 模型已限最多 5 行，本次同时补最大高度；比例宫格也补 220px 高度上限。历史筛选只有图片/视频两项，保持原有短选项。
+- 当前选中状态、方向键/Home/End、Enter、Escape 返回焦点、点击外部收起，以及手机水平边界均验证。数量、报价、任务恢复和底座结算不变。
+
+本地 51 项组件/API 测试 PASS，ESLint PASS；11 项 Chromium 用例连续三轮 PASS（8.5s / 8.2s / 8.1s），含 1440px/390px 及 20 项合成规格压力场景。新增手机测试初次在弹层覆盖的位置点击输入框超时，调整为实际可见的外部标题完成收起验证，没有用 force 绕过点击。桌面/手机截图已人工检查。上一阶段最终 CI 38470449973、Security 38470450009 均 PASS；本次修改的独立 CI 与后端联调结果后续按实际 Run 记录。
+
+截图：[紧凑数量·桌面](screenshots/c-quantity-desktop.png)、[手机](screenshots/c-quantity-mobile.png)、[分辨率·手机](screenshots/c-resolution-mobile.png)。同一预览地址刷新即可查看。未部署、未改生产、未发真实供应商请求。

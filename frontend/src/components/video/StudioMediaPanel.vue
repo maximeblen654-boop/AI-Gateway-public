@@ -69,10 +69,10 @@
             <div class="studio-composer-bottom"><div class="studio-specs">
               <button v-if="showUploader" type="button" class="studio-attachment" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" :title="accept ? '添加素材，也可拖入或粘贴图片' : '当前模型不支持参考素材'" @click="fileInput?.click()"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 13 6.5-6.5a2.8 2.8 0 0 1 4 4L10 19a4.3 4.3 0 0 1-6-6l9-9a1.4 1.4 0 0 1 2 2L6 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               <div v-if="offer?.spec.aspect_ratio?.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in offer.spec.aspect_ratio" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="ratio = r; closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
-              <label v-if="offer?.spec.resolution?.length" class="studio-chip">分辨率<select :disabled="busy" v-model="resolution" data-testid="studio-resolution"><option v-for="v in offer.spec.resolution" :key="v">{{ v }}</option></select></label>
-              <label v-if="kind === 'image' && offer?.spec.quality?.length" class="studio-chip">画质<select :disabled="busy" v-model="quality"><option v-for="v in offer.spec.quality" :key="v">{{ v }}</option></select></label>
-              <label v-if="kind === 'image'" class="studio-chip">数量<select :disabled="busy" v-model.number="count" data-testid="studio-count" :aria-invalid="invalidCount" :aria-describedby="invalidCount ? 'studio-count-error' : undefined"><option v-for="n in countOptions" :key="n" :value="n">{{ n }} 张</option></select></label>
-              <label v-else class="studio-chip">时长<select :disabled="busy" v-model.number="duration" data-testid="studio-duration"><option v-for="v in offer?.spec.duration_seconds" :key="v" :value="v">{{ v }} 秒</option></select></label>
+              <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="offer.spec.resolution" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="resolution = String($event)" @update:open="openControl = $event ? 'resolution' : null" />
+              <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="offer.spec.quality" :disabled="busy" :open="openControl === 'quality'" @update:model-value="quality = String($event)" @update:open="openControl = $event ? 'quality' : null" />
+              <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="count = Number($event)" @update:open="openControl = $event ? 'count' : null" />
+              <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="offer?.spec.duration_seconds || []" :disabled="busy" :open="openControl === 'duration'" @update:model-value="duration = Number($event)" @update:open="openControl = $event ? 'duration' : null" />
               <span class="studio-range">{{ kind === 'video' ? '每次 1 条视频' : countOptions.length ? `可选 ${countOptions[0]}–${countOptions[countOptions.length-1]} 张` : '' }}</span>
             </div><button v-if="!active" class="studio-button studio-primary studio-quote" :disabled="busy || !offer || incompatible || invalidCount || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '开始生成' }}<Icon name="arrowUp" /></button></div>
           </fieldset>
@@ -99,6 +99,7 @@ import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, stud
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
+import StudioSpecPicker from './StudioSpecPicker.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import '@/styles/studio-workspace.css'
 const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref('')
@@ -107,7 +108,7 @@ type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']
 const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
-const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), openControl=ref<'model'|'ratio'|null>(null)
+const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
 const resultRead=ref(0)
 const unavailableResults=ref<Record<string,boolean>>({})
 const quoteConfirm=ref(false), fileInput=ref<HTMLInputElement|null>(null)
@@ -126,7 +127,7 @@ const offerSpecs=(o:StudioOffer)=>{const values=[...(o.spec.resolution||[]),...(
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
 async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus()}
-function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:ratioTrigger).value?.focus()})}
+function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:previous==='ratio'?ratioTrigger:null)?.value?.focus()})}
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}
 function focusPrompt(){historyMode.value=false;void nextTick(()=>promptInput.value?.focus())}
 async function changeMode(mode:'text'|'edit'|'video'){

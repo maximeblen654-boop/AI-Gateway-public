@@ -14,6 +14,11 @@ const imageOffers = [
   { offer_id: 'image-limited', model: 'studio-image-other', display_name: '轻绘 · 标准', upstream_model: 'configured-image-other', spec: { resolution: ['1K'], aspect_ratio: ['1:1', '3:4'], count: { min: 1, max: 3 }, references: { ...references, image: { min: 0, max: 0 }, total_max: 0 } } },
 ]
 const videoOffers = [{ offer_id: 'video-standard', model: 'studio-video', display_name: '映像 · 视频', upstream_model: 'configured-video', spec: { resolution: ['720p', '1080p'], aspect_ratio: ['16:9', '9:16'], duration_seconds: [5, 10], count: { min: 1, max: 1 }, references } }]
+// Stress only the layout; synthetic option labels are not supplier capability claims.
+if (scenario === 'many-options') {
+ Object.assign(imageOffers[0]!.spec, {resolution:Array.from({length:20},(_,i)=>`规格 ${i+1}`),quality:Array.from({length:20},(_,i)=>`画质 ${i+1}`)})
+ videoOffers[0]!.spec.duration_seconds=Array.from({length:20},(_,i)=>i+1)
+}
 type Raw = Record<string, any> // Fixture deliberately emits the HTTP contract, not StudioTask.
 function task(kind: string, index: number, status = 'completed'): Raw { return { contract: kind === 'image' ? 'published_image_binding_v1' : 'account_video_v1', [kind === 'image' ? 'task_id' : 'operation_id']: (kind === 'image' ? 'img_' : 'op_') + index.toString(16).padStart(kind === 'image' ? 32 : 64, '0'), status, created_at: `2026-10-${14-index%3}T04:00:00Z`, expires_at: '2099-01-01T00:00:00Z', offer_id: kind === 'image' ? 'image-standard' : 'video-standard', model: kind === 'image' ? 'GPT Image 2' : '映像 · 视频', spec: { resolution: kind === 'image' ? '2K' : '720p', aspect_ratio: kind === 'image' ? '3:4' : '16:9', count: kind === 'image' ? 4 : 1, ...(kind === 'video' ? { duration_seconds: 5 } : {}) }, quantity: kind === 'image' ? 4 : 1, sale_price: price(kind === 'image' ? '2.80' : '2.00'), unit_price: price(kind === 'image' ? '0.70' : '2.00'), delivered_count: status === 'completed' ? (kind === 'image' ? 4 : 1) : 0, billing_state: status === 'completed' ? 'billed' : 'pending', ...(status === 'completed' ? { settled_price: price(kind === 'image' ? '2.80' : '2.00') } : {}) } }
 const initial: Record<string, Raw[]> = { image: scenario === 'empty' ? [] : [task('image', 1), task('image', 2), task('image', 3)], video: [] }

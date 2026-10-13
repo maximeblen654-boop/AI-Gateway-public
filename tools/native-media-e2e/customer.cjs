@@ -73,9 +73,9 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.product_id === geometryProduct.product_id && o.spec.resolution.includes(geometry.resolution))))
     assert(offer, JSON.stringify(catalog))
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
-    if (!video) {if(workspace)await page.getByTestId('studio-count').selectOption(String(count));else await page.getByTestId('studio-count').fill(String(count))}
+    if (!video) {if(workspace){await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()}else await page.getByTestId('studio-count').fill(String(count))}
     if (geometry) {
-      await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
+      if(workspace){await page.getByTestId('studio-resolution').click();await page.locator('#studio-resolution-menu [data-value]').filter({hasText:geometry.resolution}).click()}else await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
       if(workspace){await page.getByTestId('studio-ratio-toggle').click();await page.locator(`[data-ratio="${geometry.ratio}"]`).click()}else await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
     }
     if (scenario === 'edit' || geometry?.edit) {

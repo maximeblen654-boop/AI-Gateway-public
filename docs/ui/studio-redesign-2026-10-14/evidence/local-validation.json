@@ -28,5 +28,30 @@
     "dark"
   ],
   "front_end_api_fixture_is_only_visual_evidence": true,
-  "production_action": false
+  "production_action": false,
+  "compact_picker": {
+    "unit_and_api": {
+      "passed": 51
+    },
+    "lint": "PASS",
+    "browser": {
+      "tests": 11,
+      "consecutive_passes": 3,
+      "durations_seconds": [
+        8.5,
+        8.2,
+        8.1
+      ]
+    },
+    "viewports": [
+      1440,
+      390
+    ],
+    "quantity_grid": {
+      "columns": 5,
+      "rows": 2
+    },
+    "spec_option_scroll_max_height_px": 210,
+    "production_action": false
+  }
 }
