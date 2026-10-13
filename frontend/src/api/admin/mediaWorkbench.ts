@@ -45,6 +45,7 @@ export interface MediaConfig {
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
 }
 export interface SupplierDetail {
+  product_removal?: Record<string, { allowed: boolean; reason: string }>
   native_adapters?: Record<string, NativeAdapter>
   id: number; name: string; host: string; platform: string; type: string; status: string; schedulable: boolean
   effective_sales: boolean; effective_state: string; sales_resume_ready?: boolean
@@ -99,9 +100,9 @@ export const mediaWorkbenchAPI = {
   async initialize(id: number, mediaTypes: string[]): Promise<SupplierDetail> {
     return (await apiClient.post<SupplierDetail>(`${accountPath(id)}/initialize`, { media_types: [...mediaTypes] })).data
   },
-  async saveDraft(id: number, version: number, products: Product[]): Promise<SupplierDetail> {
+  async saveDraft(id: number, version: number, products: Product[], removeProductIds: string[] = []): Promise<SupplierDetail> {
     return (await apiClient.put<SupplierDetail>(`${accountPath(id)}/draft`, {
-      expected_record_version: version, draft: draftInput(products)
+      expected_record_version: version, draft: { ...draftInput(products), ...(removeProductIds.length ? { remove_product_ids: [...removeProductIds] } : {}) }
     })).data
   },
   async publish(id: number, version: number, revision: string): Promise<SupplierDetail | PublishAcknowledgement> {

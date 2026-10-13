@@ -37,3 +37,29 @@ export function saved(status = 'PASS'): SupplierDetail {
   dto.media_workbench_v1!.validation.draft_revision = 'mwd_b'
   return dto
 }
+
+export function draftManagementSupplier(mediaType: 'image' | 'video' = 'image'): SupplierDetail {
+  const dto = supplier()
+  const configured = dto.media_workbench_v1!.draft.products[0]!
+  configured.media_type = mediaType
+  configured.display_name = mediaType === 'image' ? 'GPT Image 2 标准商品' : '单视频标准商品'
+  configured.upstream_model = mediaType === 'image' ? 'gpt-image-2' : 'video-model'
+  configured.site_model = configured.upstream_model
+  configured.capabilities.count = { min: 1, max: mediaType === 'image' ? 10 : 1 }
+  if (mediaType === 'video') configured.capabilities.durations_seconds = [5]
+  dto.name = mediaType === 'image' ? 'Image2Pro 图片（隔离）' : '兼容视频（隔离）'
+  dto.models = [{ model_id: configured.upstream_model, state: 'PUBLISHED' }]
+  dto.media_workbench_v1!.published!.products = [copy(configured)]
+  dto.media_workbench_v1!.published!.offers = [{ product_id: configured.product_id, offer_id: 'frozen-offer' }]
+  dto.media_workbench_v1!.sales.enabled = false; dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
+  dto.product_removal = { [configured.product_id]: { allowed: false, reason: '已发布，不能移除。' } }
+  for (let i = 1; i <= 6; i++) {
+    const blank = copy(configured)
+    blank.product_id = `blank-${i}`; blank.display_name = configured.upstream_model; blank.enabled = false
+    blank.capabilities = { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: copy(configured.capabilities.count), references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] }
+    blank.pricing_rules = []; blank.adapter_config = { size_mappings: [] }
+    dto.media_workbench_v1!.draft.products.push(blank)
+    dto.product_removal[blank.product_id] = { allowed: true, reason: '' }
+  }
+  return dto
+}

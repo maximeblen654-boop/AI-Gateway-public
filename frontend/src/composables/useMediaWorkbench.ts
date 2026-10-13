@@ -17,6 +17,8 @@ export function useMediaWorkbench() {
   const conflict = ref(false)
   const validationUnavailable = ref(false)
   const saveState = ref('')
+  const addedProductIds = ref<string[]>([])
+  const removedProducts = ref<Product[]>([])
   let baseline = '[]'
   let loadSequence = 0
   let validationSequence = 0
@@ -39,6 +41,7 @@ export function useMediaWorkbench() {
     if (replaceDraft) {
       products.value = clone(draftInput(dto.media_workbench_v1?.draft.products ?? []).products)
       baseline = JSON.stringify(products.value)
+      addedProductIds.value = []; removedProducts.value = []
     }
     if (selectedModel.value && !dto.models.some(model => model.model_id === selectedModel.value)) selectedModel.value = ''
     if (!products.value.some(p => p.product_id === selectedProduct.value && p.upstream_model === selectedModel.value)) {
@@ -84,8 +87,15 @@ export function useMediaWorkbench() {
     selectedModel.value = id
     selectedProduct.value = products.value.find(p => p.upstream_model === id)?.product_id ?? ''
   }
-  function addProduct(mediaType: string) {
-    if (!selectedModel.value || pending.value || deleted.value || conflict.value) return
+  function addProduct(mediaType: string, independent = false) {
+    if (!selectedModel.value || pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed') return
+    const existing = products.value.filter(p => p.upstream_model === selectedModel.value && p.media_type === mediaType)
+    const unfinished = existing.find(p => addedProductIds.value.includes(p.product_id))
+    if (unfinished || (!independent && existing.length)) {
+      selectedProduct.value = (unfinished ?? existing[0])!.product_id
+      if (independent) message.value = '已有一份尚未保存的新商品，请先完成或撤销该商品。'
+      return
+    }
     // Identity generation only; no capability or pricing is inferred from the model name.
     const id = `media-${crypto.randomUUID()}`
     products.value.push({ product_id: id, media_type: mediaType, site_model: selectedModel.value, display_name: selectedModel.value,
@@ -93,7 +103,40 @@ export function useMediaWorkbench() {
       capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: mediaType === 'video' ? { min: 1, max: 1 } : { min: 1, max: 10 },
         references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] },
       pricing_rules: [], adapter_config: { size_mappings: [] } })
+    addedProductIds.value.push(id)
     selectedProduct.value = id
+  }
+  function removalReason(p: Product): string {
+    if (saveState.value === 'unconfirmed') return '保存结果未确认，请重新读取后再管理商品。'
+    if (addedProductIds.value.includes(p.product_id)) return ''
+    const permission = detail.value?.product_removal?.[p.product_id]
+    if (!permission?.allowed) return permission?.reason || '请重新读取，确认空白草稿的移除条件。'
+    const c = p.capabilities
+    if (c.resolutions.length || c.aspect_ratios.length || c.qualities.length || c.durations_seconds.length ||
+        c.combination_rules.length || p.pricing_rules.some(rule => rule.sale_price != null || Object.values(rule.match).some(value => Array.isArray(value) ? value.length > 0 : value != null)) || Object.values(c.references).some(value =>
+          typeof value === 'number' ? value !== 0 : value.min !== 0 || value.max !== 0)) {
+      return '已有规格、参考素材要求或价格，不属于空白草稿。'
+    }
+    return ''
+  }
+  function removeProduct(id: string) {
+    if (pending.value || loading.value || deleted.value || conflict.value) return
+    const p = products.value.find(item => item.product_id === id)
+    if (!p || removalReason(p)) return
+    if (addedProductIds.value.includes(id)) addedProductIds.value = addedProductIds.value.filter(item => item !== id)
+    else removedProducts.value.push(clone(p))
+    products.value = products.value.filter(item => item.product_id !== id)
+    if (selectedProduct.value === id) selectedProduct.value = products.value.find(item => item.upstream_model === selectedModel.value)?.product_id ?? ''
+  }
+  function undoRemoval(id: string) {
+    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed') return
+    const p = removedProducts.value.find(item => item.product_id === id)
+    if (!p) return
+    products.value.push(p)
+    const order = (config.value?.draft.products ?? []).map(item => item.product_id)
+    products.value.sort((a, b) => (order.indexOf(a.product_id) < 0 ? Infinity : order.indexOf(a.product_id)) - (order.indexOf(b.product_id) < 0 ? Infinity : order.indexOf(b.product_id)))
+    removedProducts.value = removedProducts.value.filter(item => item.product_id !== id)
+    selectedModel.value = p.upstream_model; selectedProduct.value = id
   }
   function pollValidation(id: number, revision: string, seq: number, attempt = 0) {
     pollTimer = setTimeout(async () => {
@@ -114,7 +157,7 @@ export function useMediaWorkbench() {
   }
   async function saveDraft(): Promise<boolean> {
     if (pending.value || loading.value || deleted.value || conflict.value || !detail.value) return false
-    if (!products.value.length) {
+    if (!products.value.length && !removedProducts.value.length) {
       message.value = '请先选择图片或视频产品，再保存草稿。'
       return false
     }
@@ -122,7 +165,10 @@ export function useMediaWorkbench() {
     try {
       // A nil media configuration is initialized atomically by the first explicit
       // SaveDraft. The server infers media_types from the submitted products.
-      const dto = await mediaWorkbenchAPI.saveDraft(detail.value.id, config.value?.record_version ?? 0, products.value)
+      const args = [detail.value.id, config.value?.record_version ?? 0, products.value] as const
+      const dto = removedProducts.value.length
+        ? await mediaWorkbenchAPI.saveDraft(...args, removedProducts.value.map(p => p.product_id))
+        : await mediaWorkbenchAPI.saveDraft(...args)
       if (disposed) return false
       apply(dto, true); saveState.value = 'saved'
       const c = dto.media_workbench_v1
@@ -180,5 +226,6 @@ export function useMediaWorkbench() {
   onBeforeUnmount(() => { disposed = true; loadSequence++; stopPolling() })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
     errorStatus, diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, discard }
 }

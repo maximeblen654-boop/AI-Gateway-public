@@ -57,7 +57,7 @@
         <p class="mw-muted">商品身份由系统生成；模型选择和 Account 的 canonical model mapping 统一来自当前 Account，不在商品层重复填写。</p>
         <p class="mw-muted" data-field="site_model">当前上游模型：{{ product.upstream_model }}。模型身份由 Account 的 canonical mapping 管理。</p>
         <label class="mw-field">业务用途<select :value="product.media_type" class="input" data-field="media_type" @change="setMediaType"><option v-for="type in mediaTypes" :key="type" :value="type">{{ type === 'image' ? '图片' : '视频' }}</option></select></label>
-        <label><input :checked="product.enabled" type="checkbox" @change="edit(next => { next.enabled = ($event.target as HTMLInputElement).checked })" /> 商品启用（发布后生效，不改变 Account 销售开关）</label>
+
       </details>
     </details>
   </fieldset>

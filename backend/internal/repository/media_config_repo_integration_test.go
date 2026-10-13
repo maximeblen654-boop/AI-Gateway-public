@@ -208,3 +208,44 @@ func TestMediaCatalogSnapshotPostgresDoesNotRebuildScheduler(t *testing.T) {
 	require.JSONEq(t, string(want), string(stored))
 	require.JSONEq(t, string(want), string(cached))
 }
+
+func TestBlankDraftRemovalPersistsOnlyAccountMediaConfig(t *testing.T) {
+	ctx := context.Background()
+	a, err := integrationEntClient.Account.Create().SetName("blank-draft-removal-fixture").SetPlatform("openai").SetType("apikey").SetCredentials(map[string]any{"api_key": "fixture-only", "model_mapping": map[string]any{"gpt-image-*": "gpt-image-2"}}).SetExtra(map[string]any{"unrelated": "preserve"}).SetStatus("active").SetSchedulable(true).Save(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = integrationDB.ExecContext(ctx, "DELETE FROM scheduler_outbox WHERE account_id=$1", a.ID)
+		_, _ = integrationDB.ExecContext(ctx, "DELETE FROM accounts WHERE id=$1", a.ID)
+	})
+	svc := mediaworkbench.NewService(NewMediaConfigRepository(integrationDB))
+	products := []mediaworkbench.Product{{ProductID: "configured", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"1K"}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}}}}}
+	for _, id := range []string{"blank-1", "blank-2", "blank-3", "blank-4", "blank-5", "blank-6"} {
+		products = append(products, mediaworkbench.Product{ProductID: id, MediaType: "image", UpstreamModel: "gpt-image-2"})
+	}
+	d, err := svc.SaveDraft(ctx, a.ID, 0, mediaworkbench.DraftInput{Products: products})
+	require.NoError(t, err)
+	before, err := integrationEntClient.Account.Get(ctx, a.ID)
+	require.NoError(t, err)
+	original := d.Config.Draft.Products[0]
+	remaining := append(append([]mediaworkbench.Product{}, d.Config.Draft.Products[:3]...), d.Config.Draft.Products[4:]...)
+	_, err = svc.SaveDraft(ctx, a.ID, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: remaining})
+	require.ErrorIs(t, err, mediaworkbench.ErrDraftRemoval)
+	d, err = svc.SaveDraft(ctx, a.ID, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: remaining, RemoveProductIDs: []string{"blank-3"}})
+	require.NoError(t, err)
+	loaded, err := svc.Detail(ctx, a.ID)
+	require.NoError(t, err)
+	require.Len(t, loaded.Config.Draft.Products, 6)
+	require.Equal(t, original, loaded.Config.Draft.Products[0])
+	require.Len(t, loaded.Config.RemovedDraftProducts, 1)
+	require.Equal(t, "blank-3", loaded.Config.RemovedDraftProducts[0].ProductID)
+	after, err := integrationEntClient.Account.Get(ctx, a.ID)
+	require.NoError(t, err)
+	require.Equal(t, before.Credentials, after.Credentials)
+	require.Equal(t, before.Status, after.Status)
+	require.Equal(t, before.Schedulable, after.Schedulable)
+	require.Equal(t, before.Extra["unrelated"], after.Extra["unrelated"])
+	require.False(t, d.Config.Sales.Enabled)
+	var scheduled int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT count(*) FROM scheduler_outbox WHERE account_id=$1", a.ID).Scan(&scheduled))
+	require.Zero(t, scheduled)
+}

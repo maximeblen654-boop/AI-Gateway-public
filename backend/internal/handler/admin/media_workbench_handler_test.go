@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -132,4 +133,63 @@ func TestMediaPublishHTTPContract(t *testing.T) {
 	body, _ = json.Marshal(map[string]any{"expected_record_version": d.Config.RecordVersion, "expected_draft_revision": d.Config.Draft.Revision})
 	call(string(body), 422, "MISSING_PRICE") // structured latest editor DTO in data
 	call(`{"expected_record_version":7,"expected_draft_revision":"r","api_key":"secret"}`, 400, "INVALID_MEDIA_CONFIG")
+}
+
+func TestBlankDraftRemovalHTTPContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, kind := range []string{"image", "video"} {
+		t.Run(kind, func(t *testing.T) {
+			repo := &mediaHandlerRepo{a: mediaworkbench.Account{ID: 77, Type: "apikey", Platform: "openai", Status: "active", Schedulable: true}}
+			svc := mediaworkbench.NewService(repo)
+			h := NewMediaWorkbenchHandler(svc)
+			router := gin.New()
+			router.PUT("/accounts/:id/draft", h.SaveDraft)
+			router.GET("/accounts/:id", h.Detail)
+			configured := mediaworkbench.Product{ProductID: "configured", MediaType: kind, UpstreamModel: "same-model", Enabled: true, Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"1K"}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}}}}
+			products := []mediaworkbench.Product{configured}
+			for i := 1; i <= 6; i++ {
+				products = append(products, mediaworkbench.Product{ProductID: fmt.Sprintf("blank-%d", i), MediaType: kind, UpstreamModel: "same-model"})
+			}
+			d, err := svc.SaveDraft(context.Background(), 77, 0, mediaworkbench.DraftInput{Products: products})
+			if err != nil {
+				t.Fatal(err)
+			}
+			repo.a.Config.Published = &mediaworkbench.Published{Revision: "frozen", Products: []mediaworkbench.Product{configured}}
+			published, _ := json.Marshal(repo.a.Config.Published)
+			call := func(method, path string, body any, want int) string {
+				t.Helper()
+				encoded, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(method, path, bytes.NewReader(encoded))
+				req.Header.Set("Content-Type", "application/json")
+				router.ServeHTTP(w, req)
+				if w.Code != want {
+					t.Fatalf("%s: %d %s", method, w.Code, w.Body.String())
+				}
+				return w.Body.String()
+			}
+			read := call("GET", "/accounts/77", nil, 200)
+			if !strings.Contains(read, `"product_removal"`) || !strings.Contains(read, `"allowed":true`) {
+				t.Fatal("removal eligibility missing")
+			}
+			remaining := append(append([]mediaworkbench.Product{}, products[:3]...), products[4:]...)
+			body := map[string]any{"expected_record_version": d.Config.RecordVersion, "draft": mediaworkbench.DraftInput{Products: remaining}}
+			call("PUT", "/accounts/77/draft", body, 422)
+			body["draft"] = mediaworkbench.DraftInput{Products: remaining, RemoveProductIDs: []string{"blank-3"}}
+			call("PUT", "/accounts/77/draft", body, 200)
+			call("PUT", "/accounts/77/draft", body, 409)
+			if len(repo.a.Config.Draft.Products) != 6 || len(repo.a.Config.RemovedDraftProducts) != 1 || repo.a.Config.RemovedDraftProducts[0].ProductID != "blank-3" {
+				t.Fatal("wrong persistence result")
+			}
+			after, _ := json.Marshal(repo.a.Config.Published)
+			if !bytes.Equal(published, after) {
+				t.Fatal("HTTP draft save changed Published")
+			}
+			body["expected_record_version"] = repo.a.Config.RecordVersion
+			body["draft"] = mediaworkbench.DraftInput{Products: remaining[1:], RemoveProductIDs: []string{"configured"}}
+			call("PUT", "/accounts/77/draft", body, 422)
+			body["draft"] = map[string]any{"products": remaining, "removed_draft_products": []any{}}
+			call("PUT", "/accounts/77/draft", body, 400)
+		})
+	}
 }

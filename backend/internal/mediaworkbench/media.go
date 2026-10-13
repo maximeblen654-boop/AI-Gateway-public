@@ -40,6 +40,8 @@ type Config struct {
 	Validation      Validation                `json:"validation"`
 	Published       *Published                `json:"published"`
 	Procurement     Procurement               `json:"procurement"`
+	// Retain removed blank drafts; removing an editor entry is not a hard delete.
+	RemovedDraftProducts []Product `json:"removed_draft_products,omitempty"`
 }
 type Sales struct {
 	Enabled bool `json:"enabled"`
@@ -57,7 +59,8 @@ type Draft struct {
 
 // DraftInput deliberately excludes server-owned revisions and timestamps.
 type DraftInput struct {
-	Products []Product `json:"products"`
+	Products         []Product `json:"products"`
+	RemoveProductIDs []string  `json:"remove_product_ids,omitempty"`
 }
 type Product struct {
 	ProductID string `json:"product_id"`
@@ -207,6 +210,7 @@ type ModelState struct {
 type Detail struct {
 	*Account
 	NativeAdapters map[string]AdapterDescriptor `json:"native_adapters"`
+	ProductRemoval map[string]DraftRemoval      `json:"product_removal"`
 	Host           string                       `json:"host"`
 	EffectiveSales bool                         `json:"effective_sales"`
 	EffectiveState string                       `json:"effective_state"`
@@ -247,6 +251,7 @@ func (s *Service) Suppliers(ctx context.Context) ([]Detail, error) {
 }
 func describe(a *Account) *Detail {
 	d := &Detail{Account: a, Models: []ModelState{}, EffectiveState: "NOT_INITIALIZED"}
+	d.ProductRemoval = draftRemovalOptions(a.Config)
 	d.NativeAdapters = map[string]AdapterDescriptor{}
 	for _, mediaType := range []string{"image", "video"} {
 		if descriptor, ok := Descriptor(nativeAdapterKind(a, mediaType)); ok {
@@ -440,6 +445,11 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		}
 	}
 	c := a.Config
+	removed, err := validateDraftRemovals(c, input)
+	if err != nil {
+		return nil, err
+	}
+	c.RemovedDraftProducts = append(c.RemovedDraftProducts, removed...)
 	basedOn := ""
 	if c.Published != nil {
 		basedOn = c.Published.Revision

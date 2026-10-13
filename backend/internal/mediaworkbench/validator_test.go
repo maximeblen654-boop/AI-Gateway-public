@@ -85,7 +85,9 @@ func TestSaveValidatePublishSalesZeroNetwork(t *testing.T) {
 		t.Fatalf("sales: %+v", d)
 	}
 	// An incomplete newer Draft cannot mutate or invalidate a valid Published.
-	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{})
+	incomplete := d.Config.Draft.Products[0]
+	incomplete.PricingRules = nil
+	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{incomplete}})
 	must(t, err)
 	after, _ := json.Marshal(d.Config.Published)
 	if string(snapshot) != string(after) || !d.EffectiveSales || d.Config.Validation.Status != "FAIL" {

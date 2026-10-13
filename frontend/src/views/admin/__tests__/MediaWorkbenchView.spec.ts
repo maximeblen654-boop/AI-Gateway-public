@@ -123,8 +123,9 @@ describe('Media Workbench page flow', () => {
     await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="add-product-image"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="display-name"]').setValue('保留的图片草稿')
-    const append = wrapper.findAll('button').find(button => button.text() === '添加视频产品后一起保存')!
-    await append.trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="new-independent-product"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="new-product-type"]').setValue('video')
+    await wrapper.get('[data-test="confirm-add-product"]').trigger('click'); await flushPromises()
     expect(wrapper.find('dialog[open]').exists()).toBe(false)
     expect(api.initialize).not.toHaveBeenCalled()
     expect(api.saveDraft).not.toHaveBeenCalled()

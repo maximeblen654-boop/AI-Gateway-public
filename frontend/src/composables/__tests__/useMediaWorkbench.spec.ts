@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
 import { useMediaWorkbench } from '../useMediaWorkbench'
-import { supplier, saved, copy } from '@/components/admin/media/__tests__/fixtures'
+import { supplier, saved, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
@@ -145,4 +145,74 @@ describe('Media Workbench request lifecycle', () => {
     expect(await state.saveDraft()).toBe(true)
     expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]))
   })
+})
+
+
+describe('explicit product management', () => {
+  it('repeated default creation continues the existing model and media product', async () => {
+    await start(); state.selectModel('image-native-1')
+    const before = copy(state.products.value)
+    state.addProduct('image'); state.addProduct('image')
+    expect(state.products.value).toEqual(before)
+    expect(state.selectedProduct.value).toBe(before[0]!.product_id)
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('blank draft lifecycle', () => {
+  it.each(['image', 'video'] as const)('%s removes only a confirmed blank and preserves the configured product', async type => {
+    const dto = draftManagementSupplier(type)
+    api.detail.mockResolvedValue(dto); await start(); state.selectModel(dto.models[0]!.model_id)
+    const before = copy(state.products.value)
+    state.removeProduct('canvas-1'); expect(state.products.value).toEqual(before)
+    state.removeProduct('blank-3'); expect(state.products.value).toHaveLength(6)
+    state.undoRemoval('blank-3'); expect(state.products.value).toEqual(before); expect(state.dirty.value).toBe(false)
+    state.removeProduct('blank-3')
+    api.saveDraft.mockImplementation(async (_id, _version, products) => {
+      const result = copy(dto); result.media_workbench_v1!.draft.products = copy(products); return result
+    })
+    await state.saveDraft()
+    expect(api.saveDraft).toHaveBeenCalledWith(77, 3, before.filter(p => p.product_id !== 'blank-3'), ['blank-3'])
+    expect(state.products.value[0]).toEqual(before[0]); expect(state.removedProducts.value).toEqual([])
+    expect(state.config.value!.published).toEqual(dto.media_workbench_v1!.published)
+    expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
+  it('undoes a new product without sending any write and guards repeated explicit creation', async () => {
+    await start(); state.selectModel('image-native-1'); const before = copy(state.products.value)
+    state.addProduct('image', true); const id = state.selectedProduct.value
+    state.addProduct('image', true); expect(state.products.value).toHaveLength(2)
+    state.product.value!.display_name = '未保存的编辑也能撤销'
+    state.removeProduct(id)
+    expect(state.products.value).toEqual(before); expect(state.selectedProduct.value).toBe(before[0]!.product_id)
+    expect(state.dirty.value).toBe(false); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+  it('does not treat a configured zero price or locally edited blank as removable', async () => {
+    api.detail.mockResolvedValue(draftManagementSupplier()); await start()
+    const p = state.products.value.find(p => p.product_id === 'blank-1')!
+    p.pricing_rules = [{ match: {}, sale_price: { amount: '0', currency: 'CNY', billing_mode: 'per_request' } }]
+    state.removeProduct(p.product_id); expect(state.products.value).toHaveLength(7)
+  })
+  it('keeps a pending removal after conflict or ambiguous save and requires reread before further management', async () => {
+    api.detail.mockResolvedValue(draftManagementSupplier()); await start()
+    state.removeProduct('blank-2'); api.saveDraft.mockRejectedValue({ status: 0 }); await state.saveDraft()
+    state.removeProduct('blank-3'); state.undoRemoval('blank-2')
+    expect(state.products.value).toHaveLength(6); expect(state.removedProducts.value.map(p => p.product_id)).toEqual(['blank-2'])
+    await state.selectSupplier(77); expect(state.products.value).toHaveLength(7); expect(state.removedProducts.value).toEqual([])
+  })
+  it('allows explicitly removing the last saved blank', async () => {
+    const dto = draftManagementSupplier(); dto.media_workbench_v1!.draft.products = [dto.media_workbench_v1!.draft.products[1]!]
+    api.detail.mockResolvedValue(dto); await start(); state.removeProduct('blank-1'); api.saveDraft.mockResolvedValue(dto)
+    await state.saveDraft(); expect(api.saveDraft).toHaveBeenCalledWith(77, 3, [], ['blank-1'])
+  })
+})
+
+
+it('allows an untouched blank price placeholder but protects a specified price match', async () => {
+  api.detail.mockResolvedValue(draftManagementSupplier()); await start()
+  const p = state.products.value.find(p => p.product_id === 'blank-1')!
+  p.pricing_rules = [{ match: {}, sale_price: null }]
+  expect(state.removalReason(p)).toBe('')
+  p.pricing_rules[0]!.match.resolution = ['1K']
+  expect(state.removalReason(p)).not.toBe('')
 })

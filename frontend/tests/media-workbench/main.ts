@@ -8,14 +8,18 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import i18n, { initI18n } from '@/i18n'
 import { initSiteTheme, setSiteTheme, setSidebarStyle, setYellowSidebarStyle, siteThemeOptions, type SidebarStyle, type YellowSidebarStyle } from '@/utils/siteTheme'
-import { supplier, copy } from '@/components/admin/media/__tests__/fixtures'
+import { supplier, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
 import type { User } from '@/types'
 import '@/style.css'
 import '@/styles/site-theme.css'
 
 const query = new URLSearchParams(location.search)
 const scenario = query.get('scenario') ?? 'PASS'
-const dto = supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+const management = scenario.startsWith('DRAFT_MANAGEMENT')
+const initialDTO = management ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
+const savedManagement = management ? sessionStorage.getItem(scenario) : null
+const dto = savedManagement ? JSON.parse(savedManagement) as typeof initialDTO : initialDTO
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
 if (scenario.startsWith('WIZARD')) {
@@ -69,6 +73,12 @@ apiClient.defaults.adapter = async config => {
     }
     if (url.endsWith('/draft')) {
       dto.media_workbench_v1!.draft.products = input.draft.products
+      if (management) {
+        dto.product_removal = Object.fromEntries(dto.media_workbench_v1!.draft.products.map(p => [p.product_id, {
+          allowed: p.product_id !== 'canvas-1' && p.capabilities.resolutions.length === 0 && p.pricing_rules.length === 0,
+          reason: p.product_id === 'canvas-1' ? '已发布，不能移除。' : ''
+        }]))
+      }
       dto.media_workbench_v1!.record_version++
       dto.media_workbench_v1!.draft.revision = `fixture_${dto.media_workbench_v1!.record_version}`
       dto.media_workbench_v1!.validation.draft_revision = dto.media_workbench_v1!.draft.revision
@@ -80,6 +90,7 @@ apiClient.defaults.adapter = async config => {
       }
     }
     if (url.endsWith('/sales')) { dto.media_workbench_v1!.sales.enabled = input.enabled; dto.effective_sales = input.enabled; dto.media_workbench_v1!.record_version++ }
+    if (management && config.method !== 'get') sessionStorage.setItem(scenario, JSON.stringify(dto))
     data = scenario === 'NAVIGATION' ? copy(navigationAccounts.find(account => account.id === Number(url.split('/')[4]))) : copy(dto)
   } else if (url === '/announcements') data = []
   else if (url === '/keys') data = { items: [], pages: 1, total: 0 }

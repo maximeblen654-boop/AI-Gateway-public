@@ -76,7 +76,9 @@ func TestPublishedImageRuntimeContract(t *testing.T) {
 	}
 	t.Run("Published_not_Draft_or_procurement", func(t *testing.T) {
 		s, r, b := runtimeFixture(t)
-		_, e := s.SaveDraft(context.Background(), 7, r.a.Config.RecordVersion, DraftInput{})
+		draftProduct := r.a.Config.Draft.Products[0]
+		draftProduct.PricingRules = []PricingRule{{SalePrice: &Price{Amount: "99", Currency: "CNY", BillingMode: "per_request"}}}
+		_, e := s.SaveDraft(context.Background(), 7, r.a.Config.RecordVersion, DraftInput{Products: []Product{draftProduct}})
 		must(t, e)
 		r.a.Config.Procurement.Entries = []ProcurementEntry{{ProductID: "p", Cost: Price{Amount: "0.42", Currency: "CNY"}}}
 		after, e := ResolvePublishedImageOffer(&r.a, b.Offer.OfferID, b.Spec)

@@ -105,7 +105,24 @@
               <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
               <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
             </div>
-            <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label></div>
+            <section v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
+              <div class="mw-section-heading"><strong>正在编辑的商品</strong><span class="mw-badge" data-test="product-status">{{ product.enabled ? '草稿：已启用' : '草稿：已停用' }}</span></div>
+              <label v-if="modelProducts.length > 1" class="mw-field">切换商品（此模型共 {{ modelProducts.length }} 份）<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label>
+              <p v-else class="mw-muted">{{ productDisplayTitle(product) }} · {{ product.media_type === 'video' ? '视频' : '图片' }}</p>
+              <label class="mw-product-toggle"><input type="checkbox" data-test="product-enabled" :checked="product.enabled" :disabled="managementDisabled" @change="updateProduct({ ...product, enabled: ($event.target as HTMLInputElement).checked })" /><span>启用此商品<span class="mw-muted">保存并发布后生效；不会改变 Account 销售开关。</span></span></label>
+              <div v-if="addedProductIds.includes(product.product_id)" class="mw-product-local" role="status"><span>本次新增，尚未保存</span><button type="button" class="btn btn-secondary" data-test="undo-add-product" :disabled="managementDisabled" @click="removeProduct(product.product_id)">撤销新增</button></div>
+              <details class="mw-product-options" data-test="product-options"><summary>更多商品操作</summary>
+                <p class="mw-muted">同一模型通常只需一份商品：图片的文生图、参考图编辑及多种规格可在这里一起配置。仅在需要独立售价或销售方案时另建商品。</p>
+                <div class="mw-product-type-actions"><button type="button" class="btn btn-secondary" data-test="new-independent-product" :disabled="managementDisabled" @click="newProductType = product.media_type">另建独立销售商品</button><button v-if="!addedProductIds.includes(product.product_id) && !removalReason(product)" type="button" class="btn mw-danger" data-test="remove-blank-product" :disabled="managementDisabled" @click="removeProductId = product.product_id">移除空白草稿</button></div>
+                <p v-if="!addedProductIds.includes(product.product_id) && removalReason(product)" class="mw-muted" data-test="removal-protection">{{ removalReason(product) }}</p>
+              </details>
+            </section>
+            <section v-if="removedProducts.length" class="mw-removal-notice" aria-label="待保存的草稿移除" data-test="pending-removals">
+              <strong>待移除 {{ removedProducts.length }} 份空白草稿，保存后生效</strong>
+              <ul><li v-for="removed in removedProducts" :key="removed.product_id"><span>{{ productDisplayTitle(removed) }} · {{ removed.media_type === 'video' ? '视频' : '图片' }}</span><button type="button" class="btn btn-secondary" :disabled="managementDisabled" :data-test="`undo-removal-${removed.product_id}`" @click="undoRemoval(removed.product_id)">撤销移除</button></li></ul>
+              <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
+              <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveDraft">保存草稿与移除操作</button>
+            </section>
             <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
@@ -120,8 +137,7 @@
                 </div>
               </template>
             </MediaProductEditor>
-            <div v-if="product && !config && addablePreInitTypes.length" class="mw-product-type-actions"><button v-for="type in addablePreInitTypes" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品后一起保存</button></div>
-            <div v-if="product && config" class="mw-product-type-actions"><button v-for="type in config.media_types" :key="type" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="addProduct(type)">添加{{ type === 'image' ? '图片' : '视频' }}产品（保留当前草稿）</button></div>
+
 
           </template>
           <p v-else class="mw-muted">请先从模型列表选择一个模型。</p>
@@ -129,6 +145,18 @@
       </main>
     </div>
 
+    <MediaDialog :show="!!newProductType" title="另建独立销售商品？" :busy="busy" @close="newProductType = ''">
+      <p>当前模型已有 {{ modelProducts.length }} 份商品。已有商品的规格和售价会保留；新商品有独立名称、规格、售价和启用状态。</p>
+      <p>文生图与参考图编辑、不同分辨率和比例通常可以放在同一份图片商品中，无需分别新增。</p>
+      <label class="mw-field">新商品类型<select v-model="newProductType" class="input" data-test="new-product-type"><option v-for="type in config?.media_types ?? ['image', 'video']" :key="type" :value="type">{{ type === 'video' ? '视频' : '图片' }}</option></select></label>
+      <p class="mw-muted">确认后仅在本页新增，仍需保存草稿；不会发布或启售。</p>
+      <template #actions><button type="button" class="btn btn-primary" data-test="confirm-add-product" :disabled="managementDisabled" @click="confirmAddProduct">确认另建一份</button></template>
+    </MediaDialog>
+    <MediaDialog :show="!!removeProductId" title="移除这份空白草稿？" :busy="busy" @close="removeProductId = ''">
+      <p>{{ removalTarget ? productOptionLabel(removalTarget, modelProducts.indexOf(removalTarget)) : '' }}</p>
+      <p>仅将选中的未发布空白商品移出草稿列表，保存后生效。其他商品的规格和价格保持不变；原草稿副本、已发布数据及历史关联会保留。</p>
+      <template #actions><button type="button" class="btn mw-danger" data-test="confirm-remove-product" :disabled="managementDisabled" @click="confirmRemoveProduct">确认移除这份草稿</button></template>
+    </MediaDialog>
     <MediaDialog :show="!!nextNavigation" title="有未保存修改" :busy="!!pending" @close="nextNavigation = null">
       <p>保存草稿后切换，或放弃当前未保存修改。</p>
       <template #actions><button class="btn btn-primary" data-test="save-navigate" :disabled="!!pending || conflict || deleted" @click="saveAndNavigate">保存草稿后切换</button><button class="btn btn-secondary" data-test="discard-navigate" :disabled="!!pending" @click="discardAndNavigate">放弃修改</button></template>
@@ -167,6 +195,7 @@ import '@/styles/media-workbench.css'
 const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
   diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+  addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, discard } = workbench
 const step = ref('suppliers')
 const search = ref('')
@@ -178,6 +207,9 @@ const modelsScrollPosition = ref({ top: 0, left: 0 })
 const publishDialog = ref(false)
 const salesDialog = ref(false)
 const reloadDialog = ref(false)
+const newProductType = ref('')
+const removeProductId = ref('')
+const removalTarget = computed(() => products.value.find(p => p.product_id === removeProductId.value))
 const accountSearch = ref('')
 const accountFilter = ref('')
 const platformFilter = ref('')
@@ -185,6 +217,7 @@ const collapsedSources = ref(new Set<string>())
 const knownSourceHosts = ref(new Set<string>())
 const nextNavigation = ref<(() => void | Promise<void>) | null>(null)
 const busy = computed(() => !!pending.value || loading.value)
+const managementDisabled = computed(() => busy.value || deleted.value || conflict.value || saveState.value === 'unconfirmed')
 const publishedCount = computed(() => suppliers.value.reduce((n, s) => n + s.models.filter(m => m.state === 'PUBLISHED').length, 0))
 const accountStates: Record<string, string> = {
   SELLING: '媒体销售中', SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '发布未就绪',
@@ -216,10 +249,6 @@ const productOptionSignatures = computed(() => {
     counts.set(signature, (counts.get(signature) ?? 0) + 1)
   }
   return counts
-})
-const addablePreInitTypes = computed(() => {
-  const selectedProducts = products.value.filter(item => item.upstream_model === selectedModel.value)
-  return ['image', 'video'].filter(type => !selectedProducts.some(item => item.media_type === type))
 })
 const canResume = computed(() => {
   if (detail.value?.sales_resume_ready !== undefined) return detail.value.sales_resume_ready
@@ -281,12 +310,24 @@ function productOptionLabel(p: Product, index: number) {
   const specs = p.media_type === 'video'
     ? [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/'), p.capabilities.durations_seconds?.map(value => `${value}s`).join('/')]
     : [p.capabilities.resolutions?.join('/'), p.capabilities.aspect_ratios?.join('/')]
-  const specText = specs.filter(Boolean).join(' · ') || '规格未配置'
+  const specText = specs.filter(Boolean).join(' · ') || '未配置'
   const quantityText = p.media_type === 'video' ? '固定 1 条' : `${p.capabilities.count.min}～${p.capabilities.count.max} 张`
   const status = p.enabled ? '已启用' : '已停用'
   const parts = [title, `规格 ${specText}`, `数量 ${quantityText}`, priceLabel(p), status]
   if ((productOptionSignatures.value.get(productOptionSignature(p)) ?? 0) > 1) parts.push(`商品 ${index + 1}`)
   return parts.join(' · ')
+}
+function confirmAddProduct() {
+  const type = newProductType.value
+  if (!type || managementDisabled.value) return
+  newProductType.value = '' // Consume this confirmation before handling repeated events.
+  addProduct(type, true)
+}
+function confirmRemoveProduct() {
+  const id = removeProductId.value
+  if (!id || managementDisabled.value) return
+  removeProductId.value = ''
+  removeProduct(id)
 }
 function changeProduct(event: Event) {
   const target = event.target as HTMLSelectElement

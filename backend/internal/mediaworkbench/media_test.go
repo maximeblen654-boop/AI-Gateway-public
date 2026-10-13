@@ -182,7 +182,7 @@ func TestSalesHistoryEnableAndPause(t *testing.T) {
 	if d.EffectiveSales || d.Config.Sales.Enabled || d.EffectiveState != "SALES_PAUSED" || d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled {
 		t.Fatalf("pause did not preserve sales history: %+v", d)
 	}
-	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{})
+	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: d.Config.Draft.Products})
 	must(t, err)
 	if d.EffectiveState != "SALES_PAUSED" || d.Config.Sales.HasEverEnabled == nil || !*d.Config.Sales.HasEverEnabled {
 		t.Fatal("draft save erased established sales history")
@@ -212,7 +212,7 @@ func TestLegacySalesHistoryRemainsUnknown(t *testing.T) {
 			}
 			d, err = s.SetSales(ctx, 7, d.Config.RecordVersion, false)
 			must(t, err)
-			d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{})
+			d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: d.Config.Draft.Products})
 			must(t, err)
 			if d.Config.Sales.HasEverEnabled != nil || d.EffectiveState != "SALES_OFF_UNKNOWN" {
 				t.Fatal("disable or draft save backfilled unknown sales history")
