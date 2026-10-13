@@ -53,7 +53,9 @@ const report = { source_sha: process.env.NATIVE_CANDIDATE_SOURCE_SHA, script_sha
       await expect(w('model-page')).toBeVisible()
       await page.setViewportSize({ width: 390, height: 844 })
       await expect(w('publish')).toBeEnabled()
-      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'admin mobile overflow')
+      // AppLayout animates its desktop margin for 300 ms on viewport changes.
+      // Check the settled layout, not the first frame of that transition.
+      await expect.poll(() => page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth, margin: getComputedStyle(document.querySelector('.app-layout > .relative')).marginLeft })), { timeout: 5000, message: 'settled admin mobile layout must fit 390px' }).toEqual({ width: 390, scroll: 390, margin: '0px' })
       await page.screenshot({ path: `${root}/evidence/native-artifact-admin-${kind}-mobile.png`, fullPage: true })
       await page.setViewportSize({ width: 1440, height: 1000 })
       report.checks.push({ kind, account, publish_above_models: true, account_scope_despite_search: true, confirmation_cancelled: true, navigation_preserved: true, mobile: true })
@@ -63,6 +65,7 @@ const report = { source_sha: process.env.NATIVE_CANDIDATE_SOURCE_SHA, script_sha
     report.status = 'PASS'
   } catch (error) {
     report.status = 'FAIL'; report.error = error.message
+    report.layout = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth, margin: getComputedStyle(document.querySelector('.app-layout > .relative')).marginLeft, wide_elements: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1).slice(0, 12).map(e => ({ tag: e.tagName, class: e.className, width: e.getBoundingClientRect().width })) }))
     await page.screenshot({ path: `${root}/evidence/native-artifact-admin-failure.png`, fullPage: true }).catch(() => {})
     throw error
   } finally {
