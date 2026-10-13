@@ -1,0 +1,287 @@
+{
+  "buildx.build.provenance": {
+    "builder": {
+      "id": ""
+    },
+    "buildType": "https://mobyproject.org/buildkit@v1",
+    "materials": [
+      {
+        "uri": "pkg:docker/docker/dockerfile@1.7",
+        "digest": {
+          "sha256": "a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e"
+        }
+      },
+      {
+        "uri": "pkg:docker/alpine@3.21?platform=linux%2Famd64",
+        "digest": {
+          "sha256": "ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507"
+        }
+      },
+      {
+        "uri": "pkg:docker/golang@1.27.2-alpine?platform=linux%2Famd64",
+        "digest": {
+          "sha256": "f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d"
+        }
+      },
+      {
+        "uri": "pkg:docker/node@24.21.0-alpine3.23?digest=sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2\u0026platform=linux%2Famd64",
+        "digest": {
+          "sha256": "9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2"
+        }
+      },
+      {
+        "uri": "pkg:docker/postgres@18-alpine?platform=linux%2Famd64",
+        "digest": {
+          "sha256": "77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873"
+        }
+      }
+    ],
+    "invocation": {
+      "configSource": {
+        "entryPoint": "core.Dockerfile"
+      },
+      "parameters": {
+        "frontend": "gateway.v0",
+        "args": {
+          "build-arg:COMMIT": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+          "build-arg:GOPROXY": "https://proxy.golang.org,direct",
+          "build-arg:GOSUMDB": "sum.golang.org",
+          "build-arg:GO_BUILD_PARALLELISM": "1",
+          "build-arg:SOURCE_REVISION": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+          "cmdline": "docker/dockerfile:1.7",
+          "context:candidate-notices": "local:candidate-notices",
+          "frontend.caps": "moby.buildkit.frontend.contexts+forward",
+          "label:org.opencontainers.image.licenses": "LGPL-3.0-or-later",
+          "label:org.opencontainers.image.revision": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+          "label:org.opencontainers.image.source": "https://github.com/maximeblen654-boop/AI-Gateway-public",
+          "sharedkey:localdir:candidate-notices": "notices:5d7805bd7f7bb90c",
+          "source": "docker/dockerfile:1.7"
+        },
+        "locals": [
+          {
+            "name": "candidate-notices"
+          },
+          {
+            "name": "context"
+          },
+          {
+            "name": "dockerfile"
+          }
+        ],
+        "root": {
+          "configSource": {
+            "path": "core.Dockerfile"
+          },
+          "request": {
+            "args": {
+              "build-arg:COMMIT": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+              "build-arg:GOPROXY": "https://proxy.golang.org,direct",
+              "build-arg:GOSUMDB": "sum.golang.org",
+              "build-arg:GO_BUILD_PARALLELISM": "1",
+              "build-arg:SOURCE_REVISION": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+              "context:candidate-notices": "local:candidate-notices",
+              "frontend.caps": "moby.buildkit.frontend.contexts+forward",
+              "label:org.opencontainers.image.licenses": "LGPL-3.0-or-later",
+              "label:org.opencontainers.image.revision": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+              "label:org.opencontainers.image.source": "https://github.com/maximeblen654-boop/AI-Gateway-public",
+              "sharedkey:localdir:candidate-notices": "notices:5d7805bd7f7bb90c",
+              "vcs:localdir:context": ".",
+              "vcs:revision": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+              "vcs:source": "https://github.com/maximeblen654-boop/AI-Gateway-public"
+            }
+          }
+        },
+        "compatibilityVersion": 30
+      },
+      "environment": {
+        "github_actor": "maximeblen654-boop",
+        "github_actor_id": "287436861",
+        "github_event_name": "workflow_dispatch",
+        "github_event_payload": {
+          "inputs": {
+            "acceptance_scenario": "video",
+            "build_acceptance": "studio-workspace",
+            "build_source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+            "candidate_artifact_name": "native-media-candidate-64d9b523520f087cea31a216e7db65e64605ff7b",
+            "candidate_run_id": "38183650939",
+            "candidate_source_sha": "64d9b523520f087cea31a216e7db65e64605ff7b",
+            "mode": "build"
+          },
+          "ref": "refs/heads/codex/studio-native-media",
+          "repository": {
+            "allow_forking": true,
+            "archive_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/{archive_format}{/ref}",
+            "archived": false,
+            "assignees_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/assignees{/user}",
+            "blobs_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/git/blobs{/sha}",
+            "branches_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/branches{/branch}",
+            "clone_url": "https://github.com/maximeblen654-boop/AI-Gateway-public.git",
+            "collaborators_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/collaborators{/collaborator}",
+            "comments_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/comments{/number}",
+            "commits_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/commits{/sha}",
+            "compare_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/compare/{base}...{head}",
+            "contents_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/contents/{+path}",
+            "contributors_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/contributors",
+            "created_at": "2026-10-07T19:04:54Z",
+            "default_branch": "main",
+            "deployments_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/deployments",
+            "description": "AI-Gateway source distribution derived from Sub2API. Source, tests and configuration examples.",
+            "disabled": false,
+            "downloads_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/downloads",
+            "events_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/events",
+            "fork": false,
+            "forks": 0,
+            "forks_count": 0,
+            "forks_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/forks",
+            "full_name": "maximeblen654-boop/AI-Gateway-public",
+            "git_commits_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/git/commits{/sha}",
+            "git_refs_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/git/refs{/sha}",
+            "git_tags_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/git/tags{/sha}",
+            "git_url": "git://github.com/maximeblen654-boop/AI-Gateway-public.git",
+            "has_discussions": false,
+            "has_downloads": false,
+            "has_issues": true,
+            "has_pages": false,
+            "has_projects": true,
+            "has_pull_requests": true,
+            "has_wiki": true,
+            "homepage": null,
+            "hooks_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/hooks",
+            "html_url": "https://github.com/maximeblen654-boop/AI-Gateway-public",
+            "id": 1409253120,
+            "is_template": false,
+            "issue_comment_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/issues/comments{/number}",
+            "issue_events_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/issues/events{/number}",
+            "issues_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/issues{/number}",
+            "keys_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/keys{/key_id}",
+            "labels_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/labels{/name}",
+            "language": "Go",
+            "languages_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/languages",
+            "license": {
+              "key": "lgpl-3.0",
+              "name": "GNU Lesser General Public License v3.0",
+              "node_id": "MDc6TGljZW5zZTEy",
+              "spdx_id": "LGPL-3.0",
+              "url": "https://api.github.com/licenses/lgpl-3.0"
+            },
+            "merges_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/merges",
+            "milestones_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/milestones{/number}",
+            "mirror_url": null,
+            "name": "AI-Gateway-public",
+            "node_id": "R_kgDOU_9_AA",
+            "notifications_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/notifications{?since,all,participating}",
+            "open_issues": 0,
+            "open_issues_count": 0,
+            "owner": {
+              "avatar_url": "https://avatars.githubusercontent.com/u/287436861?v=4",
+              "events_url": "https://api.github.com/users/maximeblen654-boop/events{/privacy}",
+              "followers_url": "https://api.github.com/users/maximeblen654-boop/followers",
+              "following_url": "https://api.github.com/users/maximeblen654-boop/following{/other_user}",
+              "gists_url": "https://api.github.com/users/maximeblen654-boop/gists{/gist_id}",
+              "gravatar_id": "",
+              "html_url": "https://github.com/maximeblen654-boop",
+              "id": 287436861,
+              "login": "maximeblen654-boop",
+              "node_id": "U_kgDOESHwPQ",
+              "organizations_url": "https://api.github.com/users/maximeblen654-boop/orgs",
+              "received_events_url": "https://api.github.com/users/maximeblen654-boop/received_events",
+              "repos_url": "https://api.github.com/users/maximeblen654-boop/repos",
+              "site_admin": false,
+              "starred_url": "https://api.github.com/users/maximeblen654-boop/starred{/owner}{/repo}",
+              "subscriptions_url": "https://api.github.com/users/maximeblen654-boop/subscriptions",
+              "type": "User",
+              "url": "https://api.github.com/users/maximeblen654-boop",
+              "user_view_type": "public"
+            },
+            "private": false,
+            "pull_request_creation_policy": "all",
+            "pulls_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/pulls{/number}",
+            "pushed_at": "2026-10-13T22:20:27Z",
+            "releases_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/releases{/id}",
+            "size": 116600,
+            "ssh_url": "git@github.com:maximeblen654-boop/AI-Gateway-public.git",
+            "stargazers_count": 0,
+            "stargazers_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/stargazers",
+            "statuses_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/statuses/{sha}",
+            "subscribers_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/subscribers",
+            "subscription_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/subscription",
+            "svn_url": "https://github.com/maximeblen654-boop/AI-Gateway-public",
+            "tags_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/tags",
+            "teams_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/teams",
+            "topics": [],
+            "trees_url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public/git/trees{/sha}",
+            "updated_at": "2026-10-07T21:04:39Z",
+            "url": "https://api.github.com/repos/maximeblen654-boop/AI-Gateway-public",
+            "visibility": "public",
+            "watchers": 0,
+            "watchers_count": 0,
+            "web_commit_signoff_required": false
+          },
+          "sender": {
+            "avatar_url": "https://avatars.githubusercontent.com/u/287436861?v=4",
+            "events_url": "https://api.github.com/users/maximeblen654-boop/events{/privacy}",
+            "followers_url": "https://api.github.com/users/maximeblen654-boop/followers",
+            "following_url": "https://api.github.com/users/maximeblen654-boop/following{/other_user}",
+            "gists_url": "https://api.github.com/users/maximeblen654-boop/gists{/gist_id}",
+            "gravatar_id": "",
+            "html_url": "https://github.com/maximeblen654-boop",
+            "id": 287436861,
+            "login": "maximeblen654-boop",
+            "node_id": "U_kgDOESHwPQ",
+            "organizations_url": "https://api.github.com/users/maximeblen654-boop/orgs",
+            "received_events_url": "https://api.github.com/users/maximeblen654-boop/received_events",
+            "repos_url": "https://api.github.com/users/maximeblen654-boop/repos",
+            "site_admin": false,
+            "starred_url": "https://api.github.com/users/maximeblen654-boop/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/maximeblen654-boop/subscriptions",
+            "type": "User",
+            "url": "https://api.github.com/users/maximeblen654-boop",
+            "user_view_type": "public"
+          },
+          "workflow": ".github/workflows/native-media-candidate.yml"
+        },
+        "github_job": "candidate",
+        "github_ref": "refs/heads/codex/studio-native-media",
+        "github_ref_name": "codex/studio-native-media",
+        "github_ref_protected": "false",
+        "github_ref_type": "branch",
+        "github_repository": "maximeblen654-boop/AI-Gateway-public",
+        "github_repository_id": "1409253120",
+        "github_repository_owner": "maximeblen654-boop",
+        "github_repository_owner_id": "287436861",
+        "github_run_attempt": "1",
+        "github_run_id": "38477125329",
+        "github_run_number": "76",
+        "github_runner_arch": "X64",
+        "github_runner_environment": "github-hosted",
+        "github_runner_image_os": "ubuntu24",
+        "github_runner_image_version": "20261004.327.1",
+        "github_runner_name": "GitHub Actions 1000001633",
+        "github_runner_os": "Linux",
+        "github_runner_tracking_id": "github_b60a356b-a80e-4a62-a2f9-27c7c33a66a5",
+        "github_server_url": "https://github.com",
+        "github_triggering_actor": "maximeblen654-boop",
+        "github_workflow": "Native media candidate (no deployment)",
+        "github_workflow_ref": "maximeblen654-boop/AI-Gateway-public/.github/workflows/native-media-candidate.yml@refs/heads/codex/studio-native-media",
+        "github_workflow_sha": "b2914805ba6e9f3ebe9c716167e55153827b5969",
+        "platform": "linux/amd64"
+      }
+    }
+  },
+  "buildx.build.ref": "builder-6b84a716-ec1f-4136-98bc-d107be12a409/builder-6b84a716-ec1f-4136-98bc-d107be12a4090/bui3deqlb1b06zi50vnoyka0z",
+  "containerimage.config.digest": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+  "containerimage.descriptor": {
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "digest": "sha256:b4ee8e9989f12b4481a7f34aab289d9518e92e5b9e338b7e241f622d9be1c687",
+    "size": 2757,
+    "annotations": {
+      "org.opencontainers.image.created": "2026-10-13T22:25:41Z"
+    },
+    "platform": {
+      "architecture": "amd64",
+      "os": "linux"
+    }
+  },
+  "containerimage.digest": "sha256:b4ee8e9989f12b4481a7f34aab289d9518e92e5b9e338b7e241f622d9be1c687",
+  "image.name": "docker.io/library/native-candidate-core:40310e2961a5e8150e0c9df4cc86bb8087406c06"
+}

@@ -1,0 +1,222 @@
+{
+  "core_image_id": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+  "resources": [
+    {
+      "path": "/assets/index-CimToEry.css",
+      "bytes": 292998,
+      "sha256": "8e879186d2fc76a1de025a5c9adb10a8c9466b9ce6d1014048e571644caf0eb1",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/vendor-misc-DB0Q8XAf.css",
+      "bytes": 3938,
+      "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/index-7ojwfWpC.js",
+      "bytes": 194141,
+      "sha256": "f16325b02aa8831ae6aa57bd9f818b68572154ad7bfd2472bd941529d67227ac",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/vendor-vue-DeI_Ip_v.js",
+      "bytes": 113799,
+      "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+      "bytes": 63323,
+      "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/vendor-misc-CeAxBZ0e.js",
+      "bytes": 279017,
+      "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/index-DDfo002m.js",
+      "bytes": 413892,
+      "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/AuthLayout-B6ZiYKjM.css",
+      "bytes": 523,
+      "sha256": "fd702f466c23c7eaec04f358d8631d348075d1563df805687a1b0a5ca796b782",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+      "bytes": 228,
+      "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/useClipboard-DUfq-q8i.js",
+      "bytes": 917,
+      "sha256": "02335a1d6f7ca2547cef41d55f1514db0feb97ed5a40a0d0c0b664c17408dc4b",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoginView-CZaET0_y.js",
+      "bytes": 17928,
+      "sha256": "693a3c8104c6a262d69ec46deb056ab37b421bc2122177e09dfe181a9662457b",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/AuthLayout-Ck1K0R3D.js",
+      "bytes": 2420,
+      "sha256": "7e008161cc5f6d342a2d45f35d0c854a585076c8215abce76e114c6ba4922f3e",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/AppHeader-C7aWrA1h.css",
+      "bytes": 13615,
+      "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoginView-mYEDiWCN.css",
+      "bytes": 200,
+      "sha256": "96de8eb2802f0665e11e1cfd66ac0fcebd9d351c19c8051dd3913876ebc8af38",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoginAgreementPrompt-DhEkaHwn.css",
+      "bytes": 508,
+      "sha256": "e1a547e6e2a48ac77b7e78648aba36e1cff355613de73f332c9c35b5139445af",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/CaptchaChallenge-BmkiKxf7.css",
+      "bytes": 1401,
+      "sha256": "7ad582c21fe51460913dfdb03ca27b6c1e34e0c151b89d7f6aa62c7121183b8f",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoginAgreementPrompt-Dd7u3-2L.js",
+      "bytes": 16271,
+      "sha256": "6240364267349c7a66d4d3483a9e88b0021bf1509c1f61cef18ef351deef4a57",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/oauthAffiliate-CrlUwkd1.js",
+      "bytes": 1197,
+      "sha256": "1ba453f05da3a376c7fed82fc6850b45a6f8c0d4a600bff7938917804806af89",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/apiError-zX02PgX9.js",
+      "bytes": 1212,
+      "sha256": "2b13e47dc6627eb34e647e3d20bf06c6817dc8831c6e0f1aed9c5823bd7eded3",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-DqGXAlJC.js",
+      "bytes": 10787,
+      "sha256": "6bd68490a8dd33a401e0f4315c9fee6d655bd6a41883d0348e3a0a7e89a0ee71",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/usage-DxhsLzzF.js",
+      "bytes": 1882,
+      "sha256": "90ec346705dd191dc5ca76fbefba1e8bd1bcaebe8b65b29483c6bb819d8e2442",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/DashboardView-DZ5sr8f8.js",
+      "bytes": 27006,
+      "sha256": "86dc99e5de96992c864fe80edcdb270d46315086f99ad54711d91c7891bcee7e",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-qAXcaKzo.js",
+      "bytes": 104141,
+      "sha256": "12a085761ea882dc94ce6c8b36c254b8ef02f469a640ca27dc89396c0c515e8f",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/TokenUsageTrend-Ci85YOuO.css",
+      "bytes": 9161,
+      "sha256": "f566e2ca595ffb156f0135b7b0864c1432f4170d015bbae4bc5b50e8cfa7d4a1",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LocaleSwitcher-Bgf5RUWi.js",
+      "bytes": 2345,
+      "sha256": "f9b818ace1bb10238098c6e67e5354d61789cc709cf5037f4f30e93769f048c3",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoadingSpinner-CQ95u_Uc.js",
+      "bytes": 828,
+      "sha256": "fd9316ede553194b5ca43113b16918fb9ce5332fbd8fb6d4a7fa894cbac8cf83",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/LoadingSpinner-DT-rtrW_.css",
+      "bytes": 267,
+      "sha256": "d65d063476e8e82f9b0fc783eb879d9c067a4416f877de4b80162013ddf326ce",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/Select-vfjFHKfA.css",
+      "bytes": 9840,
+      "sha256": "f7d4a7bc7d47b6a2fe4ca6b91b25d7dd239b6f92f8df8377a5577c4d926d4ac4",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-DR5d3yEo.js",
+      "bytes": 8018,
+      "sha256": "a3e7d562d5cfb70b702437f45742d39e0d273916f87a6da97fb93edc3864e945",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/VideoStudioView-DmaQAYtM.css",
+      "bytes": 21867,
+      "sha256": "af4910cb4a4fb38946ca0f544a13298c08572b7241a2584da10c30ae10887165",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/VideoStudioView-XyPpYQU6.js",
+      "bytes": 44408,
+      "sha256": "f30bc4999bb71078ba5689da3c37aa1fd778eb3130d01e54b1b86c1412852ffe",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/Select-DcA5nR6P.js",
+      "bytes": 8032,
+      "sha256": "55db8f17bca48359892e89fcc3d6f6187cf5b0f8c54f8e2f0c7167f76d01dff8",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/user-B3itUwJ9.js",
+      "bytes": 2057,
+      "sha256": "c9794f46429b0f49ce4605acedf76be48d142342aae8a0979d1bc66c974543d7",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-PWsvipse.js",
+      "bytes": 1709,
+      "sha256": "dd04cb966574ae449f3b4d419b1e4671fdb8e5c177cf15bba3ef2d1c2d62f2c0",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/MediaWorkbenchView--FAIV-X_.css",
+      "bytes": 22105,
+      "sha256": "d63929d94e25288a921d73bf1e6e806723563faa7144b228bb5baab1128fd2b1",
+      "direct_core_equal": true
+    },
+    {
+      "path": "/assets/MediaWorkbenchView-lyz2jGST.js",
+      "bytes": 98419,
+      "sha256": "5917d7c8d4657aa770ffcf0745ed434b99b45ce38df0e7637d7907d78643533b",
+      "direct_core_equal": true
+    }
+  ],
+  "verification": "Browser response bytes equal direct 28180 Core bytes; workspace/admin entry chunks required; inaccessible navigation-discarded preload bodies not counted"
+}

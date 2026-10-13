@@ -1,0 +1,47 @@
+{
+  "status": "PASS",
+  "manifest_sha256": "fe55c4ed2e5a11a9cf16cbbbc0cda5113fa4bc8fcbb43d94f2b66effbd8a306c",
+  "directory": "D:\\AI-Gateway-candidate-40310e296-final",
+  "archives": [
+    {
+      "component": "core",
+      "tar": "core-40310e2961a5e8150e0c9df4cc86bb8087406c06.tar.gz",
+      "sha256": "ada61c908172f1d6b7cc35b50979137ea85441c980157a3d1a0eefc72c8e0dec",
+      "image_id": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+      "oci": [
+        {
+          "manifest_digest": "sha256:4226192373d58d843be944c82ef7f2c0940771c61a9c80a311df532eb4c59ef3",
+          "config_digest": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "component": "bridge",
+      "tar": "bridge-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "sha256": "30ba9310b18f1da057d9d7515d5d4eddea15c32077c234c848a2cbf36c9b4b35",
+      "image_id": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda",
+      "oci": [
+        {
+          "manifest_digest": "sha256:caa90294c79db4253b8cdb97bb920a255afc9c3797555d0c18d55e6a7ffc9e25",
+          "config_digest": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "component": "bff",
+      "tar": "bff-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "sha256": "29a1da9fa2ee0229cc352a0bbda2dbaa11735f80f291f65dc7f36a8dac6402f7",
+      "image_id": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21",
+      "oci": [
+        {
+          "manifest_digest": "sha256:cc7ae2120821e12ef687847408718bc2547c2f12ab9c05b2dd6609bb41e0344a",
+          "config_digest": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21"
+        }
+      ],
+      "status": "PASS"
+    }
+  ],
+  "local_docker_load_or_build": false
+}

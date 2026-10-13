@@ -1,0 +1,78 @@
+{
+  "scope": "isolated-only; not a production compose",
+  "runtime_source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+  "script_sha": "4f35d35d5cac7deaccddd5465b93bdaac709dd04",
+  "frontend": "Core embedded resources through loopback proxy",
+  "vite": false,
+  "browser_api_mocking": false,
+  "services": {
+    "postgres": {
+      "image": "postgres:18-alpine",
+      "volumes": [
+        "native_pg_20261012:/var/lib/postgresql"
+      ]
+    },
+    "redis": {
+      "image": "redis:8-alpine"
+    },
+    "core": {
+      "image": "native-candidate-core:40310e2961a5e8150e0c9df4cc86bb8087406c06",
+      "ports": [
+        "127.0.0.1:28180:8080",
+        "127.0.0.1:28182:8091",
+        "127.0.0.1:28183:4173"
+      ],
+      "volumes": [
+        "native_core_20261012:/app/data",
+        "./evidence/simulator-ca.crt:/app/data/simulator-ca.crt:ro"
+      ],
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "simulator": {
+      "image": "node:22-alpine",
+      "network_mode": "service:core",
+      "volumes": [
+        "./evidence:/evidence",
+        "./runtime:/native:ro"
+      ],
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "bridge": {
+      "image": "native-candidate-bridge:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "network_mode": "service:core",
+      "volumes": [
+        "native_core_20261012:/app/data:ro"
+      ],
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "bff": {
+      "image": "native-candidate-bff:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "network_mode": "service:core",
+      "volumes": [
+        "native_assets_20261012:/state/assets",
+        "native_images_20261012:/state/images",
+        "native_videos_20261012:/state/videos"
+      ],
+      "depends_on": {
+        "bridge": {
+          "condition": "service_started"
+        }
+      }
+    }
+  }
+}

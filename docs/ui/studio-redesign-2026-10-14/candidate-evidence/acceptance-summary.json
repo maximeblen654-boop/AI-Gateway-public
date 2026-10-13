@@ -1,0 +1,175 @@
+{
+  "status": "PASS",
+  "runtime_source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+  "build_script_sha": "b2914805ba6e9f3ebe9c716167e55153827b5969",
+  "acceptance_script_sha": "4f35d35d5cac7deaccddd5465b93bdaac709dd04",
+  "build_run": 38477125329,
+  "build_artifact": 11857055200,
+  "acceptance_run": 38478831552,
+  "evidence_artifact": 11857001668,
+  "production_action": false,
+  "real_supplier_requests": 0,
+  "frontend": "Final Core embedded assets; no Vite and no browser API mocks",
+  "scenarios": [
+    {
+      "scenario": "image",
+      "quote_before_submit": {
+        "generated": 0,
+        "settled": 0,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "amount": {
+        "amount": "2.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "delivered": 3,
+      "generation_requests": 3,
+      "usage_delta": 1,
+      "balance_delta": 2.1,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "downloads": [
+        {
+          "bytes": 68,
+          "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+        },
+        {
+          "bytes": 68,
+          "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+        },
+        {
+          "bytes": 68,
+          "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+        }
+      ],
+      "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "refresh_does_not_generate_or_settle": true,
+      "video_playback": null,
+      "verified_resource_count": 31,
+      "chromium_unavailable_bodies_excluded": [
+        {
+          "path": "/assets/Select-DcA5nR6P.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        },
+        {
+          "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-PWsvipse.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        },
+        {
+          "path": "/assets/user-B3itUwJ9.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        },
+        {
+          "path": "/assets/vendor-chart-BykZcwza.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        }
+      ]
+    },
+    {
+      "scenario": "edit",
+      "quote_before_submit": {
+        "generated": 0,
+        "settled": 0,
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "amount": {
+        "amount": "1.40",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "delivered": 2,
+      "generation_requests": 2,
+      "usage_delta": 1,
+      "balance_delta": 1.4,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "downloads": [
+        {
+          "bytes": 68,
+          "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+        },
+        {
+          "bytes": 68,
+          "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+        }
+      ],
+      "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "refresh_does_not_generate_or_settle": true,
+      "video_playback": null,
+      "verified_resource_count": 34,
+      "chromium_unavailable_bodies_excluded": [
+        {
+          "path": "/assets/vendor-chart-BykZcwza.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        }
+      ]
+    },
+    {
+      "scenario": "video-compatible",
+      "quote_before_submit": {
+        "generated": 0,
+        "settled": 0,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "amount": {
+        "amount": "2.00",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "delivered": 1,
+      "generation_requests": 1,
+      "usage_delta": 1,
+      "balance_delta": 2.0,
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "downloads": [
+        {
+          "bytes": 1855,
+          "sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299"
+        }
+      ],
+      "repeat_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "refresh_does_not_generate_or_settle": true,
+      "video_playback": true,
+      "verified_resource_count": 34,
+      "chromium_unavailable_bodies_excluded": [
+        {
+          "path": "/assets/vendor-chart-BykZcwza.js",
+          "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+        }
+      ]
+    }
+  ],
+  "administrator": {
+    "checks": [
+      {
+        "kind": "image",
+        "account": 1,
+        "publish_above_models": true,
+        "account_scope_despite_search": true,
+        "confirmation_cancelled": true,
+        "navigation_preserved": true,
+        "mobile": true
+      },
+      {
+        "kind": "video",
+        "account": 4,
+        "publish_above_models": true,
+        "account_scope_despite_search": true,
+        "confirmation_cancelled": true,
+        "navigation_preserved": true,
+        "mobile": true
+      }
+    ],
+    "business_writes": [],
+    "status": "PASS"
+  },
+  "manual_visual_review": "Final candidate desktop, 390px customer/editor/video and administrator screenshots inspected; no overlap or horizontal overflow in settled layout. Synthetic PNG is black, synthetic MP4 is blue; neither is real supplier output."
+}

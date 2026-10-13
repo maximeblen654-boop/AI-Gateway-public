@@ -1,0 +1,90 @@
+{
+  "source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+  "build_script_sha": "b2914805ba6e9f3ebe9c716167e55153827b5969",
+  "acceptance_script_sha": "4f35d35d5cac7deaccddd5465b93bdaac709dd04",
+  "acceptance_scope": "studio-workspace-artifact",
+  "production_action": false,
+  "acceptance": "PASS",
+  "images": [
+    {
+      "archive_identity": {
+        "config_digest": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+        "config_file": "blobs/sha256/937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+        "repo_tags": [
+          "native-candidate-core:40310e2961a5e8150e0c9df4cc86bb8087406c06"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:4226192373d58d843be944c82ef7f2c0940771c61a9c80a311df532eb4c59ef3",
+            "config_digest": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "core",
+      "source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+      "disposition": "built",
+      "image_id": "sha256:937d75ef1933a6278db3434dfd5992ec452ad79aa0bd84b8d978b4c927e41132",
+      "platform": "linux/amd64",
+      "tag": "native-candidate-core:40310e2961a5e8150e0c9df4cc86bb8087406c06",
+      "tar": "core-40310e2961a5e8150e0c9df4cc86bb8087406c06.tar.gz",
+      "sha256": "ada61c908172f1d6b7cc35b50979137ea85441c980157a3d1a0eefc72c8e0dec",
+      "bytes": 61941931
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda",
+        "config_file": "blobs/sha256/dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda",
+        "repo_tags": [
+          "native-candidate-bridge:b2fcdac93afa6ae194ee81801a9b37813f8f39eb"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:caa90294c79db4253b8cdb97bb920a255afc9c3797555d0c18d55e6a7ffc9e25",
+            "config_digest": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bridge",
+      "source_sha": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "disposition": "reused",
+      "image_id": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda",
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bridge:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "tar": "bridge-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "sha256": "30ba9310b18f1da057d9d7515d5d4eddea15c32077c234c848a2cbf36c9b4b35",
+      "bytes": 19126414
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21",
+        "config_file": "blobs/sha256/e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21",
+        "repo_tags": [
+          "native-candidate-bff:b2fcdac93afa6ae194ee81801a9b37813f8f39eb"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:cc7ae2120821e12ef687847408718bc2547c2f12ab9c05b2dd6609bb41e0344a",
+            "config_digest": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bff",
+      "source_sha": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "disposition": "reused",
+      "image_id": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21",
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bff:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "tar": "bff-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "sha256": "29a1da9fa2ee0229cc352a0bbda2dbaa11735f80f291f65dc7f36a8dac6402f7",
+      "bytes": 120269341
+    }
+  ],
+  "original_build_manifest_sha256": "139b8c71ced5522399576d30222fc69e4ca409ddc4bba2872e28fcf0a32b030d",
+  "original_build_run": 38477125329,
+  "original_build_artifact": 11857055200,
+  "acceptance_run": "38478831552",
+  "images_rebuilt_or_reexported": false
+}
