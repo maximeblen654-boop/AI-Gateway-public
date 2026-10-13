@@ -62,6 +62,9 @@ function protectedState() {
         assert(prior.pass && prior.downloads.length > 0)
         const kind = scenario === 'image' ? 'image' : 'video'
         await page.goto(base + '/video-studio')
+        // onMounted restores the saved kind after ensureStudioSession; wait
+        // for the actual catalog just as the existing customer harness does.
+        await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
         await expect(page.getByTestId('studio-kind')).toBeEnabled()
         if (await page.getByTestId('studio-kind').inputValue() !== kind) await page.getByTestId('studio-kind').selectOption(kind)
         await page.locator(`[data-task-id="${prior.id}"]`).click()
