@@ -113,18 +113,40 @@ func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 	return r, ErrRuntimeBinding
 }
 
-// Enumerate the validator's executable cases rather than assuming the first
-// Cartesian spec survives an offer's exclusions.
+// Page previews are deliberately capped and cannot determine catalog eligibility.
+// Enumerate the owning published product's allowed specs using the validator's
+// existing bounded enumerator, including its combination exclusions.
 func PublishedImageOfferQuoteable(a *Account, offerID string) bool {
-	if a == nil || a.Config == nil || a.Config.Published == nil || !publishedReady(a) {
+	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
 		return false
 	}
 	p := a.Config.Published
-	v, _ := Validate(a, Draft{Revision: p.SourceDraftRevision, Products: p.Products}, p.PublishedAt)
-	for _, preview := range v.Previews {
-		if _, err := ResolvePublishedImageOffer(a, offerID, preview.Spec); err == nil {
-			return true
+	for _, offer := range p.Offers {
+		if offer.OfferID != offerID {
+			continue
 		}
+		if offer.MediaType != "image" || ValidateImageSalePrice(offer.SalePrice) != nil {
+			return false
+		}
+		for _, product := range p.Products {
+			if product.ProductID != offer.ProductID {
+				continue
+			}
+			cases, err := specs(product.Capabilities, maxCases)
+			if err != nil {
+				return false
+			}
+			for _, spec := range cases {
+				if !offer.Matches(spec) {
+					continue
+				}
+				if _, err := ResolvePublishedImageOffer(a, offerID, spec); err == nil {
+					return true
+				}
+			}
+			return false
+		}
+		return false
 	}
 	return false
 }

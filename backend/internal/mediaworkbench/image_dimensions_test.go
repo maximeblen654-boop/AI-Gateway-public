@@ -1,6 +1,7 @@
 package mediaworkbench
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -85,5 +86,48 @@ func TestGeometryWithoutMapsPreviewAndFrozenExecutionAgree(t *testing.T) {
 		if hits != 1 {
 			t.Fatalf("expected one offer for preview, got %d", hits)
 		}
+	}
+}
+
+func TestPublishedImageCatalogDoesNotUseTruncatedPreviews(t *testing.T) {
+	s, repo := validatorFixture(t)
+	first := validProduct()
+	first.AdapterConfig.SizeMappings = nil
+	first.Capabilities.Resolutions = []string{"1K", "2K", "4K"}
+	first.Capabilities.AspectRatios = []string{"1:1", "3:2", "16:9"}
+	first.Capabilities.Count = Range{1, 10}
+	first.Capabilities.References = References{Image: Range{0, 2}, TotalMax: 2}
+	first.PricingRules = nil
+	for _, res := range first.Capabilities.Resolutions {
+		first.PricingRules = append(first.PricingRules, PricingRule{Match: Match{Resolution: []string{res}}, SalePrice: &Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}})
+	}
+	second := first
+	second.ProductID = "independent"
+	second.Capabilities.Resolutions = []string{"2K"}
+	second.PricingRules = []PricingRule{{SalePrice: &Price{Amount: "1.30", Currency: "CNY", BillingMode: "per_request"}}}
+	ctx := context.Background()
+	d, err := s.SaveDraft(ctx, 7, repo.a.Config.RecordVersion, DraftInput{Products: []Product{first, second}})
+	must(t, err)
+	if !d.Config.Validation.PublishReady || len(d.Config.Validation.Previews) != maxPreviews {
+		t.Fatalf("expected truncated but valid preview: %+v", d.Config.Validation)
+	}
+	d, err = s.Publish(ctx, 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	must(t, err)
+	_, err = s.SetSales(ctx, 7, d.Config.RecordVersion, true)
+	must(t, err)
+	if len(repo.a.Config.Published.Offers) != 4 {
+		t.Fatal("expected all four price offers")
+	}
+	for _, o := range repo.a.Config.Published.Offers {
+		if !PublishedImageOfferQuoteable(&repo.a, o.OfferID) {
+			t.Fatalf("valid offer hidden by preview cap: %s %v", o.ProductID, o.SpecMatch.Resolution)
+		}
+	}
+	if PublishedImageOfferQuoteable(&repo.a, "missing") {
+		t.Fatal("unknown offer admitted")
+	}
+	repo.a.Config.Sales.Enabled = false
+	if PublishedImageOfferQuoteable(&repo.a, repo.a.Config.Published.Offers[0].OfferID) {
+		t.Fatal("paused sales admitted")
 	}
 }
