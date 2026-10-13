@@ -32,6 +32,8 @@ const dc = args => run('docker', ['compose', '-p', 'ai-gateway-native-20261012',
 const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 fs.mkdirSync(evidence, { recursive: true })
 fs.mkdirSync(out, { recursive: true })
+// Small evidence can carry exact existing identities without duplicating TARs.
+fs.copyFileSync(path.join(artifactDir, 'manifest.json'), path.join(out, 'manifest-tested-candidate.json'))
 for (const image of manifest.images) {
   const tar = path.join(artifactDir, image.tar)
   assert(fs.existsSync(tar), `missing ${image.tar}`)

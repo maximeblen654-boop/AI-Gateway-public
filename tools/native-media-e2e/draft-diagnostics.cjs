@@ -55,7 +55,9 @@ const execution = config => ({ mode: config?.mode ?? 'single', max: config?.max_
   }
   async function shot(name, target) {
     await page.evaluate(() => document.fonts.ready)
-    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'horizontal overflow')
+    // The shared AppLayout animates its desktop sidebar margin for 300ms.
+    // Wait for actual responsive layout; persistent overflow still fails.
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), { message: 'horizontal overflow after responsive layout settles', timeout: 3000 }).toBe(true)
     await target.scrollIntoViewIfNeeded()
     await target.screenshot({ path: `${root}/evidence/native-draft-${name}.png`, animations: 'disabled' })
   }

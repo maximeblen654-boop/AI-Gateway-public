@@ -63,7 +63,7 @@ jobs:
       - name: Install browser test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
           pnpm --dir frontend install --frozen-lockfile
       - name: Real candidate startup and non-paid business acceptance
         run: node tools/native-media-e2e/candidate.mjs verify
@@ -110,7 +110,7 @@ jobs:
       - name: Install browser test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
           pnpm --dir frontend install --frozen-lockfile
       - name: Accept the existing candidate without rebuilding
         env:
