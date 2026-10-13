@@ -61,7 +61,7 @@ jobs:
       NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.build_source_sha || github.sha }}
       NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.candidate-runtime
       NATIVE_REUSE_SOURCE_DIR: ${{ github.workspace }}/.candidate-reuse-source
-      NATIVE_REUSE_ARTIFACT_DIR: ${{ runner.temp }}/native-reuse-artifact
+      NATIVE_REUSE_ARTIFACT_DIR: ${{ github.workspace }}/.candidate-reuse-artifact
       NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.build_acceptance || 'standard' }}
     steps:
       - uses: actions/checkout@v6
