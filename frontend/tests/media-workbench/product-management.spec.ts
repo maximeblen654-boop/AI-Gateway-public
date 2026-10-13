@@ -40,6 +40,10 @@ for (const kind of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
     expect(await snapshot(page)).toEqual(before)
     for (const id of ['blank-1', 'blank-6', 'canvas-1', 'blank-3']) await page.getByTestId('product-select').selectOption(id)
     await expect(page.getByTestId('product-status')).toContainText('已停用')
+    if (width === 390) {
+      await expect(page.getByTestId('selected-product-description')).toBeVisible()
+      await expect(page.getByTestId('selected-product-description')).toContainText('商品 4')
+    }
     await options(page)
     await page.screenshot({ path: info.outputPath('blank-management.png'), fullPage: true })
     await page.getByTestId('remove-blank-product').click()

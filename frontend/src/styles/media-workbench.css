@@ -191,3 +191,6 @@
 .mw-product-management .btn, .mw-removal-notice .btn { white-space: normal; min-height: 44px; }
 .mw-product-options > summary:focus-visible, .mw-product-toggle input:focus-visible { outline: 3px solid rgb(var(--site-primary-500)); outline-offset: 3px; border-radius: .25rem; }
 @media (max-width: 640px) { .mw-product-management, .mw-removal-notice { padding: .9rem; } .mw-product-type-actions { flex-direction: column; align-items: stretch; } }
+
+.mw-product-description { display: none; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .mw-product-description { display: block; margin-top: .6rem; } }
