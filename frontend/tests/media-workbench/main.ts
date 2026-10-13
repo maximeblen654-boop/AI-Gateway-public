@@ -20,6 +20,7 @@ const initialDTO = management ? draftManagementSupplier(scenario.includes('VIDEO
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
 const savedManagement = management ? sessionStorage.getItem(scenario) : null
 const dto = savedManagement ? JSON.parse(savedManagement) as typeof initialDTO : initialDTO
+if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
 if (scenario.startsWith('WIZARD')) {

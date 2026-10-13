@@ -64,6 +64,14 @@
             <div><p class="mw-eyebrow">模型管理 · Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
             <div class="mw-selection-feedback" data-test="selected-account-summary"><strong>已选择账号</strong><span>#{{ detail.id }} · {{ detail.name }}</span></div>
           </div>
+          <section class="mw-account-publication" aria-label="Account 级配置发布" data-test="account-publication">
+            <div class="mw-publication-description">
+              <h3>发布 Account 配置</h3>
+              <p class="mw-muted">包含此 Account 的所有草稿商品，不限于当前搜索结果。发布前仍需通过校验并再次确认。</p>
+              <p class="mw-publication-note">发布配置不会自动开启销售</p>
+            </div>
+            <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+          </section>
           <div v-if="detail" class="mw-model-toolbar">
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
             <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
@@ -87,10 +95,6 @@
             <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
 
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
-          <div class="mw-action-card" data-test="account-publication">
-            <strong>Account 级发布与销售</strong><p class="mw-muted">发布会包含此 Account 的所有草稿商品；销售开关影响全部已发布商品。两者都需要单独确认。</p>
-            <button class="btn btn-secondary" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
-          </div>
         </section>
 
         <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page">
@@ -133,7 +137,7 @@
                   <p class="mw-muted">保存本 Account 的草稿（共 {{ products.length }} 个商品），由后台检查。不会发布、启售或发起生成。</p>
                   <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
                   <button class="btn btn-primary" data-test="save" :disabled="busy || deleted || conflict || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
-                  <button v-if="!dirty && config" type="button" class="btn btn-secondary" data-test="return-models" @click="backToModels">返回模型管理</button>
+                  <button v-if="!dirty && config" type="button" class="btn btn-secondary mw-return-models" data-test="return-models" @click="backToModels">← 返回模型列表</button>
                   <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果未确认，请重新读取后核对，不要重复发布。</p>
                 </div>
               </template>

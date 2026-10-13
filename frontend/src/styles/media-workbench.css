@@ -41,6 +41,7 @@
 .mw-selection-feedback span { font-weight: 700; overflow-wrap: anywhere; }
 .mw-selection-feedback small { color: var(--mw-muted); }
 .mw-back { margin-bottom: 1rem; }
+.media-workbench :is(.mw-back, .mw-return-models) { min-width: 10rem; min-height: 44px; padding: .7rem 1.1rem; font-size: .9rem; font-weight: 600; line-height: 1.4; white-space: nowrap; flex-shrink: 0; }
 .mw-model-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: .75rem 0 1.2rem; }
 .mw-model-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .75rem; }
 .mw-model-row { position: relative; min-height: 8rem; margin: 0; padding: 1rem; gap: .45rem; }
@@ -194,3 +195,14 @@
 
 .mw-product-description { display: none; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .mw-product-description { display: block; margin-top: .6rem; } }
+
+/* Account publication stays above the model list; sales remains a separate action. */
+.mw-account-publication { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; padding: 1.25rem; margin: 1rem 0 1.5rem; border: 1px solid rgb(var(--site-primary-500) / .5); border-radius: 1rem; background: var(--mw-soft); }
+.mw-publication-description { min-width: 0; }
+.mw-publication-description h3 { margin: 0 0 .4rem; font-size: 1.05rem; font-weight: 700; }
+.mw-publication-note { margin: .65rem 0 0; font-size: .875rem; font-weight: 600; color: var(--mw-text); }
+.media-workbench .mw-publish-action { flex-shrink: 0; min-width: 9rem; min-height: 44px; padding: .7rem 1.25rem; font-weight: 600; white-space: nowrap; }
+@media (max-width: 767px) {
+  .mw-account-publication { flex-direction: column; align-items: stretch; gap: 1rem; padding: 1rem; }
+  .mw-publish-action { width: 100%; }
+}
