@@ -15,14 +15,15 @@ const scriptSha = process.env.GITHUB_SHA
 assert.match(scriptSha, /^[a-f0-9]{40}$/)
 const candidateSha = process.env.NATIVE_CANDIDATE_SOURCE_SHA
 const draftOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'draft-diagnostics'
+const workspaceOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'studio-workspace'
 const managementOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'draft-management'
-assert.equal(candidateSha, managementOnly ? 'b2fcdac93afa6ae194ee81801a9b37813f8f39eb' : draftOnly ? 'e936b1675cc01cdeaafdfaa655e9ff430b6d51e8' : '64d9b523520f087cea31a216e7db65e64605ff7b')
+assert.equal(candidateSha, (managementOnly || workspaceOnly) ? 'b2fcdac93afa6ae194ee81801a9b37813f8f39eb' : draftOnly ? 'e936b1675cc01cdeaafdfaa655e9ff430b6d51e8' : '64d9b523520f087cea31a216e7db65e64605ff7b')
 const artifactDir = path.resolve(process.argv[2] || '')
 assert(artifactDir && fs.existsSync(path.join(artifactDir, 'manifest.json')), 'candidate artifact directory is required')
 const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf8'))
 assert.equal(manifest.source_sha, candidateSha)
 assert.equal(manifest.production_action, false)
-assert(manifest.acceptance === 'PASS' || (managementOnly && manifest.acceptance === 'NOT_PASSED'), 'only the pinned draft candidate can be resumed after a harness failure')
+assert(manifest.acceptance === 'PASS' || ((managementOnly || workspaceOnly) && manifest.acceptance === 'NOT_PASSED'), 'only the pinned draft candidate can be resumed after a harness failure')
 assert.equal(manifest.images.length, 3)
 const root = path.join(process.env.RUNNER_TEMP, 'native-media-20261012')
 const evidence = path.join(root, 'evidence')
@@ -57,7 +58,7 @@ fs.copyFileSync('tools/native-media-e2e/simulator.mjs', path.join(root, 'runtime
 run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=localhost', '-addext', `subjectAltName=DNS:localhost,IP:${resultIP}`, '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
 fs.copyFileSync(path.join(evidence, 'simulator-cert.pem'), path.join(evidence, 'simulator-ca.crt'))
 run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(evidence, 'synthetic-original.mp4')])
-let proxy
+let proxy, workspacePreview
 try {
   dc(['up', '-d', '--wait', '--wait-timeout', '180', 'core'])
   const corePID = capture('docker', ['inspect', '--format', '{{.State.Pid}}', 'ai-gateway-native-core-20261012'])
@@ -71,6 +72,12 @@ try {
   dc(['up', '-d', '--wait', '--wait-timeout', '180'])
   const directHealth = await fetch('http://127.0.0.1:28180/health').then(r => r.status).catch(() => 0)
   assert.equal(directHealth, 200, `candidate frontend health unavailable: ${directHealth}`)
+  if(workspaceOnly){
+    process.env.NATIVE_WORKSPACE_UI='true'
+    workspacePreview=spawn(process.execPath,['frontend/node_modules/vite/bin/vite.js','--config','frontend/tests/studio-workspace/vite.config.ts'],{stdio:'inherit'})
+    for(let i=0;i<60;i++){if(await fetch('http://127.0.0.1:4295/tests/studio-workspace/live.html').then(r=>r.ok).catch(()=>false))break;await new Promise(r=>setTimeout(r,500))}
+    assert(await fetch('http://127.0.0.1:4295/tests/studio-workspace/live.html').then(r=>r.ok),'workspace preview must be ready')
+  }
   proxy = spawn(process.execPath, ['tools/native-media-e2e/proxy.mjs'], { stdio: ['ignore', 'pipe', 'pipe'] })
   let proxyOutput = ''
   proxy.stdout.on('data', chunk => { proxyOutput += chunk.toString() })
@@ -82,7 +89,15 @@ try {
   assert(await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false), `same-origin proxy did not become healthy: ${proxyOutput}`)
   run(process.execPath, ['tools/native-media-e2e/seed.mjs', root])
   let scenarios
-  if (managementOnly) {
+  if (workspaceOnly) {
+    run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
+    run(process.execPath, ['tools/native-media-e2e/draft-management.cjs', root, 'seed'])
+    for (const scenario of ['image', 'edit', 'video-compatible']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
+    const reports=['image','edit','video-compatible'].map(s=>JSON.parse(fs.readFileSync(path.join(evidence,`native-customer-${s}.json`),'utf8')))
+    assert(reports.every(r=>r.pass),'workspace real-backend acceptance failed')
+    scenarios=reports.map(r=>({scenario:r.scenario,task_id:r.id,quote:r.quote.sale_price,downloads:r.downloads,before:r.before,after:r.after,http:r.http}))
+    fs.writeFileSync(path.join(out,'workspace-ui-provenance.json'),JSON.stringify({frontend_source_sha:scriptSha,backend_source_sha:candidateSha,frontend_entry:'frontend/tests/studio-workspace/live.ts',browser_api_interception:false,upstream:'runner-local simulator',production_action:false},null,2))
+  } else if (managementOnly) {
     run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
     run(process.execPath, ['tools/native-media-e2e/draft-management.cjs', root, 'seed'])
     for (const scenario of ['image', 'video-compatible']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
@@ -130,7 +145,8 @@ try {
   throw error
 } finally {
   if (proxy) proxy.kill()
-  for (const name of fs.readdirSync(evidence).filter(n => /^native-(draft-|video-(compatible|seedance)|customer-video-(compatible|seedance)|supplier-state|browser).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
+  if(workspacePreview)workspacePreview.kill()
+  for (const name of fs.readdirSync(evidence).filter(n => /^native-(draft-|video-(compatible|seedance)|customer-(image|edit|video-(compatible|seedance))|supplier-state|browser).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
   try { dc(['down', '-v', '--remove-orphans']) } catch {}
 }
 console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))

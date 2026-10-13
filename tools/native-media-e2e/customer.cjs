@@ -6,6 +6,7 @@ const { chromium, expect } = require('../../frontend/node_modules/@playwright/te
 const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const base = 'http://127.0.0.1:28100'
+const workspace=process.env.NATIVE_WORKSPACE_UI==='true'
 const scenario = process.argv[3] || 'image'
 const geometryCases = {
   'image-geometry-1k': { resolution:'1K', ratio:'1:1', cents:70, count:3 },
@@ -39,13 +40,18 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
   try {
     await page.goto(base+'/login'); await page.getByLabel('邮箱').fill('native-customer@example.invalid'); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
     await page.getByRole('button', { name: '登录', exact: true }).click(); await page.waitForURL('**/dashboard')
-    const loadedHistory = video ? page.waitForResponse(r => r.url().endsWith('/studio-v2/api/video/operations') && r.request().method() === 'GET') : null
+    const loadedHistory = video && !workspace ? page.waitForResponse(r => r.url().endsWith('/studio-v2/api/video/operations') && r.request().method() === 'GET') : null
     await page.goto(base+'/video-studio')
     const existingTasks = loadedHistory ? await (await loadedHistory).json() : []
     await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
+    if(workspace){
+      await page.getByTestId(video?'studio-mode-video':scenario==='edit'||geometry?.edit?'studio-mode-edit':'studio-mode-text').click()
+      await expect(page.getByTestId('studio-model-toggle')).toBeEnabled()
+    }else{
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
     if ((await page.getByTestId('studio-kind').inputValue()) !== kind) await page.getByTestId('studio-kind').selectOption(kind)
     await expect(page.getByTestId('studio-kind')).toBeEnabled()
+    }
     if (recover) {
       await page.locator(`[data-task-id="${report.id}"]`).click()
       report.recovered = true
@@ -57,6 +63,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       await expect(page.getByTestId('studio-refresh')).toBeEnabled()
       await page.getByTestId('studio-new').click()
     } else if (await page.getByTestId('studio-new').isVisible()) await page.getByTestId('studio-new').click()
+    if(workspace)await page.getByTestId('studio-model-toggle').click()
     await expect(page.getByTestId('studio-offer-select')).toBeEnabled()
     const catalog = await page.evaluate(async kind => (await fetch(`/studio-v2/api/${kind}/catalog`, { headers: { 'X-Studio-Request': `${kind}-binding-v1` } })).json(), kind)
     report.catalog = catalog
@@ -66,14 +73,14 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.product_id === geometryProduct.product_id && o.spec.resolution.includes(geometry.resolution))))
     assert(offer, JSON.stringify(catalog))
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
-    if (!video) await page.getByTestId('studio-count').fill(String(count))
+    if (!video) {if(workspace)await page.getByTestId('studio-count').selectOption(String(count));else await page.getByTestId('studio-count').fill(String(count))}
     if (geometry) {
       await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
-      await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
+      if(workspace){await page.getByTestId('studio-ratio-toggle').click();await page.locator(`[data-ratio="${geometry.ratio}"]`).click()}else await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
     }
     if (scenario === 'edit' || geometry?.edit) {
       await page.getByTestId('studio-asset-input').setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') })
-      await expect(page.getByTestId('studio-kind')).toBeEnabled()
+      await expect(page.getByTestId(workspace?'studio-model-toggle':'studio-kind')).toBeEnabled()
     }
     await page.getByTestId('studio-prompt').fill(`SYNTHETIC native ${scenario} ${randomUUID()}`)
     report.before = { supplier: stats(), ledger: ledger() }
@@ -83,7 +90,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     report.id = report.quote.task_id || report.quote.operation_id
     assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents || 70))
     const submitted = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/tasks`) && r.request().method() === 'POST')
-    await page.getByTestId('studio-generate').click(); const submit = await submitted
+    await page.getByTestId(workspace?'studio-confirm-generate':'studio-generate').click(); const submit = await submitted
     report.submit = { status: submit.status(), body: await submit.json() }
     }
     await expect(page.getByTestId('studio-status')).toContainText('生成完成', { timeout: 60000 })
