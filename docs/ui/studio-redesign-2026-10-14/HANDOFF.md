@@ -151,5 +151,8 @@
 - 运行前端 / 验收脚本：`40310e2961a5e8150e0c9df4cc86bb8087406c06`，分支 `codex/studio-native-media`。
 - [真实隔离后端 Run 38472664634](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472664634)：PASS；证据 Artifact `11853315700`，209840 字节，有效至 `2026-10-27T21:45:10Z`。本目录摘要和截图为 Git 内保留版本。
 - 复用同一 b2fcdac 三组件镜像，实际 Vue 通过 Core/Bridge/BFF/PostgreSQL/Redis，只有上游为模拟器。通过新数量点选产生文生图 3 张（3 请求）、编辑 2 张（2 请求）、视频 1 条（1 提交）；分别合成扣费 2.10 / 1.40 / 2.00 CNY，各增加一条原生 usage。刷新、查询、重复下载的生成次数及账务不变，原片摘要与前述固定模拟素材一致；视频实际播放通过。
-- 本次 [Security 38472646470](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646470) PASS；[CI 38472646408](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646408) 前端 job（含 Typecheck、Lint 和已有集成检查）PASS；未变化的后端全仓 job 在证据归档时仍运行中，不能将局部通过标为整个 CI 通过。上一运行基线 1fb 的完整 CI 38470449973 已 PASS。后续证据提交不修改运行源码，不把文档提交标为被测镜像版本。
+- 本次 [Security 38472646470](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646470) PASS；[CI 38472646408](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646408) 已于本次交接核对时全部完成并 PASS（包含前端及后端 job）；归档时的后端等待状态已经结束。上一运行基线 1fb 的完整 CI 38470449973 也已 PASS。后续证据提交不修改运行源码，不把文档提交标为被测镜像版本。
 - 未构建新镜像、未重新导出 TAR、未部署或读取/改动生产，未发真实收费请求。当前可操作地址仍为上面的本地视觉预览；此次云端真实隔离栈已按 harness 结束，不能当作持续在线环境。
+
+
+给 ChatGPT 的集中审核入口：[REVIEW_HANDOFF.md](REVIEW_HANDOFF.md)。该文件区分生产基线、已验收前端源码、既有后端镜像与尚待准备的运行候选。
