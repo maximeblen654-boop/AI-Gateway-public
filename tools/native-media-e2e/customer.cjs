@@ -61,7 +61,9 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     const catalog = await page.evaluate(async kind => (await fetch(`/studio-v2/api/${kind}/catalog`, { headers: { 'X-Studio-Request': `${kind}-binding-v1` } })).json(), kind)
     report.catalog = catalog
     const offerModel = video ? videoModel : geometry ? 'gpt-image-2' : 'gemini-3.1-flash-image'
-    const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.display_name === (geometry.independent ? 'Synthetic geometry independent price' : 'Synthetic geometry image') && o.spec.resolution.includes(geometry.resolution))))
+    const geometryProduct = geometry ? JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json','utf8')).products.find(p=>p.display_name === (geometry.independent ? 'Synthetic geometry independent price' : 'Synthetic geometry image')) : null
+    assert(!geometry || geometryProduct, 'saved UI product identity is required')
+    const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.product_id === geometryProduct.product_id && o.spec.resolution.includes(geometry.resolution))))
     assert(offer, JSON.stringify(catalog))
     await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
     if (!video) await page.getByTestId('studio-count').fill(String(count))
