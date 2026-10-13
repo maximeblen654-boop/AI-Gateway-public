@@ -11,6 +11,12 @@ on:
         default: build
         type: choice
         options: [build, accept-existing]
+      acceptance_scenario:
+        description: 'existing-image acceptance scope'
+        required: false
+        type: choice
+        default: video
+        options: [video, draft-diagnostics]
       candidate_run_id:
         description: 'existing candidate run id (accept-existing only)'
         required: false
@@ -109,8 +115,9 @@ jobs:
       - name: Accept the existing candidate without rebuilding
         env:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
+          NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
         run: node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
-      - name: Save small video acceptance evidence only
+      - name: Save small acceptance evidence only
         if: always()
         uses: actions/upload-artifact@v4
         with:

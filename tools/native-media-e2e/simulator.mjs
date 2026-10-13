@@ -22,7 +22,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     const signedResult = req.method === 'GET' && /^\/v1\/videos\/seedance-task-\d+\/content$/.test(url.pathname) && url.searchParams.get('signature') === 'synthetic-result-only'
     if (signedResult) assert.equal(auth, 'missing', 'result download must not forward supplier credentials')
     if (auth === 'missing' && !signedResult) return reply(401, { error: 'synthetic_auth' })
-    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream'].map(id => ({ id, object: 'model' })) })
+    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['gpt-image-2', 'grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream'].map(id => ({ id, object: 'model' })) })
     if (req.method === 'GET' && url.pathname === '/v1beta/models') return reply(200, { models: [{ name: 'models/gemini-3.1-flash-image', displayName: 'Synthetic Gemini Image', supportedGenerationMethods: ['generateContent'] }] })
     if (req.method === 'POST' && url.pathname.endsWith(':generateContent')) {
       state.image_posts++; save()

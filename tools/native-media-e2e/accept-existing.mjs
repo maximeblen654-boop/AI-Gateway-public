@@ -14,7 +14,8 @@ assert.equal(process.env.GITHUB_REF, 'refs/heads/codex/studio-native-media')
 const scriptSha = process.env.GITHUB_SHA
 assert.match(scriptSha, /^[a-f0-9]{40}$/)
 const candidateSha = process.env.NATIVE_CANDIDATE_SOURCE_SHA
-assert.equal(candidateSha, '64d9b523520f087cea31a216e7db65e64605ff7b')
+const draftOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'draft-diagnostics'
+assert.equal(candidateSha, draftOnly ? 'e936b1675cc01cdeaafdfaa655e9ff430b6d51e8' : '64d9b523520f087cea31a216e7db65e64605ff7b')
 const artifactDir = path.resolve(process.argv[2] || '')
 assert(artifactDir && fs.existsSync(path.join(artifactDir, 'manifest.json')), 'candidate artifact directory is required')
 const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf8'))
@@ -76,20 +77,29 @@ try {
   }
   assert(await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false), `same-origin proxy did not become healthy: ${proxyOutput}`)
   run(process.execPath, ['tools/native-media-e2e/seed.mjs', root])
-  run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
-  run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video-compatible'])
-  run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video-seedance'])
-  run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'video-compatible'])
-  run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'video-seedance'])
-  const reports = ['video-compatible', 'video-seedance'].map(s => JSON.parse(fs.readFileSync(path.join(evidence, `native-customer-${s}.json`), 'utf8')))
-  assert(reports.every(r => r.pass && r.downloads.length === 1), 'video acceptance did not deliver one original')
-  const state = JSON.parse(fs.readFileSync(path.join(evidence, 'native-supplier-state.json'), 'utf8'))
-  assert.equal(state.video_posts, 2)
+  let scenarios
+  if (draftOnly) {
+    run(process.execPath, ['tools/native-media-e2e/draft-diagnostics.cjs', root])
+    const report = JSON.parse(fs.readFileSync(path.join(evidence, 'native-draft-diagnostics.json'), 'utf8'))
+    assert.equal(report.status, 'PASS')
+    scenarios = report.scenarios
+  } else {
+    run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
+    run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video-compatible'])
+    run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video-seedance'])
+    run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'video-compatible'])
+    run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'video-seedance'])
+    const reports = ['video-compatible', 'video-seedance'].map(s => JSON.parse(fs.readFileSync(path.join(evidence, `native-customer-${s}.json`), 'utf8')))
+    assert(reports.every(r => r.pass && r.downloads.length === 1), 'video acceptance did not deliver one original')
+    const state = JSON.parse(fs.readFileSync(path.join(evidence, 'native-supplier-state.json'), 'utf8'))
+    assert.equal(state.video_posts, 2)
+    scenarios = reports.map(r => ({ scenario: r.scenario, task_id: r.id, quote: r.quote.sale_price, request_count: r.after.supplier.video_posts - r.before.supplier.video_posts, downloads: r.downloads, ledger_before: r.before.ledger, ledger_after: r.after.ledger, http: r.http, upstream: state.requests }))
+  }
   const containers = JSON.parse(capture('docker', ['inspect', 'ai-gateway-native-core-20261012', 'ai-gateway-native-bridge-20261012', 'ai-gateway-native-bff-20261012']))
   for (const container of containers) assert.equal(container.State.Health.Status, 'healthy')
   assert.equal(containers[1].HostConfig.NetworkMode, `container:${containers[0].Id}`)
   assert.equal(containers[2].HostConfig.NetworkMode, `container:${containers[0].Id}`)
-  fs.writeFileSync(path.join(out, 'acceptance-existing.json'), JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha, candidate_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), scenarios: reports.map(r => ({ scenario: r.scenario, task_id: r.id, quote: r.quote.sale_price, request_count: r.after.supplier.video_posts - r.before.supplier.video_posts, downloads: r.downloads, ledger_before: r.before.ledger, ledger_after: r.after.ledger, http: r.http, upstream: state.requests.filter(request => request.body?.model === (r.scenario === 'video-compatible' ? 'synthetic-compatible-video' : 'synthetic-seedance-video') || request.path.includes(r.scenario === 'video-compatible' ? '/v1/videos' : '/api/v3/contents/generations/tasks')) })), containers: containers.map(c => ({ name: c.Name, image: c.Config.Image, image_id: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode })) }, null, 2))
+  fs.writeFileSync(path.join(out, 'acceptance-existing.json'), JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha, candidate_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), scenarios, containers: containers.map(c => ({ name: c.Name, image: c.Config.Image, image_id: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode })) }, null, 2))
 } catch (error) {
   try {
     fs.writeFileSync(path.join(out, 'compose-logs-failure.txt'), capture('docker', ['compose', '-p', 'ai-gateway-native-20261012', '-f', path.join(root, 'compose.json'), 'logs', '--no-color', '--tail', '250', 'core', 'bridge', 'bff']))
@@ -97,7 +107,7 @@ try {
   throw error
 } finally {
   if (proxy) proxy.kill()
-  for (const name of fs.readdirSync(evidence).filter(n => /^native-(video-(compatible|seedance)|customer-video-(compatible|seedance)|supplier-state|browser).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
+  for (const name of fs.readdirSync(evidence).filter(n => /^native-(draft-|video-(compatible|seedance)|customer-video-(compatible|seedance)|supplier-state|browser).*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
   try { dc(['down', '-v', '--remove-orphans']) } catch {}
 }
 console.log(JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha }))
