@@ -180,6 +180,81 @@ describe('Media Workbench page flow', () => {
     expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-2')
   })
 
+  it('keeps product identity and collection stable while changing independent execution limits', async () => {
+    const dto = supplier()
+    const blank = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
+    blank.product_id = 'canvas-blank'
+    blank.display_name = ''
+    blank.pricing_rules = []
+    dto.media_workbench_v1!.draft.products.push(blank)
+    dto.media_workbench_v1!.published!.products!.push(JSON.parse(JSON.stringify(blank)))
+    api.suppliers.mockResolvedValue([dto]); api.detail.mockResolvedValue(dto)
+    const response = JSON.parse(JSON.stringify(dto))
+    response.media_workbench_v1.record_version = 4
+    response.media_workbench_v1.draft.revision = 'mwd_b'
+    response.media_workbench_v1.validation.draft_revision = 'mwd_b'
+    api.saveDraft.mockResolvedValue(response)
+
+    await openEditor()
+    const trace: Array<{ step: string; productCount: number; ids: string[]; selected: string }> = []
+    const record = (step: string) => {
+      const select = wrapper.get('[data-test="product-select"]')
+      const options = select.findAll('option')
+      trace.push({
+        step,
+        productCount: options.length,
+        ids: options.map(option => (option.element as HTMLOptionElement).value).sort(),
+        selected: (select.element as HTMLSelectElement).value
+      })
+    }
+    record('initial configured + blank')
+    await wrapper.get('[data-test="product-select"]').setValue('canvas-blank')
+    await flushPromises()
+    record('select blank')
+    await wrapper.get('[data-test="product-select"]').setValue('canvas-1')
+    await flushPromises()
+    record('select configured')
+    await wrapper.get('[data-test="image-execution-mode"]').setValue('native_multi')
+    await wrapper.get('[data-test="image-execution-max"]').setValue(10)
+    await flushPromises()
+    record('text 10')
+    await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('native_multi')
+    await wrapper.get('[data-test="image-edit-execution-max"]').setValue(1)
+    await flushPromises()
+    record('edit 1')
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    const body = api.saveDraft.mock.calls[0]![2] as Array<{ product_id: string; adapter_config: { execution?: unknown; edit_execution?: unknown } }>
+    expect(body.map(product => product.product_id).sort()).toEqual(['canvas-1', 'canvas-blank'])
+    expect(body).toHaveLength(2)
+    expect(trace).toEqual([
+      { step: 'initial configured + blank', productCount: 2, ids: ['canvas-1', 'canvas-blank'], selected: 'canvas-1' },
+      { step: 'select blank', productCount: 2, ids: ['canvas-1', 'canvas-blank'], selected: 'canvas-blank' },
+      { step: 'select configured', productCount: 2, ids: ['canvas-1', 'canvas-blank'], selected: 'canvas-1' },
+      { step: 'text 10', productCount: 2, ids: ['canvas-1', 'canvas-blank'], selected: 'canvas-1' },
+      { step: 'edit 1', productCount: 2, ids: ['canvas-1', 'canvas-blank'], selected: 'canvas-1' }
+    ])
+    expect(body.find(product => product.product_id === 'canvas-1')?.adapter_config.execution).toEqual({ mode: 'native_multi', max_output_images: 10 })
+    expect(body.find(product => product.product_id === 'canvas-1')?.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 1 })
+    expect(body.find(product => product.product_id === 'canvas-blank')?.adapter_config.execution).toBeUndefined()
+  })
+
+  it('keeps a single product when independent execution limits are edited and saved', async () => {
+    await openEditor()
+    expect(wrapper.find('[data-test="product-select"]').exists()).toBe(false)
+    await wrapper.get('[data-test="image-execution-mode"]').setValue('native_multi')
+    await wrapper.get('[data-test="image-execution-max"]').setValue(2)
+    await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('native_multi')
+    await wrapper.get('[data-test="image-edit-execution-max"]').setValue(1)
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    const body = api.saveDraft.mock.calls[0]![2] as Array<{ product_id: string; adapter_config: { execution?: unknown; edit_execution?: unknown } }>
+    expect(body).toHaveLength(1)
+    expect(body[0]?.product_id).toBe('canvas-1')
+    expect(body[0]?.adapter_config.execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
+    expect(body[0]?.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 1 })
+  })
+
   it('keeps internal product identities out of model and product selection UI', async () => {
     const dto = supplier()
     const second = JSON.parse(JSON.stringify(dto.media_workbench_v1!.draft.products[0]))
@@ -247,6 +322,53 @@ describe('Media Workbench page flow', () => {
     expect(wrapper.get('[data-test="advanced-technical"]').attributes('open')).toBeDefined()
     expect(wrapper.get(`[data-field="capabilities.${field}"]`).attributes('open')).toBeDefined()
     expect(wrapper.get(`[data-field="capabilities.${field}"]`).element.contains(document.activeElement)).toBe(true)
+  })
+
+  it.each(['image', 'video'])('labels missing prices with their actual %s product and locates it without changing prices', async mediaType => {
+    const dto = supplier(77, 'FAIL')
+    const first = dto.media_workbench_v1!.draft.products[0]!
+    first.media_type = mediaType
+    first.display_name = '已配置商品'
+    const blank = JSON.parse(JSON.stringify(first))
+    blank.product_id = 'media-blank-private'
+    blank.display_name = '待配置商品'
+    blank.pricing_rules = []
+    dto.media_workbench_v1!.draft.products.push(blank)
+    dto.media_workbench_v1!.validation.diagnostics = [{
+      class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_PRICE', scope: blank.product_id,
+      path: 'pricing_rules', message: 'Some allowed specifications have no sale price', action: '填写缺少的单价',
+      specs: [{ resolution: '4K', aspect_ratio: '16:9', quality: '', duration_seconds: mediaType === 'video' ? 5 : 0, count: 1, images: 0, videos: 0, audio: 0 }], spec_count: 1
+    }]
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    expect(wrapper.get('[data-test="diagnostic-product"]').text()).toContain('待配置商品')
+    expect(wrapper.get('[data-test="diagnostic-product"]').text()).not.toContain('media-blank-private')
+    expect(wrapper.get('[data-test="diagnostic-spec"]').text()).toContain('4K · 16:9')
+    await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="product-select"]').element).toHaveProperty('value', blank.product_id)
+    expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
+    expect(wrapper.get('[data-test="price-0"]').element).toHaveProperty('value', '')
+    await wrapper.get('[data-test="product-select"]').setValue(first.product_id); await flushPromises()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
+    expect(wrapper.get('[data-test="price-0"]').element).toHaveProperty('value', '0.18')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('locates an edit count diagnostic at the edit numeric input', async () => {
+    const dto = supplier(77, 'FAIL')
+    dto.media_workbench_v1!.draft.products[0]!.adapter_config.edit_execution = { mode: 'native_multi', max_output_images: 1 }
+    Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, {
+      code: 'IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID', scope: 'canvas-1', path: 'adapter_config.edit_execution.max_output_images'
+    })
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="advanced-technical"]').attributes('open')).toBeDefined()
+    expect(wrapper.get('[data-test="image-execution-advanced"]').attributes('open')).toBeDefined()
+    expect(document.activeElement).toBe(wrapper.get('[data-test="image-edit-execution-max"]').element)
+    expect(wrapper.get('[data-test="adapter-status"]').text()).not.toContain('尚未接通')
   })
 
   it.each([

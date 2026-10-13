@@ -25,6 +25,15 @@ describe('strict Media Workbench API boundary', () => {
     const p = copy(imageProduct); p.pricing_rules = [{ match: {}, sale_price: null }, { match: {}, sale_price: { amount: '0', currency: 'CNY', billing_mode: 'per_request' } }, { match: {}, sale_price: { amount: '0.12345678901234567890', currency: 'CNY', billing_mode: 'per_request' } }]
     expect(draftInput([p]).products[0]!.pricing_rules).toEqual(p.pricing_rules)
   })
+  it('preserves an explicitly invalid zero output limit for server diagnostics', () => {
+    const p = copy(imageProduct)
+    p.adapter_config.execution = { mode: 'native_multi', max_output_images: 0 }
+    p.adapter_config.edit_execution = { mode: 'native_multi', max_output_images: 0 }
+    expect(draftInput([p]).products[0]!.adapter_config).toMatchObject({
+      execution: { mode: 'native_multi', max_output_images: 0 },
+      edit_execution: { mode: 'native_multi', max_output_images: 0 }
+    })
+  })
   it('accepts added response fields without rejecting the response', async () => {
     const dto = { ...supplier(), future_summary: { state: 'new-state' } }; client.get.mockResolvedValue({ data: dto })
     expect(await mediaWorkbenchAPI.detail(77)).toEqual(dto)

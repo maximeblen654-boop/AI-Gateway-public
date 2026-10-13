@@ -138,6 +138,19 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 		{"precision", "INVALID_PRICE", "UI_FIXABLE", func(_ *Account, p *Product) { p.PricingRules[0].SalePrice.Amount = "1e-9" }},
 		{"negative", "INVALID_PRICE", "UI_FIXABLE", func(_ *Account, p *Product) { p.PricingRules[0].SalePrice.Amount = "-1" }},
 		{"unsupported duration", "PARAMETER_TYPE_UNSUPPORTED", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) { p.Capabilities.DurationsSeconds = []int{15} }},
+		{"invalid native multi output limit", "IMAGE_EXECUTION_CAPABILITY_INVALID", "UI_FIXABLE", func(_ *Account, p *Product) {
+			p.AdapterConfig.Execution = &ImageExecutionConfig{Mode: ImageExecutionNativeMulti, MaxOutputImages: 1}
+		}},
+		{"invalid edit native multi output limit", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", "UI_FIXABLE", func(_ *Account, p *Product) {
+			p.Capabilities.References.Image = Range{1, 1}
+			p.AdapterConfig.EditExecution = &ImageExecutionConfig{Mode: ImageExecutionNativeMulti, MaxOutputImages: 1}
+		}},
+		{"unknown execution mode still needs development", "IMAGE_EXECUTION_CAPABILITY_INVALID", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) {
+			p.AdapterConfig.Execution = &ImageExecutionConfig{Mode: "unknown_mode", MaxOutputImages: 1}
+		}},
+		{"unknown provider still needs development", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) {
+			p.AdapterConfig.EditExecution = &ImageExecutionConfig{Mode: ImageExecutionProviderAsync, Provider: "other", MaxOutputImages: 1}
+		}},
 		{"missing size map", "MISSING_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) { p.AdapterConfig.SizeMappings = p.AdapterConfig.SizeMappings[:1] }},
 		{"duplicate map", "DUPLICATE_VALUE_MAPPING", "UI_FIXABLE", func(_ *Account, p *Product) {
 			p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings, p.AdapterConfig.SizeMappings[0])
@@ -171,6 +184,76 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 				t.Fatalf("diagnostic: %+v", v)
 			}
 		})
+	}
+}
+
+func TestInvalidImageExecutionLimitsAreDraftFixableAndScoped(t *testing.T) {
+	_, r := validatorFixture(t)
+	p := validProduct()
+	p.Capabilities.References.Image = Range{1, 1}
+	p.AdapterConfig.Execution = &ImageExecutionConfig{Mode: ImageExecutionNativeMulti, MaxOutputImages: 1}
+	p.AdapterConfig.EditExecution = &ImageExecutionConfig{Mode: ImageExecutionNativeMulti, MaxOutputImages: 1}
+	v, _ := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
+	seen := map[string]Diagnostic{}
+	for _, d := range v.Diagnostics {
+		if strings.HasPrefix(d.Code, "IMAGE_") {
+			seen[d.Code] = d
+		}
+	}
+	for _, code := range []string{"IMAGE_EXECUTION_CAPABILITY_INVALID", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID"} {
+		d, ok := seen[code]
+		if !ok || d.Class != "UI_FIXABLE" || d.Scope != p.ProductID || !strings.HasSuffix(d.Path, ".max_output_images") || !strings.Contains(d.Message, "2～10") || !strings.Contains(d.Action, "单请求") {
+			t.Fatalf("execution diagnostic %s: %+v", code, d)
+		}
+	}
+}
+
+func TestMissingPriceDiagnosticStaysWithTheProductThatLacksCoverage(t *testing.T) {
+	_, r := validatorFixture(t)
+	configured := validProduct()
+	empty := validProduct()
+	empty.ProductID = "blank"
+	empty.PricingRules = nil
+	v, _ := Validate(&r.a, Draft{Revision: "r", Products: []Product{configured, empty}}, time.Now())
+	foundBlank := false
+	for _, d := range v.Diagnostics {
+		if d.Code != "MISSING_PRICE" {
+			continue
+		}
+		if d.Scope == configured.ProductID {
+			t.Fatalf("missing price leaked to configured product: %+v", d)
+		}
+		if d.Scope == empty.ProductID {
+			foundBlank = true
+			if d.SpecCount == 0 || len(d.Specs) == 0 || len(d.Specs) > 8 || d.Specs[0].Resolution != "1K" {
+				t.Fatalf("missing price must include bounded examples of actual uncovered specs: %+v", d)
+			}
+		}
+	}
+	if !foundBlank {
+		t.Fatalf("missing price diagnostic for blank product not found: %+v", v.Diagnostics)
+	}
+}
+
+func TestMissingPriceEvidenceUsesOnlyUncoveredSpecifications(t *testing.T) {
+	_, r := validatorFixture(t)
+	p := validProduct()
+	p.PricingRules = []PricingRule{{Match: Match{AspectRatio: []string{"1:1"}}, SalePrice: &Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}}}
+	v, _ := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
+	found := false
+	for _, d := range v.Diagnostics {
+		if d.Code != "MISSING_PRICE" {
+			continue
+		}
+		found = true
+		for _, spec := range d.Specs {
+			if spec.AspectRatio != "16:9" || d.Scope != p.ProductID {
+				t.Fatalf("covered spec or another product marked missing: %+v", d)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("uncovered 16:9 specs must be reported")
 	}
 }
 

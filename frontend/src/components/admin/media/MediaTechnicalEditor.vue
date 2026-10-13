@@ -13,20 +13,20 @@
       <h3>文生图单请求产出能力</h3>
       <p class="mw-muted">只填写已经核实的 Account、模型和接口能力；未知或没有多图证据时保持单图，客户 1～10 张会按批次执行。客户购买数量不在这里配置。</p>
       <div class="mw-field-grid">
-        <label class="mw-field">执行方式<select :value="product.adapter_config.execution?.mode ?? 'single'" class="input" data-test="image-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.execution!.provider })">
+        <label class="mw-field">执行方式<select :value="product.adapter_config.execution?.mode ?? 'single'" class="input" data-test="image-execution-mode" @change="changeExecutionMode('execution', $event)">
           <option value="single">单图接口（未知能力也用此项）</option><option v-if="nativeAdapter?.parameters.count?.mode !== 'fixed_by_model'" value="native_multi">已核实原生多图（使用 n）</option>
         </select></label>
-        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" type="number" :min="product.adapter_config.execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.execution?.mode ?? 'single'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>这是上游单请求上限，不是客户一次购买数量。</small></label>
+        <label class="mw-field">单请求最多输出图片数<input :value="product.adapter_config.execution?.max_output_images ?? 1" class="input" data-test="image-execution-max" data-field="adapter_config.execution.max_output_images" type="number" :min="product.adapter_config.execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.execution?.mode !== 'native_multi'" :aria-invalid="!!imageExecutionError" :aria-describedby="imageExecutionError ? 'image-execution-hint image-execution-error' : 'image-execution-hint'" @input="edit(next => { const mode = next.adapter_config.execution?.mode ?? 'single'; next.adapter_config.execution = { ...(next.adapter_config.execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small id="image-execution-hint">这是上游单请求上限，不是客户一次购买数量。</small><p v-if="imageExecutionError" id="image-execution-error" class="mw-field-error" data-test="image-execution-error" role="alert">{{ imageExecutionError }}</p></label>
       </div>
     </section>
     <section v-if="product.capabilities.references.image.max > 0" data-field="adapter_config.edit_execution">
       <h3>参考图编辑单请求产出能力</h3>
       <p class="mw-muted">这是参考图编辑接口的独立管理员配置；未填写时按单图执行，不会继承文生图多图能力。这里只记录已确认能力，不代表系统已对供应商实测。</p>
       <div class="mw-field-grid">
-        <label class="mw-field">编辑执行方式<select :value="product.adapter_config.edit_execution?.mode ?? 'single'" class="input" data-test="image-edit-execution-mode" @change="edit(next => { const mode = text($event) as 'single' | 'native_multi'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? Math.max(2, next.adapter_config.edit_execution?.max_output_images ?? 2) : 1 }; delete next.adapter_config.edit_execution!.provider })">
+        <label class="mw-field">编辑执行方式<select :value="product.adapter_config.edit_execution?.mode ?? 'single'" class="input" data-test="image-edit-execution-mode" @change="changeExecutionMode('edit_execution', $event)">
           <option value="single">单图接口（默认）</option><option v-if="nativeAdapter?.parameters.count?.mode !== 'fixed_by_model'" value="native_multi">已核实原生多图（使用 n）</option>
         </select></label>
-        <label class="mw-field">编辑单请求最多输出图片数<input :value="product.adapter_config.edit_execution?.max_output_images ?? 1" class="input" data-test="image-edit-execution-max" type="number" :min="product.adapter_config.edit_execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.edit_execution?.mode !== 'native_multi'" @input="edit(next => { const mode = next.adapter_config.edit_execution?.mode ?? 'single'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small>客户购买数量仍由商品规格控制；没有编辑能力配置时每次只提交一张。</small></label>
+        <label class="mw-field">编辑单请求最多输出图片数<input :value="product.adapter_config.edit_execution?.max_output_images ?? 1" class="input" data-test="image-edit-execution-max" data-field="adapter_config.edit_execution.max_output_images" type="number" :min="product.adapter_config.edit_execution?.mode === 'native_multi' ? 2 : 1" max="10" step="1" :disabled="product.adapter_config.edit_execution?.mode !== 'native_multi'" :aria-invalid="!!editExecutionError" :aria-describedby="editExecutionError ? 'image-edit-execution-hint image-edit-execution-error' : 'image-edit-execution-hint'" @input="edit(next => { const mode = next.adapter_config.edit_execution?.mode ?? 'single'; next.adapter_config.edit_execution = { ...(next.adapter_config.edit_execution ?? {}), mode, max_output_images: mode === 'native_multi' ? numeric($event) : 1 } })" /><small id="image-edit-execution-hint">客户购买数量仍由商品规格控制；没有编辑能力配置时每次只提交一张。</small><p v-if="editExecutionError" id="image-edit-execution-error" class="mw-field-error" data-test="image-edit-execution-error" role="alert">{{ editExecutionError }}</p></label>
       </div>
     </section>
     </details>
@@ -63,14 +63,33 @@
   </fieldset>
 </template>
 <script setup lang="ts">
-import { nextTick } from 'vue'
-import type { AdapterBinding, NativeAdapter, Product } from '@/api/admin/mediaWorkbench'
+import { computed, nextTick } from 'vue'
+import type { AdapterBinding, ImageExecutionConfig, NativeAdapter, Product } from '@/api/admin/mediaWorkbench'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter }>()
 const emit = defineEmits<{ 'update:product': [value: Product] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const numeric = (event: Event) => Number(text(event))
+function executionError(config: ImageExecutionConfig | undefined, label: string): string {
+  const mode = config?.mode ?? 'single'
+  const max = config?.max_output_images ?? 1
+  if (mode === 'single' && max !== 1) return `${label}选择了单图接口，单请求上限必须是 1。`
+  if (mode === 'native_multi' && (!Number.isInteger(max) || max < 2 || max > 10)) return `${label}选择了原生多图，请填写已确认的 2～10 张上限；若每次一张，请将此接口切换为单图。不会自动提高上限。`
+  if (mode === 'provider_async') return `${label}使用原生异步批量，需要独立队列和结算合同；当前工作台不会提交此配置。`
+  if (mode !== 'single' && mode !== 'native_multi') return `${label}的执行方式不是当前工作台支持的模式。`
+  if (config?.provider) return `${label}不能在普通单图或原生多图模式中填写 provider。`
+  return ''
+}
+const imageExecutionError = computed(() => executionError(props.product.adapter_config.execution, '文生图'))
+const editExecutionError = computed(() => executionError(props.product.adapter_config.edit_execution, '参考图编辑'))
+function changeExecutionMode(field: 'execution' | 'edit_execution', event: Event) {
+  const mode = text(event) as 'single' | 'native_multi'
+  edit(next => {
+    const previous = next.adapter_config[field]
+    next.adapter_config[field] = { mode, max_output_images: mode === 'single' ? 1 : previous?.max_output_images ?? 1 }
+  })
+}
 function edit(change: (next: Product) => void) {
   if (props.disabled) return
   const next: Product = JSON.parse(JSON.stringify(props.product))

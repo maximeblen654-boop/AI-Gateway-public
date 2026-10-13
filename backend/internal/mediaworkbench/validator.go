@@ -44,10 +44,27 @@ func diagnostic(class, code, scope, path, message string) Diagnostic {
 	if class == "NEEDS_DEVELOPMENT" {
 		action = "Develop and review the owning adapter before publishing this flow"
 	}
+	if class == "UI_FIXABLE" && (code == "IMAGE_EXECUTION_CAPABILITY_INVALID" || code == "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID") {
+		action = "请在指示的执行字段中修正单请求产出上限，然后重新保存草稿"
+	}
 	if class == "UNKNOWN" {
 		action = "Retry after the local dependency is available"
 	}
 	return Diagnostic{Class: class, Severity: "error", Code: code, Scope: scope, Path: path, Message: message, Action: action}
+}
+
+// Only ordinary single-request count conflicts are editable parameter errors.
+// Unknown modes/providers still require the owning adapter to be implemented.
+func invalidImageExecution(config *ImageExecutionConfig, scope, path, code, label string) Diagnostic {
+	if config != nil && config.Provider == "" {
+		switch config.Mode {
+		case "", ImageExecutionSingle:
+			return diagnostic("UI_FIXABLE", code, scope, path+".max_output_images", label+"选择了每次一张，单请求上限必须为 1。")
+		case ImageExecutionNativeMulti:
+			return diagnostic("UI_FIXABLE", code, scope, path+".max_output_images", label+"选择了原生多图，单请求上限必须为 2～10；若每次只输出一张，请选择每次一张。")
+		}
+	}
+	return diagnostic("NEEDS_DEVELOPMENT", code, scope, path, label+"的执行模式或供应商批量合同尚未接通；请由技术维护者核对。")
 }
 
 // Validate has no supplier client or credential input. The bounded finite domain
@@ -150,7 +167,7 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 					add("NEEDS_DEVELOPMENT", "NATIVE_IMAGE_PARAMETER_UNSUPPORTED", pid, "adapter_config.execution", "Native generateContent uses one output per execution unit and has no quality field")
 				}
 				if _, err := PlanImageExecution(p.AdapterConfig, 1); err != nil {
-					add("NEEDS_DEVELOPMENT", "IMAGE_EXECUTION_CAPABILITY_INVALID", pid, "adapter_config.execution", "Execution mode must declare a verified single-request output limit")
+					v.Diagnostics = append(v.Diagnostics, invalidImageExecution(p.AdapterConfig.Execution, pid, "adapter_config.execution", "IMAGE_EXECUTION_CAPABILITY_INVALID", "文生图"))
 				} else if p.AdapterConfig.Execution != nil && p.AdapterConfig.Execution.Mode == ImageExecutionProviderAsync {
 					add("NEEDS_DEVELOPMENT", "IMAGE_PROVIDER_ASYNC_UNAVAILABLE", pid, "adapter_config.execution", "Native provider batch adapters use a separate queue and settlement contract")
 				}
@@ -158,7 +175,7 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 					edit := p.AdapterConfig
 					edit.Execution = edit.EditExecution
 					if _, err := PlanImageExecution(edit, 1); err != nil {
-						add("NEEDS_DEVELOPMENT", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", pid, "adapter_config.edit_execution", "Edit interfaces require a separately verified single-request output limit")
+						v.Diagnostics = append(v.Diagnostics, invalidImageExecution(edit.Execution, pid, "adapter_config.edit_execution", "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID", "参考图编辑"))
 					} else if edit.Execution.Mode == ImageExecutionProviderAsync {
 						add("NEEDS_DEVELOPMENT", "IMAGE_PROVIDER_ASYNC_UNAVAILABLE", pid, "adapter_config.edit_execution", "Native provider batch adapters use a separate queue and settlement contract")
 					}
@@ -232,6 +249,7 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			}
 			if r.SalePrice == nil {
 				add("UI_FIXABLE", "MISSING_PRICE", pid, path+".sale_price", "An explicit sale price is required")
+				v.Diagnostics[len(v.Diagnostics)-1].Match = &p.PricingRules[i].Match
 			} else if !validPrice(*r.SalePrice) {
 				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Use an exact nonnegative decimal, a three-letter currency and per_request billing")
 			}
@@ -251,6 +269,8 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		v.CaseCount += len(cases)
 		hits := make([]int, len(p.PricingRules))
 		missing, overlap, mappingMissing, compilerFailed := false, false, false, false
+		missingSpecs := []Spec{}
+		missingCount := 0
 		for _, spec := range cases {
 			matched := 0
 			for i, r := range p.PricingRules {
@@ -261,6 +281,10 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 			}
 			if matched == 0 {
 				missing = true
+				missingCount++
+				if len(missingSpecs) < 8 {
+					missingSpecs = append(missingSpecs, spec)
+				}
 			}
 			if matched > 1 {
 				overlap = true
@@ -280,6 +304,8 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		}
 		if missing {
 			add("UI_FIXABLE", "MISSING_PRICE", pid, "pricing_rules", "Some allowed specifications have no sale price")
+			v.Diagnostics[len(v.Diagnostics)-1].Specs = missingSpecs
+			v.Diagnostics[len(v.Diagnostics)-1].SpecCount = missingCount
 		}
 		if overlap {
 			add("UI_FIXABLE", "PRICE_RULE_OVERLAP", pid, "pricing_rules", "An allowed request matches multiple prices")

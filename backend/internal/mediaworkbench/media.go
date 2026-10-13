@@ -125,6 +125,10 @@ type Diagnostic struct {
 	Path     string `json:"path"`
 	Message  string `json:"message"`
 	Action   string `json:"action"`
+	// Optional price coverage evidence, scoped to this diagnostic's product.
+	Match     *Match `json:"match,omitempty"`
+	Specs     []Spec `json:"specs,omitempty"`
+	SpecCount int    `json:"spec_count,omitempty"`
 }
 type Catalog struct {
 	Source   string   `json:"source"`

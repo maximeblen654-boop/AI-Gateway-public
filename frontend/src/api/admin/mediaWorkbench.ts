@@ -25,6 +25,9 @@ export interface Product {
 }
 export interface Diagnostic {
   class: string; severity: string; code: string; scope: string; path: string; message: string; action: string
+  match?: Match
+  specs?: { resolution: string; aspect_ratio: string; quality: string; duration_seconds: number; count: number; images: number; videos: number; audio: number }[]
+  spec_count?: number
 }
 export interface Validation {
   draft_revision: string; status: string; publish_ready: boolean; checked_at: string
@@ -71,7 +74,7 @@ export function draftInput(products: Product[]): { products: Product[] } {
   return { products: products.map(p => ({
     product_id: p.product_id, media_type: p.media_type, site_model: p.site_model,
     display_name: p.display_name, upstream_model: p.upstream_model, enabled: p.enabled,
-    adapter_config: { ...(p.adapter_config?.version ? { version: p.adapter_config.version } : {}), ...(p.adapter_config?.wire_profile ? { wire_profile: p.adapter_config.wire_profile } : {}), ...(p.adapter_config?.model_family ? { model_family: p.adapter_config.model_family } : {}), ...(p.adapter_config?.execution ? { execution: { ...(p.adapter_config.execution.mode ? { mode: p.adapter_config.execution.mode } : {}), ...(p.adapter_config.execution.max_output_images ? { max_output_images: p.adapter_config.execution.max_output_images } : {}), ...(p.adapter_config.execution.provider ? { provider: p.adapter_config.execution.provider } : {}) } } : {}), ...(p.adapter_config?.edit_execution ? { edit_execution: { ...(p.adapter_config.edit_execution.mode ? { mode: p.adapter_config.edit_execution.mode } : {}), ...(p.adapter_config.edit_execution.max_output_images ? { max_output_images: p.adapter_config.edit_execution.max_output_images } : {}), ...(p.adapter_config.edit_execution.provider ? { provider: p.adapter_config.edit_execution.provider } : {}) } } : {}), size_mappings: (p.adapter_config?.size_mappings ?? []).map(mapping => ({
+    adapter_config: { ...(p.adapter_config?.version ? { version: p.adapter_config.version } : {}), ...(p.adapter_config?.wire_profile ? { wire_profile: p.adapter_config.wire_profile } : {}), ...(p.adapter_config?.model_family ? { model_family: p.adapter_config.model_family } : {}), ...(p.adapter_config?.execution ? { execution: { ...(p.adapter_config.execution.mode ? { mode: p.adapter_config.execution.mode } : {}), ...(p.adapter_config.execution.max_output_images !== undefined ? { max_output_images: p.adapter_config.execution.max_output_images } : {}), ...(p.adapter_config.execution.provider ? { provider: p.adapter_config.execution.provider } : {}) } } : {}), ...(p.adapter_config?.edit_execution ? { edit_execution: { ...(p.adapter_config.edit_execution.mode ? { mode: p.adapter_config.edit_execution.mode } : {}), ...(p.adapter_config.edit_execution.max_output_images !== undefined ? { max_output_images: p.adapter_config.edit_execution.max_output_images } : {}), ...(p.adapter_config.edit_execution.provider ? { provider: p.adapter_config.edit_execution.provider } : {}) } } : {}), size_mappings: (p.adapter_config?.size_mappings ?? []).map(mapping => ({
       resolution: mapping.resolution, aspect_ratio: mapping.aspect_ratio, wire_size: mapping.wire_size
     })) },
     capabilities: {

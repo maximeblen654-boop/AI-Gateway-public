@@ -86,7 +86,7 @@
             </section>
             <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
 
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
           <div class="mw-action-card" data-test="account-publication">
             <strong>Account 级发布与销售</strong><p class="mw-muted">发布会包含此 Account 的所有草稿商品；销售开关影响全部已发布商品。两者都需要单独确认。</p>
             <button class="btn btn-secondary" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
@@ -108,7 +108,7 @@
             <div v-if="modelProducts.length > 1"><label class="mw-field">本站产品<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label></div>
             <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
               <template #save>
                 <div class="mw-save-draft">
@@ -205,6 +205,10 @@ const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.s
 const filteredModels = computed(() => detail.value?.models.filter(m => (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value))
+const diagnosticProducts = computed(() => (config.value?.draft.products ?? []).map((p, index) => ({
+  product_id: p.product_id,
+  label: `${productDisplayTitle(p)} · ${p.media_type === 'video' ? '视频' : '图片'} · 商品 ${index + 1}`
+})))
 const productOptionSignatures = computed(() => {
   const counts = new Map<string, number>()
   for (const item of modelProducts.value) {
@@ -359,7 +363,7 @@ async function locate(diagnostic: Diagnostic) {
   }
   const fieldPath = productEditor.value?.showField(path, diagnostic.code) ?? path
   await nextTick()
-  const field = ['adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
+  const field = ['adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
   const section = editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)
   section?.querySelectorAll('details').forEach(node => { node.open = true })
   let ancestor = section

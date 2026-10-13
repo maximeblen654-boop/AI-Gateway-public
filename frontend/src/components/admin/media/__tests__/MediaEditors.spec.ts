@@ -39,12 +39,39 @@ describe('media editors follow one-way props', () => {
     await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('native_multi')
     let latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
     expect(latest.adapter_config.execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
-    expect(latest.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
+    expect(latest.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 1 })
     await wrapper.setProps({ product: latest })
+    expect(wrapper.get('[data-test="image-edit-execution-error"]').text()).toContain('不会自动提高上限')
     await wrapper.get('[data-test="image-edit-execution-mode"]').setValue('single')
     latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
     expect(latest.adapter_config.edit_execution?.max_output_images).toBe(1)
     expect(latest.adapter_config.execution?.max_output_images).toBe(2)
+    wrapper.unmount()
+  })
+  it('does not report a scoped count error as an unavailable adapter', () => {
+    const product = copy(imageProduct)
+    const wrapper = mount(MediaProductEditor, { props: {
+      product, mediaTypes: ['image'], disabled: false,
+      binding: { kind: 'openai_images', revision: '1', auth: 'apikey', task_flow: 'sync' },
+      diagnostics: [{ class: 'UI_FIXABLE', severity: 'error', code: 'IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID', scope: product.product_id, path: 'adapter_config.edit_execution.max_output_images', message: '参考图编辑上限需要修正', action: '选择每次一张' }]
+    } })
+    expect(wrapper.get('[data-test="adapter-status"]').text()).not.toContain('尚未接通')
+    wrapper.unmount()
+  })
+  it('shows an inline fixable warning for conflicting single-request limits without copying modes', async () => {
+    const product = copy(imageProduct)
+    product.capabilities.count = { min: 1, max: 10 }
+    product.adapter_config.execution = { mode: 'native_multi', max_output_images: 2 }
+    product.adapter_config.edit_execution = { mode: 'native_multi', max_output_images: 1 }
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    expect(wrapper.get('[data-test="image-edit-execution-error"]').text()).toContain('2～10')
+    expect(wrapper.find('[data-test="image-execution-error"]').exists()).toBe(false)
+    await wrapper.get('[data-test="image-edit-execution-max"]').setValue(2)
+    const latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    await wrapper.setProps({ product: latest })
+    expect(wrapper.find('[data-test="image-edit-execution-error"]').exists()).toBe(false)
+    expect(latest.adapter_config.execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
+    expect(latest.adapter_config.edit_execution).toEqual({ mode: 'native_multi', max_output_images: 2 })
     wrapper.unmount()
   })
   it('does not generate a price row for the denied 2K high combination', async () => {
