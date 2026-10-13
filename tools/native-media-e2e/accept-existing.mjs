@@ -74,7 +74,7 @@ try {
   assert.equal(directHealth, 200, `candidate frontend health unavailable: ${directHealth}`)
   if(workspaceOnly){
     process.env.NATIVE_WORKSPACE_UI='true'
-    workspacePreview=spawn(process.execPath,['frontend/node_modules/vite/bin/vite.js','--config','frontend/tests/studio-workspace/vite.config.ts'],{stdio:'inherit'})
+    workspacePreview=spawn(process.execPath,['node_modules/vite/bin/vite.js','--config','tests/studio-workspace/vite.config.ts'],{cwd:path.resolve('frontend'),stdio:'inherit'})
     for(let i=0;i<60;i++){if(await fetch('http://127.0.0.1:4295/tests/studio-workspace/live.html').then(r=>r.ok).catch(()=>false))break;await new Promise(r=>setTimeout(r,500))}
     assert(await fetch('http://127.0.0.1:4295/tests/studio-workspace/live.html').then(r=>r.ok),'workspace preview must be ready')
   }
