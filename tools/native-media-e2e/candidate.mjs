@@ -84,6 +84,14 @@ if (mode === 'build') {
     for (const script of ['seed.mjs', 'customer-keys.mjs', 'browser.cjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])
     run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--video'])
     for (const scenario of ['image', 'edit', 'video']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
+    // The existing Bridge has one configured customer Group. Use the real
+    // OpenAI fixture Group/key for this scenario; do not bypass Group checks
+    // or attach the Account to an unrelated platform merely for the test.
+    const fixture = JSON.parse(fs.readFileSync(path.join(evidence, 'fixture.json'), 'utf8'))
+    assert(Number.isSafeInteger(fixture.groups.openai) && fixture.groups.openai > 0)
+    compose.services.bridge.environment.STUDIO_IMAGE_GROUP_ID = String(fixture.groups.openai)
+    fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
+    dc(['up', '-d', '--no-deps', '--force-recreate', '--wait', '--wait-timeout', '90', 'bridge'])
     run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--image-geometry'])
     for (const scenario of ['image-geometry-1k','image-geometry-2k','image-geometry-4k','edit-geometry-1k','edit-geometry-2k','edit-geometry-4k','image-geometry-independent']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
     const containers = JSON.parse(capture('docker', ['inspect', ...components.map(c => `ai-gateway-native-${c}-20261012`)]))
