@@ -189,19 +189,18 @@ function protectedState() {
       assert.deepEqual(ordinary.reread.media_workbench_v1.published, baseline.published)
       report.trace.push({ kind: d.kind, stage: 'normal-save', ids: ids(ordinary.request.draft.products), selectedProduct: (await selection()).selectedProduct })
       detail = ordinary.reread
-      if (d.kind === 'image') {
-        for (const [which, max] of [['execution', 2], ['edit_execution', 2]]) {
-          for (const key of ['advanced-technical', 'image-execution-advanced']) if (await w(key).getAttribute('open') === null) await w(key).locator(':scope > summary').click()
-          const prefix = which === 'execution' ? 'image-execution' : 'image-edit-execution'
-          await w(`${prefix}-mode`).selectOption('native_multi'); await w(`${prefix}-max`).fill(String(max))
-          const changed = await saveUI(d)
-          assert.deepEqual(ids(changed.reread.media_workbench_v1.draft.products), expectedIds)
-          assert.deepEqual(changed.reread.media_workbench_v1.draft.products.map(p => p.pricing_rules), baseline.draft.products.map(p => p.pricing_rules))
-          report.trace.push({ kind: d.kind, stage: `${which}-2-save`, ids: expectedIds, selectedProduct: (await selection()).selectedProduct })
-        }
-        // Restore only the test first-product settings through the normal draft
-        // API, then compare all seven products byte-for-byte after removal.
-        detail = await save(d, await api(d.account), baseline.draft.products)
+      // Reuse the accepted execution-limit regressions. This candidate test
+      // edits a business field available on both media types, not a quantity
+      // mode deliberately absent from a fixed-by-model native adapter.
+      for (const name of [first.display_name + ' · 隔离编辑', first.display_name]) {
+        await w('wizard-step-5').click()
+        await w('display-name').fill(name)
+        const edited = await saveUI(d)
+        const current = edited.reread.media_workbench_v1.draft.products
+        assert.deepEqual(ids(current), expectedIds)
+        assert.deepEqual(current[0], { ...first, display_name: name })
+        assert.deepEqual(current.slice(1), baseline.draft.products.slice(1))
+        report.trace.push({ kind: d.kind, stage: 'business-name-edit-save', ids: expectedIds, selectedProduct: (await selection()).selectedProduct })
       }
       await open(d)
       for (const id of [`${d.kind}-blank-1`, `${d.kind}-blank-6`, first.product_id]) await w('product-select').selectOption(id)
