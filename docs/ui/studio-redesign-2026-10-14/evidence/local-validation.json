@@ -1,0 +1,32 @@
+{
+  "vue_component_and_view_tests": 45,
+  "api_contract_tests": 6,
+  "total_frontend_targeted": 51,
+  "eslint": "PASS",
+  "browser_cases_per_run": 9,
+  "browser_consecutive_runs": [
+    {
+      "passed": 9,
+      "seconds": 6.7
+    },
+    {
+      "passed": 9,
+      "seconds": 5.9
+    },
+    {
+      "passed": 9,
+      "seconds": 6.0
+    }
+  ],
+  "existing_backend_targeted": 8,
+  "viewports": [
+    1440,
+    390
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "front_end_api_fixture_is_only_visual_evidence": true,
+  "production_action": false
+}

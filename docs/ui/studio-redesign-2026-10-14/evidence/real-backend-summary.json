@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "frontend_and_acceptance_sha": "3efbc2951f07a5495b5dbbc0934ebe93edf66c39",
+  "backend_source_sha": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+  "run": 38469785293,
+  "artifact_id": 11851047521,
+  "artifact_expiry_utc": "2026-10-27T21:21:54Z",
+  "browser_api_interception": false,
+  "upstream": "runner-local simulator",
+  "production_action": false,
+  "scenarios": [
+    {
+      "scenario": "image",
+      "pass": true,
+      "actual_generation_posts": 3,
+      "delivered": 3,
+      "synthetic_charge_cny": 2.1,
+      "native_usage_rows": 1,
+      "refresh_same_ledger": true,
+      "refresh_same_generation_posts": true,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "repeated_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "video_playback_verified": null,
+      "raw_report_sha256": "2e3736480d258578fb54d8a24251f447fcb474d84e47c9b91ae5e35591b8a2f7"
+    },
+    {
+      "scenario": "edit",
+      "pass": true,
+      "actual_generation_posts": 2,
+      "delivered": 2,
+      "synthetic_charge_cny": 1.4,
+      "native_usage_rows": 1,
+      "refresh_same_ledger": true,
+      "refresh_same_generation_posts": true,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "repeated_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "video_playback_verified": null,
+      "raw_report_sha256": "8548353d374a58146e1b6d97cf44448c152dc4fed6cd6d1962783e0b93c63615"
+    },
+    {
+      "scenario": "video-compatible",
+      "pass": true,
+      "actual_generation_posts": 1,
+      "delivered": 1,
+      "synthetic_charge_cny": 2.0,
+      "native_usage_rows": 1,
+      "refresh_same_ledger": true,
+      "refresh_same_generation_posts": true,
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "repeated_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "video_playback_verified": true,
+      "raw_report_sha256": "961fa0e1e7a4ef5c70ecaaae1eecf465ea2b4178c8693aafe28fe858e8edcab6"
+    }
+  ]
+}

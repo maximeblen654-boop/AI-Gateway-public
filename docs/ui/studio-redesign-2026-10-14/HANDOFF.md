@@ -2,6 +2,8 @@
 
 这是 Codex 本阶段执行记录，供 ChatGPT 接续；不替代或改写项目根目录的正式 `AI-Gateway-Handoff.md` / Constraints。
 
+**当前进度：用户已选择 C「作品桌」，完整实现及真实隔离前后端联调已完成。下方阶段一是选版历史；当前结果以“阶段二”和末尾验收表为准。未部署生产、未构建新 Docker 候选。**
+
 ## 当前目标与版本边界
 
 用户明确要求重新设计**客户生成工作台**。参考用户提供的聊天式创作截图：比例点选、悬浮模型选择与紫色上浮提示、左侧文生图/图生图/单视频/任务历史。先交几版实际画面比较，不扩大到无限画布、模板平台或多视频。用户将简短主文案交由 Codex 决定，本阶段使用“让想法有画面。”
@@ -83,11 +85,48 @@
 
 ### 本地证据与隔离范围
 
-- 受影响 Vue 定向测试：43/43 PASS（包含原上传、partial、恢复及数量测试）。
+- 受影响 Vue 组件/视图定向测试：45/45 PASS，另 API 合同 6/6 PASS，共 51 项（包含原上传、partial、恢复及数量测试）。
 - 真实 Chromium 1440px / 390px 浏览器 UI 用例：9/9，连续三轮 PASS；它们采用局部前端 API fixture，仅证明 UI，不能证明后端结算。
 - 独立静态视觉评审一轮 7/10：指出缩略图裁剪、手机第三项入口和焦点颜色问题；已做对应调整。折页图形进一步收敛为折光 G。该分数不冒充修改后的新评分。
 - `frontend/tests/studio-workspace/main.ts` 仅供视觉交互预览；`live.ts` 挂载相同真实组件但没有任何 API mock，用于后端联调。
-- 新增现有 `native-media-candidate.yml` 的 `accept-existing / studio-workspace` 场景：严格 GitHub-hosted、固定 b2fcdac 三镜像/摘要核验，Vite 提供当前前端，HTTP 透传到真实 Core/Bridge/BFF/PostgreSQL/Redis，仅上游是本地模拟器。前端与后端 SHA 分别记录，不把旧镜像标成新版本。本段提交时云端联调尚未运行；结果随后补齐。
+- 新增现有 `native-media-candidate.yml` 的 `accept-existing / studio-workspace` 场景：严格 GitHub-hosted、固定 b2fcdac 三镜像/摘要核验，Vite 提供当前前端，HTTP 透传到真实 Core/Bridge/BFF/PostgreSQL/Redis，仅上游是本地模拟器。前端与后端 SHA 分别记录，不把旧镜像标成新版本。最终真实联调 Run 38469785293 PASS，见末尾证据。
 - 未改 backend/studio 运行代码、生产配置、正式 root Handoff 或 Constraints；没有部署、商品发布、启售或真实供应商请求。
 
 预览：`http://127.0.0.1:4295/tests/studio-workspace/index.html`；空状态加 `?scenario=empty`，参考图点左侧“图生图”；深色加 `?theme=dark`。本地进程结束后地址不保证继续可访问。代码入口和截图保存在本目录与 `frontend/tests/studio-workspace/`。
+
+### 阶段二最终运行证据
+
+- 实际运行改动提交：`3efbc2951f07a5495b5dbbc0934ebe93edf66c39`。后续证据提交仅修正截图工具的 ESM 导入、补文档/截图和历史验证脚本，不改工作台运行代码。
+- [真实隔离前后端联调 Run 38469785293](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38469785293)：PASS。证据 Artifact `11851047521`，约 210 KB，临时有效至 `2026-10-27T21:21:54Z`。摘要和截图已入本目录长期随 Git 保存。
+- 当前前端与验收脚本 SHA 同为上述 3ef；后端复用已验收 b2fcdac Core/Bridge/BFF 精确镜像，没有 docker build，没有重新导出 TAR。没有把 b2 镜像标为 3ef 镜像。
+- 浏览器正常登录隔离 Core，由当前真实 Vue 页面访问原 API。`live.ts` 无 Axios/fetch 拦截；只有上游模拟器，未使用生产资料。已核对三组件健康、镜像身份及共享 Core 网络命名空间。
+
+| 场景 | 请求数 / 交付 | 合成冻结价 / 原生扣费 | usage 增量 | 刷新、查询与重复下载 |
+| --- | --- | --- | --- | --- |
+| 文生图 | 3 个单图请求 / 3 张 | 2.10 / 2.10 CNY | 1 | 无新增请求或扣费；摘要一致 |
+| 参考图编辑 | 2 个单图请求 / 2 张 | 1.40 / 1.40 CNY | 1 | 无新增请求或扣费；摘要一致 |
+| 普通兼容单视频 | 1 次提交 / 1 条 | 2.00 / 2.00 CNY | 1 | 无新增请求或扣费；原片重复下载一致，浏览器实际播放通过 |
+
+以上金额均为隔离 fixture。图片模拟器返回有效 1×1 PNG，因此后端验收截图是纯色块；咖啡海报截图来自独立 UI fixture，仅展示设计，不冒充供应商结果。真实后端没有在这轮再次逐供应商验收：Core/BFF/Bridge 运行代码未修改，复用已有同版本媒体执行证据。
+
+- 图片原片与重复下载 SHA-256：`431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460`。
+- 单视频原片与重复下载 SHA-256：`9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299`。
+- 合成历史策略检查：创建 51 条，原生 journal 默认返回 50 条且 `hasMore=true`；未返回的一条仍可按身份读取，另一用户得到 0 条。图片默认 72 小时，到期拒绝原片读取。测试无供应商请求，临时目录已清除。复现：`node tools/native-media-e2e/history-policy-check.mjs`。
+- 受影响后端已有测试 8/8 PASS，覆盖 partial、旧回执、过期报价、未知结果恢复、不重复生成及结算。前端组件/API 51/51 PASS，ESLint PASS，9 项浏览器测试最终连续 3 轮全通过。
+- 首次云端联调因 Vite 工作目录错误而样式编译失败（Run 38468297774），已修正启动目录；第二次和最终加强联调均通过。3ef 的 CI 前端 job 发现新截图脚本两处 CommonJS 导入不符合项目 Lint，已改为 ESM 并在本地重新执行全部新增前端文件 Lint；最终证据提交的 CI 单独列入交付结果，不将失败藏为通过。
+
+### 设计与交付位置
+
+桌面 1440px、手机 390px、浅色/深色、无历史、附件、partial 和金额确认均有真实 Chromium 截图，并逐张检查。作品完整构图使用 contain，手机最近两项有“全部任务”入口；主要输入框焦点收敛为棕色，紫色仅留给模型提示。一次独立静态评审 7/10，指出的问题已修正，未虚构第二轮评分。减掉上游宣传、积分、额外模板入口与重复协议说明，保留规格、数量、服务端金额和任务状态。
+
+- [作品桌 · 桌面](screenshots/c-gallery-desktop.png) / [手机](screenshots/c-gallery-mobile.png)
+- [无历史 · 桌面](screenshots/c-empty-desktop.png) / [手机](screenshots/c-empty-mobile.png)
+- [附件 · 桌面](screenshots/c-edit-desktop.png) / [手机](screenshots/c-edit-mobile.png)
+- [partial](screenshots/c-partial-desktop.png) / [金额确认](screenshots/c-generation-confirmation.png)
+- [深色 · 桌面](screenshots/c-dark-desktop.png) / [手机](screenshots/c-dark-mobile.png)
+- [真实后端文生图](screenshots/c-backend-image.png) / [编辑](screenshots/c-backend-edit.png) / [单视频](screenshots/c-backend-video-compatible.png)
+- [联调摘要](evidence/real-backend-summary.json) / [历史策略](evidence/history-policy.json) / [本地测试](evidence/local-validation.json)
+
+可复现预览：在 frontend 运行 `node node_modules/vite/bin/vite.js --config tests/studio-workspace/vite.config.ts`，打开 `http://127.0.0.1:4295/tests/studio-workspace/index.html`。截图：`node frontend/tests/studio-workspace/capture.mjs`。功能测试从 frontend 执行 `node node_modules/@playwright/test/cli.js test --config playwright.studio.config.ts`。预览仅为隔离 UI fixture；云端真实栈已结束，不能把 runner 地址当作仍可访问的环境。
+
+本轮最终状态为**源码和隔离联调完成，未部署**。若后续批准准备运行候选，前端资源变化需要重建包含它的 Core；Bridge/BFF 运行源码没有变化，可以沿现有流程判断精确复用。不能拿本轮前端预览或旧 b2 镜像宣称新版工作台已上线。
