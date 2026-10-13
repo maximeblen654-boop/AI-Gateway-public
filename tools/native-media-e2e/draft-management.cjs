@@ -9,7 +9,7 @@ const root = process.argv[2]
 const mode = process.argv[3]
 assert.equal(process.env.GITHUB_ACTIONS, 'true')
 assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
-assert.equal(process.env.NATIVE_CANDIDATE_SOURCE_SHA, 'b2fcdac93afa6ae194ee81801a9b37813f8f39eb')
+assert(['b2fcdac93afa6ae194ee81801a9b37813f8f39eb','40310e2961a5e8150e0c9df4cc86bb8087406c06'].includes(process.env.NATIVE_CANDIDATE_SOURCE_SHA))
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 assert(['seed', 'verify', 'check-preserved'].includes(mode))
 const compose = JSON.parse(fs.readFileSync(`${root}/compose.json`, 'utf8'))

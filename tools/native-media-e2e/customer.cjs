@@ -6,6 +6,7 @@ const { chromium, expect } = require('../../frontend/node_modules/@playwright/te
 const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const base = 'http://127.0.0.1:28100'
+const artifact = process.env.NATIVE_WORKSPACE_ARTIFACT === 'true'
 const workspace=process.env.NATIVE_WORKSPACE_UI==='true'
 const scenario = process.argv[3] || 'image'
 const geometryCases = {
@@ -33,8 +34,9 @@ const report = recover ? prior : { scenario, http: [] }
 assert(report && (!recover || report.id), 'Original task evidence is required for recovery')
 ;(async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
-  const context = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 } })
+  const context = await browser.newContext({ locale: 'zh-CN', viewport: artifact && scenario === 'edit' ? { width: 390, height: 844 } : { width: 1440, height: 1000 } })
   const page = await context.newPage(); page.setDefaultTimeout(20000)
+  const artifactProof = artifact ? require('./artifact-assets.cjs')(page) : null
   page.on('response', async r => { if (r.url().startsWith(base+'/studio-v2/api/')) report.http.push({ method: r.request().method(), path: new URL(r.url()).pathname, status: r.status(), ...(r.status() >= 400 ? { error: await r.json().catch(() => null) } : {}) }) })
   await page.addInitScript(() => { localStorage.setItem('sub2api_locale', 'zh'); localStorage.setItem('user_guide_2_user_v4_interactive', 'true') })
   try {
@@ -89,6 +91,13 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     report.quote = await response.json(); assert.equal(response.status(), 200, JSON.stringify(report.quote))
     report.id = report.quote.task_id || report.quote.operation_id
     assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents || 70))
+    if (artifact) {
+      assert.equal(stats()[`${kind}_posts`], report.before.supplier[`${kind}_posts`], 'quote must not generate')
+      assert.equal(ledger().usage, report.before.ledger.usage, 'quote must not settle')
+      report.quote_before_submit = { generated: 0, settled: 0, viewport: page.viewportSize() }
+      await expect(page.getByTestId('studio-confirm-generate')).toBeVisible()
+      await page.screenshot({ path: `${root}/evidence/native-artifact-${scenario}-confirmation.png`, fullPage: true })
+    }
     const submitted = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/tasks`) && r.request().method() === 'POST')
     await page.getByTestId(workspace?'studio-confirm-generate':'studio-generate').click(); const submit = await submitted
     report.submit = { status: submit.status(), body: await submit.json() }
@@ -124,6 +133,18 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       for (const d of report.downloads) assert.equal(d.sha256,report.original_sha256)
       report.actual_submits = posts
       report.expected_spec = geometry
+    }
+    if (artifact && !video) {
+      const requests = report.after.supplier.requests.slice(report.before.supplier.requests.length).filter(r => r.method === 'POST')
+      assert.equal(requests.length, count)
+      for (const request of requests) {
+        assert.equal(request.path, '/v1beta/models/gemini-3.1-flash-image:generateContent')
+        assert.equal(request.body.generationConfig.imageConfig.imageSize, '1K')
+        assert.equal(request.body.generationConfig.imageConfig.aspectRatio, '1:1')
+        const parts = request.body.contents.flatMap(c => c.parts)
+        assert.equal(parts.filter(p => p.inlineData || p.fileData).length, scenario === 'edit' ? 1 : 0)
+      }
+      report.actual_submits = requests
     }
     if (video) {
       assert.equal(report.after.ledger.video_captured - report.before.ledger.video_captured, 1)
@@ -164,6 +185,22 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     assert.deepEqual(ledger(), report.after.ledger)
     report.after_refresh_download = { supplier: stats(), ledger: ledger() }
     await page.getByTestId('studio-media-panel').screenshot({ path: `${root}/evidence/native-customer-${scenario}.png` })
+    if (artifact) {
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'horizontal overflow')
+      await page.screenshot({ path: `${root}/evidence/native-artifact-${scenario}-result.png`, fullPage: true })
+      if (scenario !== 'edit') {
+        await page.setViewportSize({ width: 390, height: 844 })
+        await expect(page.getByTestId('studio-refresh')).toBeEnabled()
+        await page.getByTestId('studio-refresh').click()
+        await expect(page.getByTestId('studio-refresh')).toBeEnabled()
+        await expect(page.getByTestId('studio-status')).toContainText('生成完成')
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'mobile horizontal overflow')
+        await page.screenshot({ path: `${root}/evidence/native-artifact-${scenario}-mobile.png`, fullPage: true })
+        assert.equal(stats()[`${kind}_posts`], report.after.supplier[`${kind}_posts`])
+        assert.deepEqual(ledger(), report.after.ledger)
+      }
+      report.artifact = await artifactProof()
+    }
     report.pass = true
     delete report.error
   } catch (error) { report.error = error.message; report.failure_state = { supplier: stats(), ledger: ledger() }; await page.screenshot({ path: `${root}/evidence/native-customer-${scenario}-failure.png`, fullPage: true }); throw error }

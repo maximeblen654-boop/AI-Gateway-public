@@ -1,5 +1,7 @@
 import http from 'node:http';
-const workspace=process.env.NATIVE_WORKSPACE_UI==='true';
+// Selector choice must never imply a development-server route.
+const workspace=process.env.NATIVE_WORKSPACE_DEV_SERVER==='true';
+if(process.env.NATIVE_WORKSPACE_ARTIFACT==='true' && workspace)throw new Error('Artifact acceptance forbids Vite');
 if(workspace && (process.env.GITHUB_ACTIONS!=='true'||process.env.RUNNER_ENVIRONMENT!=='github-hosted'))throw new Error('Workspace integration is GitHub-hosted only');
 const ports={front:28180,media:28183,ticket:28182,workspace:4295};
 function forward(port){return (req,res)=>{const u=http.request({hostname:'127.0.0.1',port,path:req.url,method:req.method,headers:{...req.headers,host:`127.0.0.1:${port}`}},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res)});u.on('error',()=>{if(!res.headersSent){res.writeHead(502);res.end('proxy unavailable')}});req.pipe(u)}}

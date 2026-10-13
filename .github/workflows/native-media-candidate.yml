@@ -20,7 +20,7 @@ on:
         required: false
         type: choice
         default: standard
-        options: [standard, draft-management]
+        options: [standard, draft-management, studio-workspace]
       acceptance_scenario:
         description: 'existing-image acceptance scope'
         required: false
@@ -60,6 +60,8 @@ jobs:
     env:
       NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.build_source_sha || github.sha }}
       NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.candidate-runtime
+      NATIVE_REUSE_SOURCE_DIR: ${{ github.workspace }}/.candidate-reuse-source
+      NATIVE_REUSE_ARTIFACT_DIR: ${{ runner.temp }}/native-reuse-artifact
       NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.build_acceptance || 'standard' }}
     steps:
       - uses: actions/checkout@v6
@@ -78,6 +80,21 @@ jobs:
         with:
           version: 9.15.9
       - uses: docker/setup-buildx-action@v3
+      - name: Checkout the pinned sidecar source for reuse comparison
+        if: github.event.inputs.build_acceptance == 'studio-workspace'
+        uses: actions/checkout@v6
+        with:
+          ref: b2fcdac93afa6ae194ee81801a9b37813f8f39eb
+          path: .candidate-reuse-source
+          persist-credentials: false
+      - name: Fetch existing sidecar archives without rebuilding
+        if: github.event.inputs.build_acceptance == 'studio-workspace'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 38443205417 --repo "$GITHUB_REPOSITORY" \
+            --name native-media-candidate-b2fcdac93afa6ae194ee81801a9b37813f8f39eb \
+            --dir "$NATIVE_REUSE_ARTIFACT_DIR"
       - name: Build only this commit, using existing component recipes
         id: build
         run: node tools/native-media-e2e/candidate.mjs build
