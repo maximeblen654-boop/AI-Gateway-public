@@ -9,7 +9,7 @@
       <label v-if="kind === 'video'">时长<select v-model.number="duration" class="input" data-testid="studio-duration"><option v-for="v in offer?.spec.duration_seconds" :key="v" :value="v">{{ v }} 秒</option></select></label>
       <label v-if="offer?.spec.aspect_ratio?.length">比例<select v-model="ratio" class="input" data-testid="studio-ratio"><option v-for="v in offer.spec.aspect_ratio" :key="v">{{ v }}</option></select></label>
       <label v-if="kind === 'image' && offer?.spec.quality?.length">品质<select v-model="quality" class="input"><option v-for="v in offer.spec.quality" :key="v">{{ v }}</option></select></label>
-      <label v-if="kind === 'image'">数量<input v-model.number="count" type="number" :min="offer?.spec.count.min" :max="offer?.spec.count.max" class="input" data-testid="studio-count" /></label>
+      <label v-if="kind === 'image'">生成数量<select v-model.number="count" class="input" data-testid="studio-count" :aria-invalid="invalidCount" :aria-describedby="invalidCount ? 'studio-count-error' : undefined"><option v-for="n in countOptions" :key="n" :value="n">{{ n }} 张</option></select></label>
       <label>提示词<textarea v-model="prompt" placeholder="描述你想生成的内容" class="input" data-testid="studio-prompt" /></label>
     </fieldset>
     <div class="mt-3 rounded-xl border border-dashed border-teal-300 p-4" data-testid="studio-asset-uploader" @dragover.prevent @drop.prevent="drop" @paste.stop="paste">
@@ -34,9 +34,10 @@
       </div>
     </div>
     <p v-if="!offers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限。</p>
+    <p v-if="kind === 'image' && offer && invalidCount && !active" id="studio-count-error" role="alert" data-testid="studio-count-error">{{ countOptions.length ? `请选择商品允许的生成数量（${countOptions[0]}～${countOptions[countOptions.length - 1]} 张）。` : '当前商品没有有效的数量范围，请选择其他商品或刷新目录。' }}</p>
     <p v-if="offer && incompatible && !active" role="alert">当前模型不支持这些素材类型或数量，请调整素材。</p>
     <p v-if="offer?.input_mode === 'references' && assets.length && !active">点击下方准备按钮会将引用素材上传到所选模型的供应商，随后显示报价；确认生成前不会创建生成任务。</p>
-    <button v-if="!active" class="btn btn-primary" :disabled="busy || !offer || incompatible || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '准备素材并获取报价' }}</button>
+    <button v-if="!active" class="btn btn-primary" :disabled="busy || !offer || incompatible || invalidCount || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '准备素材并获取报价' }}</button>
     <p v-if="!enabled" data-testid="studio-gate">当前生成服务未开放，仍可查看报价和已有结果。</p>
     <p v-if="error" role="alert" data-testid="studio-error">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
@@ -79,6 +80,12 @@ const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 const offer=computed(()=>offers.value.find(o=>o.offer_id===offerId.value))
+const countOptions=computed(()=>{
+ const range=offer.value?.spec.count
+ if(!range || !Number.isInteger(range.min) || !Number.isInteger(range.max) || range.min<1 || range.max>10 || range.min>range.max)return []
+ return Array.from({length:range.max-range.min+1},(_,i)=>range.min+i)
+})
+const invalidCount=computed(()=>kind.value==='image' && !countOptions.value.includes(count.value))
 const accept=computed(()=>['image','video','audio'].filter(k=>offer.value?.spec.references[k as StudioAssetReceipt['kind']].max).map(k=>`${k}/*`).join(','))
 const assets=computed(()=>uploads.value.flatMap(item=>item.receipt ? [item.receipt] : []))
 const incompatible=computed(()=>!offer.value || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
@@ -91,7 +98,7 @@ const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerI
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}份`].filter(Boolean).join(' / ')
 function remember(){if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,id:active.value?.id,attempted:[...attempted]}))}
 function accepted(task:StudioTask){if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'};active.value=task;history.value=[task,...history.value.filter(t=>t.id!==task.id)];remember()}
-function selectOffer(){const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=s?.count.min||1;intent=undefined}
+function selectOffer(){const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=kind.value==='image' ? countOptions.value[0]??1 : 1;intent=undefined}
 function newTask(){if(busy.value || !active.value || !['prepared','completed','partial','failed','released'].includes(active.value.status))return;active.value=null;intent=undefined;error.value='';notice.value='';remember()}
 async function load(selectedId?:unknown){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;offers.value=[];history.value=[];try{
  const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
@@ -138,7 +145,7 @@ async function enqueueFiles(files:File[]){if(!files.length||busy.value||active.v
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
-async function quote(){if(busy.value||active.value||!offer.value||incompatible.value||!prompt.value.trim())return;busy.value=true;error.value='';notice.value='';try{
+async function quote(){if(busy.value||active.value||!offer.value||incompatible.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;error.value='';notice.value='';try{
  const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
  if(kind.value==='video'){

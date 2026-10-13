@@ -146,3 +146,49 @@ describe('Published customer task confirmation and recovery',()=>{
   expect(api.task).toHaveBeenLastCalledWith(second);expect(wrapper.get('[data-testid="studio-task-id"]').text()).toContain(second.id);expect(api.generate).not.toHaveBeenCalled()
  })
 })
+
+
+describe('Customer image purchase quantity',()=>{
+ async function imageSetup(range={min:1,max:10}) {
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image'}))
+  api.history.mockResolvedValue([])
+  api.catalog.mockResolvedValue([{...offer,model:'synthetic-image',spec:{...offer.spec,count:range}}])
+  wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('morning light');api.request.mockClear()
+ }
+ it.each(['0','11','1000000','1.5',''])('blocks invalid quantity %s before requesting a quote',async value=>{
+  await imageSetup();const control=wrapper.get('[data-testid="studio-count"]')
+  // Injecting an option checks the action guard independently of the selector.
+  if(control.element instanceof HTMLSelectElement)control.element.add(new Option(value,value))
+  await control.setValue(value)
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined()
+  expect(wrapper.get('[data-testid="studio-count-error"]').text()).toContain('数量')
+  // Even if a caller bypasses the disabled button, no invalid quote is sent.
+  ;(wrapper.get('[data-testid="studio-quote"]').element as HTMLButtonElement).disabled=false
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click')
+  expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('offers only 1 to 10 and preserves a lower published product limit',async()=>{
+  await imageSetup();expect(wrapper.get('[data-testid="studio-count"]').findAll('option').map(o=>o.attributes('value'))).toEqual(Array.from({length:10},(_,i)=>String(i+1)))
+  await wrapper.get('[data-testid="studio-count"]').setValue('10');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
+  wrapper.unmount();await imageSetup({min:1,max:3})
+  expect(wrapper.get('[data-testid="studio-count"]').findAll('option').map(o=>o.attributes('value'))).toEqual(['1','2','3'])
+ })
+ it('does not present an invalid catalog range as purchasable',async()=>{
+  await imageSetup({min:1,max:100});expect(wrapper.get('[data-testid="studio-count"]').findAll('option')).toHaveLength(0)
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();expect(api.request).not.toHaveBeenCalled()
+ })
+ it('sends selected image quantity to the existing server quote endpoint',async()=>{
+  await imageSetup();await wrapper.get('[data-testid="studio-count"]').setValue('10')
+  api.request.mockRejectedValueOnce(new Error('stop after inspecting quote'))
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenCalledTimes(1);expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:10})}));expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('keeps video quantity fixed with no image quantity selector',async()=>{
+  api.history.mockResolvedValue([]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.find('[data-testid="studio-count"]').exists()).toBe(false)
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('a quiet cafe');api.request.mockClear();api.request.mockRejectedValueOnce(new Error('stop after inspecting quote'))
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenCalledTimes(1);expect(api.request.mock.calls[0]?.[0]).toBe('video');expect(api.generate).not.toHaveBeenCalled()
+ })
+})

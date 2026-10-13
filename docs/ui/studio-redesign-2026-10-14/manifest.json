@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "project": "AI Gateway · 客户工作台重新设计",
+  "brief": "文生图、图生图、单视频与任务历史。先选整体工作方式，再接入现有生成与结算。三版均为 1440 × 900 静态首屏；示例任务与海报为设计内容，不代表真实订单。",
+  "round": "01",
+  "nativeViewport": "1440x900",
+  "candidates": [
+    {
+      "id": "a",
+      "name": "A · 轻聊",
+      "concept": "像聊天一样开始创作，比例和模型悬浮在输入框上方。",
+      "typography": "Segoe UI / Microsoft YaHei；标题 34px，输入 17px，操作 14px。",
+      "palette": [
+        "#F5F2EC",
+        "#8A5EA7",
+        "#302C2B"
+      ],
+      "traits": [
+        "专注提示词",
+        "完整左侧任务历史",
+        "浮动模型与比例",
+        "推荐：第一次使用最自然"
+      ],
+      "source": "a.html"
+    },
+    {
+      "id": "b",
+      "name": "B · 对照",
+      "concept": "左边描述新想法，右边查看已有作品，输入与结果同时在场。",
+      "typography": "Segoe UI / Microsoft YaHei；标题 29px，输入 16px。海报为独立衬线内容。",
+      "palette": [
+        "#F4F1ED",
+        "#8C5941",
+        "#684A89"
+      ],
+      "traits": [
+        "对话与预览双栏",
+        "原图与缩略图相邻",
+        "适合反复对照作品"
+      ],
+      "source": "b.html"
+    },
+    {
+      "id": "c",
+      "name": "C · 作品桌",
+      "concept": "一打开就看见自己的作品，底部创作条随时开始下一项任务。",
+      "typography": "Segoe UI / Microsoft YaHei；标题 24px，操作 15px，辅助 13px。",
+      "palette": [
+        "#F7F4EE",
+        "#7C5A90",
+        "#66765D"
+      ],
+      "traits": [
+        "作品占据主要空间",
+        "窄侧栏保留四个入口",
+        "底部整行创作条"
+      ],
+      "source": "c.html"
+    }
+  ]
+}
