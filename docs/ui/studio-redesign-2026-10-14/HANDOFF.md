@@ -144,3 +144,12 @@
 本地 51 项组件/API 测试 PASS，ESLint PASS；11 项 Chromium 用例连续三轮 PASS（8.5s / 8.2s / 8.1s），含 1440px/390px 及 20 项合成规格压力场景。新增手机测试初次在弹层覆盖的位置点击输入框超时，调整为实际可见的外部标题完成收起验证，没有用 force 绕过点击。桌面/手机截图已人工检查。上一阶段最终 CI 38470449973、Security 38470450009 均 PASS；本次修改的独立 CI 与后端联调结果后续按实际 Run 记录。
 
 截图：[紧凑数量·桌面](screenshots/c-quantity-desktop.png)、[手机](screenshots/c-quantity-mobile.png)、[分辨率·手机](screenshots/c-resolution-mobile.png)。同一预览地址刷新即可查看。未部署、未改生产、未发真实供应商请求。
+
+
+### 紧凑控件最终隔离联调证据
+
+- 运行前端 / 验收脚本：`40310e2961a5e8150e0c9df4cc86bb8087406c06`，分支 `codex/studio-native-media`。
+- [真实隔离后端 Run 38472664634](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472664634)：PASS；证据 Artifact `11853315700`，209840 字节，有效至 `2026-10-27T21:45:10Z`。本目录摘要和截图为 Git 内保留版本。
+- 复用同一 b2fcdac 三组件镜像，实际 Vue 通过 Core/Bridge/BFF/PostgreSQL/Redis，只有上游为模拟器。通过新数量点选产生文生图 3 张（3 请求）、编辑 2 张（2 请求）、视频 1 条（1 提交）；分别合成扣费 2.10 / 1.40 / 2.00 CNY，各增加一条原生 usage。刷新、查询、重复下载的生成次数及账务不变，原片摘要与前述固定模拟素材一致；视频实际播放通过。
+- 本次 [Security 38472646470](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646470) PASS；[CI 38472646408](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38472646408) 前端 job（含 Typecheck、Lint 和已有集成检查）PASS；未变化的后端全仓 job 在证据归档时仍运行中，不能将局部通过标为整个 CI 通过。上一运行基线 1fb 的完整 CI 38470449973 已 PASS。后续证据提交不修改运行源码，不把文档提交标为被测镜像版本。
+- 未构建新镜像、未重新导出 TAR、未部署或读取/改动生产，未发真实收费请求。当前可操作地址仍为上面的本地视觉预览；此次云端真实隔离栈已按 harness 结束，不能当作持续在线环境。

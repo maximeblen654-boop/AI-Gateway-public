@@ -1,10 +1,10 @@
 {
   "status": "PASS",
-  "frontend_and_acceptance_sha": "3efbc2951f07a5495b5dbbc0934ebe93edf66c39",
+  "frontend_and_acceptance_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
   "backend_source_sha": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
-  "run": 38469785293,
-  "artifact_id": 11851047521,
-  "artifact_expiry_utc": "2026-10-27T21:21:54Z",
+  "run": 38472664634,
+  "artifact_id": 11853315700,
+  "artifact_expiry_utc": "2026-10-27T21:45:10Z",
   "browser_api_interception": false,
   "upstream": "runner-local simulator",
   "production_action": false,
@@ -21,7 +21,7 @@
       "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
       "repeated_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
       "video_playback_verified": null,
-      "raw_report_sha256": "2e3736480d258578fb54d8a24251f447fcb474d84e47c9b91ae5e35591b8a2f7"
+      "raw_report_sha256": "7854153374a4c2143cc2a95cbb481d8b6e2ac536fb2673de5aff1da0b4341c15"
     },
     {
       "scenario": "edit",
@@ -35,7 +35,7 @@
       "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
       "repeated_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
       "video_playback_verified": null,
-      "raw_report_sha256": "8548353d374a58146e1b6d97cf44448c152dc4fed6cd6d1962783e0b93c63615"
+      "raw_report_sha256": "b9001f1e9fbe85beb58954d1b7bf6be6056bd5190af58c4bd0d5b6f3d8b9149d"
     },
     {
       "scenario": "video-compatible",
@@ -49,7 +49,7 @@
       "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
       "repeated_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
       "video_playback_verified": true,
-      "raw_report_sha256": "961fa0e1e7a4ef5c70ecaaae1eecf465ea2b4178c8693aafe28fe858e8edcab6"
+      "raw_report_sha256": "9b02cb89f5e696df3df5251f59b9b68d580aadd2b7ca3cf649094e92252b8463"
     }
   ]
 }
