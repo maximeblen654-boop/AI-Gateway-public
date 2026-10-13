@@ -75,9 +75,9 @@ const report = { cases: [], http: [] }
       assertNoMappings(report.first_save_request_products)
       const first = structuredClone(report.product)
       // Configure the second independent product through the same UI.
-      await page.getByTestId('product-options').locator('summary').click()
-      await page.getByTestId('new-independent-product').click()
-      await page.getByTestId('confirm-add-product').click()
+      await w('product-options').locator('summary').click()
+      await w('new-independent-product').click()
+      await w('confirm-add-product').click()
       for (const value of ['2K', '3:2']) {
         const button = w('wizard-page-1').locator('button.mw-token-chip').filter({ hasText: new RegExp('^'+value+'$') })
         if (!(await button.getAttribute('class')).includes('mw-token-chip-selected')) await button.click()
