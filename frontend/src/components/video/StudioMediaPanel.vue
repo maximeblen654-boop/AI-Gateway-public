@@ -135,6 +135,7 @@ async function changeMode(mode:'text'|'edit'|'video'){
  const nextKind=mode==='video'?'video':'image', sameKind=nextKind===kind.value
  if(sameKind&&active.value&&!canStartNew.value){notice.value='当前任务尚未完成，请查询原任务；不会重新生成。';return}
  if(sameKind&&active.value)newTask()
+ if(mode==='text'&&uploads.value.length){clearAssets();notice.value='已切换为文生图，当前输入不再使用参考素材。'}
  imageMode.value=mode==='edit'?'edit':'text'
  if(!sameKind){kind.value=nextKind;await load();return}
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}

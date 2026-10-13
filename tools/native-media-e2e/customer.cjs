@@ -97,12 +97,13 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await expect(page.getByTestId(video ? 'studio-result-video' : 'studio-result-image')).toHaveCount(count)
     report.downloads = []
     if (video) report.original_sha256 = createHash('sha256').update(fs.readFileSync(`${root}/evidence/synthetic-original.mp4`)).digest('hex')
+    if (workspace && !video) report.original_sha256 = createHash('sha256').update(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')).digest('hex')
     for (let i = 0; i < count; i++) {
       const pending = page.waitForEvent('download'); await page.getByTestId('studio-download').nth(i).click(); const download = await pending
       assert.equal(await download.failure(), null); const bytes = fs.readFileSync(await download.path())
       report.downloads.push({ bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') })
       assert(bytes.length > 0)
-      if (video) assert.equal(report.downloads[i].sha256, report.original_sha256, 'download must match the simulator original')
+      if (video || workspace) assert.equal(report.downloads[i].sha256, report.original_sha256, 'download must match the simulator original')
     }
     report.after = { supplier: stats(), ledger: ledger() }
     assert.equal(report.after.supplier[`${kind}_posts`] - report.before.supplier[`${kind}_posts`], count)
@@ -140,7 +141,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     await page.reload(); await expect(page.getByTestId('studio-task-id')).toContainText(report.id)
     await expect(page.getByTestId('studio-status')).toContainText('生成完成')
-    if (video || geometry) {
+    if (video || geometry || workspace) {
       const queried = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/${video ? 'operations' : 'tasks'}/${report.id}`) && r.request().method() === 'GET')
       await page.getByTestId('studio-refresh').click()
       assert.equal((await queried).status(), 200)
@@ -151,6 +152,13 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       assert.equal(await download.failure(), null)
       report.repeat_download_sha256 = createHash('sha256').update(fs.readFileSync(await download.path())).digest('hex')
       assert.equal(report.repeat_download_sha256, report.original_sha256)
+    }
+    if (workspace && video) {
+      const player=page.getByTestId('studio-result-video')
+      await player.evaluate(v=>v.play())
+      await expect.poll(()=>player.evaluate(v=>v.currentTime)).toBeGreaterThan(0)
+      await player.evaluate(v=>v.pause())
+      report.playback_verified=true
     }
     assert.equal(stats()[`${kind}_posts`], report.after.supplier[`${kind}_posts`])
     assert.deepEqual(ledger(), report.after.ledger)
