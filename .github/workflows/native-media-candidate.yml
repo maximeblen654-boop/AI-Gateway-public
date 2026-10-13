@@ -26,7 +26,7 @@ on:
         required: false
         type: choice
         default: video
-        options: [video, draft-diagnostics, draft-management, studio-workspace]
+        options: [video, draft-diagnostics, draft-management, studio-workspace, studio-workspace-artifact]
       candidate_run_id:
         description: 'existing candidate run id (accept-existing only)'
         required: false
@@ -164,7 +164,12 @@ jobs:
         env:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
           NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
-        run: node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
+        run: |
+          if [ "$NATIVE_ACCEPTANCE_SCENARIO" = studio-workspace-artifact ]; then
+            node tools/native-media-e2e/accept-workspace-artifact.mjs "$RUNNER_TEMP/native-existing-artifact"
+          else
+            node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
+          fi
       - name: Save small acceptance evidence only
         if: always()
         uses: actions/upload-artifact@v4
