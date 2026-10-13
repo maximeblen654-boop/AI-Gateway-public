@@ -26,7 +26,7 @@ on:
         required: false
         type: choice
         default: video
-        options: [video, draft-diagnostics]
+        options: [video, draft-diagnostics, draft-management]
       candidate_run_id:
         description: 'existing candidate run id (accept-existing only)'
         required: false

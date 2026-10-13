@@ -15,13 +15,14 @@ const scriptSha = process.env.GITHUB_SHA
 assert.match(scriptSha, /^[a-f0-9]{40}$/)
 const candidateSha = process.env.NATIVE_CANDIDATE_SOURCE_SHA
 const draftOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'draft-diagnostics'
-assert.equal(candidateSha, draftOnly ? 'e936b1675cc01cdeaafdfaa655e9ff430b6d51e8' : '64d9b523520f087cea31a216e7db65e64605ff7b')
+const managementOnly = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'draft-management'
+assert.equal(candidateSha, managementOnly ? 'b2fcdac93afa6ae194ee81801a9b37813f8f39eb' : draftOnly ? 'e936b1675cc01cdeaafdfaa655e9ff430b6d51e8' : '64d9b523520f087cea31a216e7db65e64605ff7b')
 const artifactDir = path.resolve(process.argv[2] || '')
 assert(artifactDir && fs.existsSync(path.join(artifactDir, 'manifest.json')), 'candidate artifact directory is required')
 const manifest = JSON.parse(fs.readFileSync(path.join(artifactDir, 'manifest.json'), 'utf8'))
 assert.equal(manifest.source_sha, candidateSha)
 assert.equal(manifest.production_action, false)
-assert.equal(manifest.acceptance, 'PASS')
+assert(manifest.acceptance === 'PASS' || (managementOnly && manifest.acceptance === 'NOT_PASSED'), 'only the pinned draft candidate can be resumed after a harness failure')
 assert.equal(manifest.images.length, 3)
 const root = path.join(process.env.RUNNER_TEMP, 'native-media-20261012')
 const evidence = path.join(root, 'evidence')
@@ -41,6 +42,7 @@ for (const image of manifest.images) {
   run('docker', ['load', '--input', tar])
   const loaded = JSON.parse(capture('docker', ['image', 'inspect', image.tag]))[0]
   assert.equal(loaded.Id, image.image_id, `${image.component} image identity mismatch`)
+  assert.equal(loaded.Config.Labels['org.opencontainers.image.revision'], candidateSha)
   assert.equal(`${loaded.Os}/${loaded.Architecture}`, 'linux/amd64')
 }
 const compose = JSON.parse(fs.readFileSync('tools/native-media-e2e/compose.synthetic.json', 'utf8'))
@@ -80,7 +82,16 @@ try {
   assert(await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false), `same-origin proxy did not become healthy: ${proxyOutput}`)
   run(process.execPath, ['tools/native-media-e2e/seed.mjs', root])
   let scenarios
-  if (draftOnly) {
+  if (managementOnly) {
+    run(process.execPath, ['tools/native-media-e2e/customer-keys.mjs', root])
+    run(process.execPath, ['tools/native-media-e2e/draft-management.cjs', root, 'seed'])
+    for (const scenario of ['image', 'video-compatible']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
+    run(process.execPath, ['tools/native-media-e2e/draft-management.cjs', root, 'verify'])
+    run(process.execPath, ['tools/native-media-e2e/draft-management.cjs', root, 'check-preserved'])
+    const report = JSON.parse(fs.readFileSync(path.join(evidence, 'native-draft-management.json'), 'utf8'))
+    assert.equal(report.status, 'PASS')
+    scenarios = report.scenarios
+  } else if (draftOnly) {
     run(process.execPath, ['tools/native-media-e2e/draft-diagnostics.cjs', root])
     const report = JSON.parse(fs.readFileSync(path.join(evidence, 'native-draft-diagnostics.json'), 'utf8'))
     assert.equal(report.status, 'PASS')
@@ -98,9 +109,19 @@ try {
     scenarios = reports.map(r => ({ scenario: r.scenario, task_id: r.id, quote: r.quote.sale_price, request_count: r.after.supplier.video_posts - r.before.supplier.video_posts, downloads: r.downloads, ledger_before: r.before.ledger, ledger_after: r.after.ledger, http: r.http, upstream: state.requests }))
   }
   const containers = JSON.parse(capture('docker', ['inspect', 'ai-gateway-native-core-20261012', 'ai-gateway-native-bridge-20261012', 'ai-gateway-native-bff-20261012']))
-  for (const container of containers) assert.equal(container.State.Health.Status, 'healthy')
+  for (const container of containers) {
+    assert.equal(container.State.Health.Status, 'healthy')
+    assert.equal(container.Image, manifest.images.find(i => container.Name === `/ai-gateway-native-${i.component}-20261012`).image_id)
+  }
   assert.equal(containers[1].HostConfig.NetworkMode, `container:${containers[0].Id}`)
   assert.equal(containers[2].HostConfig.NetworkMode, `container:${containers[0].Id}`)
+  const runtimeFiles = manifest.images.map(i => {
+    const file = i.component === 'core' ? '/app/sub2api' : i.component === 'bridge' ? '/app/studio-bridge' : '/app/studio/bff/image-server.mjs'
+    const container = `ai-gateway-native-${i.component}-20261012`
+    return { component: i.component, path: file, bytes: Number(capture('docker', ['exec', container, 'stat', '-c', '%s', file])), sha256: capture('docker', ['exec', container, 'sha256sum', file]).split(' ')[0] }
+  })
+  fs.writeFileSync(path.join(out, 'runtime-files.json'), JSON.stringify({ source_sha: candidateSha, files: runtimeFiles }, null, 2))
+  if (managementOnly) fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ ...manifest, build_script_sha: manifest.acceptance_script_sha, acceptance_script_sha: scriptSha, acceptance: 'PASS', tested_build_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), runtime_files: runtimeFiles }, null, 2))
   fs.writeFileSync(path.join(out, 'acceptance-existing.json'), JSON.stringify({ status: 'PASS', candidate_source_sha: candidateSha, script_sha: scriptSha, candidate_manifest_sha256: hash(path.join(artifactDir, 'manifest.json')), scenarios, containers: containers.map(c => ({ name: c.Name, image: c.Config.Image, image_id: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode })) }, null, 2))
 } catch (error) {
   try {

@@ -28,7 +28,7 @@ const definitions = [
 ]
 for (const d of definitions) assert(Number.isSafeInteger(d.account) && d.account > 0)
 const blank = (d, i) => ({ product_id: `${d.kind}-blank-${i}`, site_model: d.model, upstream_model: d.model, media_type: d.kind, display_name: `隔离${d.kind === 'image' ? '图片' : '视频'}空白草稿 ${i}`, enabled: false,
-  capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: { min: 1, max: d.kind === 'image' ? 10 : 1 }, references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] }, pricing_rules: [], adapter_config: {} })
+  capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: { min: 1, max: d.kind === 'image' ? 10 : 1 }, references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] }, pricing_rules: [], adapter_config: { size_mappings: [] } })
 const configured = d => ({ ...blank(d, 0), product_id: `${d.kind}-configured`, display_name: `已配置${d.kind === 'image' ? '图片' : '视频'}商品`, enabled: true,
   capabilities: { ...blank(d, 0).capabilities, resolutions: [d.resolution], aspect_ratios: [d.ratio], durations_seconds: d.kind === 'video' ? [5] : [], references: { ...blank(d, 0).capabilities.references, image: { min: 0, max: 2 }, total_max: 2 } },
   pricing_rules: [{ match: {}, sale_price: { amount: d.amount, currency: 'CNY', billing_mode: 'per_request' } }] })
