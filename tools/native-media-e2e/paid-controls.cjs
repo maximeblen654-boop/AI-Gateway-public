@@ -29,7 +29,8 @@ const p='/admin/media-workbench/paid-controls/'
    const a=await api('/admin/accounts/'+fixture.accounts.openai)
    await api('/admin/accounts/'+a.id,'PUT',{credentials:{...a.credentials,model_mapping:{'legacy-image':'other-image'}}})
    const user=await api('/auth/me');assert.equal(user.email,'native-admin@example.invalid')
-   await api('/admin/users/'+user.id,'PUT',{balance:100,allowed_groups:Object.values(fixture.groups)})
+   await api('/admin/users/'+user.id,'PUT',{allowed_groups:Object.values(fixture.groups)})
+   const funded=await api('/admin/users/'+user.id+'/balance','POST',{balance:100,operation:'set',notes:'Isolated preflight fixture only'});assert.equal(Number(funded.balance),100)
    for(const gid of [fixture.groups.openai,fixture.groups.grok])await api('/keys','POST',{name:'Synthetic preflight '+gid,group_id:gid})
    report.checks.push('Existing synthetic Account catalog with unrelated mapping, admin native keys and test credit; no product binding prefilled')
   }else if(phase==='close'){
@@ -105,5 +106,5 @@ const p='/admin/media-workbench/paid-controls/'
   const key=dc('exec','-T','postgres','psql','-U','native','-d','sub2api','-At','-c',`SELECT key FROM api_keys WHERE user_id=1 AND group_id=${gid} ORDER BY id LIMIT 1`).toString().trim()
   if(key){const response=await fetch('http://127.0.0.1:28180/v1/studio/images/catalog',{headers:{Authorization:'Bearer '+key,'X-Studio-Binding-Contract':'published_image_binding_v1'}});const b=await response.json().catch(()=>({}));report.core_catalog_diagnostic={status:response.status,error:b.error,code:b.code,message:b.message,stage:b.diagnostic_stage}}
 await page.screenshot({path:root+'/evidence/native-paid-failure-'+phase+'.png'});throw e}
- finally{fs.writeFileSync(root+'/evidence/native-paid-controls-'+phase+'.json',JSON.stringify(report,null,2));await browser.close()}
+ finally{if(!report.pass)console.error(JSON.stringify({http_errors:report.http_errors,core_catalog_diagnostic:report.core_catalog_diagnostic}));fs.writeFileSync(root+'/evidence/native-paid-controls-'+phase+'.json',JSON.stringify(report,null,2));await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1})
