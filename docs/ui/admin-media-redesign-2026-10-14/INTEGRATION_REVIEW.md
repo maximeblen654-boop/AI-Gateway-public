@@ -1,6 +1,6 @@
 # 前后端联调审查与实施验收清单
 
-本文件是本次设计的阶段交接，不取代项目正式 Handoff。以下源码核对基于 `a14000c68c1f090d34c8fde0197d860d2d767215`。此轮只做源码连接核对与原型归档，未运行真实后端联调。
+本文件是本次设计的阶段交接，不取代项目正式 Handoff。以下源码核对基于 `a14000c68c1f090d34c8fde0197d860d2d767215`。设计归档时未运行真实后端联调。2026-10-14 Review 5513583921 有条件通过后，当前 PR 已进入非生产 Vue 实施；实际新证据另见 IMPLEMENTATION_REPORT.md（完成后归档）。
 
 ## 已观察到的原型局限
 
@@ -26,10 +26,10 @@
 | 选择分辨率与比例 | components/admin/media/MediaProductEditor.vue::setCapability | Product.capabilities.resolutions / aspect_ratios；validator.go::Validate | 读取已有值、增删、返回步骤、保存重读完全对应 |
 | 参考素材 | MediaReferenceEditor.vue | capabilities.references，validator.go::validCapabilities/specs | 上限 16 和适配器限制；0 不是无限；文生图/编辑独立 execution |
 | 哪些规格影响售价 | pricingMatrix.ts::allowedSpecs / buildPricingRules / dimensionsFor | validator.go::Matches / Validate | 计算真正有效组合；保留可用价格，冲突/丢失先确认；数量不进入矩阵维度 |
-| 填写单价 | MediaProductEditor.vue；pricing_rules | validator.go::validPrice；服务端冻结报价 | 空白是未配置，明确 0 是免费；唯一正式售价输入不变 |
+| 填写单价 | MediaProductEditor.vue；pricing_rules | validator.go::validPrice；服务端冻结报价 | 空白是未配置；图片明确 0 可免费，视频必须大于 0 才可报价；唯一正式售价输入不变 |
 | 保存草稿 | api/admin/mediaWorkbench.ts::draftInput / saveDraft；useMediaWorkbench.ts::saveDraft | handler/admin/media_workbench_handler.go；mediaworkbench/media.go::SaveDraft | 白名单载荷、expected_record_version、全部商品身份与明确移除指令；成本数据不进入载荷 |
 | 发布和销售 | useMediaWorkbench.ts::publish / sales；MediaDialog.vue | media.go::Publish；API publish 与 sales 分离 | Account 级范围，expected_draft_revision，二次确认；发布不自动启售 |
-| 参数预览 → 执行 | 服务端返回 validation.previews，不由新页面猜尺寸 | validator.go::Validate → adapter.go::compilePlan；runtime.go::CompilePublishedImagePlanForCount → compilePlan | 同一规格编译器；客户有效分辨率和比例不能丢失或变成 auto |
+| 参数预览 → 执行 | validation.previews 最多 64 条，仅为诊断示例；完整域由 capabilities/combination_rules/pricing_rules 决定 | validator.go::Validate → adapter.go::compilePlan；runtime.go::CompilePublishedImagePlanForCount → compilePlan | 同一规格编译器；预览样本不得构造完整选择器或 eligibility；有效分辨率和比例不能丢失或变成 auto |
 | 视频执行 | 保留现有商品/API 合同 | video_runtime.go::CompilePublishedVideoPlan | 单视频、已有映射/任务/结算保持；不新增视频协议 |
 | 成本估算 | MediaCostCalculator.vue；costCalculator.ts；decimalText.ts | 不进入服务端业务合同 | 使用 storageKey / consumptionKey，不能使用行号；视频按整条，当前售价只读引用 |
 
@@ -52,7 +52,7 @@
 - 图生图带参考图重复上述规格检查；图片购买数量与输入参考图数量、上游单请求上限互相独立。
 - 5 张、上限 2 → 2+2+1；合法单图接口 → 5 个单图单元。沿用现有模拟执行证据，只补改版影响部分。
 
-## 必须补齐的真实隔离验收（本轮全部 NOT_RUN）
+## 必须补齐的真实隔离验收（设计归档时 NOT_RUN；实施结果另附）
 
 | 关卡 | 合格证据 |
 | --- | --- |
@@ -60,6 +60,8 @@
 | 发布前诊断 | 缺价/无效规格准确定位商品和字段；真实未支持能力仍阻止；不删校验换绿灯 |
 | 发布与销售分离 | 仅隔离发布，Account 多商品范围和二次确认；保存/导航不触发发布或启售 |
 | 报价与文生图/编辑 | Core/Bridge/BFF + 模拟上游，实际冻结规格、数量、账户、模型与请求一致 |
+| 报价后依赖变化 | 分别测试仅保存草稿（Published 未变）与发布版本、Account mapping、路由变化；保留冻结 Offer/ResolvedConfig/SpecHash/单价总价/execution，按 readiness/hash 合同继续或拒绝，不悄悄改绑 |
+| 视频零价与预览抽样 | 免费图片实际可报价；0 视频不误显示可购买；超过 64 个合法规格不因预览截断而丢价/丢资格 |
 | 结果与资金 | 原片摘要/下载、partial、刷新恢复，生成次数与原生结算次数不增加；不得重发未知执行 |
 | 视频共用 UI | 普通单视频及既有特殊路径按改动影响补验，商品规格与整条单价不串图片状态 |
 | 多商品与草稿管理 | 配置商品+空白草稿，返回/切换不新增；显式移除保护；不会因新布局丢商品 |

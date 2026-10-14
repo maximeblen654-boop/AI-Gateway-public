@@ -1,8 +1,10 @@
 <template>
-  <details class="mw-cost" data-test="cost-calculator">
-    <summary><span><strong>成本换算</strong><small>辅助估算 · 不改变售价</small></span><span aria-hidden="true" class="mw-cost-chevron">⌄</span></summary>
+  <div class="mw-cost-entry"><button type="button" class="mw-cost-trigger" data-test="cost-open" @click="open()"><span aria-hidden="true">↗</span> 成本换算</button><span class="mw-muted">按当前售价档位估算，不改变售价</span></div>
+  <dialog ref="panel" class="mw-cost" data-test="cost-calculator" :aria-labelledby="titleId" :aria-modal="narrow ? 'true' : 'false'" @cancel.prevent="close" @keydown="narrow && containDialogFocus($event, panel)">
+    <header class="mw-cost-header"><div><h2 :id="titleId" tabindex="-1">成本换算</h2><p>Account #{{ accountId }} · {{ product.display_name || product.upstream_model }}</p></div><button type="button" class="mw-cost-close" data-test="cost-close" aria-label="收起成本换算" @click="close">×</button></header>
     <div class="mw-cost-body">
-      <p class="mw-muted">采购参数按当前管理员和 Account 记在此浏览器，不跨设备同步。积分消耗按商品及规格单独记忆；规格范围变化后请重新估算。</p>
+      <div class="mw-cost-tabs" role="tablist" aria-label="选择售价档位"><button v-for="(row, index) in rows" :key="row.key" type="button" role="tab" :id="`${titleId}-tab-${index}`" :aria-controls="`${titleId}-panel-${index}`" :aria-selected="selectedKey === row.key" :tabindex="selectedKey === row.key ? 0 : -1" :data-test="`cost-tab-${index}`" @click="selectedKey = row.key" @keydown="moveTab($event, index)">{{ labels[index] || '统一售价' }}</button></div>
+      <p class="mw-muted">采购参数按当前管理员和 Account 记在此浏览器，不跨设备同步。积分消耗按商品及规格记忆。</p>
       <p v-if="storageWarning" class="mw-field-error" role="status">{{ storageWarning }}</p>
       <div class="mw-cost-purchase">
         <label class="mw-field">上游采购金额（人民币）<input class="input" data-test="cost-purchase" inputmode="decimal" placeholder="请输入采购金额" :value="memory.purchase" :aria-invalid="!!decimalError(memory.purchase, true)" @input="setAccount('purchase', $event)" /><span v-if="decimalError(memory.purchase, true)" class="mw-field-error">{{ decimalError(memory.purchase, true) }}</span></label>
@@ -10,7 +12,7 @@
       </div>
       <p class="mw-cost-rate" data-test="cost-rate">每积分成本 <strong>{{ rate ? `${rate} CNY` : '待填写有效采购参数' }}</strong></p>
       <p class="mw-muted">同价档位覆盖不同上游消耗时，按最高单件消耗估算。{{ product.media_type === 'video' ? '视频按整条计算，不再乘秒数。' : '图片按单张计算。' }}</p>
-      <div v-for="(row, index) in rows" :key="row.key" class="mw-cost-row" :data-test="`cost-row-${index}`">
+      <div v-for="(row, index) in rows" :key="row.key" v-show="row.key === selectedKey" class="mw-cost-row" role="tabpanel" :id="`${titleId}-panel-${index}`" :aria-labelledby="`${titleId}-tab-${index}`" :data-test="`cost-row-${index}`">
         <div class="mw-cost-row-heading"><strong>{{ labels[index] || '统一售价' }}</strong><span>现有售价：{{ row.rule.sale_price ? `${row.rule.sale_price.amount} ${row.rule.sale_price.currency} / ${unit}` : '待填写' }}</span></div>
         <label class="mw-field">预计每{{ unit }}上游积分消耗<input class="input" inputmode="decimal" placeholder="待估算，允许明确填 0" :value="memory.consumption[row.key] ?? ''" :aria-invalid="!!decimalError(memory.consumption[row.key] ?? '')" :data-test="`cost-consumption-${index}`" @input="setConsumption(row.key, $event)" /><span v-if="decimalError(memory.consumption[row.key] ?? '')" class="mw-field-error">{{ decimalError(memory.consumption[row.key] ?? '') }}</span></label>
         <dl class="mw-cost-results"><div><dt>单{{ unit }}估算上游成本</dt><dd>{{ row.estimate.cost === undefined ? '待估算' : `${row.estimate.cost} CNY` }}</dd></div><div><dt>售价扣除上游成本后</dt><dd :class="{ 'mw-cost-loss': row.estimate.belowCost }">{{ row.estimate.difference === undefined ? '待估算' : `${row.estimate.difference} CNY` }}</dd></div></dl>
@@ -20,13 +22,22 @@
       </div>
       <p class="mw-cost-disclaimer">未包含手续费、税费、服务器等费用。差额不是净利润，不保证不亏损；估算不进入发布、客户报价或正式结算。</p>
     </div>
-  </details>
+  </dialog>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import type { Product } from '@/api/admin/mediaWorkbench'
+import { containDialogFocus } from './mediaDialogFocus'
 import { consumptionKey, decimalError, emptyCostMemory, estimateCost, readCostMemory, storageKey } from './costCalculator'
-const props = defineProps<{ product: Product; accountId?: number; adminId?: number; labels: string[] }>()
+const props = defineProps<{ product: Product; accountId?: number; adminId?: number; labels: string[]; active?: boolean }>()
+const emit = defineEmits<{ toggle: [open: boolean] }>()
+const panel = ref<HTMLDialogElement>()
+const titleId = `media-cost-${useId()}`
+const selectedKey = ref('')
+const opened = ref(false)
+const narrow = ref(false)
+let trigger: HTMLElement | null = null
+let viewport: MediaQueryList | undefined
 const memory = ref(emptyCostMemory())
 const storageWarning = ref('')
 const identity = computed(() => storageKey(props.adminId, props.accountId))
@@ -37,11 +48,54 @@ watch(identity, key => {
   if (!key) { storageWarning.value = '未取得管理员或账号身份，估算仅在当前编辑期间保留。'; return }
   try { memory.value = readCostMemory(localStorage.getItem(key)) } catch { storageWarning.value = '浏览器记忆不可用或已损坏，已忽略旧值；仍可继续估算和填写售价。' }
 }, { immediate: true })
+async function open(index = 0, source?: HTMLElement) {
+  const row = rows.value[index]
+  if (!row) return
+  trigger = source ?? document.activeElement as HTMLElement
+  selectedKey.value = row.key
+  opened.value = true; emit('toggle', true)
+  await nextTick()
+  if (!panel.value?.open) {
+    if (narrow.value) panel.value?.showModal?.()
+    else panel.value?.show?.()
+  }
+  panel.value?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true })
+}
+function close() {
+  if (!opened.value) return
+  opened.value = false; panel.value?.close?.(); emit('toggle', false)
+  if (trigger?.isConnected) trigger.focus({ preventScroll: true })
+}
+function resize() {
+  narrow.value = viewport?.matches ?? true
+  if (opened.value) {
+    panel.value?.close?.()
+    if (narrow.value) panel.value?.showModal?.()
+    else panel.value?.show?.()
+  }
+}
+function escape(event: KeyboardEvent) { if (event.key === 'Escape' && opened.value && !document.querySelector('dialog.media-dialog[open]')) { event.preventDefault(); close() } }
+onMounted(() => {
+  viewport = window.matchMedia?.('(max-width: 1279px)'); resize()
+  viewport?.addEventListener('change', resize); window.addEventListener('keydown', escape)
+})
+onBeforeUnmount(() => { emit('toggle', false); panel.value?.close?.(); viewport?.removeEventListener('change', resize); window.removeEventListener('keydown', escape) })
+watch(() => props.active, active => { if (active === false) close() })
+watch([() => props.adminId, () => props.accountId, () => props.product.product_id], () => close())
+defineExpose({ open, close })
 const rate = computed(() => estimateCost(memory.value.purchase, memory.value.credits, '', null).perCredit)
 const rows = computed(() => (props.product.pricing_rules.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }]).map(rule => {
   const key = consumptionKey(props.product, rule)
   return { key, rule, estimate: estimateCost(memory.value.purchase, memory.value.credits, memory.value.consumption[key] ?? '', rule.sale_price) }
 }))
+watch(rows, value => { if (opened.value && !value.some(row => row.key === selectedKey.value)) close() })
+function moveTab(event: KeyboardEvent, index: number) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const target = event.key === 'Home' ? 0 : event.key === 'End' ? rows.value.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + rows.value.length) % rows.value.length
+  selectedKey.value = rows.value[target]!.key
+  panel.value?.querySelectorAll<HTMLButtonElement>('[role=tab]')[target]?.focus()
+}
 function persist() {
   if (!identity.value) return
   // Invalid intermediate input stays visible, but never poisons remembered values.
@@ -57,10 +111,15 @@ function setAccount(field: 'purchase' | 'credits', event: Event) { memory.value[
 function setConsumption(key: string, event: Event) { memory.value.consumption[key] = (event.target as HTMLInputElement).value; persist() }
 </script>
 <style scoped>
-.mw-cost{--mw-cost-warning:#b43c23;margin-top:24px;border:1px solid var(--mw-border);border-radius:14px;background:var(--mw-soft);color:var(--mw-text);min-width:0}
-.mw-cost summary{cursor:pointer;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;list-style:none}
-.mw-cost summary::-webkit-details-marker{display:none}.mw-cost summary>span:first-child{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}.mw-cost summary small{color:var(--mw-muted);font-size:12px}.mw-cost summary:focus-visible{outline:3px solid #668bc4;outline-offset:3px;border-radius:12px}.mw-cost[open] .mw-cost-chevron{transform:rotate(180deg)}
-.mw-cost-body{padding:0 20px 20px;display:grid;gap:16px;min-width:0}.mw-cost-body p{margin:0;line-height:1.7;font-size:13px}.mw-cost-purchase{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.mw-cost .mw-field{display:grid;gap:8px;font-size:13px;min-width:0}.mw-cost .input{width:100%;min-width:0;box-sizing:border-box}.mw-cost-rate{padding:12px 0;border-bottom:1px solid var(--mw-border);display:flex;gap:12px;flex-wrap:wrap}.mw-cost-rate strong{font-variant-numeric:tabular-nums}
-.mw-cost-row{border-top:1px solid var(--mw-border);padding-top:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px 24px}.mw-cost-row-heading{grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}.mw-cost-row-heading>span{color:var(--mw-muted);font-size:13px}.mw-cost-results{display:grid;gap:10px;margin:0;font-size:13px}.mw-cost-results>div{display:flex;justify-content:space-between;gap:16px}.mw-cost-results dt{color:var(--mw-muted)}.mw-cost-results dd{margin:0;font-weight:650;font-variant-numeric:tabular-nums}.mw-cost-row>p{grid-column:1/-1}.mw-cost-loss{color:var(--mw-cost-warning);font-weight:600}:global(.dark .mw-cost){--mw-cost-warning:#ffab94}.mw-cost-disclaimer{color:var(--mw-muted);padding-top:16px;border-top:1px solid var(--mw-border)}.mw-cost :is(strong,dd,span){overflow-wrap:anywhere}
-@media(max-width:640px){.mw-cost summary{padding:16px}.mw-cost-body{padding:0 16px 16px}.mw-cost-purchase,.mw-cost-row{grid-template-columns:minmax(0,1fr)}.mw-cost-results>div{flex-wrap:wrap;gap:6px}.mw-cost summary>span:first-child{gap:6px}}
+.mw-cost-entry{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.mw-cost-trigger{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--mw-border);border-radius:8px;font-weight:600;font-size:13px;background:var(--mw-surface)}
+.mw-cost{--mw-cost-warning:#b43c23;position:fixed;inset:80px 16px 16px auto;margin:0;width:400px;height:calc(100dvh - 96px);max-height:none;max-width:calc(100vw - 24px);padding:0;border:1px solid var(--mw-border);border-radius:16px;background:var(--mw-surface);color:var(--mw-text);box-shadow:0 14px 50px #101d1626;z-index:45;overflow:hidden}
+.mw-cost[open]{display:flex;flex-direction:column;animation:mw-cost-in .28s cubic-bezier(.2,.75,.2,1)}.mw-cost::backdrop{background:#0b171950;backdrop-filter:blur(2px)}
+.mw-cost-header{padding:24px;display:flex;align-items:flex-start;gap:12px;justify-content:space-between;border-bottom:1px solid var(--mw-border);flex-shrink:0}.mw-cost-header h2{font-size:20px;font-weight:600;letter-spacing:-.025em;margin:0}.mw-cost-header p{font-size:12px;color:var(--mw-muted);margin-top:8px;overflow-wrap:anywhere}.mw-cost-close{width:36px;height:36px;flex-shrink:0;border:1px solid var(--mw-border);border-radius:50%;font-size:24px;line-height:1}
+.mw-cost-body{padding:20px 24px;display:grid;gap:20px;min-width:0;overflow-y:auto;overscroll-behavior:contain}.mw-cost-body p{margin:0;line-height:1.7;font-size:13px}.mw-cost-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:4px;background:var(--mw-soft);border-radius:10px}.mw-cost-tabs button{flex:1 1 90px;min-width:0;padding:9px 8px;font-size:12px;border-radius:7px;overflow-wrap:anywhere;transition:background .2s,color .2s}.mw-cost-tabs [aria-selected=true]{background:var(--mw-surface);color:var(--mw-accent);box-shadow:0 1px 4px #00000012;font-weight:600}
+.mw-cost-purchase{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.mw-cost .mw-field{display:grid;gap:8px;font-size:12px;min-width:0;margin:0}.mw-cost .input{width:100%;min-width:0;box-sizing:border-box}.mw-cost-rate{padding-bottom:16px;border-bottom:1px solid var(--mw-border);display:flex;gap:12px;flex-wrap:wrap}.mw-cost-rate strong{font-variant-numeric:tabular-nums}
+.mw-cost-row{display:grid;gap:18px}.mw-cost-row-heading{display:grid;gap:8px;font-size:14px}.mw-cost-row-heading>span{color:var(--mw-muted);font-size:13px}.mw-cost-results{display:grid;gap:18px;margin:0;padding:18px;background:var(--mw-soft);border-radius:10px;font-size:13px}.mw-cost-results>div{display:grid;gap:6px}.mw-cost-results dt{color:var(--mw-muted)}.mw-cost-results dd{margin:0;font-size:22px;font-weight:600;color:var(--mw-text);font-variant-numeric:tabular-nums}.mw-cost-results>div:last-child{padding-top:16px;border-top:1px solid var(--mw-border)}.mw-cost-loss,.mw-cost-results dd.mw-cost-loss{color:var(--mw-cost-warning);font-weight:600}:global(.dark .mw-cost){--mw-cost-warning:#ffab94}.mw-cost-disclaimer{color:var(--mw-muted);padding-top:16px;border-top:1px solid var(--mw-border)}.mw-cost :is(strong,dd,span){overflow-wrap:anywhere}
+@keyframes mw-cost-in{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
+@media(max-width:1279px){.mw-cost{inset:auto 8px 8px;width:calc(100vw - 16px);max-width:520px;height:min(780px,calc(100dvh - 24px));margin:0 auto;border-radius:20px;z-index:60;animation-name:mw-cost-up}.mw-cost-header{padding:20px}.mw-cost-body{padding:20px}.mw-cost-close{width:44px;height:44px}.mw-cost-tabs button{min-height:44px}}
+@keyframes mw-cost-up{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.mw-cost[open]{animation:none}.mw-cost-tabs button{transition:none}}
 </style>

@@ -7,23 +7,13 @@
 </template>
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { containDialogFocus } from './mediaDialogFocus'
 const props = defineProps<{ show: boolean; title: string; busy?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const element = ref<HTMLDialogElement>()
 const titleId = `media-dialog-${useId()}`
 let previousFocus: HTMLElement | null = null
-function trapFocus(event: KeyboardEvent) {
-  if (event.key !== 'Tab' || !element.value) return
-  const focusable = Array.from(element.value.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')).filter(node => node.getClientRects().length > 0)
-  const first = focusable[0]
-  const last = focusable.at(-1)
-  if (!first) { event.preventDefault(); element.value.focus(); return }
-  if (event.shiftKey && (document.activeElement === first || document.activeElement === element.value)) {
-    event.preventDefault(); last?.focus()
-  } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === element.value)) {
-    event.preventDefault(); first.focus()
-  }
-}
+function trapFocus(event: KeyboardEvent) { containDialogFocus(event, element.value) }
 watch(() => props.show, async show => {
   await nextTick()
   if (show) {

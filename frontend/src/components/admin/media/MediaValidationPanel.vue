@@ -19,7 +19,7 @@
       </li>
     </ul>
     <button v-if="development.length" type="button" class="btn btn-secondary" data-test="copy-codex" @click="copy">复制给 Codex</button>
-    <details v-if="validation?.previews"><summary>请求预览（后台本地构造）</summary><pre>{{ JSON.stringify(validation.previews, null, 2) }}</pre></details>
+    <details v-if="validation?.previews"><summary>请求编译示例（最多 64 条）</summary><p class="mw-muted">这是有界抽样，不是完整可售规格。选择范围和价格覆盖以商品规格、组合限制及服务端发布结果为准。</p><pre>{{ JSON.stringify(validation.previews, null, 2) }}</pre></details>
   </section>
 </template>
 <script setup lang="ts">

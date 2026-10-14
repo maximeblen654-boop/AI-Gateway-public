@@ -1,21 +1,20 @@
 <template>
-    <div class="mw-adapter-status" data-test="adapter-status">
-      <strong>{{ adapterStatus.title }}</strong><p class="mw-muted">{{ adapterStatus.description }}</p>
+    <details class="mw-adapter-status" data-test="adapter-status" :open="adapterDiagnostics.length > 0">
+      <summary>{{ adapterStatus.title }}</summary><p class="mw-muted">{{ adapterStatus.description }}</p>
       <p v-for="diagnostic in adapterDiagnostics" :key="diagnostic.code + diagnostic.path" class="mw-muted">{{ diagnostic.code }}：{{ diagnostic.message }} {{ diagnostic.action }}</p>
-    </div>
-  <fieldset ref="wizardElement" :disabled="disabled" class="mw-product-fields mw-wizard">
+    </details>
+  <fieldset ref="wizardElement" :disabled="disabled" class="mw-product-fields mw-wizard" :style="{ '--mw-step-index': wizardStep - 1 }">
     <nav class="mw-wizard-steps" aria-label="当前模型配置步骤">
       <button v-for="(label, index) in stepLabels" :key="label" type="button" :data-test="`wizard-step-${index + 1}`" :aria-current="wizardStep === index + 1 ? 'step' : undefined" @click="goToStep(index + 1)"><span>{{ index + 1 }}</span><strong>{{ label }}</strong></button>
     </nav>
     <div ref="stepHeading" class="mw-wizard-heading" tabindex="-1">
-      <p class="mw-eyebrow">商品配置 · {{ wizardStep }} / 5</p><h3>{{ stepQuestions[wizardStep - 1] }}</h3>
+      <h3>{{ stepQuestions[wizardStep - 1] }}</h3>
       <p class="mw-muted">{{ stepDescriptions[wizardStep - 1] }}</p>
       <span class="mw-draft-state">{{ dirty ? '有未保存修改' : '正在查看草稿' }} · 切换步骤不会保存或发布</span>
     </div>
     <div v-show="wizardStep === 1" data-test="wizard-page-1">
     <section data-field="capabilities">
-      <h3>规格</h3>
-      <p class="mw-muted">按供应商实际能力填写，保存后由后台检查。</p>
+
       <div class="mw-field-grid">
         <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="setCapability('resolution', $event)" />
         <MediaTokensField label="比例" :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="setCapability('aspect_ratio', $event)" />
@@ -50,18 +49,18 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <p class="mw-muted">未填写表示价格未配置；只有明确填写 0 才表示免费。已有非标准价格规则继续保留，由服务端核验。</p>
+      <p class="mw-muted">{{ product.media_type === 'video' ? '视频单条售价须大于 0；0 元视频不能用于客户报价。' : '空白是未配置；明确填写 0 才表示免费图片。' }} 已有价格规则继续保留，由服务端核验。</p>
       <div class="mw-price-table" role="table" aria-label="商品单价表">
         <div class="mw-price-table-head" role="row"><span role="columnheader">规格组合</span><span role="columnheader">单{{ unitLabel }}售价 · CNY</span><span role="columnheader">填写状态</span></div>
         <div v-for="(rule, index) in priceRows" :key="index" class="mw-price-row" role="row">
-          <div role="cell" class="mw-price-spec"><span class="mw-row-number">{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ pricingRuleLabel(rule) }}</strong></div>
+          <div role="cell" class="mw-price-spec"><span class="mw-row-number">{{ String(index + 1).padStart(2, '0') }}</span><div><strong>{{ pricingRuleLabel(rule) }}</strong><p class="mw-muted">{{ samePriceText }}</p><button type="button" class="mw-link mw-row-cost" :data-test="`open-cost-${index}`" @click="calculator?.open(index, $event.currentTarget as HTMLElement)">估算成本 ↗</button></div></div>
           <div role="cell"><label class="mw-field"><span class="mw-price-mobile-label">单{{ unitLabel }}售价 · CNY</span>
             <input class="input" inputmode="decimal" placeholder="待填写" :aria-label="`${pricingRuleLabel(rule)} 单${unitLabel}价格（CNY）`" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-invalid="!!priceError(rule)" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
           </label><p v-if="priceError(rule)" class="mw-field-error" role="alert">{{ priceError(rule) }}</p><p v-if="rule.sale_price && (rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原价格 {{ rule.sale_price.currency }} / {{ rule.sale_price.billing_mode }}；重新填写才改为 CNY / {{ unitLabel }}。</p></div>
           <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费 · 0 元' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
         </div>
       </div>
-      <MediaCostCalculator :product="product" :account-id="accountId" :admin-id="adminId" :labels="priceRows.map(pricingRuleLabel)" />
+      <MediaCostCalculator ref="calculator" :active="wizardStep === 4" @toggle="emit('cost-toggle', $event)" :product="product" :account-id="accountId" :admin-id="adminId" :labels="priceRows.map(pricingRuleLabel)" />
       <p class="mw-muted" data-test="pricing-row-summary">价格行：{{ priceRows.length }}，已填写 {{ filledPricingRows }}，待填写 {{ priceRows.length - filledPricingRows }}。</p>
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
@@ -101,7 +100,7 @@ import MediaCostCalculator from './MediaCostCalculator.vue'
 import { multiplyDecimalText } from './decimalText'
 import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number }>()
-const emit = defineEmits<{ 'update:product': [value: Product] }>()
+const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [open: boolean] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const durationPresets = ['5', '10', '15']
@@ -115,7 +114,8 @@ const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = 
 
 const stepLabels = ['可售规格', '参考素材', '计费维度', '填写单价', '确认保存']
 const stepQuestions = ['这个模型可以出售什么规格？', '客户可以上传什么参考素材？', '什么情况需要卖不同的价格？', '每个价格档位卖多少钱？', '确认商品配置并保存']
-const stepDescriptions = ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', '为每个有效组合填写人民币单价。空白是未配置，明确填写 0 才表示免费。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。']
+const stepDescriptions = computed(() => ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', props.product.media_type === 'video' ? '按整条填写人民币单价，须大于 0。空白是未配置。' : '按张填写人民币单价。空白是未配置，明确填 0 表示免费。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。'])
+const calculator = ref<InstanceType<typeof MediaCostCalculator>>()
 const wizardStep = ref(1)
 const stepHeading = ref<HTMLElement>()
 const wizardElement = ref<HTMLElement>()
@@ -267,7 +267,7 @@ const pricingPreview = computed(() => {
   if (!specs || !specs.some(spec => spec.count === quantity && pricingDimensions.every(key => !selected[key] || String(spec[key]) === selected[key]))) return undefined
   const matching = priceRows.value.filter(item => activePricingDimensions.value.every(key => { const values = matchValues(item.match, key); return !values.length || values.includes(selected[key] ?? '') }))
   const rule = matching.length === 1 ? matching[0] : undefined
-  if (!rule?.sale_price || rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return undefined
+  if (!rule?.sale_price || priceError(rule) || rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return undefined
   if (!Number.isInteger(quantity) || quantity < props.product.capabilities.count.min || quantity > props.product.capabilities.count.max) return undefined
   return { unit: rule.sale_price.amount, quantity, total: multiplyDecimalText(rule.sale_price.amount, quantity) }
 })
@@ -277,7 +277,11 @@ function edit(change: (value: Product) => void) {
   change(next)
   emit('update:product', next)
 }
-function priceError(rule: Product['pricing_rules'][number]): string { return rule.sale_price && !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount) ? '请输入非负金额，最多 8 位小数；免费请明确填写 0。' : '' }
+function priceError(rule: Product['pricing_rules'][number]): string {
+  if (!rule.sale_price) return ''
+  if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return '请输入有效金额，最多 8 位小数。'
+  return props.product.media_type === 'video' && /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '视频单条售价须大于 0；当前合同不支持免费视频报价。' : ''
+}
 function setAmount(index: number, event: Event) {
   edit(next => {
     if (!next.pricing_rules?.length) next.pricing_rules = [{ match: {}, sale_price: null }]

@@ -1,11 +1,10 @@
 <template>
   <AppLayout>
-    <div class="media-workbench" :class="`mw-step-${step}`" :aria-busy="!!pending || loading">
+    <div class="media-workbench" :class="[`mw-step-${step}`, { 'mw-cost-open': costOpen }]" :aria-busy="!!pending || loading">
       <header class="mw-heading">
         <div>
-          <p class="mw-eyebrow">MEDIA WORKBENCH</p>
           <h1>媒体工作台</h1>
-          <p v-if="step !== 'editor'" class="mw-muted">按“来源与账号 → 模型 → 完整配置”完成媒体产品设置。</p>
+          <p v-if="step !== 'editor'" class="mw-muted">选择现有账号，为模型配置可售规格和价格。</p>
         </div>
         <nav class="mw-steps" aria-label="工作台导航">
           <span :class="{ 'mw-step-current': step === 'suppliers' }">来源与账号</span>
@@ -76,8 +75,8 @@
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
             <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
           </div>
-          <label class="mw-field">搜索模型<input v-model="search" class="input" placeholder="模型名称或精确 ID" type="search" data-test="model-search" /></label>
-          <label class="mw-field">模型状态<select v-model="filter" class="input" data-test="model-filter"><option value="">全部状态</option><option v-for="state in modelStates" :key="state" :value="state">{{ modelLabel(state) }}</option></select></label>
+          <div class="mw-model-filters"><label class="mw-field">搜索模型<input v-model="search" class="input" placeholder="模型名称或精确 ID" type="search" data-test="model-search" /></label>
+          <label class="mw-field">模型状态<select v-model="filter" class="input" data-test="model-filter"><option value="">全部状态</option><option v-for="state in modelStates" :key="state" :value="state">{{ modelLabel(state) }}</option></select></label></div>
           <p v-if="!filteredModels.length" class="mw-muted">没有匹配模型。可同步上游模型目录。</p>
           <div class="mw-model-list">
             <button v-for="row in filteredModels" :key="row.model_id" class="mw-model-row" :class="{ 'mw-selected': selectedModel === row.model_id }" :aria-pressed="selectedModel === row.model_id" :disabled="busy" :data-test="`model-${row.model_id}`" @click="navigate(() => openEditor(row.model_id))">
@@ -128,7 +127,7 @@
               <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
               <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveDraft">保存草稿与移除操作</button>
             </section>
-            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
@@ -198,6 +197,7 @@ import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
 import type { Product, Diagnostic, SupplierDetail } from '@/api/admin/mediaWorkbench'
 import '@/styles/media-workbench.css'
 
+const costOpen = ref(false)
 const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
   diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,

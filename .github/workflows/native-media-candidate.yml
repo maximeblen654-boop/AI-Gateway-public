@@ -10,7 +10,7 @@ on:
         required: true
         default: build
         type: choice
-        options: [build, accept-existing]
+        options: [build, accept-existing, admin-ui-review]
       build_source_sha:
         description: 'exact runtime source SHA; empty uses this workflow commit'
         required: false
@@ -179,3 +179,60 @@ jobs:
           compression-level: 6
           path: |
             ${{ runner.temp }}/native-existing-acceptance-output/*
+
+  admin-ui-review:
+    if: >-
+      github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
+      github.ref == 'refs/heads/codex/admin-media-design-review' &&
+      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'admin-ui-review'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      NATIVE_ACCEPTANCE_SCENARIO: admin-ui-review
+      NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.review-runtime
+      NATIVE_REUSE_SOURCE_DIR: ${{ github.workspace }}/.candidate-reuse-source
+      NATIVE_REUSE_ARTIFACT_DIR: ${{ github.workspace }}/.candidate-reuse-artifact
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: .review-runtime
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: b2fcdac93afa6ae194ee81801a9b37813f8f39eb
+          path: .candidate-reuse-source
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+      - uses: docker/setup-buildx-action@v3
+      - name: Reuse existing sidecars in the isolated stack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 38443205417 --repo "$GITHUB_REPOSITORY" --name native-media-candidate-b2fcdac93afa6ae194ee81801a9b37813f8f39eb --dir "$NATIVE_REUSE_ARTIFACT_DIR"
+      - name: Compile Core for disposable integration tests only
+        run: node tools/native-media-e2e/candidate.mjs build
+      - name: Prepare existing browser harness
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Actual Vue and isolated backend integration
+        run: node tools/native-media-e2e/candidate.mjs verify
+      - name: Preserve small review evidence, no image export
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-implementation-review-${{ github.sha }}
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/native-candidate-output/*.json
+            ${{ runner.temp }}/native-candidate-output/*.png

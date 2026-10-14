@@ -10,6 +10,7 @@ const artifact = process.env.NATIVE_WORKSPACE_ARTIFACT === 'true'
 const workspace=process.env.NATIVE_WORKSPACE_UI==='true'
 const scenario = process.argv[3] || 'image'
 const geometryCases = {
+  'image-geometry-free': { resolution:'1K', ratio:'1:1', cents:0, count:1 },
   'image-geometry-1k': { resolution:'1K', ratio:'1:1', cents:70, count:3 },
   'image-geometry-2k': { resolution:'2K', ratio:'3:2', cents:90, count:1 },
   'image-geometry-4k': { resolution:'4K', ratio:'16:9', cents:110, count:1 },
@@ -26,7 +27,9 @@ const videoModel = ({ grok: 'grok-imagine-video', compatible: 'synthetic-compati
 const docker = (...args) => execFileSync('docker', [...(process.platform === 'win32' ? ['--context', 'desktop-linux'] : []), ...args], { windowsHide: true, encoding: 'utf8' })
 const stats = () => JSON.parse(fs.readFileSync(`${root}/evidence/native-supplier-state.json`, 'utf8'))
 const ledger = () => JSON.parse(docker('exec', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-At', '-c', "select json_build_object('balance',balance,'frozen_balance',frozen_balance,'usage',(select count(*) from usage_logs where user_id=2),'video_captured',(select count(*) from studio_video_orders where user_id=2 and state='CAPTURED')) from users where id=2"))
-const reportPath = `${root}/evidence/native-customer-${scenario}.json`
+const drift = process.env.NATIVE_QUOTE_DRIFT
+assert(!drift || process.env.NATIVE_ACCEPTANCE_SCENARIO === 'admin-ui-review')
+const reportPath = `${root}/evidence/native-customer-${scenario}${drift ? '-'+drift : ''}.json`
 const recover = process.argv.includes('--recover')
 const prior = fs.existsSync(reportPath) ? JSON.parse(fs.readFileSync(reportPath, 'utf8')) : null
 assert(recover || !prior?.id || prior.pass, 'Previous task exists: use --recover, do not submit again')
@@ -39,6 +42,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
   const artifactProof = artifact ? require('./artifact-assets.cjs')(page) : null
   page.on('response', async r => { if (r.url().startsWith(base+'/studio-v2/api/')) report.http.push({ method: r.request().method(), path: new URL(r.url()).pathname, status: r.status(), ...(r.status() >= 400 ? { error: await r.json().catch(() => null) } : {}) }) })
   await page.addInitScript(() => { localStorage.setItem('sub2api_locale', 'zh'); localStorage.setItem('user_guide_2_user_v4_interactive', 'true') })
+  let restoreDrift
   try {
     await page.goto(base+'/login'); await page.getByLabel('邮箱').fill('native-customer@example.invalid'); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
     await page.getByRole('button', { name: '登录', exact: true }).click(); await page.waitForURL('**/dashboard')
@@ -90,7 +94,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     await page.getByTestId('studio-quote').click(); const response = await quote
     report.quote = await response.json(); assert.equal(response.status(), 200, JSON.stringify(report.quote))
     report.id = report.quote.task_id || report.quote.operation_id
-    assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents || 70))
+    assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents ?? 70))
     if (artifact) {
       assert.equal(stats()[`${kind}_posts`], report.before.supplier[`${kind}_posts`], 'quote must not generate')
       assert.equal(ledger().usage, report.before.ledger.usage, 'quote must not settle')
@@ -98,9 +102,17 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       await expect(page.getByTestId('studio-confirm-generate')).toBeVisible()
       await page.screenshot({ path: `${root}/evidence/native-artifact-${scenario}-confirmation.png`, fullPage: true })
     }
+    if (drift) restoreDrift = await require('./quote-drift.cjs')(root, drift, report)
     const submitted = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/tasks`) && r.request().method() === 'POST')
     await page.getByTestId(workspace?'studio-confirm-generate':'studio-generate').click(); const submit = await submitted
     report.submit = { status: submit.status(), body: await submit.json() }
+    if (drift && drift !== 'draft') {
+      assert(submit.status() >= 400 || ['failed','unknown'].includes(report.submit.body?.status), JSON.stringify(report.submit))
+      assert.equal(stats().image_posts, report.before.supplier.image_posts, 'stale quote must never reach upstream')
+      assert.deepEqual(ledger(), report.before.ledger, 'stale quote must not charge')
+      report.after = { supplier: stats(), ledger: ledger() }; report.pass = true; report.rejected_before_generation = true
+      return
+    }
     }
     await expect(page.getByTestId('studio-status')).toContainText('生成完成', { timeout: 60000 })
     await expect(page.getByTestId(video ? 'studio-result-video' : 'studio-result-image')).toHaveCount(count)
@@ -116,7 +128,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     report.after = { supplier: stats(), ledger: ledger() }
     assert.equal(report.after.supplier[`${kind}_posts`] - report.before.supplier[`${kind}_posts`], count)
-    assert.equal(Math.round((report.before.ledger.balance - report.after.ledger.balance) * 100), video ? 200 : count * (geometry?.cents || 70))
+    assert.equal(Math.round((report.before.ledger.balance - report.after.ledger.balance) * 100), video ? 200 : count * (geometry?.cents ?? 70))
     assert.equal(report.after.ledger.usage - report.before.ledger.usage, 1)
     if (geometry) {
       const posts = report.after.supplier.requests.slice(report.before.supplier.requests.length).filter(r=>r.method==='POST')
@@ -134,7 +146,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
       report.actual_submits = posts
       report.expected_spec = geometry
     }
-    if (artifact && !video) {
+    if (artifact && !video && !geometry) {
       const requests = report.after.supplier.requests.slice(report.before.supplier.requests.length).filter(r => r.method === 'POST')
       assert.equal(requests.length, count)
       for (const request of requests) {
@@ -204,6 +216,6 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     report.pass = true
     delete report.error
   } catch (error) { report.error = error.message; report.failure_state = { supplier: stats(), ledger: ledger() }; await page.screenshot({ path: `${root}/evidence/native-customer-${scenario}-failure.png`, fullPage: true }); throw error }
-  finally { fs.writeFileSync(`${root}/evidence/native-customer-${scenario}.json`, JSON.stringify(report, null, 2)); await browser.close() }
+  finally { if (restoreDrift) await restoreDrift(); fs.writeFileSync(reportPath, JSON.stringify(report, null, 2)); await browser.close() }
   console.log(JSON.stringify({ scenario, pass: true, id: report.id, delivered: count }))
 })().catch(error => { console.error(error.message); process.exitCode = 1 })
