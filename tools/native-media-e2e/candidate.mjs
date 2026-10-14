@@ -187,6 +187,7 @@ if (mode === 'load-existing') {
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'verify'])
       for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
+      run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
     } else if (adminReview) {
       assert.equal(await fetch('http://127.0.0.1:4295/').then(() => true).catch(() => false), false)
       for (const script of ['seed.mjs', 'customer-keys.mjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])

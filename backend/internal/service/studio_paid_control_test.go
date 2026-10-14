@@ -200,3 +200,44 @@ func TestStudioPaidControlFailedCheckClosesExistingGrant(t *testing.T) {
 		t.Fatal("failed preflight left old grant open")
 	}
 }
+
+func TestStudioPaidControlCancelledEnableStaysClosed(t *testing.T) {
+	for _, stage := range []string{"check", "final_fingerprint"} {
+		t.Run(stage, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			store := &paidSettingsFake{values: map[string]string{}}
+			gate := &StudioPaidControl{Settings: store, Managed: true}
+			gate.Check = func(context.Context, string, int64) PaidReport {
+				if stage == "check" {
+					cancel()
+				}
+				return PaidReport{Pass: true, Fingerprint: "same"}
+			}
+			gate.Fingerprint = func(context.Context, string, int64) (string, error) { cancel(); return "same", nil }
+			state, _, err := gate.Apply(ctx, "image", 1, true, "", "same")
+			if err == nil || state.Effective || state.Requested || gate.Status(context.Background(), "image").Effective || gate.Status(context.Background(), "video").Effective {
+				t.Fatal("cancelled recheck granted admission", state, err)
+			}
+		})
+	}
+}
+
+func TestStudioPaidPreflightCancelledRequest(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		want := "check_cancelled"
+		if deadline {
+			cancel()
+			ctx, cancel = context.WithTimeout(context.Background(), -1)
+			want = "check_timeout"
+		} else {
+			cancel()
+		}
+		report := (&studioPaidPreflight{}).check(ctx, "image", 1)
+		cancel()
+		if report.Pass || len(report.Checks) != 1 || report.Checks[0].Code != want || report.Metrics.SpecsChecked != 0 {
+			t.Fatalf("cancelled preflight: %+v", report)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package mediaworkbench
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -484,6 +485,10 @@ func publishedRevision(p *Published) string {
 	}{p.SourceDraftRevision, p.Products, p.Offers, p.Dependencies})
 }
 func publishedReady(a *Account) bool {
+	return publishedReadyContext(context.Background(), a)
+}
+
+func publishedReadyContext(ctx context.Context, a *Account) bool {
 	if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady || a.Config == nil {
 		return false
 	}
@@ -493,6 +498,6 @@ func publishedReady(a *Account) bool {
 	}
 	// Validate the immutable Published products rather than a newer/incomplete
 	// Draft. An edit failure must not interrupt previously published sales.
-	v, offers := Validate(a, Draft{Revision: p.SourceDraftRevision, Products: p.Products}, p.PublishedAt)
+	v, offers := validateContext(ctx, a, Draft{Revision: p.SourceDraftRevision, Products: p.Products}, p.PublishedAt)
 	return v.PublishReady && hash(offers) == hash(p.Offers)
 }

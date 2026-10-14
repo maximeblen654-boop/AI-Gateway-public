@@ -180,15 +180,31 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 	out.fingerprint = studioHash(parts)
 	return out, nil
 }
-func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) PaidReport {
-	report := PaidReport{Media: m, Pass: true, Checks: []PaidCheck{}, CheckedAt: time.Now().UTC()}
+func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) (report PaidReport) {
+	started := time.Now()
+	report = PaidReport{Metrics: &PaidCheckMetrics{TimingsMS: map[string]int64{}}, Media: m, Pass: true, Checks: []PaidCheck{}, CheckedAt: time.Now().UTC()}
 	add := func(code string, account int64, product, path string, err error) {
 		report.Checks = append(report.Checks, PaidCheck{code, account, product, path, err == nil})
 		if err != nil {
 			report.Pass = false
 		}
 	}
+	defer func() {
+		report.Metrics.TimingsMS["total"] = time.Since(started).Milliseconds()
+		if err := ctx.Err(); err != nil {
+			code := "check_cancelled"
+			if errors.Is(err, context.DeadlineExceeded) {
+				code = "check_timeout"
+			}
+			add(code, 0, "", "", err)
+		}
+	}()
+	if ctx.Err() != nil {
+		return report
+	}
+	stage := time.Now()
 	snap, e := p.snapshot(ctx, m, actor)
+	report.Metrics.TimingsMS["initial_dependencies"] = time.Since(stage).Milliseconds()
 	if e != nil {
 		var qe *StudioQuoteError
 		code := "dependencies_unavailable"
@@ -251,49 +267,29 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 	if e != nil {
 		return report
 	}
+	report.Metrics.TimingsMS["eligibility_and_storage"] = time.Since(started).Milliseconds() - report.Metrics.TimingsMS["initial_dependencies"]
 	for i := range snap.accounts {
+		if ctx.Err() != nil {
+			return report
+		}
 		a := &snap.accounts[i]
-		for _, o := range a.Config.Published.Offers {
-			if o.MediaType != m {
-				continue
+		inspection, err := mediaworkbench.InspectPublishedOffers(ctx, a, m)
+		report.Metrics.TimingsMS["published_validation"] += inspection.ValidationTime.Milliseconds()
+		report.Metrics.TimingsMS["spec_compilation"] += inspection.CompilationTime.Milliseconds()
+		report.Metrics.SpecsChecked += inspection.SpecCount
+		add("published_specs", a.ID, "", "", err)
+		if err != nil {
+			if ctx.Err() != nil {
+				return report
 			}
-			cases, err := mediaworkbench.PublishedOfferSpecs(a, o)
-			add("published_specs", a.ID, o.ProductID, "", err)
-			if err != nil {
-				continue
-			}
-			selected := map[string]mediaworkbench.Spec{}
-			for _, spec := range cases {
-				path := "text"
-				if spec.Images+spec.Videos+spec.Audio > 0 {
-					path = "edit"
-				}
-				if path == "edit" && !snap.assets {
-					err = ErrPaidControl
-					break
-				}
-				if m == "image" {
-					var resolved mediaworkbench.ResolvedImageOffer
-					resolved, err = mediaworkbench.ResolvePublishedImageOffer(a, o.OfferID, spec)
-					if err == nil {
-						_, err = mediaworkbench.PublishedImageExecution(resolved)
-					}
-					if err == nil {
-						refs := make([]string, spec.Images)
-						for i := range refs {
-							refs[i] = "data:image/png;base64,c3ludGhldGlj"
-						}
-						_, err = mediaworkbench.CompilePublishedImagePlan(resolved, "non-paid preflight", refs)
-					}
-				} else {
-					_, err = mediaworkbench.ResolvePublishedVideoOffer(a, o.OfferID, spec)
-				}
-				if err != nil {
-					break
-				}
-				if _, ok := selected[path]; !ok {
-					selected[path] = spec
-				}
+			continue
+		}
+		report.Metrics.AccountsValidated++
+		for _, checked := range inspection.Offers {
+			o, selected := checked.Offer, checked.Selected
+			err = checked.Err
+			if _, edit := selected["edit"]; edit && !snap.assets {
+				err = ErrPaidControl
 			}
 			add("spec_compilation_and_assets", a.ID, o.ProductID, "", err)
 			if err != nil {
@@ -304,6 +300,10 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 				if !ok {
 					continue
 				}
+				if ctx.Err() != nil {
+					return report
+				}
+				quoteStarted := time.Now()
 				if m == "image" {
 					_, err = p.image.Issue(ctx, owner, key, o.OfferID, spec, sid)
 				} else {
@@ -327,6 +327,7 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 						}
 					}
 				}
+				report.Metrics.TimingsMS["native_quotes"] += time.Since(quoteStarted).Milliseconds()
 				code := "native_quote"
 				if err != nil {
 					code = "quote_" + QuoteFailureStage(err)
@@ -335,7 +336,12 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 			}
 		}
 	}
+	if ctx.Err() != nil {
+		return report
+	}
+	stage = time.Now()
 	latest, e := p.snapshot(ctx, m, actor)
+	report.Metrics.TimingsMS["final_dependencies"] = time.Since(stage).Milliseconds()
 	if e != nil || latest.fingerprint != report.Fingerprint {
 		add("dependencies_changed", 0, "", "", ErrPaidControl)
 	}

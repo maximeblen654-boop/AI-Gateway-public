@@ -20,12 +20,20 @@ type PaidCheck struct {
 	Path      string `json:"path,omitempty"`
 	Pass      bool   `json:"pass"`
 }
+
+// Aggregate admin-only diagnostics; no credentials, request bodies or routes.
+type PaidCheckMetrics struct {
+	AccountsValidated int              `json:"accounts_validated"`
+	SpecsChecked      int              `json:"specs_checked"`
+	TimingsMS         map[string]int64 `json:"timings_ms"`
+}
 type PaidReport struct {
-	Media       string      `json:"media"`
-	Pass        bool        `json:"pass"`
-	Fingerprint string      `json:"fingerprint"`
-	Checks      []PaidCheck `json:"checks"`
-	CheckedAt   time.Time   `json:"checked_at"`
+	Metrics     *PaidCheckMetrics `json:"metrics,omitempty"`
+	Media       string            `json:"media"`
+	Pass        bool              `json:"pass"`
+	Fingerprint string            `json:"fingerprint"`
+	Checks      []PaidCheck       `json:"checks"`
+	CheckedAt   time.Time         `json:"checked_at"`
 }
 type PaidState struct {
 	Media       string `json:"media"`
@@ -175,12 +183,12 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 		return s.Status(ctx, m), nil, nil
 	}
 	report := s.Preflight(ctx, m, actor)
-	if !report.Pass || fingerprint == "" || report.Fingerprint != fingerprint {
+	if ctx.Err() != nil || !report.Pass || fingerprint == "" || report.Fingerprint != fingerprint {
 		return s.Status(ctx, m), &report, ErrPaidControl
 	}
 	// Re-read all dependencies after checking, before granting admission.
 	latest, e := s.Fingerprint(ctx, m, actor)
-	if e != nil || latest != report.Fingerprint {
+	if ctx.Err() != nil || e != nil || latest != report.Fingerprint {
 		return s.Status(ctx, m), &report, ErrPaidControl
 	}
 	next.Enabled = true

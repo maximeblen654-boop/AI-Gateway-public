@@ -43,6 +43,63 @@ const p='/admin/media-workbench/paid-controls/'
    const funded=await api('/admin/users/'+user.id+'/balance','POST',{balance:100,operation:'set',notes:'Isolated preflight fixture only'});assert.equal(Number(funded.balance),100)
    for(const gid of [fixture.groups.openai,fixture.groups.grok])await api('/keys','POST',{name:'Synthetic preflight '+gid,group_id:gid})
    report.checks.push('Existing synthetic Account catalog with unrelated mapping, admin native keys and test credit; no product binding prefilled')
+  }else if(phase==='scale'){
+   const proof=require('./artifact-assets.cjs')(page)
+   for(const kind of ['image','video']){assert.equal((await current(kind)).effective_enabled,false)}
+   const before=stats()
+   const accountPath='/admin/media-workbench/accounts/'+fixture.accounts.openai
+   let detail=await api(accountPath),config=detail.media_workbench_v1
+   const products=structuredClone(config.draft.products)
+   assert.equal(products.filter(p=>p.media_type==='image').length,1)
+   const product=products.find(p=>p.media_type==='image')
+   assert.equal(product.upstream_model,'gpt-image-2')
+   Object.assign(product.capabilities,{resolutions:['4K'],aspect_ratios:['1:1','16:9','4:5','5:4','21:9','3:4','4:3','2:3','3:2','9:16','9:21'],qualities:[],durations_seconds:[],count:{min:1,max:10},references:{image:{min:0,max:16},video:{min:0,max:0},audio:{min:0,max:0},total_max:16},combination_rules:[]})
+   product.adapter_config.size_mappings=[]
+   product.pricing_rules=[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}]
+   detail=await api(accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products}})
+   config=detail.media_workbench_v1
+   assert.equal(config.validation.publish_ready,true,JSON.stringify(config.validation.diagnostics))
+   assert.equal(config.validation.case_count,1870)
+   await api(accountPath+'/publish','POST',{expected_record_version:config.record_version,expected_draft_revision:config.draft.revision})
+   detail=await api(accountPath);assert.deepEqual(detail.media_workbench_v1.published.products[0].capabilities,product.capabilities)
+   await page.goto(base+'/admin/media')
+   const card=page.locator('[data-test="paid-image"]')
+   report.scale={specs:1870,client_timeout_ms:30000,budget_ms:15000,runs:[]}
+   // Actual Vue/Axios clicks against final Core, no Vite or browser API mock.
+   for(let i=0;i<3;i++){
+    const start=Date.now()
+    const response=page.waitForResponse(r=>r.url().endsWith(p+'image/check')&&r.request().method()==='POST')
+    await card.getByRole('button',{name:'开启前检查',exact:true}).click()
+    const r=await response;assert.equal(r.status(),200)
+    const result=(await r.json()).data
+    await expect(card).toContainText('检查通过')
+    const elapsed=Date.now()-start
+    assert.equal(result.pass,true,JSON.stringify(result));assert.equal(result.metrics.specs_checked,1870);assert.equal(result.metrics.accounts_validated,1)
+    for(const path of ['text','edit'])assert(result.checks.some(c=>c.code==='native_quote'&&c.path===path&&c.pass))
+    assert(elapsed<15000,`full UI preflight took ${elapsed}ms`)
+    report.scale.runs.push({wall_ms:elapsed,report:result})
+   }
+   for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await card.scrollIntoViewIfNeeded()
+    const name=`native-preflight-1870-${width}.png`;await page.screenshot({path:root+'/evidence/'+name,animations:'disabled'});report.screenshots.push(name)
+   }
+   await page.setViewportSize({width:1440,height:1000})
+   await card.getByRole('button',{name:'开启图片',exact:true}).click()
+   const start=Date.now(),applied=page.waitForResponse(r=>r.url().endsWith(p+'image')&&r.request().method()==='PUT')
+   await page.getByRole('button',{name:'确认开启',exact:true}).click()
+   const response=await applied;assert.equal(response.status(),200)
+   const result=(await response.json()).data
+   await expect(card).toContainText('实际已开放')
+   const elapsed=Date.now()-start
+   assert(result.state.effective_enabled);assert(result.report.pass);assert.equal(result.report.metrics.specs_checked,1870);assert.equal(result.report.metrics.accounts_validated,1)
+   assert(elapsed<15000,`server enable recheck took ${elapsed}ms`)
+   report.scale.apply={wall_ms:elapsed,report:result.report}
+   assert.equal((await current('video')).effective_enabled,false)
+   assert.deepEqual(stats(),before,'all 1870 checks and enable recheck must make zero supplier calls')
+   assert.equal((await change('image',false)).status,200)
+   assert.equal((await current('image')).effective_enabled,false)
+   report.assets=await proof()
+   report.checks.push('All 1870 specs checked; three real admin UI preflights and enable recheck under 15s; video stayed closed; zero supplier requests; final both closed')
   }else if(phase==='close'){
    for(const kind of ['image','video']){assert.equal((await change(kind,false)).status,200);assert.equal((await current(kind)).effective_enabled,false)}
    report.checks.push('Both synthetic paid gates closed after simulated task acceptance')

@@ -1,6 +1,7 @@
 package mediaworkbench
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -68,6 +69,10 @@ func invalidImageExecution(config *ImageExecutionConfig, scope, path, code, labe
 // Validate has no supplier client or credential input. The bounded finite domain
 // proves price uniqueness/coverage; only compact rule matchers are persisted.
 func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
+	return validateContext(context.Background(), a, d, now)
+}
+
+func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (Validation, []Offer) {
 	deps := DependenciesFor(a)
 	v := Validation{DraftRevision: d.Revision, Status: "PASS", PublishReady: true, CheckedAt: now, AdapterRegistryRevision: RegistryRevision, Dependencies: deps, Diagnostics: []Diagnostic{}, Previews: []Preview{}}
 	if a.Catalog != nil {
@@ -75,6 +80,17 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 	}
 	add := func(class, code, scope, path, message string) {
 		v.Diagnostics = append(v.Diagnostics, diagnostic(class, code, scope, path, message))
+	}
+	cancelled := func() bool {
+		if ctx.Err() == nil {
+			return false
+		}
+		v.Status, v.PublishReady = "UNKNOWN", false
+		add("UNKNOWN", "VALIDATION_CANCELLED", "", "validation", "Validation request ended before completing all specifications")
+		return true
+	}
+	if cancelled() {
+		return v, nil
 	}
 	offers := []Offer{}
 	if a.Config == nil || a.Config.SchemaVersion != 1 {
@@ -98,6 +114,9 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 	ids := map[string]bool{}
 	enabled := 0
 	for _, p := range d.Products {
+		if cancelled() {
+			return v, nil
+		}
 		if !p.Enabled {
 			continue
 		}
@@ -270,6 +289,9 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		missingSpecs := []Spec{}
 		missingCount := 0
 		for _, spec := range cases {
+			if cancelled() {
+				return v, nil
+			}
 			matched := 0
 			for i, r := range p.PricingRules {
 				if Matches(r.Match, spec) {
@@ -348,6 +370,9 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 		}
 		v.PublishReady = false
 		offers = nil
+	}
+	if cancelled() {
+		return v, nil
 	}
 	return v, offers
 }

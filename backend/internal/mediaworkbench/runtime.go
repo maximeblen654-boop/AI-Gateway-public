@@ -105,6 +105,12 @@ func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
 		return r, ErrRuntimeBinding
 	}
+	return resolvePublishedImageOffer(a, offerID, s)
+}
+
+// Caller must validate the published Account within this synchronous operation.
+func resolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedImageOffer, error) {
+	var r ResolvedImageOffer
 	s, h, err := NormalizeImageSpec(s)
 	if err != nil {
 		return r, err
@@ -251,6 +257,10 @@ func PublishedOfferSpecs(a *Account, o Offer) ([]Spec, error) {
 	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
 		return nil, ErrRuntimeBinding
 	}
+	return publishedOfferSpecs(a, o)
+}
+
+func publishedOfferSpecs(a *Account, o Offer) ([]Spec, error) {
 	for _, p := range a.Config.Published.Products {
 		if p.ProductID != o.ProductID {
 			continue

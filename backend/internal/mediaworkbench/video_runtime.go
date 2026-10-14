@@ -57,7 +57,15 @@ func PublishedVideoOffers(a *Account) []Offer {
 
 func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
 	var r ResolvedVideoOffer
-	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) || spec.Count != 1 || spec.DurationSeconds <= 0 || spec.Quality != "" {
+	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+		return r, ErrRuntimeBinding
+	}
+	return resolvePublishedVideoOffer(a, offerID, spec)
+}
+
+func resolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
+	var r ResolvedVideoOffer
+	if spec.Count != 1 || spec.DurationSeconds <= 0 || spec.Quality != "" {
 		return r, ErrRuntimeBinding
 	}
 	for _, o := range a.Config.Published.Offers {
