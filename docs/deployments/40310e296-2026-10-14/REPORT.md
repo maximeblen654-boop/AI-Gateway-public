@@ -40,3 +40,13 @@ Handoff59原样同步；Constraints保持。后续计算器仅在非生产工作
 生产截图：[作品桌桌面](workspace-desktop.png)、[作品桌手机](workspace-mobile.png)、[管理员手机](admin-mobile.png)。截图仅证明读取与页面，不是实际付费生成验收。
 
 管理员桌面原截图含登录账号与余额，仅保留本地部署证据，未上传公开Git；公开管理员手机截图不含这些内容。
+
+## 运行身份与公开核对摘要
+
+[运行摘要](runtime-summary.json)保留镜像、网络、挂载、全局开关及只读结果，不含凭据或客户订单。Docker本次显示的OCI manifest摘要与上述config digest分别为不同对象，已核验关联：
+
+- Core OCI：sha256:4226192373d58d843be944c82ef7f2c0940771c61a9c80a311df532eb4c59ef3
+- Bridge OCI：sha256:caa90294c79db4253b8cdb97bb920a255afc9c3797555d0c18d55e6a7ffc9e25
+- BFF OCI：sha256:cc7ae2120821e12ef687847408718bc2547c2f12ab9c05b2dd6609bb41e0344a
+
+实际入口：https://laifufu.top/video-studio 、https://laifufu.top/admin/media 。

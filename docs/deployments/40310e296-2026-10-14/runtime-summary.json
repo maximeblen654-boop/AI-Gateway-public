@@ -1,0 +1,82 @@
+{
+  "status": "DEPLOYED_SALES_DISABLED",
+  "runtime_source_sha": "40310e2961a5e8150e0c9df4cc86bb8087406c06",
+  "checked_at": "2026-10-14T02:01:38.293369+00:00",
+  "business_configuration_unchanged": true,
+  "global_paid_submission_enabled": false,
+  "existing_account77_sales_flag": true,
+  "migration_ledger": {
+    "count": 293,
+    "sha256": "d6a8f75d4ae22b8a460a31de549f4865b710699f18a233d62408491b61f5631f"
+  },
+  "health": {
+    "core": "200",
+    "bridge": "200",
+    "bff": "200"
+  },
+  "services": {
+    "sub2api": {
+      "image": "sha256:4226192373d58d843be944c82ef7f2c0940771c61a9c80a311df532eb4c59ef3",
+      "ref": "native-candidate-core:40310e2961a5e8150e0c9df4cc86bb8087406c06",
+      "health": "healthy",
+      "status": "running",
+      "network": "deploy_sub2api-network",
+      "mounts": [
+        {
+          "Type": "volume",
+          "Source": "/var/lib/docker/volumes/deploy_sub2api_data/_data",
+          "Destination": "/app/data",
+          "RW": true
+        }
+      ],
+      "flags": {
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false",
+        "IMAGE_RECEIPT_WORKER_ENABLED": "false"
+      }
+    },
+    "studio-v2-bridge": {
+      "image": "sha256:caa90294c79db4253b8cdb97bb920a255afc9c3797555d0c18d55e6a7ffc9e25",
+      "ref": "native-candidate-bridge:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "health": "healthy",
+      "status": "running",
+      "network": "container:74ac9f7a1dfb84a59cd2c28ad8591b19ae2ee026c568239d1c0a25293932772d",
+      "mounts": [],
+      "flags": {
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false"
+      }
+    },
+    "studio-v2-bff": {
+      "image": "sha256:cc7ae2120821e12ef687847408718bc2547c2f12ab9c05b2dd6609bb41e0344a",
+      "ref": "native-candidate-bff:b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+      "health": "healthy",
+      "status": "running",
+      "network": "container:74ac9f7a1dfb84a59cd2c28ad8591b19ae2ee026c568239d1c0a25293932772d",
+      "mounts": [
+        {
+          "Type": "bind",
+          "Source": "/var/lib/ai-gateway/studio-v2/assets",
+          "Destination": "/state/assets",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/var/lib/ai-gateway/studio-v2/images",
+          "Destination": "/state/images",
+          "RW": true
+        },
+        {
+          "Type": "bind",
+          "Source": "/var/lib/ai-gateway/studio-v2/videos",
+          "Destination": "/state/videos",
+          "RW": true
+        }
+      ],
+      "flags": {
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false"
+      }
+    }
+  }
+}

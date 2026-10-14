@@ -42,3 +42,12 @@
 ## 下一步
 
 等待产品审核。若要求上线计算器，先按项目现有流程准备运行候选并单独授权部署。本次作品桌部署授权不延伸到计算器。
+
+## 精确交付身份
+
+计算器运行代码：`8c0eb6bbc526f7660a4105a76a24566237fba42a`，分支`codex/admin-cost-calculator`。后续证据归档提交仅整理报告，不改变运行代码。
+
+- [完整CI 38500563195](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38500563195)：前端（含浏览器）、Lint、发布辅助检查已通过；整体最终状态见此固定Run。
+- [Security 38500563145](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38500563145)：PASS。
+- 云端浏览器证据Artifact `11865383953`，`product-wizard-browser-evidence`，有效至2026-10-28 02:24:09 UTC。必要截图已另存Git，不依赖临时artifact永久有效。
+- 本轮没有计算器Docker候选，没有部署计算器。生产仍为作品桌40310e296与b2 Bridge/BFF组合。
