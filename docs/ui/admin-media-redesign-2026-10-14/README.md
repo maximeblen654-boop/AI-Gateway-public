@@ -1,26 +1,28 @@
-# 管理员媒体工作台 PR #1：正式实现复审入口
+# 管理员媒体工作台 PR #1：运行候选审核入口
 
-**IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED**。
+**CANDIDATE_READY_NOT_DEPLOYED**。正式 Vue 保留，图片/视频统一正价规则已落实，最终 Core＋原 b2 Bridge/BFF 组合已通过隔离验收。正式 Handoff / Constraints 未修改。
 
-ChatGPT Review `5513583921` 的条件实现已完成。正式运行代码沿用 Vue/composable、pricingMatrix、成本计算器及现有 API；没有导入 prototype.js 作为业务状态管理器。正式 Handoff / Constraints 保持原文。
+## 当前材料
 
-## 当前要审核的材料
+1. **[最终候选报告、镜像身份、TAR、测试及截图](CANDIDATE_REPORT.md)**。
+2. **[最终 PASS manifest](candidate-evidence/run-38541341605/manifest.json)**，SHA-256 `9741cb3cec6406354bd1ec829035c9a7746063f8ea802d3ed0707d7a51c26086`。
+3. [真实成品验收](candidate-evidence/run-38541341605/acceptance.json)、[业务交叉核对](candidate-evidence/run-38541341605/contract-cross-check.json)、[零价边界](candidate-evidence/run-38541341605/native-positive-retail.json)、[CI / Security](candidate-evidence/run-38541341605/ci-status.json)。
+4. [组件复用依据](candidate-evidence/run-38541341605/reuse-proof.json)、[运行源码与测试脚本等价边界](candidate-evidence/run-38541341605/runtime-equivalence.json)。
 
-1. **[实施、真实联调与截图报告](IMPLEMENTATION_REPORT.md)**：源码、三项审核结果、请求/报价/资金对照、CI 和四组正式 Core 页面截图。
-2. [前后端合同检查表](INTEGRATION_REVIEW.md)：规格/映射/发布/报价/执行的既有来源及验收边界。
-3. **[可复制的 ChatGPT 复审提示词](CHATGPT_REVIEW_PROMPT.md)**。
-4. [机器交叉核对](implementation-evidence/run-38523316345/contract-cross-check.json)、[真实隔离验收](implementation-evidence/run-38523316345/acceptance.json)、[证据摘要](implementation-evidence/SHA256SUMS.json)。
+Core 运行源码：`15d09689abc0b7e07269692d50e78f83859d1fb6`；验收脚本：`5c8ee1d4af6fd4e4ea6686e43332049cc0aca218`；Bridge/BFF：`b2fcdac93afa6ae194ee81801a9b37813f8f39eb`。文档归档提交不代表镜像源码。
 
-被测 Core 与验收脚本：`f246974afaedf5a3d143bde57cee4378ddf87372`；正式组件实现于 `64cc40c4f06dbedd51f748fb9a52a83e99256479`，随后是测试脚本修正。真实联调 Run **38523316345 PASS**，CI **38523320929 PASS**，Security **38523320928 PASS**。运行代码与证据归档提交分开标记。
+[最终补验 Run 38541341605 PASS](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38541341605)。它加载原构建产物，没有重复构建或导出 TAR。完整 Artifact 11882680877；最终小证据 11882812063。完整本地候选位置见报告。
 
-## 正式 Vue 预览
+## 最终镜像的页面
 
-![正式桌面价格表与成本抽屉](implementation-evidence/run-38523316345/native-admin-formal-1440-light.png)
+![正式桌面价格表与成本抽屉](candidate-evidence/run-38541341605/native-admin-formal-1440-light.png)
 
-[桌面深色](implementation-evidence/run-38523316345/native-admin-formal-1440-dark.png) · [手机浅色](implementation-evidence/run-38523316345/native-admin-formal-390-light.png) · [手机深色](implementation-evidence/run-38523316345/native-admin-formal-390-dark.png) · [完整价格页](implementation-evidence/run-38523316345/native-geometry-prices-desktop.png)。这些图片来自真实隔离 Core 嵌入资源，合成账号/商品/金额；不是生产页面。
+[桌面深色](candidate-evidence/run-38541341605/native-admin-formal-1440-dark.png) · [390px 手机浅色](candidate-evidence/run-38541341605/native-admin-formal-390-light.png) · [390px 手机深色](candidate-evidence/run-38541341605/native-admin-formal-390-dark.png) · [手机规格流程](candidate-evidence/run-38541341605/native-geometry-dimensions-mobile.png) · [报价确认](candidate-evidence/run-38541341605/native-artifact-image-geometry-4k-confirmation.png) · [单视频结果](candidate-evidence/run-38541341605/native-artifact-video-compatible-result.png)。
 
-## 旧设计材料，仅保留溯源
+真实 Core 嵌入页面，无 Vite/prototype/API mock；数据和成品均为隔离合成样本。runner 已结束，不提供失效预览地址。本轮未连接生产，不部署、不启售、不实付。
 
-[第二版设计说明](REVIEW_V2.md)、`shots/`、`motion/record-cost.mp4`、`prototype.js` 与旧 `ASSET_MANIFEST.json` 属于设计阶段。旧原型可以用 `python -m http.server 4396 --bind 127.0.0.1 --directory docs/ui/admin-media-redesign-2026-10-14` 打开；它不连接真实后台，不能替代本轮正式实现证据。
+## 历史资料
 
-本次云端只构建临时 Core 联调镜像，精确复用已有 Bridge/BFF，不导出新生产候选。runner 已结束，不能把它的 loopback 地址当成现成可操作入口。复审通过之前不合并、部署、发布生产商品或启售。
+[实现阶段报告](IMPLEMENTATION_REPORT.md)、[前后端合同审查](INTEGRATION_REVIEW.md)、[旧实现复审提示](CHATGPT_REVIEW_PROMPT.md)保留溯源。实现阶段的免费图片样例已被本轮用户明确的“图片和视频售价均大于0”替代，不能作为当前业务规则。
+
+[第二版设计说明](REVIEW_V2.md)、`shots/`、`motion/record-cost.mp4`、`prototype.js` 与旧 `ASSET_MANIFEST.json` 是设计资料，不是本次运行候选或联调证明。

@@ -1,5 +1,7 @@
 # 管理员媒体工作台：正式组件实现与真实隔离联调
 
+> 本文保留实现阶段历史证据。用户后续决定图片/视频均禁止零价；当前冻结候选及最终规则请看 [CANDIDATE_REPORT.md](CANDIDATE_REPORT.md)。
+
 **IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED**。PR #1 的三项条件审核均已有针对性实证；等待 ChatGPT 复审，没有部署或合并。
 
 ## 身份与修改范围

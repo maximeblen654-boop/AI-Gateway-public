@@ -1,0 +1,72 @@
+{
+  "source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "reused_source_sha": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+  "original_run": 38443205417,
+  "original_artifact": 11836997249,
+  "equal_inputs": [
+    {
+      "path": "studio",
+      "git_object": "4bc6e6ffcd16c29b6cb15df96ab1ee65c2932562"
+    },
+    {
+      "path": "deploy/studio",
+      "git_object": "4a3b3f86e8578754d980d5dd3c5f52ec1886ed13"
+    },
+    {
+      "path": "Dockerfile",
+      "git_object": "c50c57d4c9ae0f70d2c483cc0b65aa5fcd9aca54"
+    },
+    {
+      "path": ".dockerignore",
+      "git_object": "609a74dd7b00971c52a0f6706a3d77a9c7358b22"
+    },
+    {
+      "path": "tools/phase5-candidate/build.mjs",
+      "git_object": "75561922ab6c9b9a8750bdb6a0c9a02b7337423b"
+    },
+    {
+      "path": "LICENSE",
+      "git_object": "153d416dc8d2d60076698ec3cbfce34d91436a03"
+    },
+    {
+      "path": "tools/phase5-candidate/COPYING.GPL-3.0",
+      "git_object": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7"
+    }
+  ],
+  "core_only_price_changes": [
+    {
+      "path": "backend/internal/mediaworkbench/positive_price_test.go",
+      "current": "34966081e25d21c910fb3183589a99e826a48772",
+      "prior": null
+    },
+    {
+      "path": "backend/internal/mediaworkbench/runtime.go",
+      "current": "602cef3c9839355d55e5c77ebaba460bd436d186",
+      "prior": "7043033aeecc90d039a1cfee922d2d08fb03b836"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/validator.go",
+      "current": "67ca015e8ef2e56575a57ddc1632227d007ffcc8",
+      "prior": "bc9fd6c1402e0982d9ef695ba89fee48d379937b"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/validator_test.go",
+      "current": "e79c918303faa973ff62f44bc3c185ba3716111a",
+      "prior": "30504130167ba033e1591d80d06213c9ec7dadb9"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/video_runtime.go",
+      "current": "a12eb97b278d426956a31cafe3924dcf0f0e58dc",
+      "prior": "ce343eefd8655d8505a5f294e5e1056347704c8e"
+    },
+    {
+      "path": "backend/internal/service/studio_image_contract_test.go",
+      "current": "7afbc650dec3f1c95192f0362ce92decc3f7f0de",
+      "prior": "52058bc8007ce540a5247271aafbc514bab4648a"
+    }
+  ],
+  "bridge_price_boundary": "Bridge forwards catalog/quote/submit to Core; it uses ImageBindingVersion but does not call mediaworkbench Validate, Publish or ResolvePublished*Offer. cmd/studio-bridge, internal/studiobridge, service/repository implementation, locks and HTTP contracts remain byte-identical. Combination acceptance verifies the exact reused binaries.",
+  "bridge_frontend_boundary": "The studio-bridge target compiles cmd/studio-bridge without the embed tag and copies only its binary. Frontend resources are only shipped in Core.",
+  "original_acceptance_run": 38446164266,
+  "strategy": "Build Core only; preserve sidecar archive bytes, labels and original identities."
+}

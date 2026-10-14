@@ -1,0 +1,20 @@
+{
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "verification_test_sha": "debd2301257991ec3cf383430720269f33cc11c4",
+  "acceptance_script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "runtime_unchanged_after_source": true,
+  "test_fixture_changes": [
+    "backend/internal/handler/admin/media_workbench_handler_test.go",
+    "backend/internal/repository/media_config_repo_integration_test.go",
+    "backend/internal/service/studio_video_runtime_test.go"
+  ],
+  "local_checks": [
+    "go test ./internal/mediaworkbench: PASS",
+    "2 targeted frontend files / 24 tests: PASS",
+    "vue-tsc --noEmit: PASS",
+    "targeted ESLint: PASS",
+    "harness syntax and git diff --check: PASS"
+  ],
+  "images_rebuilt_after_export": false,
+  "production_action": false
+}

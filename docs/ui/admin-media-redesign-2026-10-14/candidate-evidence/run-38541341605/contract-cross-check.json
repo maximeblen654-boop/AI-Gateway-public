@@ -1,0 +1,308 @@
+{
+  "pass": true,
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "integration_script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "status": "CANDIDATE_READY_NOT_DEPLOYED",
+  "results": [
+    {
+      "scenario": "preview-sampling",
+      "samples": 64,
+      "unsampled_resolution_executed": "4K",
+      "full_capabilities_preserved": true
+    },
+    {
+      "scenario": "image-geometry-1k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 3,
+      "price": {
+        "amount": "2.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "1K",
+        "duration_seconds": 0,
+        "aspect_ratio": "1:1",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "edit-geometry-2k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 2,
+      "price": {
+        "amount": "1.80",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "2K",
+        "duration_seconds": 0,
+        "aspect_ratio": "3:2",
+        "quality": "",
+        "count": 2,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "image-geometry-4k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 1,
+      "price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "video-compatible",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 1,
+      "price": {
+        "amount": "2.00",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "720p",
+        "duration_seconds": 5,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "image-geometry-2k-draft",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 3,
+      "price": {
+        "amount": "2.70",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "2K",
+        "duration_seconds": 0,
+        "aspect_ratio": "3:2",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "published",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    },
+    {
+      "scenario": "mapping",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    },
+    {
+      "scenario": "routing",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    },
+    {
+      "scenario": "strict-positive-retail",
+      "checks": [
+        {
+          "kind": "image",
+          "amount": null,
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "image",
+          "amount": "0",
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "image",
+          "amount": "0.00000000",
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "image",
+          "amount": "0.01",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "0.01",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "image",
+          "amount": "1",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "1",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "image",
+          "amount": "9.9",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "9.9",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "image",
+          "legacy_zero_catalog_excluded": true,
+          "quote_status": 409,
+          "generate_status": 409,
+          "no_new_quote": true
+        },
+        {
+          "kind": "image",
+          "generation_requests": 0,
+          "ledger_changes": 0
+        },
+        {
+          "kind": "video",
+          "amount": null,
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "video",
+          "amount": "0",
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "video",
+          "amount": "0.00000000",
+          "draft_saved": true,
+          "db_equal": true,
+          "publish_status": 422,
+          "published_unchanged": true
+        },
+        {
+          "kind": "video",
+          "amount": "0.01",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "0.01",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "video",
+          "amount": "1",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "1",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "video",
+          "amount": "9.9",
+          "publish_status": 200,
+          "quote_status": 200,
+          "price": {
+            "amount": "9.9",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "kind": "video",
+          "legacy_zero_catalog_excluded": true,
+          "quote_status": 409,
+          "generate_status": 409,
+          "no_new_quote": true
+        },
+        {
+          "kind": "video",
+          "generation_requests": 0,
+          "ledger_changes": 0
+        }
+      ]
+    }
+  ]
+}

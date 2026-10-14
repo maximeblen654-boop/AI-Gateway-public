@@ -1,0 +1,21 @@
+{
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "acceptance_script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "manifest_sha256": "9741cb3cec6406354bd1ec829035c9a7746063f8ea802d3ed0707d7a51c26086",
+  "build": {
+    "run": 38539809920,
+    "artifact": 11882680877,
+    "expires_at_utc": "2026-10-28T09:12:08Z",
+    "build_steps": "PASS",
+    "initial_acceptance": "FAIL: test selected /v1/responses instead of /v1/videos; corrected without runtime changes"
+  },
+  "acceptance": {
+    "run": 38541341605,
+    "artifact": 11882812063,
+    "expires_at_utc": "2026-10-28T09:21:18Z",
+    "result": "PASS"
+  },
+  "local_archive": "D:/AI-Gateway-candidate-15d09689a-final/",
+  "production_actions": false,
+  "sales_and_generation_production_flags": "must remain false; no production inspection performed"
+}

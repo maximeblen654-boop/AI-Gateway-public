@@ -1,0 +1,23 @@
+{
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "run": 38541341605,
+  "reviewed_images": [
+    "native-admin-formal-1440-light.png",
+    "native-admin-formal-1440-dark.png",
+    "native-admin-formal-390-light.png",
+    "native-admin-formal-390-dark.png",
+    "native-geometry-dimensions-mobile.png",
+    "native-artifact-image-geometry-4k-confirmation.png",
+    "native-artifact-video-compatible-result.png"
+  ],
+  "observations": [
+    "1440 price rows and desktop cost drawer are separately visible; no text overlap.",
+    "390 cost sheet stays within viewport, has its own scrolling region and visible close control.",
+    "Light/dark text, inputs and focus rings are legible.",
+    "Mobile dimension cards and five-step navigation stack within 390px.",
+    "Confirmation shows server quote 4K / 16:9 / 1 image / 1.10 CNY.",
+    "Video result shows synthetic blue original, one item and frozen 2.00 CNY."
+  ],
+  "fixture_notice": "Actual final Core pages; generated images are synthetic one-pixel fixtures and video is a synthetic blue clip, not supplier quality samples."
+}
