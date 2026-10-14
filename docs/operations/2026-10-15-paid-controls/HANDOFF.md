@@ -29,7 +29,7 @@ Core、Bridge、BFF 保留有限且脱敏的 `diagnostic_stage`。客户仍收�
 
 ## 验证状态
 
-工作分支：`codex/media-paid-controls`。冻结运行源码：`c6af2299086831f99a40b045b889ce72573aadc2`；当前验收脚本：`f60f684999fcf0b2e212bb238df7d0a33b3ae2d5`。运行源码 CI [38611429466](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38611429466) 与 Security [38611429465](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38611429465) 均 PASS。最终候选 [Run 38612619132](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38612619132) 已 PASS。状态：`CANDIDATE_READY_NOT_DEPLOYED`。
+工作分支：`codex/media-paid-controls`。冻结运行源码：`c6af2299086831f99a40b045b889ce72573aadc2`；当前验收脚本：`f60f684999fcf0b2e212bb238df7d0a33b3ae2d5`。运行源码 CI [38611429466](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38611429466) 与 Security [38611429465](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38611429465) 均 PASS。验收脚本 f60f6849 的 [CI 38612617456](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38612617456) 与 [Security 38612617507](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38612617507) 也均 PASS。最终候选 [Run 38612619132](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38612619132) 已 PASS。状态：`CANDIDATE_READY_NOT_DEPLOYED`。
 
 已完成本地定向验证：报价同形复现、绑定漂移、图片/视频隔离、旧 PASS、存储失败、重启、只读非付费视频预检、内部回环地址与重定向安全、BFF 错误脱敏、Vue 开关确认与失败状态。已有相关多图、partial、恢复、单视频及原生账务测试继续复用并运行受影响范围。
 
