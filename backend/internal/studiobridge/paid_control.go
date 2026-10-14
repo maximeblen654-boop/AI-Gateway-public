@@ -29,7 +29,7 @@ func (b *ImageBridge) paidEnabled(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	var state struct {
 		Mode    string `json:"mode"`
 		Enabled bool   `json:"paid_enabled"`

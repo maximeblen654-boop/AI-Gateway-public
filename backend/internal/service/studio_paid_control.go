@@ -134,7 +134,11 @@ func (s *StudioPaidControl) Preflight(ctx context.Context, m string, actor int64
 	if s == nil || !s.Managed || !validPaidMedia(m) || actor <= 0 || s.Check == nil {
 		return PaidReport{Media: m, Checks: []PaidCheck{{Code: "deployment_mode"}}, CheckedAt: time.Now().UTC()}
 	}
-	return s.Check(ctx, m, actor)
+	report := s.Check(ctx, m, actor)
+	if !report.Pass {
+		s.failed.Store(m, true)
+	}
+	return report
 }
 func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, enable bool, revision, fingerprint string) (PaidState, *PaidReport, error) {
 	if s == nil || !s.Managed || !validPaidMedia(m) || actor <= 0 {

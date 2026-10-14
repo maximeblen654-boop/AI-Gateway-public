@@ -56,11 +56,11 @@ func NewStudioPaidControl(settings SettingRepository, image *StudioImageRuntime,
 func paidSidecarStatus(ctx context.Context, raw string) (paidSidecar, error) {
 	var out paidSidecar
 	u, e := url.Parse(raw)
-	if e != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "localhost" && u.Hostname() != "::1") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+	if e != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "::1") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return out, ErrPaidControl
 	}
 	u.Path = "/internal/studio/paid-control"
-	req, e := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, e := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil) //nolint:gosec // G704: deployment-only URL, literal loopback IP and http validated above; path overwritten, no redirects.
 	if e != nil {
 		return out, e
 	}
@@ -69,12 +69,12 @@ func paidSidecarStatus(ctx context.Context, raw string) (paidSidecar, error) {
 		return out, ErrPaidControl
 	}
 	req.Header.Set("X-Studio-Service-Token", secret)
-	client := http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, e := client.Do(req)
+	client := http.Client{Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}, Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, e := client.Do(req) //nolint:gosec // G704: only the validated literal loopback endpoint; proxy and redirects disabled.
 	if e != nil {
 		return out, ErrPaidControl
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 || json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&out) != nil || out.Version != StudioPaidControlVersion || !out.Ready {
 		return out, ErrPaidControl
 	}

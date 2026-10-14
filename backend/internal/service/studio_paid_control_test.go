@@ -187,3 +187,16 @@ func TestStudioPaidControlReadFailureCannotRestoreOldOpenState(t *testing.T) {
 		}
 	}
 }
+
+func TestStudioPaidControlFailedCheckClosesExistingGrant(t *testing.T) {
+	ctx := context.Background()
+	pass := true
+	gate := &StudioPaidControl{Managed: true, Settings: &paidSettingsFake{values: map[string]string{}}, Check: func(context.Context, string, int64) PaidReport { return PaidReport{Pass: pass, Fingerprint: "a"} }, Fingerprint: func(context.Context, string, int64) (string, error) { return "a", nil }}
+	if state, _, err := gate.Apply(ctx, "image", 1, true, "", "a"); err != nil || !state.Effective {
+		t.Fatal(state, err)
+	}
+	pass = false
+	if gate.Preflight(ctx, "image", 1).Pass || gate.Effective(ctx, "image") {
+		t.Fatal("failed preflight left old grant open")
+	}
+}

@@ -14,7 +14,10 @@ func TestStudioQuoteCatalogModelAlongsideLegacyAliases(t *testing.T) {
 			r, original, key, account, _ := studioContractFixture(t)
 			account.a.Extra = nil
 			account.a.Credentials["model_mapping"] = map[string]any{"legacy-image": "other-image"}
-			ma := r.Media.(*studioMediaFixture)
+			ma, ok := r.Media.(*studioMediaFixture)
+			if !ok {
+				t.Fatal("fixture repository type")
+			}
 			ma.a.ModelMapping = map[string]string{"legacy-image": "other-image"}
 			svc := mediaworkbench.NewService(ma)
 			p := ma.a.Config.Draft.Products[0]

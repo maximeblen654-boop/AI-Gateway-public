@@ -36,14 +36,15 @@ const p='/admin/media-workbench/paid-controls/'
    report.checks.push('Both synthetic paid gates closed after simulated task acceptance')
   }else{
    const proof=require('./artifact-assets.cjs')(page)
-   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','readiness')).status).toBe(200)
+   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','catalog')).status,{message:'Real UI session exchange and catalog must finish before direct contract checks'}).toBe(200)
    for(const kind of ['image','video']){
     assert.equal((await current(kind)).effective_enabled,false)
     assert.equal((await media(kind,'readiness')).body.paid_enabled,false)
     assert.equal((await media(kind,'tasks','POST',{})).status,503)
    }
    const before=stats()
-   const catalog=(await media('image','catalog')).body
+   const catalogResponse=await media('image','catalog');assert.equal(catalogResponse.status,200,JSON.stringify(catalogResponse))
+   const catalog=catalogResponse.body;assert(Array.isArray(catalog.offers),JSON.stringify(catalog))
    const offer=catalog.offers.find(o=>o.upstream_model==='gpt-image-2'&&o.spec.resolution.includes('1K'));assert(offer)
    for(const images of [0,1]){
     const r=await media('image','quotes','POST',{offer_id:offer.offer_id,spec:{resolution:'1K',aspect_ratio:'1:1',count:1,images,videos:0,audio:0,duration_seconds:0,quality:''}})
@@ -76,7 +77,7 @@ const p='/admin/media-workbench/paid-controls/'
    const original=await api('/admin/accounts/'+fixture.accounts.openai)
    await api('/admin/accounts/'+original.id,'PUT',{credentials:{...original.credentials,model_mapping:{'gpt-image-2':'different-upstream'}}})
    assert.equal((await current('image')).effective_enabled,false)
-   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','readiness')).status).toBe(200)
+   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','catalog')).status,{message:'Real UI session exchange and catalog must finish before direct contract checks'}).toBe(200)
    for(const images of [0,1]){
     const r=await media('image','quotes','POST',{offer_id:offer.offer_id,spec:{resolution:'1K',aspect_ratio:'1:1',count:1,images,videos:0,audio:0,duration_seconds:0,quality:''}})
     assert.equal(r.status,409);assert.equal(r.body.diagnostic_stage,'published_offer');assert(!JSON.stringify(r.body).includes('synthetic-native-only'))

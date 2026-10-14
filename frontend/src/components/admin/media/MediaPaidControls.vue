@@ -6,7 +6,7 @@
       <article v-for="kind in kinds" :key="kind" :data-test="`paid-${kind}`">
         <h3>{{ label(kind) }}付费生成</h3>
         <p class="mw-paid-state" :class="{ 'is-open': states[kind]?.effective_enabled }">{{ states[kind]?.mode === 'managed-v1' ? (states[kind]?.effective_enabled ? '实际已开放' : '实际未开放') : '状态未确认' }}</p>
-        <p class="mw-muted">{{ states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
+        <p class="mw-muted">{{ !states[kind] || states[kind]?.mode !== 'managed-v1' || states[kind]?.reason === 'state_unavailable' ? '请求状态未确认' : states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
         <p v-if="kind === 'image'" class="mw-muted">文生图与图生图共用此开关，视频独立控制。</p>
         <div class="mw-paid-actions">
           <button class="btn btn-secondary" :disabled="busy || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
@@ -15,7 +15,7 @@
         </div>
         <div v-if="reports[kind]" class="mw-paid-checks" aria-live="polite">
           <strong>{{ reports[kind]?.pass ? '检查通过，开启时服务端将再次核对' : '检查未通过，保持关闭' }}</strong>
-          <ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item.code) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="item.path"> · {{ item.path === 'edit' ? '参考素材路径' : '无参考素材路径' }}</template></small></span></li></ul>
+          <details :open="!reports[kind]?.pass"><summary>检查明细（{{ reports[kind]?.checks.length }} 项）</summary><ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item.code) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="item.path"> · {{ item.path === 'edit' ? '参考素材路径' : '无参考素材路径' }}</template></small></span></li></ul></details>
         </div>
       </article>
     </div>
@@ -72,6 +72,7 @@ onMounted(() => refresh())
 .mw-paid-state.is-open { color:#15803d; }
 .mw-paid-actions { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
 .mw-paid-checks { border-top:1px solid var(--mw-border, #d8dee7); padding-top:14px; font-size:13px; }
+.mw-paid-checks summary { cursor:pointer; padding:12px 0 4px; }
 .mw-paid-checks ul { margin-top:12px; display:grid; gap:8px; }
 .mw-paid-checks li { display:flex; gap:8px; }
 .mw-paid-checks small { display:block; opacity:.7; margin-top:3px; }
