@@ -87,7 +87,7 @@ func TestStudioQuotedUsageInsertUsesDeliveredAmounts(t *testing.T) {
 		sale, base string
 	}{
 		{"all_five", 5, "0.125", "1.75"},
-		{"partial_two", 2, "0.05", "0.7"},
+		{"partial_two", 2, "0.050", "0.7"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := quotedBillingFixture(t, 1, 2, 7, 3)
