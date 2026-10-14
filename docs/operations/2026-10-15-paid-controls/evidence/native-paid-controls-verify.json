@@ -1,0 +1,657 @@
+{
+  "phase": "verify",
+  "checks": [
+    "text real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping",
+    "edit real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping",
+    "Native insufficient balance rejects both quotes and preflight without opening; safe billing diagnostic preserved",
+    "Server recheck rejects stale PASS; native permission rejects customer; mapping drift invalidates text/edit; BFF outage blocks opening; independent video enable; no supplier activity during any preflight"
+  ],
+  "screenshots": [
+    "native-paid-controls-1440-light.png",
+    "native-paid-controls-1440-dark.png",
+    "native-paid-controls-390-light.png",
+    "native-paid-controls-390-dark.png"
+  ],
+  "http_errors": [
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 401,
+      "error": "image_session_required"
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 503,
+      "error": "published_image_paid_gate_off"
+    },
+    {
+      "path": "/studio-v2/api/video/tasks",
+      "status": 503,
+      "error": "account_video_paid_gate_off"
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "status": 409,
+      "error": "image_binding_unavailable",
+      "stage": "billing_eligibility"
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "status": 409,
+      "error": "image_binding_unavailable",
+      "stage": "billing_eligibility"
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "status": 409,
+      "error": "image_binding_unavailable",
+      "stage": "published_offer"
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "status": 409,
+      "error": "image_binding_unavailable",
+      "stage": "published_offer"
+    }
+  ],
+  "production": false,
+  "supplier": "local simulator only",
+  "supplier_before_checks": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/v1beta/models",
+        "auth": "gemini-key",
+        "body": {}
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "gpt-5.4",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "synthetic-compatible-video",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "synthetic-seedance-video",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      }
+    ],
+    "image_posts": 0,
+    "video_posts": 0,
+    "tasks": {}
+  },
+  "supplier_after_checks": {
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/v1beta/models",
+        "auth": "gemini-key",
+        "body": {}
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "gpt-5.4",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "synthetic-compatible-video",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      },
+      {
+        "method": "POST",
+        "path": "/v1/responses",
+        "auth": "bearer",
+        "body": {
+          "input": [
+            {
+              "content": [
+                {
+                  "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                  "type": "input_text"
+                }
+              ],
+              "role": "user"
+            }
+          ],
+          "max_output_tokens": 512,
+          "model": "synthetic-seedance-video",
+          "stream": false,
+          "tool_choice": "required",
+          "tools": [
+            {
+              "description": "Capability probe. Call to acknowledge.",
+              "name": "probe_ping",
+              "parameters": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "type": "object"
+              },
+              "type": "function"
+            }
+          ]
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/v1/models",
+        "auth": "bearer",
+        "body": {}
+      }
+    ],
+    "image_posts": 0,
+    "video_posts": 0,
+    "tasks": {}
+  },
+  "image_preflight": {
+    "media": "image",
+    "pass": true,
+    "fingerprint": "f2cf7cfdd7a9f1b7511c7a6a4fb763b170512c5aea363773e7d9c461048d9c3d",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "edit",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "edit",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 3,
+        "product_id": "media-77045773-7fbf-4c88-a7d6-9c8c2ecd332a",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 3,
+        "product_id": "media-77045773-7fbf-4c88-a7d6-9c8c2ecd332a",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-77045773-7fbf-4c88-a7d6-9c8c2ecd332a",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-77045773-7fbf-4c88-a7d6-9c8c2ecd332a",
+        "path": "edit",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 3,
+        "product_id": "media-ed34f1e7-604c-4475-a37c-5147de9eb4f5",
+        "path": "edit",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-14T18:15:19.523544758Z"
+  },
+  "video_preflight": {
+    "media": "video",
+    "pass": true,
+    "fingerprint": "c5017a377c2f2597a3b580bb387ef52bca6cf8fea444455d2b8d93897d51f027",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf-same-model",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf-same-model",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf-same-model",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf",
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 4,
+        "product_id": "media-d86b43c0-f11d-4952-aab1-036f0744a5cf",
+        "path": "text",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-14T18:15:21.328742186Z"
+  },
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/index-cIeRDn5a.js",
+        "bytes": 194144,
+        "sha256": "c4c6e7400cbbb6d7a9daad0ebbc9a2692c7e2ab6a7b4a43f8c9f9a68574d245d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DDfo002m.js",
+        "bytes": 413892,
+        "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-DmaQAYtM.css",
+        "bytes": 21867,
+        "sha256": "af4910cb4a4fb38946ca0f544a13298c08572b7241a2584da10c30ae10887165",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-ClyDrYlp.js",
+        "bytes": 44408,
+        "sha256": "1aaf990b87a4ff16108a2a51f17f0872536f9d99f0851ddfe9b2d2ce88c79d48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CTUvPV8r.js",
+        "bytes": 104141,
+        "sha256": "eb06d4dce09ba293eebd6865768427c990d7b37b73c9b6a4fcb991cdfb447d6c",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-DXwVEzov.js",
+        "bytes": 917,
+        "sha256": "387007acce413ba4159b09464c0563d6b5e44f583ca40cee36cc636b9111b2b0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CK5V2A61.js",
+        "bytes": 2345,
+        "sha256": "f0da22aee9515fbf41b109ec5b113fb4de1e35f029570d3ab4d7b462f730ccb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-B7uGLJt7.js",
+        "bytes": 1535,
+        "sha256": "08df14aa8d8c58855d9fbf46378dbdd711328640a14248056470fed28622ce15",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-BwzGhhIj.css",
+        "bytes": 34868,
+        "sha256": "b57f1402f1d68cd8e66c9ae44e07f4aecf8ce0034ed242242384bbb49c469441",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-CpmXzQLE.js",
+        "bytes": 116227,
+        "sha256": "07b44c591b7e9d92b17f6bd26ffc5ef3c9f7321e9c1749403cbc43a5b26619d6",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": []
+  },
+  "pass": true
+}

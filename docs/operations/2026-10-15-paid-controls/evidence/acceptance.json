@@ -1,0 +1,62 @@
+{
+  "source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+  "script_sha": "f60f684999fcf0b2e212bb238df7d0a33b3ae2d5",
+  "scope": "paid-controls",
+  "status": "PASS",
+  "containers": [
+    {
+      "name": "/ai-gateway-native-core-20261012",
+      "image": "sha256:8fcdb2a0c4fbee281f0df2abbf2d8a4a1ce4a5f651ef7aabfa9a92cd5601923d",
+      "health": "healthy",
+      "network": "ai-gateway-native-net-20261012",
+      "mounts": [
+        {
+          "type": "volume",
+          "destination": "/app/data",
+          "rw": true
+        },
+        {
+          "type": "bind",
+          "destination": "/app/data/simulator-ca.crt",
+          "rw": false
+        }
+      ]
+    },
+    {
+      "name": "/ai-gateway-native-bridge-20261012",
+      "image": "sha256:caf64e63e1a1f29b4685795e8fb585c40bb1f75ebd2cf52232a3814195db3dec",
+      "health": "healthy",
+      "network": "container:9916638d283b04fd725370d097e82ca828f46aea7d5ec1b4cd24120526296eee",
+      "mounts": [
+        {
+          "type": "volume",
+          "destination": "/app/data",
+          "rw": false
+        }
+      ]
+    },
+    {
+      "name": "/ai-gateway-native-bff-20261012",
+      "image": "sha256:fe7407d6abbfb3d84c6f1270a1a2cae94a47ba1b3ebf723087c692b83ce456ac",
+      "health": "healthy",
+      "network": "container:9916638d283b04fd725370d097e82ca828f46aea7d5ec1b4cd24120526296eee",
+      "mounts": [
+        {
+          "type": "volume",
+          "destination": "/state/videos",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "destination": "/state/assets",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "destination": "/state/images",
+          "rw": true
+        }
+      ]
+    }
+  ]
+}

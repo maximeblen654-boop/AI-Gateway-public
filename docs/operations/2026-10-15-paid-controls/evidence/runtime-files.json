@@ -1,0 +1,26 @@
+{
+  "source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+  "files": [
+    {
+      "component": "core",
+      "source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+      "path": "/app/sub2api",
+      "bytes": 135962784,
+      "sha256": "a8807742bd84055872e3e70ea582182ccaa04a3a14a9d1f2b43a54b655e730c7"
+    },
+    {
+      "component": "bridge",
+      "source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+      "path": "/app/studio-bridge",
+      "bytes": 37388448,
+      "sha256": "34b3c05e551bb29859d6255006d384243ca9dd0460667d4e079d3cb55d672bc2"
+    },
+    {
+      "component": "bff",
+      "source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+      "path": "/app/studio/bff/image-server.mjs",
+      "bytes": 11901,
+      "sha256": "7a42aef466f3ddaa8767920d6e8616a8f05b130c8de28d3539d1447da1fc3123"
+    }
+  ]
+}
