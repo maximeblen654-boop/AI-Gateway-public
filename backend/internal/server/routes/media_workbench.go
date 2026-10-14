@@ -8,6 +8,11 @@ import (
 // Inherits existing admin authentication, audit and compliance middleware.
 func registerMediaWorkbenchRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	media := admin.Group("/media-workbench")
+	if h.OpenAIGateway != nil {
+		media.GET("/paid-controls/:media", h.OpenAIGateway.StudioPaidStatus)
+		media.POST("/paid-controls/:media/check", h.OpenAIGateway.StudioPaidCheck)
+		media.PUT("/paid-controls/:media", h.OpenAIGateway.StudioPaidApply)
+	}
 	media.GET("/suppliers", h.Admin.MediaWorkbench.Suppliers)
 	media.GET("/accounts/:id", h.Admin.MediaWorkbench.Detail)
 	media.POST("/accounts/:id/initialize", h.Admin.MediaWorkbench.Initialize)

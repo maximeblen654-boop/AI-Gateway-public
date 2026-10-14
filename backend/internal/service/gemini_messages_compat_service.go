@@ -274,7 +274,7 @@ func (s *GeminiMessagesCompatService) isAccountUsableForRequestWithPrecheck(
 
 	// 检查模型支持
 	// Check model support
-	if requestedModel != "" && !s.isModelSupportedByAccount(account, requestedModel) {
+	if requestedModel != "" && !(s.isModelSupportedByAccount(account, requestedModel) || account.Platform == PlatformGemini && accountSupportsRequestedModel(ctx, account, requestedModel)) {
 		return false
 	}
 

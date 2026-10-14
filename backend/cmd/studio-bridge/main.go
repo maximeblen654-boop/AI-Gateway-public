@@ -3,8 +3,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
@@ -14,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -46,11 +50,24 @@ func main() {
 		log.Fatal("bridge identity configuration unavailable")
 	}
 	group, _ := strconv.ParseInt(os.Getenv("STUDIO_IMAGE_GROUP_ID"), 10, 64)
-	image, err := studiobridge.NewImage(studiobridge.ImageOptions{ImageSubmissionEnabled: os.Getenv("STUDIO_IMAGE_PUBLISHED_SUBMISSION") == "true", ServiceToken: token, GroupID: group, CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db}})
+	image, err := studiobridge.NewImage(studiobridge.ImageOptions{ManagedPaidControl: service.StudioManagedPaidMode(), ImageSubmissionEnabled: os.Getenv("STUDIO_IMAGE_PUBLISHED_SUBMISSION") == "true", ServiceToken: token, GroupID: group, CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db}})
 	if err != nil {
 		log.Fatal("image bridge configuration unavailable")
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/internal/studio/paid-control", func(w http.ResponseWriter, r *http.Request) {
+		expected, got := sha256.Sum256([]byte(token)), sha256.Sum256([]byte(r.Header.Get("X-Studio-Service-Token")))
+		if r.Method != "GET" || len(token) < 32 || subtle.ConstantTimeCompare(expected[:], got[:]) != 1 {
+			w.WriteHeader(401)
+			return
+		}
+		videoGroup, _ := strconv.ParseInt(os.Getenv("STUDIO_VIDEO_GROUP_ID"), 10, 64)
+		coreURL, _ := url.Parse(os.Getenv("STUDIO_IMAGE_CORE_URL"))
+		coreLoopback := coreURL != nil && coreURL.Scheme == "http" && coreURL.Hostname() == "127.0.0.1"
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(map[string]any{"version": service.StudioPaidMode(), "ready": service.StudioManagedPaidMode(), "core_loopback": coreLoopback, "image_group": group, "video_group": videoGroup})
+	})
 	mux.Handle(studiobridge.ImagePath, image)
 	if os.Getenv("STUDIO_LEGACY_VIDEO_RECOVERY") == "true" {
 		// Existing installations only. Never create or migrate the legacy table.
@@ -68,7 +85,7 @@ func main() {
 	}
 	if raw := os.Getenv("STUDIO_VIDEO_GROUP_ID"); raw != "" {
 		videoGroup, _ := strconv.ParseInt(raw, 10, 64)
-		video, e := studiobridge.NewVideo(studiobridge.ImageOptions{ServiceToken: token, GroupID: videoGroup, VideoSubmissionEnabled: os.Getenv("STUDIO_VIDEO_ACCOUNT_SUBMISSION") == "true", CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db, Video: true}})
+		video, e := studiobridge.NewVideo(studiobridge.ImageOptions{ManagedPaidControl: service.StudioManagedPaidMode(), ServiceToken: token, GroupID: videoGroup, VideoSubmissionEnabled: os.Getenv("STUDIO_VIDEO_ACCOUNT_SUBMISSION") == "true", CoreURL: os.Getenv("STUDIO_IMAGE_CORE_URL"), Verify: identity.VerifySession, Keys: studiobridge.SQLImageCredentialReader{DB: db, Video: true}})
 		if e != nil {
 			log.Fatal("video bridge configuration unavailable")
 		}

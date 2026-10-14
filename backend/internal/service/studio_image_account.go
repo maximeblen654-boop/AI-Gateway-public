@@ -27,6 +27,15 @@ func (s *OpenAIGatewayService) SelectQuotedImageAccount(ctx context.Context, q S
 			return fail()
 		}
 	}
+	ma, err := mediaRepo.Get(ctx, a.ID)
+	if err != nil {
+		return fail()
+	}
+	current, err := mediaworkbench.ResolvePublishedImageOffer(ma, q.Binding.Offer.OfferID, q.Binding.Spec)
+	if err != nil || studioHash(current) != studioHash(q.Binding) {
+		return fail()
+	}
+	ctx = withPublishedMediaModel(ctx, a, current.Offer.SiteModel, current.Offer.UpstreamModel)
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	gid := q.Owner.GroupID
 	if a.Platform == PlatformGemini {
@@ -52,14 +61,6 @@ func (s *OpenAIGatewayService) SelectQuotedImageAccount(ctx context.Context, q S
 		return fail()
 	}
 	if _, err = s.validateUpstreamBaseURL(q.BaseURL); err != nil {
-		return fail()
-	}
-	ma, err := mediaRepo.Get(ctx, a.ID)
-	if err != nil {
-		return fail()
-	}
-	current, err := mediaworkbench.ResolvePublishedImageOffer(ma, q.Binding.Offer.OfferID, q.Binding.Spec)
-	if err != nil || studioHash(current) != studioHash(q.Binding) {
 		return fail()
 	}
 	release := func() {}

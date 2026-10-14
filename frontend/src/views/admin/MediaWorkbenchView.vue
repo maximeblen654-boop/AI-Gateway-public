@@ -13,6 +13,7 @@
         </nav>
       </header>
 
+      <MediaPaidControls v-if="step === 'suppliers'" />
       <div v-if="step === 'suppliers'" class="mw-statistics">
         <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
         <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
@@ -186,6 +187,7 @@
 </template>
 
 <script setup lang="ts">
+import MediaPaidControls from '@/components/admin/media/MediaPaidControls.vue'
 import { useAuthStore } from '@/stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'

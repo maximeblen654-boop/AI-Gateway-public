@@ -265,4 +265,7 @@ func RegisterAuthRoutes(
 	h.Auth.EnableStudioTickets(repository.NewStudioTicketStore(redisClient))
 	v1.POST("/internal/studio/tickets/consume", h.Auth.ConsumeStudioTicket)
 	v1.POST("/internal/studio/sessions/verify", h.Auth.VerifyStudioSession)
+	if h.OpenAIGateway != nil {
+		v1.GET("/internal/studio/paid-control/:media", h.OpenAIGateway.StudioPaidInternal)
+	}
 }

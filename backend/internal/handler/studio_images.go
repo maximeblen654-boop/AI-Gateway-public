@@ -35,7 +35,7 @@ func studioDecode(c *gin.Context, v any) error {
 	return nil
 }
 func studioError(c *gin.Context, err error) {
-	c.JSON(http.StatusConflict, gin.H{"error": "studio_image_binding_unavailable", "message": err.Error()})
+	c.JSON(http.StatusConflict, gin.H{"error": "studio_image_binding_unavailable", "diagnostic_stage": service.QuoteFailureStage(err)})
 }
 
 func (h *OpenAIGatewayHandler) StudioImageQuote(c *gin.Context) {
@@ -61,7 +61,7 @@ func (h *OpenAIGatewayHandler) StudioImageQuote(c *gin.Context) {
 		return
 	}
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), key.User, key, key.Group, subscription, service.QuotaPlatform(c.Request.Context(), key)); err != nil {
-		studioError(c, err)
+		studioError(c, service.QuoteFailure("billing_eligibility", err))
 		return
 	}
 	token, err := h.studioImage.Issue(c.Request.Context(), owner, key, input.OfferID, input.Spec, subscriptionID)
@@ -209,7 +209,7 @@ func (h *OpenAIGatewayHandler) StudioImageReadiness(c *gin.Context) {
 	if _, _, ok := h.studioOwner(c, false); !ok {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "paid_enabled": h.studioImage.Enabled()})
+	c.JSON(http.StatusOK, gin.H{"contract": mediaworkbench.ImageBindingVersion, "control_mode": service.StudioPaidMode(), "paid_enabled": h.studioImage.Enabled()})
 }
 
 func (h *OpenAIGatewayHandler) StudioImageCatalog(c *gin.Context) {

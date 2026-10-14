@@ -200,3 +200,8 @@ test('BFF/Bridge contract transport pins key/version and rejects version drift',
   const bad=createPublishedImageClient({baseUrl:'http://127.0.0.1',serviceToken:'s'.repeat(32),fetchImpl:async()=>new Response(JSON.stringify({code:0,data:{contract:'old',key_ref:42}}))});
   await assert.rejects(bad(owner,'GET','catalog'),/contract mismatch/);
 });
+
+for(const stage of ['account_admission','https://secret.invalid/token']) test('quote diagnostics remain bounded and safe: '+stage, async()=>{
+ const call=createPublishedImageClient({baseUrl:'http://127.0.0.1:1',serviceToken:'x'.repeat(32),fetchImpl:async()=>new Response(JSON.stringify({diagnostic_stage:stage,message:'secret-key-and-internal-route'}),{status:409})});
+ await assert.rejects(call(owner,'POST','quotes',{}),e=>{assert.equal(e.stage,stage==='account_admission'?stage:undefined);assert(!JSON.stringify(e).includes('secret'));assert(!e.message.includes('internal-route'));return true;});
+});

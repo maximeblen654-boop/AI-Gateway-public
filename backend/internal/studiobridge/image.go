@@ -76,6 +76,7 @@ func (r SQLImageCredentialReader) resolve(ctx context.Context, user, group, keyI
 }
 
 type ImageOptions struct {
+	ManagedPaidControl     bool
 	ImageSubmissionEnabled bool
 	VideoSubmissionEnabled bool
 	ServiceToken           string
@@ -86,6 +87,7 @@ type ImageOptions struct {
 	Client                 *http.Client
 }
 type ImageBridge struct {
+	managed bool
 	opts    ImageOptions
 	base    *url.URL
 	client  *http.Client
@@ -108,7 +110,7 @@ func NewImage(opts ImageOptions) (*ImageBridge, error) {
 		*client = *opts.Client
 	}
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &ImageBridge{opts: opts, base: base, client: client, enabled: opts.ImageSubmissionEnabled}, nil
+	return &ImageBridge{opts: opts, base: base, client: client, enabled: opts.ImageSubmissionEnabled, managed: opts.ManagedPaidControl}, nil
 }
 
 var imageTaskPath = regexp.MustCompile(`^tasks/[A-Za-z0-9_-]{1,128}(?:/result)?$`)
@@ -147,7 +149,7 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 401, "invalid image session")
 		return
 	}
-	if r.Method == http.MethodPost && operation == "tasks" && !b.enabled {
+	if r.Method == http.MethodPost && operation == "tasks" && !b.paidEnabled(r.Context()) {
 		writeError(w, 503, "published image paid gate off")
 		return
 	}
@@ -222,7 +224,14 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, (32<<20)+1))
 	if err != nil || len(data) > 32<<20 || !json.Valid(data) || response.StatusCode >= 300 {
-		writeError(w, responseStatus(response.StatusCode), "core image operation unavailable")
+		var failure struct {
+			Stage string `json:"diagnostic_stage"`
+		}
+		_ = json.Unmarshal(data, &failure)
+		stage := service.QuoteFailureStage(&service.StudioQuoteError{Stage: failure.Stage})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(responseStatus(response.StatusCode))
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": responseStatus(response.StatusCode), "message": "core image operation unavailable", "diagnostic_stage": stage})
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -232,7 +241,11 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 502, "invalid readiness")
 			return
 		}
-		readiness["paid_enabled"] = b.enabled && readiness["paid_enabled"] == true
+		if b.managed {
+			readiness["paid_enabled"] = readiness["control_mode"] == service.StudioPaidControlVersion && readiness["paid_enabled"] == true
+		} else {
+			readiness["paid_enabled"] = b.enabled && readiness["paid_enabled"] == true
+		}
 		data, _ = json.Marshal(readiness)
 	}
 	writeSuccess(w, struct {

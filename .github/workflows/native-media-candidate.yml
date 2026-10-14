@@ -20,7 +20,7 @@ on:
         required: false
         type: choice
         default: standard
-        options: [standard, draft-management, studio-workspace]
+        options: [standard, draft-management, studio-workspace, paid-controls]
       acceptance_scenario:
         description: 'existing-image acceptance scope'
         required: false
@@ -52,7 +52,8 @@ jobs:
   candidate:
     if: >-
       github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
-      github.ref == 'refs/heads/codex/studio-native-media' &&
+      (github.ref == 'refs/heads/codex/studio-native-media' ||
+       (github.ref == 'refs/heads/codex/media-paid-controls' && github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'build' && github.event.inputs.build_acceptance == 'paid-controls')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.mode != 'accept-existing') &&
       (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[native-media-candidate]'))
     runs-on: ubuntu-24.04

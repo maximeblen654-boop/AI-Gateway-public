@@ -127,6 +127,7 @@ func ProvideGatewayHandler(
 }
 
 func ProvideOpenAIGatewayHandler(
+	paidSettings service.SettingRepository,
 	videoOrders service.StudioVideoOrderRepository,
 	geminiCompatService *service.GeminiMessagesCompatService,
 	mediaRepository mediaworkbench.Repository,
@@ -155,6 +156,9 @@ func ProvideOpenAIGatewayHandler(
 	h.studioImage.APIKeys = apiKeyService
 	h.studioVideo = service.NewStudioVideoRuntime(gatewayService, mediaRepository, videoOrders)
 	h.studioVideo.APIKeys = apiKeyService
+	h.studioPaidControl = service.NewStudioPaidControl(paidSettings, h.studioImage, h.studioVideo, apiKeyService)
+	h.studioImage.PaidControl = h.studioPaidControl
+	h.studioVideo.PaidControl = h.studioPaidControl
 	gatewayService.StartImageReceiptWorker(context.Background(), apiKeyService)
 	return h
 }

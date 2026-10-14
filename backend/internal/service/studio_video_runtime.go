@@ -21,6 +21,7 @@ import (
 )
 
 type StudioVideoRuntime struct {
+	PaidControl       *StudioPaidControl
 	Core              *OpenAIGatewayService
 	Media             mediaworkbench.Repository
 	Orders            StudioVideoOrderRepository
@@ -81,6 +82,14 @@ func NewStudioVideoRuntime(core *OpenAIGatewayService, media mediaworkbench.Repo
 	return r
 }
 func (r *StudioVideoRuntime) Enabled() bool {
+	if r == nil || r.Core == nil || r.Media == nil || r.Store == nil || r.Orders == nil || r.request == nil {
+		return false
+	}
+	if r != nil && r.PaidControl != nil && r.PaidControl.Managed {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return r.PaidControl.Effective(ctx, "video")
+	}
 	return r != nil && r.enabled && r.Core != nil && r.Media != nil && r.Orders != nil && r.Store != nil && r.request != nil
 }
 
@@ -119,6 +128,17 @@ func (r *StudioVideoRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 }
 
 func (r *StudioVideoRuntime) IssueWithPreparation(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, body []byte, preparationID string) (string, StudioVideoQuote, error) {
+	return r.issueQuote(ctx, owner, key, offerID, spec, body, preparationID, false)
+}
+
+// quotePreflight compiles inert reference placeholders through the native plan
+// and validates the same frozen price, Account and cost rules. It never uploads
+// references, sends upstream requests, or issues an executable quote token.
+func (r *StudioVideoRuntime) quotePreflight(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, body []byte) error {
+	_, _, err := r.issueQuote(ctx, owner, key, offerID, spec, body, "", true)
+	return err
+}
+func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, body []byte, preparationID string, preflight bool) (string, StudioVideoQuote, error) {
 	var q StudioVideoQuote
 	if r == nil || r.Core == nil || r.Media == nil || r.Store == nil || len(body) > 24<<20 || !videoOwnerKey(owner, key) {
 		return "", q, ErrStudioVideoInvalidOrder
@@ -138,7 +158,7 @@ func (r *StudioVideoRuntime) IssueWithPreparation(ctx context.Context, owner Stu
 	if e != nil || aCurrent == nil {
 		return "", q, ErrStudioVideoInvalidOrder
 	}
-	if preparationID == "" && gjson.GetBytes(body, "references.#").Int() > 0 {
+	if !preflight && preparationID == "" && gjson.GetBytes(body, "references.#").Int() > 0 {
 		return "", q, ErrStudioVideoConflict
 	}
 	var preparation *StudioVideoReferencePreparation
@@ -229,6 +249,9 @@ func (r *StudioVideoRuntime) IssueWithPreparation(ctx context.Context, owner Stu
 	} else {
 		release()
 	}
+	if preflight {
+		return "", q, nil
+	}
 	token, e := r.Store.Issue(q)
 	if e == nil && preparation != nil {
 		preparation.FinalQuoteToken = token
@@ -265,6 +288,15 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		if !a.IsSchedulable() || a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
 			return fail()
 		}
+		ma, e := r.Media.Get(ctx, a.ID)
+		if e != nil {
+			return fail()
+		}
+		current, e := mediaworkbench.ResolvePublishedVideoOffer(ma, b.Offer.OfferID, b.Spec)
+		if e != nil || current.PublishedRevision != b.PublishedRevision || studioHash(current.Offer) != studioHash(b.Offer) {
+			return fail()
+		}
+		ctx = withPublishedMediaModel(ctx, a, current.Offer.SiteModel, current.Offer.UpstreamModel)
 		gid := b.Owner.GroupID
 		ctx = r.Core.withOpenAIQuotaAutoPauseContext(ctx)
 		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, b.Offer.SiteModel, false, "")
@@ -277,14 +309,7 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, b.Offer.SiteModel) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
 			return fail()
 		}
-		ma, e := r.Media.Get(ctx, a.ID)
-		if e != nil {
-			return fail()
-		}
-		current, e := mediaworkbench.ResolvePublishedVideoOffer(ma, b.Offer.OfferID, b.Spec)
-		if e != nil || current.PublishedRevision != b.PublishedRevision || studioHash(current.Offer) != studioHash(b.Offer) {
-			return fail()
-		}
+
 	}
 	release := func() {}
 	if slot {

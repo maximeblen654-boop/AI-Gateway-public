@@ -1,3 +1,4 @@
+import {effectivePaid,paidControlHandler} from './paid-control.mjs';
 import http from 'node:http';
 import {createAccountVideoClient,createAccountVideoRuntime} from './video-account.mjs';
 import {createVideoResultStore} from './video-result-store.mjs';
@@ -17,7 +18,7 @@ async function jsonBody(request) {
   for await (const chunk of request) {bytes+=chunk.length;if(bytes>1<<20)throw new Error('Image request too large');chunks.push(chunk);}
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=IMAGE_PAID_ENABLED }) {
+export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=IMAGE_PAID_ENABLED, managedPaid=false }) {
   return async (req,res) => {
     function reply(status,body) {res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));}
     try {
@@ -65,7 +66,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         return;
       }
       if(req.method==='GET' && url.pathname==='/studio-v2/api/image/readiness') {
-        const enabled=paidEnabled===true && (await tasks.readiness(session)).paid_enabled===true;
+        const enabled=managedPaid ? await effectivePaid(tasks,session,paidEnabled,true) : paidEnabled===true && (await tasks.readiness(session)).paid_enabled===true;
         reply(200,{contract:IMAGE_BINDING_CONTRACT,paid_enabled:enabled});return;
       }
       if(req.method==='GET' && url.pathname==='/studio-v2/api/image/catalog') {reply(200,await tasks.catalog(session));return;}
@@ -77,7 +78,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         reply(200,tasks.view(tasks.prepare(session,input).task));return;
       }
       if(req.method==='POST' && url.pathname==='/studio-v2/api/image/tasks') {
-        if(paidEnabled!==true){reply(503,{error:'published_image_paid_gate_off'});return;}
+        if(!await effectivePaid(tasks,session,paidEnabled,managedPaid)){reply(503,{error:'published_image_paid_gate_off'});return;}
         const input=await jsonBody(req);
         const stored=input&&Object.keys(input).length===1&&/^img_[a-f0-9]{32}$/.test(input.task_id);
         if(!stored&&(!input || !Array.isArray(input.asset_refs) || Object.hasOwn(input,'references')))throw Error('Private asset refs required');
@@ -90,7 +91,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
       }
       reply(404,{error:'image_route_not_found'});
-    } catch(error) {if(!res.headersSent)reply(409,{error:error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',recovery:'GET original task only'});else res.end();}
+    } catch(error) {if(!res.headersSent)reply(409,{error:error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',...(error?.stage ? {diagnostic_stage:error.stage} : {}),recovery:'GET original task only'});else res.end();}
   };
 }
 
@@ -106,13 +107,15 @@ export function buildImageServer(env=process.env, {legacyVideo}={}) {
   const assetIntake=assetRoot?createAssetIntake({rootDir:assetRoot,ffprobePath:env.STUDIO_FFPROBE_PATH||'ffprobe'}):undefined;
   const imageAssetResolver=assetIntake?(session,refs)=>refs.map(ref=>{const a=assetIntake.uploadPayload(session.ownerId,ref);if(a.kind!=='image')throw Error('image_reference_required');return `data:${a.mimeType};base64,${Buffer.from(a.bytes).toString('base64')}`}):undefined;
   const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call:createPublishedImageClient(common),results:createImageResultStore({rootDir:path.join(root,'results')}),assetResolver:imageAssetResolver});
-  const imageHandler=createImageHandler({sessions,tasks,assetIntake,paidEnabled:env.STUDIO_IMAGE_PUBLISHED_SUBMISSION==='true'});
-  if(!env.STUDIO_VIDEO_DATA_ROOT)return http.createServer(imageHandler);
+  const imageHandler=createImageHandler({sessions,tasks,assetIntake,paidEnabled:env.STUDIO_IMAGE_PUBLISHED_SUBMISSION==='true',managedPaid:env.STUDIO_PAID_CONTROL_MODE==='managed-v1'});
+  if(!env.STUDIO_VIDEO_DATA_ROOT)return http.createServer((req,res)=>new URL(req.url,'http://localhost').pathname==='/internal/studio/paid-control'?paidControlHandler(env)(req,res):imageHandler(req,res));
   if(!path.isAbsolute(env.STUDIO_VIDEO_DATA_ROOT))throw new Error('Private video root required');
   const videoTasks=createAccountVideoRuntime({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'journal'),call:createAccountVideoClient(common),resultStore:createVideoResultStore({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'results')})});
   const resolveAssets=createVideoAssetResolver({intake:assetIntake,tasks:videoTasks});
-  const videoHandler=createVideoHandler({sessions,tasks:videoTasks,resolveAssets,paidEnabled:env.STUDIO_VIDEO_ACCOUNT_SUBMISSION==='true'});
+  const videoHandler=createVideoHandler({sessions,tasks:videoTasks,resolveAssets,paidEnabled:env.STUDIO_VIDEO_ACCOUNT_SUBMISSION==='true',managedPaid:env.STUDIO_PAID_CONTROL_MODE==='managed-v1'});
+  const control=paidControlHandler(env);
   return http.createServer((req,res)=>{
+    if(req.url==='/internal/studio/paid-control')return control(req,res);
     return req.url.startsWith('/studio-v2/api/video/')?videoHandler(req,res):imageHandler(req,res);
   });
 }

@@ -244,3 +244,31 @@ func PublishedImageExecution(r ResolvedImageOffer) (ImageExecutionPlan, error) {
 	}
 	return PlanImageExecution(config, r.Spec.Count)
 }
+
+// PublishedOfferSpecs enumerates the actual published contract, never the UI's
+// capped previews. Used by non-paid admission checks; it does not mutate Draft.
+func PublishedOfferSpecs(a *Account, o Offer) ([]Spec, error) {
+	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+		return nil, ErrRuntimeBinding
+	}
+	for _, p := range a.Config.Published.Products {
+		if p.ProductID != o.ProductID {
+			continue
+		}
+		all, err := specs(p.Capabilities, maxCases)
+		if err != nil {
+			return nil, err
+		}
+		out := []Spec{}
+		for _, v := range all {
+			if o.Matches(v) {
+				out = append(out, v)
+			}
+		}
+		if len(out) == 0 {
+			return nil, ErrRuntimeBinding
+		}
+		return out, nil
+	}
+	return nil, ErrRuntimeBinding
+}

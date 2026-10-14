@@ -35,6 +35,7 @@ import (
 
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
+	studioPaidControl          *service.StudioPaidControl
 	studioImage                *service.StudioImageRuntime
 	studioVideo                *service.StudioVideoRuntime
 	compositeResolver          *service.CompositeRouteResolver

@@ -42,7 +42,16 @@ export function createPublishedImageClient({ baseUrl, serviceToken, fetchImpl = 
       method, headers, ...(method === 'POST' ? { body:JSON.stringify({ key_ref:keyRef,payload }) } : {}),
       redirect:'error', signal:AbortSignal.timeout(960000),
     });
-    if (!response.ok) throw new Error('Image bridge unavailable; receipt GET recovery only');
+    if (!response.ok) {
+      const error = new Error('Image bridge unavailable; receipt GET recovery only');
+      error.layer = 'bridge'; error.upstreamStatus = response.status;
+      try {
+        const reader=response.body.getReader(); const chunks=[]; let size=0;
+        for (;;) {const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>4096){await reader.cancel();break;}chunks.push(value);}
+        if(size<=4096) {const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(['billing_eligibility','published_offer','price','account','account_admission','execution','account_cost','quote_store','binding'].includes(body.diagnostic_stage)){error.stage=body.diagnostic_stage;error.layer='core';}}
+      } catch { /* Never echo the raw upstream body. */ }
+      throw error;
+    }
     const reader = response.body.getReader(), chunks=[];
     let size=0;
     for (;;) { const {done,value}=await reader.read(); if(done)break;size+=value.byteLength;

@@ -40,7 +40,7 @@ func (h *OpenAIGatewayHandler) StudioVideoReadiness(c *gin.Context) {
 	if _, _, ok := h.videoOwner(c); !ok {
 		return
 	}
-	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "paid_enabled": h.studioVideo.Enabled()})
+	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "control_mode": service.StudioPaidMode(), "paid_enabled": h.studioVideo.Enabled()})
 }
 func (h *OpenAIGatewayHandler) StudioVideoQuote(c *gin.Context) {
 	owner, key, ok := h.videoOwner(c)

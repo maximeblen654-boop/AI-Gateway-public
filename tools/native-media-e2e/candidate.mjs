@@ -10,8 +10,9 @@ assert.equal(process.env.GITHUB_ACTIONS, 'true')
 assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
 assert.equal(process.env.RUNNER_OS, 'Linux')
 assert.equal(process.env.GITHUB_REPOSITORY, 'maximeblen654-boop/AI-Gateway-public')
+const paidControls = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'paid-controls'
 const adminReview = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'admin-ui-review'
-assert.equal(process.env.GITHUB_REF, adminReview ? 'refs/heads/codex/admin-media-design-review' : 'refs/heads/codex/studio-native-media')
+assert.equal(process.env.GITHUB_REF, paidControls ? 'refs/heads/codex/media-paid-controls' : adminReview ? 'refs/heads/codex/admin-media-design-review' : 'refs/heads/codex/studio-native-media')
 const adminCandidate = adminReview && process.env.NATIVE_EXPORT_CANDIDATE === 'true'
 if (adminReview && !adminCandidate) assert(['build', 'verify'].includes(process.argv[2]), 'Implementation review cannot export a production candidate')
 const scriptSha = process.env.GITHUB_SHA
@@ -117,21 +118,25 @@ if (mode === 'build') {
   space(10)
   const compose = JSON.parse(fs.readFileSync('tools/native-media-e2e/compose.synthetic.json', 'utf8'))
   for (const c of components) compose.services[c].image = tag(c)
-  if (workspaceArtifact || adminReview) {
+  if (workspaceArtifact || adminReview || paidControls) {
     process.env.NATIVE_WORKSPACE_UI = 'true'
     process.env.NATIVE_WORKSPACE_ARTIFACT = 'true'
     process.env.NATIVE_WORKSPACE_DEV_SERVER = 'false'
   }
-  if (draftManagement || workspaceArtifact || adminReview) compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = 'https://203.0.113.10:19090'
+  if (paidControls) {
+    for (const c of components) Object.assign(compose.services[c].environment, {STUDIO_PAID_CONTROL_MODE:'managed-v1',STUDIO_IMAGE_PUBLISHED_SUBMISSION:'false',STUDIO_VIDEO_ACCOUNT_SUBMISSION:'false',IMAGE_RECEIPT_WORKER_ENABLED:'false'})
+    compose.services.core.environment.STUDIO_CONTROL_BFF_URL='http://127.0.0.1:4173'
+  }
+  if (draftManagement || workspaceArtifact || adminReview || paidControls) compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = 'https://203.0.113.10:19090'
   fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
   fs.mkdirSync(path.join(root, 'runtime'), { recursive: true })
   fs.copyFileSync('tools/native-media-e2e/simulator.mjs', path.join(root, 'runtime/simulator.mjs'))
   run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=localhost',
-    '-addext', (draftManagement || workspaceArtifact || adminReview) ? 'subjectAltName=DNS:localhost,IP:203.0.113.10' : 'subjectAltName=DNS:localhost', '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
+    '-addext', (draftManagement || workspaceArtifact || adminReview || paidControls) ? 'subjectAltName=DNS:localhost,IP:203.0.113.10' : 'subjectAltName=DNS:localhost', '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
   fs.copyFileSync(path.join(evidence, 'simulator-cert.pem'), path.join(evidence, 'simulator-ca.crt'))
   run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(evidence, 'synthetic-original.mp4')])
   dc(['up', '-d', '--wait', '--wait-timeout', '180', 'core'])
-  if (draftManagement || workspaceArtifact || adminReview) {
+  if (draftManagement || workspaceArtifact || adminReview || paidControls) {
     // Existing accept-existing harness: the documented result address is local
     // to this synthetic Core namespace, never a real supplier destination.
     const pid = capture('docker', ['inspect', '--format', '{{.State.Pid}}', 'ai-gateway-native-core-20261012'])
@@ -150,7 +155,20 @@ if (mode === 'build') {
       if (await fetch('http://127.0.0.1:28100/health').then(r => r.ok).catch(() => false)) break
       await new Promise(resolve => setTimeout(resolve, 500))
     }
-    if (adminReview) {
+    if (paidControls) {
+      assert.equal(await fetch('http://127.0.0.1:4295/').then(()=>true).catch(()=>false),false)
+      for (const script of ['seed.mjs','customer-keys.mjs']) run(process.execPath,[`tools/native-media-e2e/${script}`,root])
+      run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'seed'])
+      run(process.execPath,['tools/native-media-e2e/browser.cjs',root,'--image-geometry'])
+      run(process.execPath,['tools/native-media-e2e/browser.cjs',root,'--video-compatible'])
+      const fixture=JSON.parse(fs.readFileSync(path.join(evidence,'fixture.json'),'utf8'))
+      compose.services.bridge.environment.STUDIO_IMAGE_GROUP_ID=String(fixture.groups.openai)
+      fs.writeFileSync(path.join(root,'compose.json'),JSON.stringify(compose))
+      dc(['up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','90','bridge'])
+      run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'verify'])
+      for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
+      run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
+    } else if (adminReview) {
       assert.equal(await fetch('http://127.0.0.1:4295/').then(() => true).catch(() => false), false)
       for (const script of ['seed.mjs', 'customer-keys.mjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])
       run(process.execPath, ['tools/native-media-e2e/browser.cjs', root, '--image-geometry'])
@@ -215,7 +233,7 @@ if (mode === 'build') {
       return { component: c, source_sha: componentSource(c), path: file, bytes: Number(capture('docker', ['exec', container, 'stat', '-c', '%s', file])), sha256: capture('docker', ['exec', container, 'sha256sum', file]).split(' ')[0] }
     })
     fs.writeFileSync(path.join(out, 'runtime-files.json'), JSON.stringify({ source_sha: sha, files: runtimeFiles }, null, 2))
-    fs.writeFileSync(path.join(out, 'acceptance.json'), JSON.stringify({ source_sha: sha, script_sha: scriptSha, scope: adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', status: 'PASS', containers: containers.map(c => ({ name: c.Name, image: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode, mounts: c.Mounts.map(m => ({ type: m.Type, destination: m.Destination, rw: m.RW })) })) }, null, 2))
+    fs.writeFileSync(path.join(out, 'acceptance.json'), JSON.stringify({ source_sha: sha, script_sha: scriptSha, scope: paidControls ? 'paid-controls' : adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', status: 'PASS', containers: containers.map(c => ({ name: c.Name, image: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode, mounts: c.Mounts.map(m => ({ type: m.Type, destination: m.Destination, rw: m.RW })) })) }, null, 2))
   } finally {
     proxy.kill()
     for (const name of fs.readdirSync(evidence).filter(n => /^native-.*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
@@ -243,5 +261,5 @@ if (mode === 'build') {
     const archiveIdentity = JSON.parse(capture('python3', ['tools/native-media-e2e/archive-identity.py', path.join(out, file), image.Id]))
     images.push({ archive_identity: archiveIdentity, component: c, source_sha: componentSource(c), disposition: reuseSidecars && c !== 'core' ? 'reused' : 'built', image_id: image.Id, config_digest: image.Id, run_id: reuseSidecars && c !== 'core' ? '38443205417' : process.env.GITHUB_RUN_ID, artifact: reuseSidecars && c !== 'core' ? { id: '11836997249', name: `native-media-candidate-${reuseSha}` } : { name: `native-media-candidate-${sha}` }, platform: 'linux/amd64', tag: tag(c), tar: file, sha256: await hash(path.join(out, file)), bytes: fs.statSync(path.join(out, file)).size })
   }
-  fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ source_sha: sha, build_run_id: process.env.GITHUB_RUN_ID, acceptance_run_id: process.env.GITHUB_RUN_ID, deployment_state: acceptance.status === 'PASS' ? 'CANDIDATE_READY_NOT_DEPLOYED' : 'CANDIDATE_NOT_ACCEPTED', required_production_flags: { STUDIO_IMAGE_PUBLISHED_SUBMISSION: false, STUDIO_VIDEO_ACCOUNT_SUBMISSION: false, IMAGE_RECEIPT_WORKER_ENABLED: false }, build_script_sha: scriptSha, acceptance_script_sha: scriptSha, acceptance_scope: adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', production_action: false, acceptance: acceptance.status, images }, null, 2))
+  fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ source_sha: sha, build_run_id: process.env.GITHUB_RUN_ID, acceptance_run_id: process.env.GITHUB_RUN_ID, deployment_state: acceptance.status === 'PASS' ? 'CANDIDATE_READY_NOT_DEPLOYED' : 'CANDIDATE_NOT_ACCEPTED', required_production_flags: { STUDIO_IMAGE_PUBLISHED_SUBMISSION: false, STUDIO_VIDEO_ACCOUNT_SUBMISSION: false, IMAGE_RECEIPT_WORKER_ENABLED: false }, build_script_sha: scriptSha, acceptance_script_sha: scriptSha, acceptance_scope: paidControls ? 'paid-controls' : adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', production_action: false, acceptance: acceptance.status, images }, null, 2))
 } else throw Error('choose build, verify or export')

@@ -20,13 +20,14 @@ import (
 )
 
 type StudioImageRuntime struct {
-	Core    *OpenAIGatewayService
-	Gemini  *GeminiMessagesCompatService
-	Media   mediaworkbench.Repository
-	Store   *StudioImageStore
-	APIKeys *APIKeyService
-	enabled bool
-	network func(context.Context, *gin.Context, *Account, []byte, string) ([]byte, string, error)
+	PaidControl *StudioPaidControl
+	Core        *OpenAIGatewayService
+	Gemini      *GeminiMessagesCompatService
+	Media       mediaworkbench.Repository
+	Store       *StudioImageStore
+	APIKeys     *APIKeyService
+	enabled     bool
+	network     func(context.Context, *gin.Context, *Account, []byte, string) ([]byte, string, error)
 }
 
 var studioImageTaskID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
@@ -85,6 +86,14 @@ func NewStudioImageRuntime(core *OpenAIGatewayService, media mediaworkbench.Repo
 	return r
 }
 func (r *StudioImageRuntime) Enabled() bool {
+	if r == nil || r.Core == nil || r.Media == nil || r.Store == nil || r.network == nil || r.Core.usageBillingRepo == nil {
+		return false
+	}
+	if r != nil && r.PaidControl != nil && r.PaidControl.Managed {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return r.PaidControl.Effective(ctx, "image")
+	}
 	return r != nil && r.enabled && r.Core != nil && r.Media != nil && r.Store != nil && r.Core.usageBillingRepo != nil && r.network != nil
 }
 func studioCredentialFingerprint(a *Account) string {
@@ -110,7 +119,7 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 		return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
 	})
 	if err != nil || !studioGroupAllows(key, resolved.Offer.SiteModel) {
-		return "", mediaworkbench.ErrRuntimeBinding
+		return "", QuoteFailure("published_offer", mediaworkbench.ErrRuntimeBinding)
 	}
 	unitPrice, totalPrice, err := mediaworkbench.PriceForQuantity(resolved.Offer.SalePrice, resolved.Spec.Count)
 	if err != nil {
@@ -142,10 +151,10 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	q.ExpiresAt = q.CreatedAt.Add(2 * time.Minute)
 	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt)
 	if err != nil {
-		return "", err
+		return "", QuoteFailure("account_cost", err)
 	}
 	if _, release, e := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, false, r.Gemini); e != nil {
-		return "", e
+		return "", QuoteFailure("account_admission", e)
 	} else {
 		release()
 	}
