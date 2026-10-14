@@ -61,6 +61,7 @@
           <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费 · 0 元' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
         </div>
       </div>
+      <MediaCostCalculator :product="product" :account-id="accountId" :admin-id="adminId" :labels="priceRows.map(pricingRuleLabel)" />
       <p class="mw-muted" data-test="pricing-row-summary">价格行：{{ priceRows.length }}，已填写 {{ filledPricingRows }}，待填写 {{ priceRows.length - filledPricingRows }}。</p>
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
@@ -96,8 +97,10 @@ import type { NativeAdapter, AdapterBinding, Diagnostic, Product } from '@/api/a
 import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
+import MediaCostCalculator from './MediaCostCalculator.vue'
+import { multiplyDecimalText } from './decimalText'
 import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
-const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string }>()
+const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number }>()
 const emit = defineEmits<{ 'update:product': [value: Product] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const ratioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
@@ -257,16 +260,6 @@ const referenceSummary = computed(() => {
   if (refs.total_max === 0) return '不允许上传素材（合计上限为 0，保留原语义）。'
   return (['image', 'video', 'audio'] as const).filter(key => refs[key].max > 0).map(key => `${({ image: '图片', video: '视频', audio: '音频' })[key]}：${refs[key].min > 0 ? `必填 ${refs[key].min}～` : '可选，最多 '}${Math.min(refs[key].max, refs.total_max)} 份`).join('；') + `。合计最多 ${refs.total_max} 份。`
 })
-function multiplyDecimalText(left: string, right: number): string {
-  if (!/^\d+(?:\.\d+)?$/.test(left) || !Number.isInteger(right) || right < 1) return left
-  const [whole, fraction = ''] = left.split('.')
-  const digits = BigInt(`${whole}${fraction}`) * BigInt(right)
-  const scale = fraction.length
-  if (!scale) return digits.toString()
-  const text = digits.toString().padStart(scale + 1, '0')
-  const result = `${text.slice(0, -scale)}.${text.slice(-scale)}`.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
-  return result
-}
 const pricingPreview = computed(() => {
   const selected = previewDimensions.value.reduce<Record<string, string>>((result, { key }) => { result[key] = previewValue(key); return result }, {})
   const specs = sellableSpecs(props.product)

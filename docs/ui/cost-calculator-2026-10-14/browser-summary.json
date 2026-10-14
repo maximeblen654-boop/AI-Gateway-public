@@ -1,0 +1,20 @@
+{
+  "scope": "isolated frontend fixture, no production or supplier requests",
+  "stats": {
+    "startTime": "2026-10-14T02:16:31.959Z",
+    "duration": 68582.485,
+    "expected": 12,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "repeatEach": 3,
+  "viewports": [
+    1440,
+    390
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ]
+}

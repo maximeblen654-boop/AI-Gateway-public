@@ -72,7 +72,7 @@ jobs:
         working-directory: frontend
         run: |
           pnpm exec playwright install --with-deps chromium
-          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts
+          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts
 
       - name: Upload isolated wizard screenshots and results
         if: always()

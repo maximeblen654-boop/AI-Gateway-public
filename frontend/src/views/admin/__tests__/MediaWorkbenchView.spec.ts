@@ -1,3 +1,4 @@
+import { createPinia } from 'pinia'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,7 +17,7 @@ let router: ReturnType<typeof createRouter>
 async function mountWorkbench() {
   router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/admin/media', component: MediaWorkbenchView }, { path: '/admin/accounts', component: { template: '<div>Accounts</div>' } }] })
   await router.push('/admin/media')
-  wrapper = mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [router], stubs: { AppLayout: { template: '<div><slot /></div>' } } } })
+  wrapper = mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [createPinia(), router], stubs: { AppLayout: { template: '<div><slot /></div>' } } } })
   await flushPromises()
 }
 async function expandSource(host: string) {
