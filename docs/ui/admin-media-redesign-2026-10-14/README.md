@@ -1,56 +1,26 @@
-# 管理员媒体工作台：设计与联调审核入口
+# 管理员媒体工作台 PR #1：正式实现复审入口
 
-状态：**DESIGN_REVIEW_ONLY · BACKEND_INTEGRATION_NOT_DONE**。
+**IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED**。
 
-这是 oil-ui 第二版可操作设计稿，范围仅为管理员媒体工作台。用户尚未确认最终设计；本次提交用于 ChatGPT / Codex 审核，不是正式 UI 实现、运行候选或部署。
+ChatGPT Review `5513583921` 的条件实现已完成。正式运行代码沿用 Vue/composable、pricingMatrix、成本计算器及现有 API；没有导入 prototype.js 作为业务状态管理器。正式 Handoff / Constraints 保持原文。
 
-运行代码基线：`a14000c68c1f090d34c8fde0197d860d2d767215`（包含已完成、尚未部署的成本计算器）。本分支只新增本目录，未修改 frontend、backend、Studio、构建或部署配方。正式 Handoff / Constraints 保持不变。
+## 当前要审核的材料
 
-## 先看什么
+1. **[实施、真实联调与截图报告](IMPLEMENTATION_REPORT.md)**：源码、三项审核结果、请求/报价/资金对照、CI 和四组正式 Core 页面截图。
+2. [前后端合同检查表](INTEGRATION_REVIEW.md)：规格/映射/发布/报价/执行的既有来源及验收边界。
+3. **[可复制的 ChatGPT 复审提示词](CHATGPT_REVIEW_PROMPT.md)**。
+4. [机器交叉核对](implementation-evidence/run-38523316345/contract-cross-check.json)、[真实隔离验收](implementation-evidence/run-38523316345/acceptance.json)、[证据摘要](implementation-evidence/SHA256SUMS.json)。
 
-1. [前后端联调审查清单](INTEGRATION_REVIEW.md)：尤其图片比例、分辨率、价格组合、保存与实际请求是否使用同一合同。
-2. [第二版设计说明](REVIEW_V2.md)：视觉意图、交互、既有演示验证和局限。
-3. [交给 ChatGPT / Codex 的审核提示词](CHATGPT_REVIEW_PROMPT.md)。
+被测 Core 与验收脚本：`f246974afaedf5a3d143bde57cee4378ddf87372`；正式组件实现于 `64cc40c4f06dbedd51f748fb9a52a83e99256479`，随后是测试脚本修正。真实联调 Run **38523316345 PASS**，CI **38523320929 PASS**，Security **38523320928 PASS**。运行代码与证据归档提交分开标记。
 
-**现有后端已有规格处理链，新外观尚未接回该链。不能把这个原型未接通，误报成现有生产后端不支持；也不能用原型通过，证明新外观已经联调。**
+## 正式 Vue 预览
 
-## 视觉预览
+![正式桌面价格表与成本抽屉](implementation-evidence/run-38523316345/native-admin-formal-1440-light.png)
 
-### 默认价格页面（1440px）
-![默认价格页面](shots/default/page.png)
+[桌面深色](implementation-evidence/run-38523316345/native-admin-formal-1440-dark.png) · [手机浅色](implementation-evidence/run-38523316345/native-admin-formal-390-light.png) · [手机深色](implementation-evidence/run-38523316345/native-admin-formal-390-dark.png) · [完整价格页](implementation-evidence/run-38523316345/native-geometry-prices-desktop.png)。这些图片来自真实隔离 Core 嵌入资源，合成账号/商品/金额；不是生产页面。
 
-### 按售价档位打开成本换算（1440px）
-![成本抽屉](shots/drawer-final/page.png)
+## 旧设计材料，仅保留溯源
 
-### 深色
-![深色成本抽屉](shots/dark-final/page.png)
+[第二版设计说明](REVIEW_V2.md)、`shots/`、`motion/record-cost.mp4`、`prototype.js` 与旧 `ASSET_MANIFEST.json` 属于设计阶段。旧原型可以用 `python -m http.server 4396 --bind 127.0.0.1 --directory docs/ui/admin-media-redesign-2026-10-14` 打开；它不连接真实后台，不能替代本轮正式实现证据。
 
-### 手机（390px）
-![手机成本面板](shots/mobile-final/page.png)
-
-[4 秒交互录屏](motion/record-cost.mp4)。截图及视频均来自本地设计原型，账号、模型、金额与状态均为合成示例，不能当成生产 Account #77 的现场信息。
-
-## 本地打开原型
-
-在仓库根目录执行：
-
-```sh
-python -m http.server 4396 --bind 127.0.0.1 --directory docs/ui/admin-media-redesign-2026-10-14
-```
-
-然后访问 `http://127.0.0.1:4396/index.html`。如端口占用可改为其他本地端口。GitHub 文件页仅展示源码，不会运行 HTML；此提交不发布公网预览。
-
-操作：价格行“估算成本” → 切换档位 → 改积分 → 关闭 → 切换步骤 → 返回模型列表。主题按钮可切换浅深色。刷新会重置演示数据。保存、发布、销售仅显示标明“预览”的对话框，不发业务请求。
-
-字体优先使用本机 Noto Sans SC；未安装时会回退。没有携带第三方字体二进制，正式实施前需确定可分发字体与回退效果。
-
-## 验证口径
-
-- [interaction-results.json](interaction-results.json)：原本地原型连续 3 次浏览器交互 PASS；不是 Core/Bridge/BFF 联调结果。
-- `costCalculator.js` / `decimalText.js` 由基线已有 TypeScript 纯函数转译供演示，未另造成本算法；正式实现仍导入原模块。
-- [check-prototype.cjs](check-prototype.cjs) 为原检查脚本的路径可移植副本，参数为本机原型地址和报告输出位置；结果需区分原始证据与此次可移植副本运行。
-- [archive-check-results.json](archive-check-results.json)：归档后通过临时 127.0.0.1:4397 静态服务运行可移植脚本，3 次 PASS；仍仅为原型检查，服务已停止。
-- [ASSET_MANIFEST.json](ASSET_MANIFEST.json) 记录原型和原始截图/报告的摘要，用于核对归档来源。
-- 本轮不重跑全量业务测试、不构建候选、不连接生产。下一阶段必须用真实隔离后端补 INTEGRATION_REVIEW 中的验收。
-
-设计目标：让售价表成为主操作区，成本估算随当前档位按需展开。将信息层级、抽屉手感与真实业务合同分别审查，设计确认后再进入应用组件实现。
+本次云端只构建临时 Core 联调镜像，精确复用已有 Bridge/BFF，不导出新生产候选。runner 已结束，不能把它的 loopback 地址当成现成可操作入口。复审通过之前不合并、部署、发布生产商品或启售。

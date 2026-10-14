@@ -1,0 +1,133 @@
+{
+  "scope": "Formal Vue with Axios fixture; backend results are separate",
+  "source_sha": "64cc40c4f06dbedd51f748fb9a52a83e99256479",
+  "stats": {
+    "startTime": "2026-10-14T06:08:38.488Z",
+    "duration": 67266.163,
+    "expected": 17,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "checks": [
+    {
+      "title": "cost estimate 1440 light: optional, local only, price preserved",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 dark: optional, local only, price preserved",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 light: optional, local only, price preserved",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 dark: optional, local only, price preserved",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "seven drafts IMAGE 1440: explicit creation, undo and selected removal",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "seven drafts IMAGE 390: explicit creation, undo and selected removal",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "seven drafts VIDEO 1440: explicit creation, undo and selected removal",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "seven drafts VIDEO 390: explicit creation, undo and selected removal",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "one configured product creates a second only after explicit confirmation and saves enable state separately",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "changing generation and edit limits, saving and rereading keeps exactly seven identities and prices",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "five-step wizard 1440 light: configure, back, save, reload and account boundary",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "five-step wizard 1440 dark: configure, back, save, reload and account boundary",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "five-step wizard 390 light: configure, back, save, reload and account boundary",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "five-step wizard 390 dark: configure, back, save, reload and account boundary",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "reference legacy zero, immediate safety limit and unsaved leave prompt",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "denied combination gives five rows; missing, free and conflicting prices remain explicit",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "unsupported Account remains diagnosed and cannot be published",
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    }
+  ]
+}

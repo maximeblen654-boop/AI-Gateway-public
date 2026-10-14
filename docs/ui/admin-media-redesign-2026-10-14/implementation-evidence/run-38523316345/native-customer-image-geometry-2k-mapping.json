@@ -1,0 +1,1113 @@
+{
+  "scenario": "image-geometry-2k",
+  "http": [
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/session/exchange",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/image/quotes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/image/prepare",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/image/tasks",
+      "status": 409,
+      "error": {
+        "error": "image_binding_unavailable",
+        "recovery": "GET original task only"
+      }
+    }
+  ],
+  "customer": {
+    "id": 5,
+    "email": "native-mapping-customer@example.invalid"
+  },
+  "catalog": {
+    "contract": "published_image_binding_v1",
+    "offers": [
+      {
+        "display_name": "gpt-image-2",
+        "upstream_model": "gpt-image-2",
+        "offer_id": "mw_offer_1efdeb538ca815f52ca3e917067bf267dd3f1e6765ff9634eeb93a92c7f2a202",
+        "product_id": "media-b52f2335-0696-4fb9-aa2b-076233347772",
+        "model": "gpt-image-2",
+        "published_revision": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67",
+        "spec": {
+          "resolution": [
+            "2K"
+          ],
+          "duration_seconds": [
+            0
+          ],
+          "aspect_ratio": [
+            "16:9",
+            "1:1",
+            "3:2"
+          ],
+          "quality": [
+            ""
+          ],
+          "count": {
+            "min": 1,
+            "max": 10
+          },
+          "references": {
+            "image": {
+              "min": 0,
+              "max": 2
+            },
+            "video": {
+              "min": 0,
+              "max": 0
+            },
+            "audio": {
+              "min": 0,
+              "max": 0
+            },
+            "total_max": 2
+          }
+        },
+        "excluded": [],
+        "sale_price": {
+          "amount": "0.90",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      },
+      {
+        "display_name": "gpt-image-2",
+        "upstream_model": "gpt-image-2",
+        "offer_id": "mw_offer_33bea9c2c183df49a3105a91f03d5045b968ee88bdecf78864286b736fee20ff",
+        "product_id": "media-b52f2335-0696-4fb9-aa2b-076233347772",
+        "model": "gpt-image-2",
+        "published_revision": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67",
+        "spec": {
+          "resolution": [
+            "1K"
+          ],
+          "duration_seconds": [
+            0
+          ],
+          "aspect_ratio": [
+            "16:9",
+            "1:1",
+            "3:2"
+          ],
+          "quality": [
+            ""
+          ],
+          "count": {
+            "min": 1,
+            "max": 10
+          },
+          "references": {
+            "image": {
+              "min": 0,
+              "max": 2
+            },
+            "video": {
+              "min": 0,
+              "max": 0
+            },
+            "audio": {
+              "min": 0,
+              "max": 0
+            },
+            "total_max": 2
+          }
+        },
+        "excluded": [],
+        "sale_price": {
+          "amount": "0",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      },
+      {
+        "display_name": "gpt-image-2",
+        "upstream_model": "gpt-image-2",
+        "offer_id": "mw_offer_5020fda056d22f66c6332866ea77d3795a4089b7f522ac842e59b882bb697f4b",
+        "product_id": "media-719b2ea5-be60-4912-9e60-21046777bd31",
+        "model": "gpt-image-2",
+        "published_revision": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67",
+        "spec": {
+          "resolution": [
+            "2K"
+          ],
+          "duration_seconds": [
+            0
+          ],
+          "aspect_ratio": [
+            "3:2"
+          ],
+          "quality": [
+            ""
+          ],
+          "count": {
+            "min": 1,
+            "max": 10
+          },
+          "references": {
+            "image": {
+              "min": 0,
+              "max": 2
+            },
+            "video": {
+              "min": 0,
+              "max": 0
+            },
+            "audio": {
+              "min": 0,
+              "max": 0
+            },
+            "total_max": 2
+          }
+        },
+        "excluded": [],
+        "sale_price": {
+          "amount": "1.30",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      },
+      {
+        "display_name": "gpt-image-2",
+        "upstream_model": "gpt-image-2",
+        "offer_id": "mw_offer_8b0bd418c6abf8bfa155c9733ae68e7da09462d21219cc6e8d7dd8c46ce2ecd0",
+        "product_id": "media-b52f2335-0696-4fb9-aa2b-076233347772",
+        "model": "gpt-image-2",
+        "published_revision": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67",
+        "spec": {
+          "resolution": [
+            "4K"
+          ],
+          "duration_seconds": [
+            0
+          ],
+          "aspect_ratio": [
+            "16:9",
+            "1:1",
+            "3:2"
+          ],
+          "quality": [
+            ""
+          ],
+          "count": {
+            "min": 1,
+            "max": 10
+          },
+          "references": {
+            "image": {
+              "min": 0,
+              "max": 2
+            },
+            "video": {
+              "min": 0,
+              "max": 0
+            },
+            "audio": {
+              "min": 0,
+              "max": 0
+            },
+            "total_max": 2
+          }
+        },
+        "excluded": [],
+        "sale_price": {
+          "amount": "1.10",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      }
+    ]
+  },
+  "before": {
+    "supplier": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/v1beta/models",
+          "auth": "gemini-key",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "gpt-5.4",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "synthetic-compatible-video",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "synthetic-seedance-video",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "images": [
+              {
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+              }
+            ],
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "images": [
+              {
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+              }
+            ],
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "16:9",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-4k e10820a4-e348-458c-ae02-38e3d4332ebb",
+            "resolution": "4K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/videos",
+          "auth": "bearer",
+          "body": {
+            "model": "synthetic-compatible-video",
+            "prompt": "SYNTHETIC native video-compatible b903f6c8-30c6-47ff-935f-0e8e082df1b2",
+            "duration": 5,
+            "resolution": "720p",
+            "ratio": "16:9",
+            "face_direct": false
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1/content",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-free e38433a7-3949-4ed2-88b0-b64c73b424b4",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        }
+      ],
+      "image_posts": 10,
+      "video_posts": 1,
+      "tasks": {
+        "native-video-1": {
+          "id": "native-video-1",
+          "polls": 3,
+          "kind": "compatible"
+        }
+      }
+    },
+    "ledger": {
+      "balance": 100,
+      "frozen_balance": 0,
+      "usage": 0,
+      "video_captured": 0
+    }
+  },
+  "quote": {
+    "contract": "published_image_binding_v1",
+    "task_id": "img_e973a6e1e1f88d3321019c504678098b",
+    "created_at": "2026-10-14T06:47:04.011Z",
+    "status": "prepared",
+    "results": [],
+    "offer_id": "mw_offer_1efdeb538ca815f52ca3e917067bf267dd3f1e6765ff9634eeb93a92c7f2a202",
+    "sale_price": {
+      "amount": "0.90",
+      "currency": "CNY",
+      "billing_mode": "per_request"
+    },
+    "unit_price": {
+      "amount": "0.90",
+      "currency": "CNY",
+      "billing_mode": "per_request"
+    },
+    "total_price": {
+      "amount": "0.90",
+      "currency": "CNY",
+      "billing_mode": "per_request"
+    },
+    "quantity": 1,
+    "spec": {
+      "resolution": "2K",
+      "duration_seconds": 0,
+      "aspect_ratio": "3:2",
+      "quality": "",
+      "count": 1,
+      "images": 0,
+      "videos": 0,
+      "audio": 0
+    },
+    "expires_at": "2026-10-14T06:49:03.969538447Z",
+    "expected_count": 1,
+    "delivered_count": 0,
+    "failed_count": 0,
+    "pending_count": 0,
+    "execution": {
+      "mode": "single",
+      "max_output_images": 1,
+      "units": [
+        {
+          "index": 0,
+          "output_offset": 0,
+          "output_count": 1,
+          "mode": "single"
+        }
+      ]
+    }
+  },
+  "id": "img_e973a6e1e1f88d3321019c504678098b",
+  "quote_before_submit": {
+    "generated": 0,
+    "settled": 0,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    }
+  },
+  "dependency_change": {
+    "kind": "mapping",
+    "published_before": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67",
+    "quote_before": {
+      "contract": "published_image_binding_v1",
+      "task_id": "img_e973a6e1e1f88d3321019c504678098b",
+      "created_at": "2026-10-14T06:47:04.011Z",
+      "status": "prepared",
+      "results": [],
+      "offer_id": "mw_offer_1efdeb538ca815f52ca3e917067bf267dd3f1e6765ff9634eeb93a92c7f2a202",
+      "sale_price": {
+        "amount": "0.90",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit_price": {
+        "amount": "0.90",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.90",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "quantity": 1,
+      "spec": {
+        "resolution": "2K",
+        "duration_seconds": 0,
+        "aspect_ratio": "3:2",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "expires_at": "2026-10-14T06:49:03.969538447Z",
+      "expected_count": 1,
+      "delivered_count": 0,
+      "failed_count": 0,
+      "pending_count": 0,
+      "execution": {
+        "mode": "single",
+        "max_output_images": 1,
+        "units": [
+          {
+            "index": 0,
+            "output_offset": 0,
+            "output_count": 1,
+            "mode": "single"
+          }
+        ]
+      }
+    },
+    "published_after": "mwp_6b323ce5b73bc7e6a5d2af5d4f50d7a1ad2ba0f221d458b9f1dfeff28740ef67"
+  },
+  "submit": {
+    "status": 409,
+    "body": {
+      "error": "image_binding_unavailable",
+      "recovery": "GET original task only"
+    }
+  },
+  "after": {
+    "supplier": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/v1beta/models",
+          "auth": "gemini-key",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "gpt-5.4",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "synthetic-compatible-video",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "synthetic-seedance-video",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/models",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "images": [
+              {
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+              }
+            ],
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "images": [
+              {
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+              }
+            ],
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "16:9",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-4k e10820a4-e348-458c-ae02-38e3d4332ebb",
+            "resolution": "4K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/videos",
+          "auth": "bearer",
+          "body": {
+            "model": "synthetic-compatible-video",
+            "prompt": "SYNTHETIC native video-compatible b903f6c8-30c6-47ff-935f-0e8e082df1b2",
+            "duration": 5,
+            "resolution": "720p",
+            "ratio": "16:9",
+            "face_direct": false
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "GET",
+          "path": "/v1/videos/native-video-1/content",
+          "auth": "bearer",
+          "body": {}
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "1:1",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-free e38433a7-3949-4ed2-88b0-b64c73b424b4",
+            "resolution": "1K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "auth": "bearer",
+          "body": {
+            "aspect_ratio": "3:2",
+            "model": "gpt-image-2",
+            "n": 1,
+            "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+            "resolution": "2K"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v1/responses",
+          "auth": "bearer",
+          "body": {
+            "input": [
+              {
+                "content": [
+                  {
+                    "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                    "type": "input_text"
+                  }
+                ],
+                "role": "user"
+              }
+            ],
+            "max_output_tokens": 512,
+            "model": "different-synthetic-model",
+            "stream": false,
+            "tool_choice": "required",
+            "tools": [
+              {
+                "description": "Capability probe. Call to acknowledge.",
+                "name": "probe_ping",
+                "parameters": {
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                },
+                "type": "function"
+              }
+            ]
+          }
+        }
+      ],
+      "image_posts": 10,
+      "video_posts": 1,
+      "tasks": {
+        "native-video-1": {
+          "id": "native-video-1",
+          "polls": 3,
+          "kind": "compatible"
+        }
+      }
+    },
+    "ledger": {
+      "balance": 100,
+      "frozen_balance": 0,
+      "usage": 0,
+      "video_captured": 0
+    }
+  },
+  "pass": true,
+  "rejected_before_generation": true
+}

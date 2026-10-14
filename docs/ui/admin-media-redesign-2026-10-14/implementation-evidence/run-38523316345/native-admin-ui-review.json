@@ -1,0 +1,640 @@
+{
+  "checks": [
+    "Real UI saves reread identically from PostgreSQL; two independent products; 64 sampled previews do not truncate products/offers",
+    "Actual Vue 3/6/1/3 matrix, equal-price preservation, expected_record_version, second product and published snapshot unchanged; no cost fields in save",
+    "Cost parameters persisted locally across reload without price mutation; Account publication requires separate confirmation",
+    "Valid historical size mapping retained in shared preview; pixel/aspect conflict rejected by real server",
+    "Zero video published historical contract is excluded from actual customer catalog; positive video restored",
+    "Explicit free image set only in synthetic Account for customer quote/generation verification"
+  ],
+  "screenshots": [
+    "native-admin-formal-1440-light.png",
+    "native-admin-formal-1440-dark.png",
+    "native-admin-formal-390-light.png",
+    "native-admin-formal-390-dark.png"
+  ],
+  "persisted_products": [
+    {
+      "product_id": "media-b52f2335-0696-4fb9-aa2b-076233347772",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry image",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "capabilities": {
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "aspect_ratios": [
+          "1:1",
+          "3:2",
+          "16:9"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {
+            "resolution": [
+              "1K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.70",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "2K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.90",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "4K"
+            ]
+          },
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ],
+      "adapter_config": {
+        "size_mappings": []
+      }
+    },
+    {
+      "product_id": "media-719b2ea5-be60-4912-9e60-21046777bd31",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry independent price",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "capabilities": {
+        "resolutions": [
+          "2K"
+        ],
+        "aspect_ratios": [
+          "3:2"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {},
+          "sale_price": {
+            "amount": "1.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ],
+      "adapter_config": {
+        "size_mappings": []
+      }
+    }
+  ],
+  "preview_count": 64,
+  "published_offers": [
+    {
+      "id": "mw_offer_1efdeb538ca815f52ca3e917067bf267dd3f1e6765ff9634eeb93a92c7f2a202",
+      "spec": {
+        "resolution": [
+          "2K"
+        ],
+        "duration_seconds": [
+          0
+        ],
+        "aspect_ratio": [
+          "16:9",
+          "1:1",
+          "3:2"
+        ],
+        "quality": [
+          ""
+        ],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        }
+      }
+    },
+    {
+      "id": "mw_offer_5020fda056d22f66c6332866ea77d3795a4089b7f522ac842e59b882bb697f4b",
+      "spec": {
+        "resolution": [
+          "2K"
+        ],
+        "duration_seconds": [
+          0
+        ],
+        "aspect_ratio": [
+          "3:2"
+        ],
+        "quality": [
+          ""
+        ],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        }
+      }
+    },
+    {
+      "id": "mw_offer_539222e3098133c259bbc23555a260f4065fcc134e1abbc2478171b7f9b2b8fc",
+      "spec": {
+        "resolution": [
+          "1K"
+        ],
+        "duration_seconds": [
+          0
+        ],
+        "aspect_ratio": [
+          "16:9",
+          "1:1",
+          "3:2"
+        ],
+        "quality": [
+          ""
+        ],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        }
+      }
+    },
+    {
+      "id": "mw_offer_8b0bd418c6abf8bfa155c9733ae68e7da09462d21219cc6e8d7dd8c46ce2ecd0",
+      "spec": {
+        "resolution": [
+          "4K"
+        ],
+        "duration_seconds": [
+          0
+        ],
+        "aspect_ratio": [
+          "16:9",
+          "1:1",
+          "3:2"
+        ],
+        "quality": [
+          ""
+        ],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        }
+      }
+    }
+  ],
+  "mapping_rejection": [
+    {
+      "class": "UI_FIXABLE",
+      "severity": "error",
+      "code": "IMAGE_SPEC_MAPPING_MISMATCH",
+      "scope": "media-b52f2335-0696-4fb9-aa2b-076233347772",
+      "path": "adapter_config.size_mappings",
+      "message": "image_spec_mapping_mismatch: fixed dimensions and aspect ratio must agree with wire size; auto requires an automatic specification",
+      "action": "Edit the indicated Draft field and save again"
+    }
+  ],
+  "video_zero": {
+    "filtered_offer_ids": [
+      "mw_offer_4ea184b3a4c1cdcac72113f738db4cd06b609cc982b11470ec5796b2ae0344ef"
+    ],
+    "catalog_offer_ids": [
+      "mw_offer_4369c1a9a9b24dc0e1b0f836efd8bfc9c23da69db31cd9bf4ed5ea3d26bb5d86"
+    ]
+  },
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-C_RqWgs6.js",
+        "bytes": 194141,
+        "sha256": "bcdf8c408dc070dd7fc11b860af7327bf86c692ced37c5b1a1f0af9c0da0c47a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DDfo002m.js",
+        "bytes": 413892,
+        "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-DhEkaHwn.css",
+        "bytes": 508,
+        "sha256": "e1a547e6e2a48ac77b7e78648aba36e1cff355613de73f332c9c35b5139445af",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge-BmkiKxf7.css",
+        "bytes": 1401,
+        "sha256": "7ad582c21fe51460913dfdb03ca27b6c1e34e0c151b89d7f6aa62c7121183b8f",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-mYEDiWCN.css",
+        "bytes": 200,
+        "sha256": "96de8eb2802f0665e11e1cfd66ac0fcebd9d351c19c8051dd3913876ebc8af38",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-B6ZiYKjM.css",
+        "bytes": 523,
+        "sha256": "fd702f466c23c7eaec04f358d8631d348075d1563df805687a1b0a5ca796b782",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-CZoQPE98.js",
+        "bytes": 17928,
+        "sha256": "5885740ac4e1e593188b6b92719be0261ea89ec946b2f42a04bd8146aa3865c1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-BWeqJqy1.js",
+        "bytes": 917,
+        "sha256": "72e76417d7e2857b0b96d37a091077426e8bd7a46c52863bd53af5bc4ff21d6a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-DjAiiBsL.js",
+        "bytes": 2420,
+        "sha256": "09baef256df2357751f27712f17e70be7b56420322ce5b1849c398eb2ad45e9a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/oauthAffiliate-CrlUwkd1.js",
+        "bytes": 1197,
+        "sha256": "1ba453f05da3a376c7fed82fc6850b45a6f8c0d4a600bff7938917804806af89",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-BlychIYM.js",
+        "bytes": 16271,
+        "sha256": "b94e7889b473aaa564079bceb2b3f62dea17934fcb17d1cea0bd869f32fc9939",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/apiError-zX02PgX9.js",
+        "bytes": 1212,
+        "sha256": "2b13e47dc6627eb34e647e3d20bf06c6817dc8831c6e0f1aed9c5823bd7eded3",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-D_J-wAaM.js",
+        "bytes": 10787,
+        "sha256": "85793e4ef81657cf588edb75e0ba180c4e9764f7502d5672b1d0a3d8d24192ae",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DashboardView-BRaWlUt0.js",
+        "bytes": 27006,
+        "sha256": "dab59dede4f4e252e3091d3bd20c9f4dcd095630ba31b447cd6985e02d52c5a8",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DT-rtrW_.css",
+        "bytes": 267,
+        "sha256": "d65d063476e8e82f9b0fc783eb879d9c067a4416f877de4b80162013ddf326ce",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/usage-3h-3o5pU.js",
+        "bytes": 1882,
+        "sha256": "5b7a1b8ecae8e5a9cf5d9dbc1b90e1b37e4cab40df9e2c87141f4d77d9880d4b",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-B55Vfmtu.js",
+        "bytes": 828,
+        "sha256": "74d53ce939e188f6d4ade67def6743cf3eb70a8f253c234979b28b09295f074e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-Cq9-RPiF.js",
+        "bytes": 8018,
+        "sha256": "f32fa63e8969cae89c04bb9e80134fd2f8ad88932b2225cb6e2f8b9eec9e919e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-BOBIEgJ3.js",
+        "bytes": 2345,
+        "sha256": "3d84105a1f1bbe277863618378f5bc8c75f2533742abd8889769b451ccd1a526",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend-Ci85YOuO.css",
+        "bytes": 9161,
+        "sha256": "f566e2ca595ffb156f0135b7b0864c1432f4170d015bbae4bc5b50e8cfa7d4a1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-vfjFHKfA.css",
+        "bytes": 9840,
+        "sha256": "f7d4a7bc7d47b6a2fe4ca6b91b25d7dd239b6f92f8df8377a5577c4d926d4ac4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-BF4JqP2N.js",
+        "bytes": 104141,
+        "sha256": "e38b94a59c733fadd451eb49666b22874b3a51b62ea44a73c91285000b6ddeb2",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-BCHTKZXK.js",
+        "bytes": 1709,
+        "sha256": "470b8d9f6dbebd35f26dc04fd555c91d0d4db2fe85c70916d5e26595550510c6",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-DVe3Uc01.js",
+        "bytes": 8032,
+        "sha256": "bd2aa5282b0cee901f3927d1bbd4c9d1b4cca36469cbce3426d773f9cbd21975",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/user-BmpzeK5b.js",
+        "bytes": 2057,
+        "sha256": "e9b767ca9b07483870b29b8b8255b4aed9ddcaa95ac2891eb40e5d34d9503346",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-chart-BykZcwza.js",
+        "bytes": 178340,
+        "sha256": "366e4c225173b9c986439842af0a76522ed4b8d54a120dad3bf5cc27b07e4b88",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-COmpXOPT.css",
+        "bytes": 33318,
+        "sha256": "10b6e7e790c2153d4997cc8e840153732c4513f54a6d1ebfd2787c80cc19aec9",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-BDGzjNkZ.js",
+        "bytes": 110005,
+        "sha256": "48fd93640a56a4d39474594d7c91934f8333e14f24cc9eec7653520d613ffd6b",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": [
+      {
+        "path": "/assets/TablePageLayout-CTUsgGJ4.css",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/groups-D-Cupuyb.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/TablePageLayout-8-MYCyjv.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/usePersistedPageSize-x0WpaIWh.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/DataTable-DRS5jFpR.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/DataTable-bsUFtred.css",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/GroupOptionItem-EDVK0Prz.css",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/Pagination-CtuvddY-.css",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/KeysView-M789QAU0.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/Pagination-DVwA0Jzt.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-0ExT1YFL.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/SearchInput.vue_vue_type_script_setup_true_lang-BmrI1uv9.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/PlatformIcon.vue_vue_type_script_setup_true_lang-Bbz3Di6t.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/GroupBadge.vue_vue_type_script_setup_true_lang-C2sPKIBi.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/peak-rate-qZGUWdry.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/GroupOptionItem-DqPg8IYg.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/maskApiKey-ClKV8GuA.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/platformColors-D6rWOAel.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/UsageView-UdERZu08.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/errorBadges-T2YtJ7V9.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/EndpointDistributionChart.vue_vue_type_script_setup_true_lang-Bye2JLQM.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/ModelDistributionChart.vue_vue_type_script_setup_true_lang-DR4Qs4Wy.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/vendor-ui-DvkHjAxN.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/GroupDistributionChart.vue_vue_type_script_setup_true_lang-oFAl1WWL.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      }
+    ]
+  },
+  "pass": true
+}

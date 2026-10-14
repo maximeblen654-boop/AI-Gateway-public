@@ -1,0 +1,397 @@
+{
+  "cases": [
+    "Five-step UI to actual Core save/validation without protocol input",
+    "Two same-model products saved through the real draft endpoint",
+    "Same-name same-type product selector shows stable business distinction without internal IDs",
+    "Saved native product reload preserves specifications and prices",
+    "Isolated account publish and sales enabled through normal UI"
+  ],
+  "http": [
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/4",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/4/draft",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/4/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/4",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/4",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/media-workbench/accounts/4/publish",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/4/sales",
+      "status": 200
+    }
+  ],
+  "validation": {
+    "draft_revision": "mwd_f2141f7ae76377f67839ce4318dabe225b34b84e19498ee1397ec609b7041346",
+    "status": "PASS",
+    "publish_ready": true,
+    "checked_at": "2026-10-14T06:46:03.920551388Z",
+    "model_catalog": {
+      "synced_at": "2026-10-14T06:45:44Z",
+      "sha256": "627388e34b2a749f590c2de7e5710eea91ac4691773a62e5547388dcb1d0ff7f"
+    },
+    "adapter_registry_revision": "media_registry_v1_r1",
+    "diagnostics": [],
+    "dependencies": {
+      "account_id": 4,
+      "routing_sha256": "cb9bc3f1fbd256b3d6f8a065df707cf5dbbbd1b64592094446bfee2446e1a513",
+      "catalog_sha256": "627388e34b2a749f590c2de7e5710eea91ac4691773a62e5547388dcb1d0ff7f",
+      "mapping_sha256": "4091832a20920e47929ea33c2c5d252583f3f1343b798d2195b8df39b1b66e9a",
+      "binding_sha256": "a779dc84cbb6c9a2651e7f491df762054fb23d82f1cf3fb3f845ca9f4797344c",
+      "registry_revision": "media_registry_v1_r1"
+    },
+    "previews": [
+      {
+        "product_id": "media-a59a4250-3856-4103-9f35-b617a115786a",
+        "spec": {
+          "resolution": "720p",
+          "duration_seconds": 5,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/videos",
+        "encoding": "application/json",
+        "fields": {
+          "duration": 5,
+          "face_direct": false,
+          "model": "synthetic-compatible-video",
+          "prompt": "<dry-run-prompt>",
+          "ratio": "16:9",
+          "resolution": "720p"
+        },
+        "omitted": [],
+        "asset_slots": []
+      }
+    ],
+    "case_count": 1
+  },
+  "product": {
+    "product_id": "media-a59a4250-3856-4103-9f35-b617a115786a",
+    "media_type": "video",
+    "site_model": "synthetic-compatible-video",
+    "display_name": "Synthetic native compatible video",
+    "upstream_model": "synthetic-compatible-video",
+    "enabled": true,
+    "capabilities": {
+      "resolutions": [
+        "720p"
+      ],
+      "aspect_ratios": [
+        "16:9"
+      ],
+      "qualities": [],
+      "durations_seconds": [
+        5
+      ],
+      "count": {
+        "min": 1,
+        "max": 1
+      },
+      "references": {
+        "image": {
+          "min": 0,
+          "max": 1
+        },
+        "video": {
+          "min": 0,
+          "max": 0
+        },
+        "audio": {
+          "min": 0,
+          "max": 0
+        },
+        "total_max": 0
+      },
+      "combination_rules": []
+    },
+    "pricing_rules": [
+      {
+        "match": {
+          "resolution": [
+            "720p"
+          ]
+        },
+        "sale_price": {
+          "amount": "2.00",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      }
+    ],
+    "adapter_config": {
+      "version": 1,
+      "size_mappings": [],
+      "wire_profile": "images"
+    }
+  },
+  "duplicate_product": {
+    "product_id": "media-a59a4250-3856-4103-9f35-b617a115786a-same-model",
+    "media_type": "video",
+    "site_model": "synthetic-compatible-video",
+    "display_name": "Synthetic native compatible video",
+    "upstream_model": "synthetic-compatible-video",
+    "enabled": true,
+    "capabilities": {
+      "resolutions": [
+        "720p"
+      ],
+      "aspect_ratios": [
+        "16:9"
+      ],
+      "qualities": [],
+      "durations_seconds": [
+        5
+      ],
+      "count": {
+        "min": 1,
+        "max": 1
+      },
+      "references": {
+        "image": {
+          "min": 0,
+          "max": 1
+        },
+        "video": {
+          "min": 0,
+          "max": 0
+        },
+        "audio": {
+          "min": 0,
+          "max": 0
+        },
+        "total_max": 0
+      },
+      "combination_rules": []
+    },
+    "pricing_rules": [
+      {
+        "match": {
+          "resolution": [
+            "720p"
+          ]
+        },
+        "sale_price": {
+          "amount": "2.00",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      }
+    ],
+    "adapter_config": {
+      "version": 1,
+      "size_mappings": [],
+      "wire_profile": "images"
+    }
+  },
+  "product_options": [
+    "Synthetic native compatible video · 规格 720p · 16:9 · 5s · 数量 固定 1 条 · CNY 2.00 · 已启用 · 商品 1",
+    "Synthetic native compatible video · 规格 720p · 16:9 · 5s · 数量 固定 1 条 · CNY 2.00 · 已启用 · 商品 2"
+  ]
+}

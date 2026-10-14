@@ -1,0 +1,490 @@
+{
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/v1beta/models",
+      "auth": "gemini-key",
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/v1/models",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "gpt-5.4",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/models",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "synthetic-compatible-video",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/models",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "synthetic-seedance-video",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/models",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "1:1",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+        "resolution": "1K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "1:1",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+        "resolution": "1K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "1:1",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-1k ba75e10f-6f8d-458f-970f-4b636a8009a3",
+        "resolution": "1K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/edits",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "3:2",
+        "images": [
+          {
+            "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+          }
+        ],
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+        "resolution": "2K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/edits",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "3:2",
+        "images": [
+          {
+            "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+          }
+        ],
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native edit-geometry-2k 87fe9671-b24c-4a25-88e2-b07228108200",
+        "resolution": "2K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "16:9",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-4k e10820a4-e348-458c-ae02-38e3d4332ebb",
+        "resolution": "4K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/videos",
+      "auth": "bearer",
+      "body": {
+        "model": "synthetic-compatible-video",
+        "prompt": "SYNTHETIC native video-compatible b903f6c8-30c6-47ff-935f-0e8e082df1b2",
+        "duration": 5,
+        "resolution": "720p",
+        "ratio": "16:9",
+        "face_direct": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/videos/native-video-1",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/v1/videos/native-video-1",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/v1/videos/native-video-1",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "GET",
+      "path": "/v1/videos/native-video-1/content",
+      "auth": "bearer",
+      "body": {}
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "1:1",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-free e38433a7-3949-4ed2-88b0-b64c73b424b4",
+        "resolution": "1K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "3:2",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+        "resolution": "2K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "3:2",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+        "resolution": "2K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/images/generations",
+      "auth": "bearer",
+      "body": {
+        "aspect_ratio": "3:2",
+        "model": "gpt-image-2",
+        "n": 1,
+        "prompt": "SYNTHETIC native image-geometry-2k a2b816ab-54d7-439a-a1a7-dcd50834a03a",
+        "resolution": "2K"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "different-synthetic-model",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "gpt-5.4",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/changed-route/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "gpt-5.4",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "auth": "bearer",
+      "body": {
+        "input": [
+          {
+            "content": [
+              {
+                "text": "Call the probe_ping function with ok=true to acknowledge readiness. You must use the tool.",
+                "type": "input_text"
+              }
+            ],
+            "role": "user"
+          }
+        ],
+        "max_output_tokens": 512,
+        "model": "gpt-5.4",
+        "stream": false,
+        "tool_choice": "required",
+        "tools": [
+          {
+            "description": "Capability probe. Call to acknowledge.",
+            "name": "probe_ping",
+            "parameters": {
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "function"
+          }
+        ]
+      }
+    }
+  ],
+  "image_posts": 10,
+  "video_posts": 1,
+  "tasks": {
+    "native-video-1": {
+      "id": "native-video-1",
+      "polls": 3,
+      "kind": "compatible"
+    }
+  }
+}
