@@ -26,7 +26,11 @@ const video = Boolean(videoMode); const kind = video ? 'video' : 'image'; const 
 const videoModel = ({ grok: 'grok-imagine-video', compatible: 'synthetic-compatible-video', seedance: 'synthetic-seedance-video' })[videoMode]
 const docker = (...args) => execFileSync('docker', [...(process.platform === 'win32' ? ['--context', 'desktop-linux'] : []), ...args], { windowsHide: true, encoding: 'utf8' })
 const stats = () => JSON.parse(fs.readFileSync(`${root}/evidence/native-supplier-state.json`, 'utf8'))
-const ledger = () => JSON.parse(docker('exec', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-At', '-c', "select json_build_object('balance',balance,'frozen_balance',frozen_balance,'usage',(select count(*) from usage_logs where user_id=2),'video_captured',(select count(*) from studio_video_orders where user_id=2 and state='CAPTURED')) from users where id=2"))
+let testCustomer = { id: 2, email: 'native-customer@example.invalid' }
+const ledger = () => {
+  assert(Number.isSafeInteger(testCustomer.id) && testCustomer.id > 0)
+  return JSON.parse(docker('exec', 'ai-gateway-native-postgres-20261012', 'psql', '-U', 'native', '-d', 'sub2api', '-At', '-c', `select json_build_object('balance',balance,'frozen_balance',frozen_balance,'usage',(select count(*) from usage_logs where user_id=${testCustomer.id}),'video_captured',(select count(*) from studio_video_orders where user_id=${testCustomer.id} and state='CAPTURED')) from users where id=${testCustomer.id}`))
+}
 const drift = process.env.NATIVE_QUOTE_DRIFT
 assert(!drift || process.env.NATIVE_ACCEPTANCE_SCENARIO === 'admin-ui-review')
 const reportPath = `${root}/evidence/native-customer-${scenario}${drift ? '-'+drift : ''}.json`
@@ -36,6 +40,12 @@ assert(recover || !prior?.id || prior.pass, 'Previous task exists: use --recover
 const report = recover ? prior : { scenario, http: [] }
 assert(report && (!recover || report.id), 'Original task evidence is required for recovery')
 ;(async () => {
+  if (drift) {
+    // Rejected tasks remain recoverable and locked. Independent cases use independent owners.
+    testCustomer = recover ? prior.customer : await require('./quote-drift.cjs').createCustomer(root, drift)
+    assert(testCustomer && Number.isSafeInteger(testCustomer.id))
+    report.customer = testCustomer
+  }
   const browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ locale: 'zh-CN', viewport: artifact && scenario === 'edit' ? { width: 390, height: 844 } : { width: 1440, height: 1000 } })
   const page = await context.newPage(); page.setDefaultTimeout(20000)
@@ -44,7 +54,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
   await page.addInitScript(() => { localStorage.setItem('sub2api_locale', 'zh'); localStorage.setItem('user_guide_2_user_v4_interactive', 'true') })
   let restoreDrift
   try {
-    await page.goto(base+'/login'); await page.getByLabel('邮箱').fill('native-customer@example.invalid'); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
+    await page.goto(base+'/login'); await page.getByLabel('邮箱').fill(testCustomer.email); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
     await page.getByRole('button', { name: '登录', exact: true }).click(); await page.waitForURL('**/dashboard')
     const loadedHistory = video && !workspace ? page.waitForResponse(r => r.url().endsWith('/studio-v2/api/video/operations') && r.request().method() === 'GET') : null
     await page.goto(base+'/video-studio')

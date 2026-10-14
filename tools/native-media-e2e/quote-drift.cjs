@@ -42,3 +42,25 @@ module.exports = async (root, change, report) => {
     assert.deepEqual(report.quote,report.dependency_change.quote_before,'frozen quote must not be replaced')
   }
 }
+
+// The UI intentionally resumes unknown tasks instead of allowing another submission.
+// Keep each dependency counterexample under its own synthetic owner, without deleting any task.
+module.exports.createCustomer = async (root, change) => {
+  assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO, 'admin-ui-review')
+  assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+  assert(['draft', 'published', 'mapping', 'routing'].includes(change))
+  const compose=JSON.parse(fs.readFileSync(`${root}/compose.json`)), fixture=JSON.parse(fs.readFileSync(`${root}/evidence/fixture.json`))
+  assert.equal(compose.services.core.environment.ADMIN_EMAIL, 'native-admin@example.invalid')
+  let token
+  const api=async(path, method='GET', body)=>{
+    const r=await fetch('http://127.0.0.1:28180/api/v1'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})})
+    const v=await r.json();assert(r.ok && v.code===0, `${path}: ${r.status} ${JSON.stringify(v)}`);return v.data
+  }
+  token=(await api('/auth/login','POST',{email:compose.services.core.environment.ADMIN_EMAIL,password:compose.services.core.environment.ADMIN_PASSWORD})).access_token
+  const email=`native-${change}-customer@example.invalid`, password='Native-Customer-Only-20261012'
+  const customer=await api('/admin/users','POST',{email,password,balance:100,concurrency:5,allowed_groups:Object.values(fixture.groups)})
+  assert(Number.isSafeInteger(customer.id))
+  token=(await api('/auth/login','POST',{email,password})).access_token
+  await api('/keys','POST',{name:`Synthetic quote ${change}`,group_id:fixture.groups.openai})
+  return {id:customer.id,email}
+}
