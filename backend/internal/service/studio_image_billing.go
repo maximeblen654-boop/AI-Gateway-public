@@ -107,18 +107,37 @@ func (m *UsageBillingExactAmounts) Validate() error {
 	return nil
 }
 
+// QuotedImageUsageAmounts uses the same delivered quantity and exact decimals as
+// native settlement. SQL usage inserts must not fall back to the offer unit price.
+func QuotedImageUsageAmounts(r *StudioImageReceipt) (sale, accountBase string, quantity int, err error) {
+	if r == nil {
+		return "", "", 0, mediaworkbench.ErrRuntimeBinding
+	}
+	_, total, quantity, err := studioImageReceiptPrices(r)
+	if err != nil {
+		return "", "", 0, err
+	}
+	base, err := mediaworkbench.DecimalAmount(r.Quote.Accounting.BaseAmount)
+	if err != nil {
+		return "", "", 0, err
+	}
+	if r.Version == StudioImageMultiReceiptVersion {
+		base, err = scaleImageAccountAmount(r.Quote.Accounting.BaseAmount, quantity, r.Quote.Binding.Spec.Count)
+		if err != nil {
+			return "", "", 0, err
+		}
+	}
+	return total.Amount, base.String(), quantity, nil
+}
+
 func QuotedImageUsageLog(r *StudioImageReceipt) *UsageLog {
 	q := r.Quote
-	_, frozenTotal, quantity, err := studioImageReceiptPrices(r)
+	saleAmount, baseAmount, quantity, err := QuotedImageUsageAmounts(r)
 	if err != nil {
-		frozenTotal = q.Binding.Offer.SalePrice
-		quantity = q.Binding.Spec.Count
+		saleAmount, baseAmount, quantity = q.Binding.Offer.SalePrice.Amount, q.Accounting.BaseAmount, q.Binding.Spec.Count
 	}
-	sale, _ := mediaworkbench.DecimalAmount(frozenTotal.Amount)
-	base, _ := mediaworkbench.DecimalAmount(q.Accounting.BaseAmount)
-	if r.Version == StudioImageMultiReceiptVersion {
-		base, _ = scaleImageAccountAmount(q.Accounting.BaseAmount, quantity, q.Binding.Spec.Count)
-	}
+	sale, _ := mediaworkbench.DecimalAmount(saleAmount)
+	base, _ := mediaworkbench.DecimalAmount(baseAmount)
 	rate, _ := mediaworkbench.DecimalAmount(q.Accounting.AccountRateMultiplier)
 	baseFloat, rateFloat := base.InexactFloat64(), rate.InexactFloat64()
 	upstream, mode, inbound := q.Binding.Offer.UpstreamModel, "image", "/v1/studio/images/tasks"

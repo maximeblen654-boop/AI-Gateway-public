@@ -13,14 +13,18 @@ func insertQuotedImageUsage(ctx context.Context, tx *sql.Tx, cmd *service.UsageB
 	if err := receipt.Quote.Accounting.Validate(receipt.Quote); err != nil {
 		return err
 	}
+	sale, accountBase, _, err := service.QuotedImageUsageAmounts(receipt)
+	if err != nil {
+		return err
+	}
 	log := service.QuotedImageUsageLog(receipt)
 	prepared := prepareUsageLogInsert(log)
-	prepared.args[25] = receipt.Quote.Binding.Offer.SalePrice.Amount
-	prepared.args[26] = receipt.Quote.Binding.Offer.SalePrice.Amount
+	prepared.args[25] = sale
+	prepared.args[26] = sale
 	prepared.args[27] = "1"
 	prepared.args[28] = receipt.Quote.Accounting.AccountRateMultiplier
-	prepared.args[57] = receipt.Quote.Accounting.BaseAmount
+	prepared.args[57] = accountBase
 	repo := newUsageLogRepositoryWithSQL(nil, tx)
-	_, err := repo.createSinglePrepared(ctx, tx, log, prepared)
+	_, err = repo.createSinglePrepared(ctx, tx, log, prepared)
 	return err
 }

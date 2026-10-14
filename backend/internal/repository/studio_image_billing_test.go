@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -75,4 +76,56 @@ func TestStudioQuotedUsageExactNumericParameters(t *testing.T) {
 	require.Equal(t, "numeric", usageLogInsertArgTypes[26])
 	require.Equal(t, "numeric", usageLogInsertArgTypes[28])
 	require.Equal(t, "numeric", usageLogInsertArgTypes[57])
+}
+
+// A multi-image quote freezes a unit price but usage records the delivered total.
+// Keep the exact decimal values in the same native INSERT, including partials.
+func TestStudioQuotedUsageInsertUsesDeliveredAmounts(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		delivered  int
+		sale, base string
+	}{
+		{"all_five", 5, "0.125", "1.75"},
+		{"partial_two", 2, "0.05", "0.7"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := quotedBillingFixture(t, 1, 2, 7, 3)
+			r.Version = service.StudioImageMultiReceiptVersion
+			r.ExpectedCount = 5
+			r.DeliveredCount = tc.delivered
+			r.FailedCount = 5 - tc.delivered
+			q := &r.Quote
+			q.Binding.Spec.Count = 5
+			q.Quantity = 5
+			q.Binding.Offer.SalePrice.Amount = "0.025"
+			unit := q.Binding.Offer.SalePrice
+			total := unit
+			total.Amount = "0.125"
+			q.UnitPrice = &unit
+			q.TotalPrice = &total
+			q.Execution = &mediaworkbench.ImageExecutionPlan{}
+			q.Accounting.RequestCount = 5
+			q.Accounting.BaseAmount = "1.75"
+			q.Accounting.EffectiveAccountQuotaCost = "1.75"
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			mock.ExpectBegin()
+			tx, err := db.Begin()
+			require.NoError(t, err)
+			args := make([]driver.Value, len(prepareUsageLogInsert(service.QuotedImageUsageLog(r)).args))
+			for i := range args {
+				args[i] = sqlmock.AnyArg()
+			}
+			args[25] = tc.sale
+			args[26] = tc.sale
+			args[57] = tc.base
+			mock.ExpectQuery("INSERT INTO usage_logs").WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(1, time.Now()))
+			require.NoError(t, insertQuotedImageUsage(context.Background(), tx, &service.UsageBillingCommand{QuotedImage: r}))
+			mock.ExpectRollback()
+			require.NoError(t, tx.Rollback())
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
 }
