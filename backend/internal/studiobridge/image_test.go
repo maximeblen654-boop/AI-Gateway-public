@@ -176,3 +176,33 @@ func TestImageStudioTicketNativeRevocation(t *testing.T) {
 		t.Fatal("native revocation ignored")
 	}
 }
+
+func TestImageBridgeNativeBillingFailureDiagnostic(t *testing.T) {
+	for _, tc := range []struct{ code, stage string }{{"INSUFFICIENT_BALANCE", "billing_eligibility"}, {"API_KEY_QUOTA_EXHAUSTED", "billing_eligibility"}, {"SUBSCRIPTION_INVALID", "billing_eligibility"}, {"untrusted-secret-route", "binding"}} {
+		t.Run(tc.code, func(t *testing.T) {
+			core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(403)
+				_ = json.NewEncoder(w).Encode(map[string]string{"code": tc.code, "message": "secret-token-and-internal-route"})
+			}))
+			defer core.Close()
+			token := strings.Repeat("s", 32)
+			bridge, err := NewImage(ImageOptions{ServiceToken: token, GroupID: 3, CoreURL: core.URL, Keys: &imageKeys{}, Verify: func(context.Context, string) (int64, error) { return 1, nil }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest("GET", ImagePath+"catalog", nil)
+			req.Header.Set("X-Studio-Service-Token", token)
+			req.Header.Set("X-Studio-Binding-Contract", mediaworkbench.ImageBindingVersion)
+			out := httptest.NewRecorder()
+			bridge.ServeHTTP(out, req)
+			var body struct {
+				Stage string `json:"diagnostic_stage"`
+			}
+			_ = json.Unmarshal(out.Body.Bytes(), &body)
+			if out.Code != 403 || body.Stage != tc.stage || strings.Contains(out.Body.String(), "secret") {
+				t.Fatal(out.Code, out.Body.String())
+			}
+		})
+	}
+}

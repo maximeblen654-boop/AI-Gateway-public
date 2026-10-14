@@ -225,10 +225,21 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(io.LimitReader(response.Body, (32<<20)+1))
 	if err != nil || len(data) > 32<<20 || !json.Valid(data) || response.StatusCode >= 300 {
 		var failure struct {
-			Stage string `json:"diagnostic_stage"`
+			Stage string          `json:"diagnostic_stage"`
+			Code  json.RawMessage `json:"code"`
 		}
 		_ = json.Unmarshal(data, &failure)
 		stage := service.QuoteFailureStage(&service.StudioQuoteError{Stage: failure.Stage})
+		// Native authentication can reject before the Studio handler runs.
+		// Preserve only a finite category, never its message or raw response.
+		if stage == "binding" {
+			var code string
+			_ = json.Unmarshal(failure.Code, &code)
+			switch code {
+			case "INSUFFICIENT_BALANCE", "API_KEY_QUOTA_EXHAUSTED", "SUBSCRIPTION_INVALID", "USAGE_LIMIT_EXCEEDED":
+				stage = "billing_eligibility"
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(responseStatus(response.StatusCode))
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": responseStatus(response.StatusCode), "message": "core image operation unavailable", "diagnostic_stage": stage})
