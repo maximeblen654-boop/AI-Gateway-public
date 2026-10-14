@@ -7,13 +7,14 @@ assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted');assert.equal(proces
 assert(root.endsWith('/native-media-20261012'))
 const fixture=JSON.parse(fs.readFileSync(root+'/evidence/fixture.json')),compose=JSON.parse(fs.readFileSync(root+'/compose.json'))
 assert.equal(compose.services.postgres.environment.POSTGRES_DB,'sub2api');assert.equal(compose.services.core.environment.STUDIO_PAID_CONTROL_MODE,'managed-v1')
-const report={phase,checks:[],screenshots:[],production:false,supplier:'local simulator only'}
+const report={phase,checks:[],screenshots:[],http_errors:[],production:false,supplier:'local simulator only'}
 const stats=()=>JSON.parse(fs.readFileSync(root+'/evidence/native-supplier-state.json'))
 const dc=(...args)=>execFileSync('docker',['compose','-p','ai-gateway-native-20261012','-f',root+'/compose.json',...args],{stdio:'pipe'})
 const p='/admin/media-workbench/paid-controls/'
 ;(async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true})
  const page=await browser.newPage({locale:'zh-CN',viewport:{width:1440,height:1000}});page.setDefaultTimeout(30000)
+ page.on('response',async r=>{if(r.url().startsWith(base+'/studio-v2/api/')&&r.status()>=400){const b=await r.json().catch(()=>({}));report.http_errors.push({path:new URL(r.url()).pathname,status:r.status(),error:b.error,stage:b.diagnostic_stage})}})
  await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');localStorage.setItem('admin_guide_1_admin_v4_interactive','true')})
  const raw=async(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{const r=await fetch('/api/v1'+path,{method,headers:{'Content-Type':'application/json','X-Admin-UI-Request':'1',Authorization:'Bearer '+localStorage.getItem('auth_token')},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json()}},{path,method,body})
  const api=async(...args)=>{const r=await raw(...args);assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.body.code,0,JSON.stringify(r));return r.body.data}
@@ -99,6 +100,10 @@ const p='/admin/media-workbench/paid-controls/'
    report.image_preflight=imageCheck;report.video_preflight=videoCheck;report.assets=await proof()
   }
   report.pass=true
- }catch(e){report.error=e.message;await page.screenshot({path:root+'/evidence/native-paid-failure-'+phase+'.png'});throw e}
+ }catch(e){report.error=e.message;
+  const gid=Number(compose.services.bridge.environment.STUDIO_IMAGE_GROUP_ID);assert(Number.isSafeInteger(gid))
+  const key=dc('exec','-T','postgres','psql','-U','native','-d','sub2api','-At','-c',`SELECT key FROM api_keys WHERE user_id=1 AND group_id=${gid} ORDER BY id LIMIT 1`).toString().trim()
+  if(key){const response=await fetch('http://127.0.0.1:28180/v1/studio/images/catalog',{headers:{Authorization:'Bearer '+key,'X-Studio-Binding-Contract':'published_image_binding_v1'}});const b=await response.json().catch(()=>({}));report.core_catalog_diagnostic={status:response.status,error:b.error,code:b.code,message:b.message,stage:b.diagnostic_stage}}
+await page.screenshot({path:root+'/evidence/native-paid-failure-'+phase+'.png'});throw e}
  finally{fs.writeFileSync(root+'/evidence/native-paid-controls-'+phase+'.json',JSON.stringify(report,null,2));await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1})

@@ -26,7 +26,7 @@ on:
         required: false
         type: choice
         default: video
-        options: [video, draft-diagnostics, draft-management, studio-workspace, studio-workspace-artifact, admin-media-candidate-artifact]
+        options: [video, draft-diagnostics, draft-management, studio-workspace, studio-workspace-artifact, admin-media-candidate-artifact, paid-controls]
       candidate_run_id:
         description: 'existing candidate run id (accept-existing only)'
         required: false
@@ -134,7 +134,8 @@ jobs:
       (github.ref == 'refs/heads/codex/studio-native-media' ||
        (github.ref == 'refs/heads/codex/admin-media-design-review' &&
         github.event.inputs.acceptance_scenario == 'admin-media-candidate-artifact' &&
-        github.event.inputs.candidate_source_sha == '15d09689abc0b7e07269692d50e78f83859d1fb6')) &&
+        github.event.inputs.candidate_source_sha == '15d09689abc0b7e07269692d50e78f83859d1fb6') ||
+       (github.ref == 'refs/heads/codex/media-paid-controls' && github.event.inputs.acceptance_scenario == 'paid-controls')) &&
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.mode == 'accept-existing'
     runs-on: ubuntu-24.04
@@ -169,7 +170,10 @@ jobs:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
           NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
         run: |
-          if [ "$NATIVE_ACCEPTANCE_SCENARIO" = studio-workspace-artifact ] || [ "$NATIVE_ACCEPTANCE_SCENARIO" = admin-media-candidate-artifact ]; then
+          if [ "$NATIVE_ACCEPTANCE_SCENARIO" = paid-controls ]; then
+            node tools/native-media-e2e/candidate.mjs load-existing "$RUNNER_TEMP/native-existing-artifact"
+            node tools/native-media-e2e/candidate.mjs verify
+          elif [ "$NATIVE_ACCEPTANCE_SCENARIO" = studio-workspace-artifact ] || [ "$NATIVE_ACCEPTANCE_SCENARIO" = admin-media-candidate-artifact ]; then
             node tools/native-media-e2e/accept-workspace-artifact.mjs "$RUNNER_TEMP/native-existing-artifact"
           else
             node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
@@ -183,6 +187,8 @@ jobs:
           compression-level: 6
           path: |
             ${{ runner.temp }}/native-existing-acceptance-output/*
+            ${{ runner.temp }}/native-candidate-output/*.json
+            ${{ runner.temp }}/native-candidate-output/*.png
 
   admin-ui-review:
     if: >-

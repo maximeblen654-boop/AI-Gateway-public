@@ -54,7 +54,26 @@ fs.mkdirSync(out, { recursive: true })
 fs.mkdirSync(recipes, { recursive: true })
 fs.mkdirSync(evidence, { recursive: true })
 const mode = process.argv[2]
-if (mode === 'build') {
+if (mode === 'load-existing') {
+  assert(paidControls && !reuseSidecars)
+  space(10)
+  const dir=path.resolve(process.argv[3]), manifestPath=path.join(dir,'manifest.json')
+  const prior=JSON.parse(fs.readFileSync(manifestPath,'utf8'))
+  assert.equal(prior.source_sha,sha);assert.equal(prior.production_action,false);assert.equal(prior.acceptance_scope,'paid-controls')
+  assert.deepEqual(prior.images.map(i=>i.component).sort(),[...components].sort())
+  for(const i of prior.images){
+    assert.equal(i.source_sha,sha);assert.equal(i.tag,tag(i.component));assert.equal(path.basename(i.tar),i.tar)
+    const archive=path.join(dir,i.tar);assert.equal(await hash(archive),i.sha256)
+    const identity=JSON.parse(capture('python3',['tools/native-media-e2e/archive-identity.py',archive,i.image_id]))
+    assert.deepEqual(identity,i.archive_identity)
+    run('docker',['load','--input',archive])
+    const loaded=JSON.parse(capture('docker',['image','inspect',i.tag]))[0]
+    assert.equal(loaded.Id,i.image_id);assert.equal(loaded.Id,i.config_digest)
+    assert.equal(loaded.Config.Labels['org.opencontainers.image.revision'],sha);assert.equal(`${loaded.Os}/${loaded.Architecture}`,'linux/amd64')
+  }
+  fs.writeFileSync(path.join(out,'manifest-tested-candidate.json'),JSON.stringify(prior,null,2))
+  fs.writeFileSync(path.join(out,'reuse-existing.json'),JSON.stringify({source_sha:sha,original_manifest_sha256:await hash(manifestPath),original_build_run:prior.build_run_id,acceptance_script_sha:scriptSha,acceptance_run_id:process.env.GITHUB_RUN_ID,rebuild:false,reexport:false},null,2))
+} else if (mode === 'build') {
   // Estimated peak includes Go cache, image layers, test dependencies and exports.
   space(30)
   assert.equal(capture('git', ['-C', source, 'rev-parse', 'HEAD']), sha)
@@ -234,6 +253,11 @@ if (mode === 'build') {
     })
     fs.writeFileSync(path.join(out, 'runtime-files.json'), JSON.stringify({ source_sha: sha, files: runtimeFiles }, null, 2))
     fs.writeFileSync(path.join(out, 'acceptance.json'), JSON.stringify({ source_sha: sha, script_sha: scriptSha, scope: paidControls ? 'paid-controls' : adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', status: 'PASS', containers: containers.map(c => ({ name: c.Name, image: c.Image, health: c.State.Health.Status, network: c.HostConfig.NetworkMode, mounts: c.Mounts.map(m => ({ type: m.Type, destination: m.Destination, rw: m.RW })) })) }, null, 2))
+    const priorManifest=path.join(out,'manifest-tested-candidate.json')
+    if(paidControls && fs.existsSync(priorManifest)){
+      const prior=JSON.parse(fs.readFileSync(priorManifest,'utf8'))
+      fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify({...prior,acceptance:'PASS',deployment_state:'CANDIDATE_READY_NOT_DEPLOYED',acceptance_run_id:process.env.GITHUB_RUN_ID,acceptance_script_sha:scriptSha},null,2))
+    }
   } finally {
     proxy.kill()
     for (const name of fs.readdirSync(evidence).filter(n => /^native-.*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
