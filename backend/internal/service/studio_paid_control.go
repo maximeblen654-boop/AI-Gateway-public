@@ -92,6 +92,7 @@ func (s *StudioPaidControl) Status(ctx context.Context, m string) PaidState {
 	out.Mode = StudioPaidControlVersion
 	r, err := s.read(ctx, m)
 	if err != nil {
+		s.failed.Store(m, true)
 		out.Reason = "state_unavailable"
 		return out
 	}
@@ -143,6 +144,7 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 	defer s.mu.Unlock()
 	current, err := s.read(ctx, m)
 	if err != nil {
+		s.failed.Store(m, true)
 		return PaidState{Media: m, Reason: "state_unavailable"}, nil, err
 	}
 	if current.Revision != revision {

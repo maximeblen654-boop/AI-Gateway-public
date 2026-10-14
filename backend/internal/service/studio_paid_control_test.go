@@ -11,11 +11,15 @@ import (
 
 type paidSettingsFake struct {
 	SettingRepository
-	values map[string]string
-	fail   bool
+	values   map[string]string
+	fail     bool
+	readFail bool
 }
 
 func (f *paidSettingsFake) GetValue(_ context.Context, k string) (string, error) {
+	if f.readFail {
+		return "", errors.New("read unavailable")
+	}
 	v, ok := f.values[k]
 	if !ok {
 		return "", ErrSettingNotFound
@@ -156,5 +160,30 @@ func TestStudioVideoPreflightReusesQuoteWithoutSubmissionOrToken(t *testing.T) {
 	after, e := os.ReadDir(r.Store.Root)
 	if e != nil || len(before) != len(after) || orders.reserves != 0 {
 		t.Fatal("preflight created executable state", e)
+	}
+}
+
+func TestStudioPaidControlReadFailureCannotRestoreOldOpenState(t *testing.T) {
+	ctx := context.Background()
+	for _, apply := range []bool{false, true} {
+		store := &paidSettingsFake{values: map[string]string{}}
+		gate := &StudioPaidControl{Settings: store, Managed: true, Check: func(context.Context, string, int64) PaidReport { return PaidReport{Pass: true, Fingerprint: "a"} }, Fingerprint: func(context.Context, string, int64) (string, error) { return "a", nil }}
+		state, _, err := gate.Apply(ctx, "image", 1, true, "", "a")
+		if err != nil || !state.Effective {
+			t.Fatal(state, err)
+		}
+		store.readFail = true
+		if apply {
+			_, _, err = gate.Apply(ctx, "image", 1, false, state.Revision, "")
+			if err == nil {
+				t.Fatal("failed disable not reported")
+			}
+		} else if gate.Effective(ctx, "image") {
+			t.Fatal("read failure admitted")
+		}
+		store.readFail = false
+		if gate.Effective(ctx, "image") {
+			t.Fatal("read recovery reopened old enabled record")
+		}
 	}
 }

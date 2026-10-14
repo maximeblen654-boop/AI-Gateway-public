@@ -26,6 +26,9 @@ type paidSidecar struct {
 	CoreLoopback bool   `json:"core_loopback"`
 	ImageReady   bool   `json:"image_ready"`
 	VideoReady   bool   `json:"video_ready"`
+	ImageStorage string `json:"image_storage"`
+	VideoStorage string `json:"video_storage"`
+	AssetStorage string `json:"asset_storage"`
 }
 type paidSnapshot struct {
 	accounts    []mediaworkbench.Account
@@ -109,12 +112,19 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 	if e != nil || key.User == nil || key.Group == nil || key.GroupID == nil || *key.GroupID != out.group || key.UserID != actor || !key.IsActive() || key.IsExpired() || !key.User.IsActive() || !key.Group.IsActive() {
 		return out, QuoteFailure("customer_key", ErrPaidControl)
 	}
+	if !key.Group.IsSubscriptionType() && !key.User.CanBindGroup(key.Group.ID, key.Group.IsExclusive) {
+		return out, QuoteFailure("customer_key", ErrPaidControl)
+	}
 	out.key = key
 	rows, e := p.image.Media.List(ctx)
 	if e != nil {
 		return out, e
 	}
-	parts := []any{m, bridge, bff, struct {
+	storage, coreRoot := bff.ImageStorage, p.image.Store.Root
+	if m == "video" {
+		storage, coreRoot = bff.VideoStorage, p.video.Store.Root
+	}
+	parts := []any{key.User.AllowedGroups, key.User.RestrictPublicGroups, key.User.Role, key.User.RPMLimit, m, bridge.Version, bridge.CoreLoopback, out.group, bff.Version, storage, bff.AssetStorage, bff.Assets, coreRoot, struct {
 		ID          int64
 		UserID      int64
 		UserStatus  string
@@ -148,7 +158,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		}
 		// Exclude unpublished Draft and live usage counters. Every frozen Published,
 		// mapping, routing, auth, Account-cost and permission dependency participates.
-		parts = append(parts, []any{a.ID, a.Status, a.Schedulable, a.RuntimeReady, mediaworkbench.DependenciesFor(&a), a.Config.Sales, a.Config.Published, studioCredentialFingerprint(native), native.GroupIDs, native.RateMultiplier})
+		parts = append(parts, []any{a.ID, a.Status, a.Schedulable, a.RuntimeReady, mediaworkbench.DependenciesFor(&a), a.Config.Sales, a.Config.Published, studioCredentialFingerprint(native), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
 		out.accounts = append(out.accounts, a)
 	}
 	if len(out.accounts) == 0 {

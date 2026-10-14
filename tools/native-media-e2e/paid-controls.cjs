@@ -15,7 +15,7 @@ const p='/admin/media-workbench/paid-controls/'
  const browser=await chromium.launch({channel:'chrome',headless:true})
  const page=await browser.newPage({locale:'zh-CN',viewport:{width:1440,height:1000}});page.setDefaultTimeout(30000)
  await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');localStorage.setItem('admin_guide_1_admin_v4_interactive','true')})
- const raw=async(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{const r=await fetch('/api/v1'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('auth_token')},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json()}},{path,method,body})
+ const raw=async(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{const r=await fetch('/api/v1'+path,{method,headers:{'Content-Type':'application/json','X-Admin-UI-Request':'1',Authorization:'Bearer '+localStorage.getItem('auth_token')},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json()}},{path,method,body})
  const api=async(...args)=>{const r=await raw(...args);assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.body.code,0,JSON.stringify(r));return r.body.data}
  const media=async(kind,op,method='GET',body)=>page.evaluate(async({kind,op,method,body})=>{const r=await fetch(`/studio-v2/api/${kind}/${op}`,{method,headers:{'Content-Type':'application/json','X-Studio-Request':kind+'-binding-v1'},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json()}},{kind,op,method,body})
  const current=kind=>api(p+kind)
