@@ -1,0 +1,112 @@
+{
+  "status": "DEPLOYED_IMAGE_DISABLED_PRECHECK_BLOCKED",
+  "runtime_source_sha": "c6af2299086831f99a40b045b889ce72573aadc2",
+  "script_sha": "f60f684999fcf0b2e212bb238df7d0a33b3ae2d5",
+  "candidate_manifest_sha256": "9364d33ef3562968978991d17bfa09ff4e64a300d90a86e7755f00ffd66d7eef",
+  "candidate_run": "38612619132",
+  "artifact": "11918028540",
+  "maintenance_start": "2026-10-14T18:51:42.402236+00:00",
+  "maintenance_end": "2026-10-14T18:52:26.858270+00:00",
+  "switch_finalized": "2026-10-14T19:01:48.271261+00:00",
+  "final_readonly_check": "2026-10-14T19:02:38.148782+00:00",
+  "images": [
+    {
+      "component": "core",
+      "tag": "native-candidate-core:c6af2299086831f99a40b045b889ce72573aadc2",
+      "manifest_digest": "sha256:e0aeec12b9bb77011fe60b87a4c500328ac55ecb293b4d60756f988ee2baad6d",
+      "config_digest": "sha256:8fcdb2a0c4fbee281f0df2abbf2d8a4a1ce4a5f651ef7aabfa9a92cd5601923d",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-paid-controls-c6af2299-20261015/core-c6af2299086831f99a40b045b889ce72573aadc2.tar.gz",
+      "sha256": "a1070f752822346b7475758e794fc00d3752d1dff552ea82a743c71de223c10e",
+      "size": 307486712
+    },
+    {
+      "component": "bridge",
+      "tag": "native-candidate-bridge:c6af2299086831f99a40b045b889ce72573aadc2",
+      "manifest_digest": "sha256:9cf2285b85924cd062d22be05eeacd88d2c1148c7cfbc632d49897f6bfb7e82a",
+      "config_digest": "sha256:caf64e63e1a1f29b4685795e8fb585c40bb1f75ebd2cf52232a3814195db3dec",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-paid-controls-c6af2299-20261015/bridge-c6af2299086831f99a40b045b889ce72573aadc2.tar.gz",
+      "sha256": "c17c638fd8899efdfd7ea572df070ce234b15916490c23db9f02696aefa398d8",
+      "size": 95861091
+    },
+    {
+      "component": "bff",
+      "tag": "native-candidate-bff:c6af2299086831f99a40b045b889ce72573aadc2",
+      "manifest_digest": "sha256:c821cccd98d6bfe4dc5762e005fe3bc6f713780ef2741a5022f4bd45e69740f5",
+      "config_digest": "sha256:fe7407d6abbfb3d84c6f1270a1a2cae94a47ba1b3ebf723087c692b83ce456ac",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-paid-controls-c6af2299-20261015/bff-c6af2299086831f99a40b045b889ce72573aadc2.tar.gz",
+      "sha256": "26d3cd853827b65a2f600b828f1da415fb0c87377b5db699008788e8499a9ab4",
+      "size": 617445702
+    }
+  ],
+  "image_paid_enabled": false,
+  "video_paid_enabled": false,
+  "requested_enabled": {
+    "image": false,
+    "video": false
+  },
+  "legacy_flags": false,
+  "managed_mode": "managed-v1",
+  "account77_product_count": 1,
+  "account77_unchanged": true,
+  "all_accounts_config_unchanged": true,
+  "user_balance_fingerprint_unchanged": true,
+  "usage_last_id_unchanged": true,
+  "migration_ledger_unchanged": true,
+  "pending_migrations": 0,
+  "managed_settings_records_created": 0,
+  "preflight_ui": {
+    "pass": false,
+    "timeout_ms": 30000,
+    "server_durations_ms": [
+      189764,
+      194696,
+      196650,
+      197211,
+      192832
+    ],
+    "full_report_received": false
+  },
+  "non_paid_quotes": [
+    {
+      "path": "text",
+      "status": 200,
+      "ms": 543,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "frozen_price_matches_current_published": true,
+      "quote_issued": true
+    },
+    {
+      "path": "edit",
+      "status": 200,
+      "ms": 517,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 1,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "frozen_price_matches_current_published": true,
+      "quote_issued": true
+    }
+  ],
+  "rollback_performed": false,
+  "generation_submitted": false,
+  "supplier_requests": false,
+  "notes": "Direct quotes PASS does not mean full administrator preflight PASS. Never enable until the preflight timeout is fixed and reverified."
+}
