@@ -24,7 +24,7 @@ async function call(path,method='GET',body,headers={}) {const r=await fetch(orig
   const spec=kind==='image'?{resolution:'4K',aspect_ratio:'16:9',count:1,images:0,videos:0,audio:0,duration_seconds:0}:{resolution:'720p',aspect_ratio:'16:9',duration_seconds:5,count:1,images:0,videos:0,audio:0}
   const first=original.draft.products[0],offerFor=c=>c.published.offers.find(o=>o.product_id===first.product_id&&(!o.spec_match.resolution?.length||o.spec_match.resolution.includes(spec.resolution)))
   let request
-  if(kind==='video') {const evidence=JSON.parse(fs.readFileSync(`${root}/evidence/native-customer-video-compatible.json`));request=evidence.after.supplier.requests.find(r=>r.method==='POST'&&r.body?.model==='synthetic-compatible-video').body}
+  if(kind==='video') {const evidence=JSON.parse(fs.readFileSync(`${root}/evidence/native-customer-video-compatible.json`));const submitted=evidence.after.supplier.requests.filter(r=>r.method==='POST'&&r.path==='/v1/videos'&&r.body?.model==='synthetic-compatible-video');assert.equal(submitted.length,1);request=submitted[0].body;assert.equal(request.duration,spec.duration_seconds);assert.equal(request.resolution,spec.resolution);assert.equal(request.ratio,spec.aspect_ratio);report.video_request_source={path:submitted[0].path,model:request.model,duration:request.duration,resolution:request.resolution,ratio:request.ratio}}
   const quote=offer=>call(`/v1/studio/${kind}s/quotes`,'POST',{offer_id:offer.offer_id,spec,...(request?{request}:{})},headers)
   const before={ledger:ledger(),stats:stats()}
   try{
