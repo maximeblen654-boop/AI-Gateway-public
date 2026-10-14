@@ -51,7 +51,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
   const page = await context.newPage(); page.setDefaultTimeout(20000)
   const artifactProof = artifact ? require('./artifact-assets.cjs')(page) : null
   page.on('response', async r => { if (r.url().startsWith(base+'/studio-v2/api/')) report.http.push({ method: r.request().method(), path: new URL(r.url()).pathname, status: r.status(), ...(r.status() >= 400 ? { error: await r.json().catch(() => null) } : {}) }) })
-  await page.addInitScript(() => { localStorage.setItem('sub2api_locale', 'zh'); localStorage.setItem('user_guide_2_user_v4_interactive', 'true') })
+  await page.addInitScript(id => { localStorage.setItem('sub2api_locale', 'zh'); localStorage.setItem(`user_guide_${id}_user_v4_interactive`, 'true') }, testCustomer.id)
   let restoreDrift
   try {
     await page.goto(base+'/login'); await page.getByLabel('邮箱').fill(testCustomer.email); await page.getByLabel('密码').fill('Native-Customer-Only-20261012')
