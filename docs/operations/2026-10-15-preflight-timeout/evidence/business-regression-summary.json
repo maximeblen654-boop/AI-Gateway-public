@@ -1,0 +1,141 @@
+[
+  {
+    "scenario": "image-geometry-1k",
+    "pass": true,
+    "downloads": [
+      {
+        "bytes": 68,
+        "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+      },
+      {
+        "bytes": 68,
+        "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+      },
+      {
+        "bytes": 68,
+        "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+      }
+    ],
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "before": {
+      "ledger": {
+        "balance": 100,
+        "frozen_balance": 0,
+        "usage": 0,
+        "video_captured": 0
+      },
+      "image_posts": 0,
+      "video_posts": 0
+    },
+    "after": {
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      },
+      "image_posts": 3,
+      "video_posts": 0
+    },
+    "after_refresh_download": {
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      },
+      "image_posts": 3,
+      "video_posts": 0
+    }
+  },
+  {
+    "scenario": "edit-geometry-2k",
+    "pass": true,
+    "downloads": [
+      {
+        "bytes": 68,
+        "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+      },
+      {
+        "bytes": 68,
+        "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+      }
+    ],
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "before": {
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      },
+      "image_posts": 3,
+      "video_posts": 0
+    },
+    "after": {
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      },
+      "image_posts": 5,
+      "video_posts": 0
+    },
+    "after_refresh_download": {
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      },
+      "image_posts": 5,
+      "video_posts": 0
+    }
+  },
+  {
+    "scenario": "video-compatible",
+    "pass": true,
+    "downloads": [
+      {
+        "bytes": 1855,
+        "sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299"
+      }
+    ],
+    "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "repeat_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "before": {
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      },
+      "image_posts": 5,
+      "video_posts": 0
+    },
+    "after": {
+      "ledger": {
+        "balance": 94.1,
+        "frozen_balance": 0,
+        "usage": 3,
+        "video_captured": 1
+      },
+      "image_posts": 5,
+      "video_posts": 1
+    },
+    "after_refresh_download": {
+      "ledger": {
+        "balance": 94.1,
+        "frozen_balance": 0,
+        "usage": 3,
+        "video_captured": 1
+      },
+      "image_posts": 5,
+      "video_posts": 1
+    },
+    "playback_verified": true
+  }
+]

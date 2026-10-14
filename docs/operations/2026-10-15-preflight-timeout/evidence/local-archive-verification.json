@@ -1,0 +1,23 @@
+[
+  {
+    "component": "core",
+    "bytes": 61997333,
+    "tar_sha256": "488a0c5b7fbafb0a3c673957fcd1e0ca5ceacf73dd4da5361835c29bd7b03e83",
+    "image_id": "sha256:63da522e6fec055511ebe3858159560928bf53fe39e02bb2bf1f1fc8b8d7c08a",
+    "identity_match": true
+  },
+  {
+    "component": "bridge",
+    "bytes": 19123320,
+    "tar_sha256": "9975e570262eaea2caaf1588338cbbbdb65a36d041d7fe3370b1933d73049ea8",
+    "image_id": "sha256:5738acb0c36def030432e3aeceb54474e99f2b6e8879b1fcd3fc127d4f2d9fa9",
+    "identity_match": true
+  },
+  {
+    "component": "bff",
+    "bytes": 120286134,
+    "tar_sha256": "e6447e1812be54423cc99dbe8f87052e7eaca08fd45028123f5afc8f2f94ee83",
+    "image_id": "sha256:435fb41d4cab784d0676c21a2ae4a514cfd7b2007823af5564a5569fc258755b",
+    "identity_match": true
+  }
+]

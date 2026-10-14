@@ -1,0 +1,9 @@
+{
+  "source_sha": "1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+  "original_manifest_sha256": "193ea32ce353003e8ca47a45c7890d297f2d2b9e4b109ea0f22c9e29592eab83",
+  "original_build_run": "38623006825",
+  "acceptance_script_sha": "3b3698723510c0ccea76ea681698113bd7d983b8",
+  "acceptance_run_id": "38624490131",
+  "rebuild": false,
+  "reexport": false
+}

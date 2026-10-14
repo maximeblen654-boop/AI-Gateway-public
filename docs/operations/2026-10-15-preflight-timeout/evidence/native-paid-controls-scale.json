@@ -1,0 +1,490 @@
+{
+  "phase": "scale",
+  "checks": [
+    "All 1870 specs checked; three real admin UI preflights and enable recheck under 15s; video stayed closed; zero supplier requests; final both closed"
+  ],
+  "screenshots": [
+    "native-preflight-1870-1440.png",
+    "native-preflight-1870-390.png"
+  ],
+  "http_errors": [],
+  "production": false,
+  "supplier": "local simulator only",
+  "scale_fixture": {
+    "target_product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+    "preserved_sibling_id": "media-34989a9b-fce4-4489-ab85-b4a1b53bb0a9",
+    "sibling_disabled_only_in_isolation": true
+  },
+  "scale": {
+    "specs": 1870,
+    "client_timeout_ms": 30000,
+    "budget_ms": 15000,
+    "runs": [
+      {
+        "wall_ms": 1037,
+        "report": {
+          "metrics": {
+            "accounts_validated": 1,
+            "specs_checked": 1870,
+            "timings_ms": {
+              "eligibility_and_storage": 1,
+              "final_dependencies": 16,
+              "initial_dependencies": 22,
+              "native_quotes": 397,
+              "published_validation": 79,
+              "spec_compilation": 135,
+              "total": 653
+            }
+          },
+          "media": "image",
+          "pass": true,
+          "fingerprint": "4057e3bf42808107db92664f83b39a5255424b536e308362630eb4088f295a9c",
+          "checks": [
+            {
+              "code": "billing_eligibility",
+              "pass": true
+            },
+            {
+              "code": "private_result_storage",
+              "pass": true
+            },
+            {
+              "code": "published_specs",
+              "account_id": 3,
+              "pass": true
+            },
+            {
+              "code": "spec_compilation_and_assets",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "text",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "edit",
+              "pass": true
+            }
+          ],
+          "checked_at": "2026-10-14T19:35:23.307732305Z"
+        }
+      },
+      {
+        "wall_ms": 699,
+        "report": {
+          "metrics": {
+            "accounts_validated": 1,
+            "specs_checked": 1870,
+            "timings_ms": {
+              "eligibility_and_storage": 2,
+              "final_dependencies": 16,
+              "initial_dependencies": 21,
+              "native_quotes": 329,
+              "published_validation": 96,
+              "spec_compilation": 134,
+              "total": 600
+            }
+          },
+          "media": "image",
+          "pass": true,
+          "fingerprint": "4057e3bf42808107db92664f83b39a5255424b536e308362630eb4088f295a9c",
+          "checks": [
+            {
+              "code": "billing_eligibility",
+              "pass": true
+            },
+            {
+              "code": "private_result_storage",
+              "pass": true
+            },
+            {
+              "code": "published_specs",
+              "account_id": 3,
+              "pass": true
+            },
+            {
+              "code": "spec_compilation_and_assets",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "text",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "edit",
+              "pass": true
+            }
+          ],
+          "checked_at": "2026-10-14T19:35:24.071302785Z"
+        }
+      },
+      {
+        "wall_ms": 684,
+        "report": {
+          "metrics": {
+            "accounts_validated": 1,
+            "specs_checked": 1870,
+            "timings_ms": {
+              "eligibility_and_storage": 2,
+              "final_dependencies": 15,
+              "initial_dependencies": 18,
+              "native_quotes": 313,
+              "published_validation": 97,
+              "spec_compilation": 148,
+              "total": 596
+            }
+          },
+          "media": "image",
+          "pass": true,
+          "fingerprint": "4057e3bf42808107db92664f83b39a5255424b536e308362630eb4088f295a9c",
+          "checks": [
+            {
+              "code": "billing_eligibility",
+              "pass": true
+            },
+            {
+              "code": "private_result_storage",
+              "pass": true
+            },
+            {
+              "code": "published_specs",
+              "account_id": 3,
+              "pass": true
+            },
+            {
+              "code": "spec_compilation_and_assets",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "text",
+              "pass": true
+            },
+            {
+              "code": "native_quote",
+              "account_id": 3,
+              "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+              "path": "edit",
+              "pass": true
+            }
+          ],
+          "checked_at": "2026-10-14T19:35:24.757080832Z"
+        }
+      }
+    ],
+    "apply": {
+      "wall_ms": 735,
+      "report": {
+        "metrics": {
+          "accounts_validated": 1,
+          "specs_checked": 1870,
+          "timings_ms": {
+            "eligibility_and_storage": 1,
+            "final_dependencies": 15,
+            "initial_dependencies": 16,
+            "native_quotes": 347,
+            "published_validation": 79,
+            "spec_compilation": 165,
+            "total": 625
+          }
+        },
+        "media": "image",
+        "pass": true,
+        "fingerprint": "4057e3bf42808107db92664f83b39a5255424b536e308362630eb4088f295a9c",
+        "checks": [
+          {
+            "code": "billing_eligibility",
+            "pass": true
+          },
+          {
+            "code": "private_result_storage",
+            "pass": true
+          },
+          {
+            "code": "published_specs",
+            "account_id": 3,
+            "pass": true
+          },
+          {
+            "code": "spec_compilation_and_assets",
+            "account_id": 3,
+            "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 3,
+            "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+            "path": "text",
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 3,
+            "product_id": "media-28e9bd0d-11fb-4454-bdb1-11f82d4fa726",
+            "path": "edit",
+            "pass": true
+          }
+        ],
+        "checked_at": "2026-10-14T19:35:26.038186137Z"
+      }
+    }
+  },
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/TablePageLayout-CTUsgGJ4.css",
+        "bytes": 3516,
+        "sha256": "dd0f0ab4d4e0c05322bffbc8902a8a84989c4fc962542d6f8d7a4d49530dba8e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/usePersistedPageSize-x0WpaIWh.js",
+        "bytes": 1205,
+        "sha256": "f6319237ad734117d138310cf2daab0a1bc92c1907123694365eeaaaf17e635c",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/groups-K9rV3W9y.js",
+        "bytes": 251,
+        "sha256": "735b54992ecdfd6834f6b32c71c9b8898be5b660ee2a8bfdbdf7464ec287e404",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TablePageLayout-BCJhjeNH.js",
+        "bytes": 993,
+        "sha256": "217d6d44a97a582e20b891151e6a3364b834cdb56e99e298112d8f0c8c46d460",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DataTable-bsUFtred.css",
+        "bytes": 3238,
+        "sha256": "53c6f1f5111eabd48f7492d13b17c7e7105ecc5ed4425a16f87f38a21d069bf1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/GroupOptionItem-EDVK0Prz.css",
+        "bytes": 70,
+        "sha256": "732d3355f2a966e2a59d454e3f8f9f90c535ec6e0cb01da78c509051d35d64f0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-B7uGLJt7.js",
+        "bytes": 1535,
+        "sha256": "08df14aa8d8c58855d9fbf46378dbdd711328640a14248056470fed28622ce15",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/SearchInput.vue_vue_type_script_setup_true_lang-DX7Nj-Ux.js",
+        "bytes": 853,
+        "sha256": "28ee9f327170f37ad021b81e8c1ce0d5436157c5b7d21c465fe98e62cd7ee126",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Pagination-CUpaHhcG.js",
+        "bytes": 5806,
+        "sha256": "057b32f6d9c327f5abbf7985af8a253c5c3cfeb5405f47f741be8d77d0244a62",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/KeysView-CJQp9wap.js",
+        "bytes": 114739,
+        "sha256": "f3e1ae826da33a51dce40eb892c19f24738fc32ba270f250eda930fe7b5d15fd",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DataTable-BPAR6NpM.js",
+        "bytes": 15647,
+        "sha256": "35a299f874eca16684f99dfec7421e2aaa1f671931156a787d400125289bf39d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Pagination-CtuvddY-.css",
+        "bytes": 113,
+        "sha256": "493dd7789d900b69592d92d672725eb442092d9a4e36b161e0aafe874fc5debb",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/peak-rate-qZGUWdry.js",
+        "bytes": 279,
+        "sha256": "4b6a4d336eabe0c3f9596833b6a1fd31f17f18323d834a71c057cdeaba429584",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/GroupOptionItem-B5pOoWOJ.js",
+        "bytes": 3322,
+        "sha256": "3555ff428fe3479f7b08b716ea3cf64d22fb6f4d978b161450cd3e47b400020a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/maskApiKey-ClKV8GuA.js",
+        "bytes": 111,
+        "sha256": "228a14ee10033a993aaec9ef617f17839aee8dcceb66062a34e09615836aa111",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/PlatformIcon.vue_vue_type_script_setup_true_lang-Bbz3Di6t.js",
+        "bytes": 18898,
+        "sha256": "ab69a0de9d3e76ecd9790e9b740cb4cba1547f27129acff66ea45d5ead7a03cb",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/GroupBadge.vue_vue_type_script_setup_true_lang-C8Q5uHmB.js",
+        "bytes": 5756,
+        "sha256": "0b6e940da5b38ed914b59d6dce773784a1e7c00080f91b09ceca62ae52218d60",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/platformColors-DrUycA90.js",
+        "bytes": 10246,
+        "sha256": "cc86e90f7a3da2b832ce9d5fa7f80b0049ca235dff2430fd25648d6f28c5d6f8",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/errorBadges-l5RHj717.js",
+        "bytes": 7505,
+        "sha256": "da3cfbcf551695f80f6ff708979d3810c261be803362a98ea38ee5d82def032e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/UsageView-DoJeDjcu.js",
+        "bytes": 29850,
+        "sha256": "0fb9bf40614ff50959481a2b5da49de6e19a4ba5aea89caf85c246e1337a6ac8",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/ModelDistributionChart.vue_vue_type_script_setup_true_lang-CpzFGRO5.js",
+        "bytes": 14646,
+        "sha256": "3caad77af25490bdf66824698d183ef0e885b0bc618bcb2c63a3ec454705862d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/EndpointDistributionChart.vue_vue_type_script_setup_true_lang-Cf4LJqF9.js",
+        "bytes": 7784,
+        "sha256": "13f8e568f447431ada7ac17a585b14a44c4540d84acfaa5b94602a6ca3347a49",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/GroupDistributionChart.vue_vue_type_script_setup_true_lang-BOZSDLeD.js",
+        "bytes": 48820,
+        "sha256": "e1223b5a2ec7ad90b0c27b57b5e7f4944cd6377f17d96714ad1a6dbb1e28e2e1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-ui-DvkHjAxN.js",
+        "bytes": 503428,
+        "sha256": "ac4ee852c5a002090032301f2af902c017992de62aa9dbfb1f24f9f8b4a93f13",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-cIeRDn5a.js",
+        "bytes": 194144,
+        "sha256": "c4c6e7400cbbb6d7a9daad0ebbc9a2692c7e2ab6a7b4a43f8c9f9a68574d245d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DDfo002m.js",
+        "bytes": 413892,
+        "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CTUvPV8r.js",
+        "bytes": 104141,
+        "sha256": "eb06d4dce09ba293eebd6865768427c990d7b37b73c9b6a4fcb991cdfb447d6c",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-DXwVEzov.js",
+        "bytes": 917,
+        "sha256": "387007acce413ba4159b09464c0563d6b5e44f583ca40cee36cc636b9111b2b0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-BwzGhhIj.css",
+        "bytes": 34868,
+        "sha256": "b57f1402f1d68cd8e66c9ae44e07f4aecf8ce0034ed242242384bbb49c469441",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CK5V2A61.js",
+        "bytes": 2345,
+        "sha256": "f0da22aee9515fbf41b109ec5b113fb4de1e35f029570d3ab4d7b462f730ccb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-CpmXzQLE.js",
+        "bytes": 116227,
+        "sha256": "07b44c591b7e9d92b17f6bd26ffc5ef3c9f7321e9c1749403cbc43a5b26619d6",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": []
+  },
+  "pass": true
+}

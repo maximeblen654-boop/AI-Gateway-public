@@ -1,6 +1,6 @@
 # 图片开启前检查：完整规格校验性能修复
 
-状态：非生产实现与本地定向回归完成，最终镜像验收待 GitHub-hosted runner。
+状态：CANDIDATE_READY_NOT_DEPLOYED。最终同镜像验收已通过，完整结果与固定身份见 [执行交接](HANDOFF.md)。
 
 ## 事实与边界
 
@@ -30,4 +30,4 @@ InspectPublishedOffers 在一次同步调用内完整验证当前仓储快照，
 
 复用 native-media-candidate / paid-controls 场景。保留文生图、参考图编辑、单视频、原片摘要、下载、一次结算、权限拒绝、配置失效和 sidecar 故障回归。
 额外 scale 阶段在真实隔离数据库保存发布同形 1,870 规格商品，最终 Core 页面执行三次“开启前检查”和一次确认开启；每次必须完整覆盖 1,870，页面到结果小于15秒，视频不串开，模拟供应商计数不变，最终两种提交都关闭。
-大型构建仅在 GitHub-hosted runner，本地不构建镜像。最终结果和指纹在候选完成后追加，当前不宣称候选 PASS。
+大型构建仅在 GitHub-hosted runner，本地不构建镜像。最终结果和指纹见上述执行交接；未部署生产。
