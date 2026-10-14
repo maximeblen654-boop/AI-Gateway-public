@@ -67,7 +67,7 @@ const p='/admin/media-workbench/paid-controls/'
    assert.equal((await current('video')).effective_enabled,false)
    for(const width of [1440,390])for(const theme of ['light','dark']){
     await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.classList.toggle('dark',t==='dark'),theme)
-    await imageCard.scrollIntoViewIfNeeded();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
+    await imageCard.scrollIntoViewIfNeeded();await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),{timeout:10000,message:'Responsive layout must settle without horizontal overflow'}).toBe(true)
     const name=`native-paid-controls-${width}-${theme}.png`;await page.screenshot({path:root+'/evidence/'+name,animations:'disabled'});report.screenshots.push(name)
    }
    // An unprivileged customer cannot check or apply the administrator gate.
