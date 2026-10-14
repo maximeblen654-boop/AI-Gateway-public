@@ -5,13 +5,13 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 24458,
-      "sha256": "9bd2325e78ffdc17b8ff956e04ca1e24b193e1fe4d21f70eaaf1e25cfd5a4b45"
+      "bytes": 24436,
+      "sha256": "5ca7dbe825a564463f3f9d02a58abd2553e9bff1bba9f2a149dc8d240fe49685"
     },
     {
       "path": "prototype.js",
-      "bytes": 19965,
-      "sha256": "a992adc9f1dbc1b9a2c6cdf188453d9c869da8494fea4656ff4f65c4286f33eb"
+      "bytes": 19964,
+      "sha256": "273ee45d97f6f53ab3e2fbad6ca3e6c0e6a76cf3ab5d6f77e87b68bc4c7017db"
     },
     {
       "path": "costCalculator.js",
@@ -25,14 +25,14 @@
     },
     {
       "path": "REVIEW_V2.md",
-      "bytes": 4811,
-      "sha256": "0bf8ee34c1441d5eb70a95dbaadf4bbafd7366b3bd1cb6ce967aa1be9884a785",
+      "bytes": 4754,
+      "sha256": "48ae6c2bd5bc259d2a20a801cfb5d58470dce7864bf02c85d2c7e589ea99c787",
       "note": "Archive wording and relative README link updated; original design evidence unchanged"
     },
     {
       "path": "interaction-results.json",
-      "bytes": 1274,
-      "sha256": "867db0b4a04f16a07cfa8aab2fba5b61413e154172fb0298a7194bac47892f98"
+      "bytes": 1275,
+      "sha256": "364127c12921127ab9cd8a2e88c3b31d21033ae1774491e9aaf9c83fa61c745d"
     },
     {
       "path": "shots/default/page.png",
@@ -59,5 +59,6 @@
       "bytes": 383832,
       "sha256": "51e91c4af0ccdd3dff8f8494f8d2abd6af0f0e7fbd89920294f73328db437f87"
     }
-  ]
+  ],
+  "archive_normalization": "Text files use LF line endings; screenshots and recording are unchanged."
 }
