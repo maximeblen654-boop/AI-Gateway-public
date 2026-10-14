@@ -186,6 +186,7 @@ if (mode === 'load-existing') {
       dc(['up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','90','bridge'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'verify'])
       for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
+      run(process.execPath,['tools/native-media-e2e/task-experience.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
     } else if (adminReview) {

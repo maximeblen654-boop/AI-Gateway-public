@@ -93,7 +93,7 @@ describe('Published customer task confirmation and recovery',()=>{
   const task={...prepared,kind:'image' as const,status,spec:{count:5},quantity:5,price:{amount:'3.50',currency:'CNY',billing_mode:'per_request'},billingState:'billing_unknown'};
   api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises();
   expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('待结算');expect(wrapper.get('[data-testid="studio-settlement"]').text()).not.toContain('3.50');
-  expect(wrapper.find('[data-testid="studio-new"]').exists()).toBe(false);expect(wrapper.find('[data-testid="studio-generate"]').exists()).toBe(false);
+  expect(wrapper.find('[data-testid="studio-new"]').exists()).toBe(true);expect(wrapper.find('[data-testid="studio-generate"]').exists()).toBe(false);
   await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(api.generate).not.toHaveBeenCalled();
  });
  it('delivers a settled partial task without repricing or resubmission across refresh and remount',async()=>{
@@ -140,7 +140,7 @@ describe('Published customer task confirmation and recovery',()=>{
   let finish!:(tasks:StudioTask[])=>void;const image:StudioTask={...prepared,kind:'image',id:'img_'+'b'.repeat(32)}
   api.history.mockReturnValueOnce(new Promise<StudioTask[]>(r=>{finish=r})).mockResolvedValueOnce([image])
   await wrapper.findAll('button').find(b=>b.text()==='刷新记录')!.trigger('click');await wrapper.get('[data-testid="studio-mode-text"]').trigger('click');await flushPromises()
-  finish([prepared]);await flushPromises();expect(wrapper.findAll('[data-task-id]').map(b=>b.attributes('data-task-id'))).toEqual([image.id]);expect(api.task).toHaveBeenCalledWith(image)
+  finish([prepared]);await flushPromises();expect(wrapper.findAll('[data-task-id]').map(b=>b.attributes('data-task-id'))).toEqual([image.id]);expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false)
  })
  it('selecting another historical task during a query eventually queries the new identity',async()=>{
   const second={...prepared,id:'op_'+'b'.repeat(64)};api.history.mockResolvedValue([prepared,second]);wrapper=mount(StudioMediaPanel);await flushPromises()
@@ -206,5 +206,51 @@ describe('Artwork desk navigation',()=>{
  it('shows saved works without locking a new visit to a completed task',async()=>{sessionStorage.clear();api.history.mockResolvedValue([{...prepared,kind:'image',status:'completed',resultCount:1}]);wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(wrapper.findAll('[data-task-id]')).toHaveLength(1);expect(api.task).not.toHaveBeenCalled()})
  it('opens and closes the ratio selector using Escape and restores focus',async()=>{await setup();await wrapper.get('[data-testid="studio-ratio-toggle"]').trigger('click');expect(wrapper.find('#studio-ratio-menu').exists()).toBe(true);await wrapper.get('#studio-ratio-menu button').trigger('keydown',{key:'Escape'});await flushPromises();expect(wrapper.get('[data-testid="studio-ratio-toggle"]').attributes('aria-expanded')).toBe('false');expect(document.activeElement).toBe(wrapper.get('[data-testid="studio-ratio-toggle"]').element)})
  it('keeps unavailable originals separate from completed billing and retries only a read',async()=>{sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:prepared.id}));api.history.mockResolvedValue([{...prepared,kind:'image',status:'completed',resultCount:1}]);wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-result-image"]').trigger('error');expect(wrapper.find('[data-testid="studio-download"]').exists()).toBe(false);expect(wrapper.text()).toContain('原片暂不可用');const oldImage=wrapper.get('[data-testid="studio-result-image"]').element;await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(wrapper.get('[data-testid="studio-result-image"]').element).not.toBe(oldImage);await wrapper.get('[data-testid="studio-result-image"]').trigger('load');expect(wrapper.get('[data-testid="studio-download"]').exists()).toBe(true);expect(api.generate).not.toHaveBeenCalled()})
- it('does not create a replacement when an unresolved task mode is clicked',async()=>{sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image'}));api.history.mockResolvedValue([{...prepared,kind:'image',status:'unknown'}]);wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');expect(wrapper.text()).toContain('当前任务尚未完成');expect(wrapper.get('[data-testid="studio-status"]').text()).toContain('结果待确认');expect(api.generate).not.toHaveBeenCalled()})
+ it('does not create a replacement when an unresolved task mode is clicked',async()=>{sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image'}));api.history.mockResolvedValue([{...prepared,kind:'image',status:'unknown'}]);wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(wrapper.get('[data-testid="studio-prompt"]').isVisible()).toBe(true);expect(wrapper.get('[data-testid="studio-history"]').text()).toContain('结果待确认');expect(api.generate).not.toHaveBeenCalled()})
+})
+
+describe('Unresolved tasks do not lock creation',()=>{
+ it('opens text and edit with an unknown image task retained in history',async()=>{
+  const task={...prepared,id:'img_'+'c'.repeat(32),kind:'image' as const,status:'unknown'}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.catalog.mockResolvedValue([withImageReferences()]);api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-mode-text"]').trigger('click');await flushPromises();expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false)
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('new independent idea');await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-testid="studio-attachment"]').isVisible()).toBe(true);expect(wrapper.find(`[data-task-id="${task.id}"]`).exists()).toBe(true)
+  wrapper.unmount();wrapper=mount(StudioMediaPanel);await flushPromises();expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('reports query progress, unchanged state and persistent failure',async()=>{
+  const task={...prepared,status:'unknown'};api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises();const query=deferred<StudioTask>();api.task.mockReturnValueOnce(query.promise)
+  await wrapper.get('[data-testid="studio-refresh"]').trigger('click');expect(wrapper.get('[data-testid="studio-refresh"]').attributes('aria-busy')).toBe('true');expect(wrapper.get('[data-testid="studio-refresh"]').text()).toContain('查询中')
+  query.resolve(task);await flushPromises();expect(wrapper.get('[data-testid="studio-query-feedback"]').text()).toContain('暂无新结果');expect(wrapper.get('[data-testid="studio-query-feedback"] time').attributes('datetime')).toBeTruthy()
+  api.task.mockRejectedValueOnce(new Error('network'));await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(wrapper.get('[data-testid="studio-query-error"]').text()).toContain('查询未完成');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('allows editing during a pending POST and a late response never reopens task detail',async()=>{
+  wrapper=mount(StudioMediaPanel);await flushPromises();const dispatch=deferred<StudioTask>();api.generate.mockReturnValueOnce(dispatch.promise);await wrapper.get('[data-testid="studio-generate"]').trigger('click')
+  expect(wrapper.get('[data-testid="studio-waiting"]').text()).toContain('提交处理中');await wrapper.get('[data-testid="studio-new"]').trigger('click');await wrapper.get('[data-testid="studio-prompt"]').setValue('next task')
+  dispatch.resolve({...prepared,status:'completed',resultCount:1});await flushPromises();expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','next task');expect(wrapper.find(`[data-task-id="${prepared.id}"]`).exists()).toBe(true);expect(api.generate).toHaveBeenCalledTimes(1)
+ })
+})
+
+
+describe('Task-local asynchronous feedback',()=>{
+ it('submits two explicit identities and prices without cross-updating the active task',async()=>{
+  wrapper=mount(StudioMediaPanel);await flushPromises();const first=deferred<StudioTask>(),secondResponse=deferred<StudioTask>();api.generate.mockReturnValueOnce(first.promise).mockReturnValueOnce(secondResponse.promise)
+  await wrapper.get('[data-testid="studio-generate"]').trigger('click');await wrapper.get('[data-testid="studio-new"]').trigger('click');await wrapper.get('[data-testid="studio-prompt"]').setValue('second independent task')
+  const second={...prepared,id:'op_'+'d'.repeat(64),price:{...prepared.price,amount:'1.20'}}
+  api.request.mockResolvedValueOnce({contract:'account_video_v1',operation_id:second.id,model:second.model,status:'prepared',created_at:second.createdAt,expires_at:second.expiresAt,offer_id:second.offerId,spec:second.spec,sale_price:second.price})
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();await wrapper.get('[data-testid="studio-generate"]').trigger('click')
+  first.resolve({...prepared,status:'completed',resultCount:1});await flushPromises();expect(wrapper.get('[data-testid="studio-task-id"]').text()).toContain(second.id);expect(wrapper.get('[data-testid="studio-price"]').text()).toContain('1.20')
+  secondResponse.resolve({...second,status:'completed',resultCount:1});await flushPromises();expect(wrapper.findAll('[data-task-id]')).toHaveLength(2);expect(api.generate.mock.calls.map(c=>c[0].id)).toEqual([prepared.id,second.id])
+  await wrapper.get(`[data-task-id="${prepared.id}"]`).trigger('click');await flushPromises();expect(wrapper.get('[data-testid="studio-price"]').text()).toContain('0.80');expect(api.generate).toHaveBeenCalledTimes(2)
+ })
+ it('does not automatically poll unknown outcomes',async()=>{
+  vi.useFakeTimers();api.history.mockResolvedValue([{...prepared,status:'unknown'}]);wrapper=mount(StudioMediaPanel);await flushPromises();api.task.mockClear();await vi.advanceTimersByTimeAsync(120000);expect(api.task).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled();expect(wrapper.get('[data-testid="studio-waiting"]').text()).toContain('不等于仍在正常生成')
+ })
+ it('bounds known-state refreshes and stops polling after a visible query failure',async()=>{
+  vi.useFakeTimers();api.history.mockResolvedValue([{...prepared,status:'processing'}]);wrapper=mount(StudioMediaPanel);await flushPromises();api.task.mockClear();await vi.advanceTimersByTimeAsync(180000);expect(api.task).toHaveBeenCalledTimes(12)
+  api.task.mockRejectedValueOnce(new Error('query failed'));await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();api.task.mockClear();await vi.advanceTimersByTimeAsync(60000);expect(api.task).not.toHaveBeenCalled();expect(wrapper.get('[data-testid="studio-query-error"]').text()).toContain('查询未完成');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('shows elapsed long-wait feedback but keeps creation available',async()=>{
+  vi.useFakeTimers();wrapper=mount(StudioMediaPanel);await flushPromises();const pending=deferred<StudioTask>();api.generate.mockReturnValueOnce(pending.promise);await wrapper.get('[data-testid="studio-generate"]').trigger('click');await vi.advanceTimersByTimeAsync(61000);expect(wrapper.get('[data-testid="studio-elapsed"]').text()).toContain('1 分');expect(wrapper.get('[data-testid="studio-waiting"]').text()).toContain('仍未返回');expect(wrapper.get('[data-testid="studio-new"]').attributes('disabled')).toBeUndefined();pending.resolve({...prepared,status:'unknown'});await flushPromises()
+ })
 })

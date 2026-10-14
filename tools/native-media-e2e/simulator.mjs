@@ -34,6 +34,9 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     if (req.method === 'POST' && ['/v1/images/generations', '/v1/images/edits'].includes(url.pathname)) {
       state.image_posts++; save()
       assert.equal(auth, 'bearer'); assert.equal(typeof body.prompt, 'string'); assert(Number.isInteger(body.n) && body.n >= 1 && body.n <= 10)
+      // Bounded fault/latency fixtures for task recovery UX; this simulator never forwards externally.
+      if (body.prompt.startsWith('SYNTHETIC_UNKNOWN_502')) return reply(502, { error: 'synthetic_upstream_outcome_unknown' })
+      if (body.prompt.startsWith('SYNTHETIC_WAIT')) await new Promise(resolve => setTimeout(resolve, 15000))
       const calls = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt)
       if (body.prompt.startsWith('SYNTHETIC_PARTIAL') && calls.length === 2) return reply(422, { error: 'synthetic_second_batch_rejected' })
       return reply(200, { data: Array.from({ length: body.n }, () => ({ b64_json: png })) })

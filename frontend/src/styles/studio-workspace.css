@@ -22,3 +22,12 @@
 
 /* Compact spec choices: number grid, bounded option panels, one selection at a time. */
 .studio-spec-control{position:relative}.studio-chip strong{color:var(--sw-ink);font-weight:650;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.studio-spec-menu{bottom:calc(100% + 10px);width:244px;max-width:calc(100vw - 32px);padding:12px}.studio-spec-menu>p{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px;font-size:12px;font-weight:600;color:var(--sw-ink)}.studio-spec-menu>p>span{font-size:11px;font-weight:400;color:var(--sw-muted)}.studio-spec-options{display:grid;gap:5px;max-height:210px;overflow-y:auto;overscroll-behavior:contain;padding:3px;margin:-3px}.studio-spec-options button{min-width:0;min-height:39px;padding:7px 5px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--sw-ink);font-size:13px;overflow-wrap:anywhere}.studio-spec-options button:hover{background:var(--sw-soft)}.studio-spec-options button.chosen{background:var(--sw-soft);border-color:var(--sw-accent);color:var(--sw-accent);font-weight:700}.studio-spec-options button:focus-visible{outline:2px solid var(--sw-accent);outline-offset:1px}.studio-count-menu .studio-spec-options button{font-variant-numeric:tabular-nums}.studio-ratio-menu{max-height:220px;overflow-y:auto;overscroll-behavior:contain}.studio-model-menu select{max-height:220px;overflow-y:auto;overscroll-behavior:contain}
+
+/* Task-local waiting must not disable the composer or navigation. */
+.studio-waiting{display:flex;align-items:flex-start;gap:12px;margin:18px 0;padding:16px;border:1px solid var(--sw-line);border-radius:14px;background:var(--sw-paper)}
+.studio-waiting>svg{flex-shrink:0;width:20px;height:20px;margin-top:2px}
+.studio-waiting strong{font-size:14px}.studio-waiting p{margin:6px 0;line-height:1.65}.studio-waiting small{line-height:1.7;opacity:.75}
+.studio-waiting.is-uncertain{border-style:dashed}.studio-query-feedback{font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.studio-task-actions{flex-wrap:wrap}.studio-task-actions button{min-height:40px}
+@media(max-width:600px){.studio-waiting{padding:12px}.studio-task-actions button{flex:1 1 140px}}
+@media(prefers-reduced-motion:reduce){.studio-workspace .spinning{animation:none}}

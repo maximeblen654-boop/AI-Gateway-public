@@ -12,7 +12,7 @@
       <header class="studio-header">
         <div><h1><a href="/dashboard" aria-label="AI Gateway，返回控制台">AI Gateway</a> <span>{{ historyMode ? '任务历史' : modeLabel }}</span></h1><p class="studio-mobile-tagline">让想法有画面。</p></div>
         <button v-if="!active" class="studio-button studio-header-new" :disabled="busy" @click="focusPrompt"><Icon name="plus" />开始创作</button>
-        <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />新建任务</button>
+        <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
       <div class="studio-section-heading">
         <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="history.length">{{ history.length }}</span></h2>
@@ -36,11 +36,17 @@
       <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
       <p v-if="!enabled" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
       <section v-if="active" ref="taskDetail" class="studio-task-detail" data-testid="studio-task" aria-label="当前任务">
-        <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ statusText(active.status) }}</span></div>
+        <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</span></div>
         <div class="studio-price-line"><p data-testid="studio-price">冻结报价 <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
         <p v-if="active.status === 'prepared'" class="studio-quote-expiry">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
         <p v-if="active.status === 'partial'" class="studio-partial" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
-        <p v-if="['unknown','reserve_pending','recovery_blocked'].includes(active.status)" class="studio-notice">结果待确认。系统只查询原任务，不会自动再次生成或更换供应商。</p>
+        <div v-if="waiting" class="studio-waiting" data-testid="studio-waiting" :class="{ 'is-uncertain': uncertain && !submitting[active.id] }">
+          <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
+          <div><strong>{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
+        </div>
+        <p v-if="['failed','released'].includes(active.status)" role="alert" class="studio-error">{{ active.status === 'released' ? '本次生成未成功，服务端报告费用已释放。' : '本次生成未成功；费用状态以实际结算回执为准。' }}原任务已保留，不会自动再次生成。</p>
+        <p v-if="taskFeedback?.message" role="status" class="studio-query-feedback" data-testid="studio-query-feedback"><time :datetime="new Date(taskFeedback.at).toISOString()">{{ new Date(taskFeedback.at).toLocaleTimeString() }}</time> · {{ taskFeedback.message }}</p>
+        <p v-if="taskFeedback?.error" role="alert" class="studio-error" data-testid="studio-query-error">{{ taskFeedback.error }}</p>
         <div v-if="hasResults(active)" class="studio-results" data-testid="studio-results">
           <figure v-for="i in active.resultCount" :key="`${active.id}-${i}`">
             <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="unavailableResults[`${active.id}-${i}`] = false" @error="unavailableResults[`${active.id}-${i}`] = true" />
@@ -48,7 +54,7 @@
             <figcaption><span>原始结果 {{ i }}</span><span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download"><Icon name="download" />下载原片</a></figcaption>
           </figure>
         </div>
-        <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || !enabled || expired" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy" @click="refresh"><Icon name="refresh" />查询原任务</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '新建任务' }}</button></div>
+        <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || !enabled || expired" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '继续创作' }}</button></div>
         <details class="studio-task-id"><summary>任务详情</summary><p data-testid="studio-task-id">任务：{{ active.id }}</p></details>
       </section>
       <section v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
@@ -120,7 +126,7 @@ const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || 
 const offer=computed(()=>visibleOffers.value.find(o=>o.offer_id===offerId.value))
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
 const visibleHistory=computed(()=>historyMode.value?history.value:history.value.slice(0,3))
-const canStartNew=computed(()=>!!active.value && ['prepared','completed','partial','failed','released'].includes(active.value.status))
+const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
 const offerSpecs=(o:StudioOffer)=>{const values=[...(o.spec.resolution||[]),...(o.spec.aspect_ratio||[])];return values.length ? ' · '+values.join(' / ') : ''}
@@ -134,11 +140,10 @@ async function changeMode(mode:'text'|'edit'|'video'){
  if(busy.value)return
  historyMode.value=false;openControl.value=null
  const nextKind=mode==='video'?'video':'image', sameKind=nextKind===kind.value
- if(sameKind&&active.value&&!canStartNew.value){notice.value='当前任务尚未完成，请查询原任务；不会重新生成。';return}
  if(sameKind&&active.value)newTask()
  if(mode==='text'&&uploads.value.length){clearAssets();notice.value='已切换为文生图，当前输入不再使用参考素材。'}
  imageMode.value=mode==='edit'?'edit':'text'
- if(!sameKind){kind.value=nextKind;await load();return}
+ if(!sameKind){quoteConfirm.value=false;active.value=null;intent=undefined;kind.value=nextKind;await load(undefined,false);focusPrompt();return}
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
  remember();focusPrompt()
 }
@@ -154,15 +159,36 @@ const incompatible=computed(()=>!offer.value || kind.value==='image' && (imageMo
 const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
 let generation=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
+// Only local HTTP submission activity; it never asserts supplier acceptance.
+const submitting=ref<Record<string,number>>({})
+const feedback=ref<Record<string,{at:number;message:string;error?:string}>>({})
+const autoChecks=new Map<string,number>()
+const taskFeedback=computed(()=>active.value ? feedback.value[active.value.id] : undefined)
+const uncertain=computed(()=>!!active.value && ['unknown','reserve_pending','recovery_blocked'].includes(active.value.status))
+const waiting=computed(()=>!!active.value && (!!submitting.value[active.value.id] || uncertain.value || ['queued','processing','billing_pending'].includes(active.value.status)))
+const elapsedSeconds=computed(()=>{if(!active.value)return 0;const start=submitting.value[active.value.id] || Date.parse(active.value.createdAt);return Number.isFinite(start)?Math.max(0,Math.floor((clock.value-start)/1000)):0})
+const elapsedText=computed(()=>{const n=elapsedSeconds.value;return n<60?`${n} 秒`:n<3600?`${Math.floor(n/60)} 分 ${n%60} 秒`:`${Math.floor(n/3600)} 小时 ${Math.floor(n%3600/60)} 分`})
+const waitingMessage=computed(()=>{
+ if(active.value && submitting.value[active.value.id])return elapsedSeconds.value>=60?'本次提交仍未返回最终结果。请勿重复提交这笔任务。':'正在等待本次提交返回，供应商最终状态尚未确认。'
+ if(uncertain.value)return '最终结果暂时无法确认，这不等于仍在正常生成。查询仅恢复原任务，不会重新发起生成。'
+ if(active.value?.status==='billing_pending')return '结果已保存，正在确认原生结算；不会再次生成。'
+ return elapsedSeconds.value>=60?'服务端尚未返回最终结果，请稍后查询原任务。':'等待服务端更新任务状态。'
+})
 const statuses:Record<string,string>={prepared:'报价已冻结，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
 const statusText=(status:string)=>statuses[status]||'结果待确认'
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||(!/^media[-_]/.test(task.model)?task.model:'')||'已保存的创作'
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
-function remember(){if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,attempted:[...attempted]}))}
-function accepted(task:StudioTask){if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'};active.value=task;resultRead.value++;history.value=[task,...history.value.filter(t=>t.id!==task.id)];remember()}
+function remember(){try{if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,view:active.value?'task':'compose',attempted:[...attempted]}))}catch{/* Durable server history remains available when browser storage is unavailable. */}}
+function accepted(task:StudioTask,select=true){
+ if(!mounted)return
+ if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'}
+ if(select || active.value?.id===task.id && active.value.kind===task.kind){active.value=task;resultRead.value++}
+ if(select || task.kind===kind.value)history.value=[task,...history.value.filter(t=>t.id!==task.id)]
+ remember()
+}
 function selectOffer(){const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=kind.value==='image' ? countOptions.value[0]??1 : 1;intent=undefined}
-function newTask(){if(busy.value || !active.value || !['prepared','completed','partial','failed','released'].includes(active.value.status))return;quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;remember();focusPrompt()}
-async function load(selectedId?:unknown){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;offers.value=[];history.value=[];try{
+function newTask(){if(busy.value || !active.value)return;quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;remember();focusPrompt()}
+async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;offers.value=[];history.value=[];try{
  const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
  if(epoch!==generation)return;
  if(catalog.status==='fulfilled')offers.value=catalog.value;
@@ -171,13 +197,26 @@ async function load(selectedId?:unknown){const epoch=++generation;busy.value=tru
  history.value=tasks.value;
  if(catalog.status==='rejected'||readiness.status==='rejected')notice.value='目录或生成服务暂不可用，仍可查询原任务和已保存结果。';
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
- const restored=history.value.find(t=>t.id===selectedId)||history.value.find(t=>!['completed','partial','failed','released'].includes(t.status))||(catalog.status==='rejected'?history.value[0]:undefined);if(restored)accepted(restored);remember()
+ const restored=history.value.find(t=>t.id===selectedId)||(restorePending?history.value.find(t=>!['completed','partial','failed','released'].includes(t.status))||(catalog.status==='rejected'?history.value[0]:undefined):undefined);if(restored)accepted(restored);remember()
  }catch(e){error.value=studioErrorMessage(e)}finally{if(epoch===generation)busy.value=false}
  if(active.value)await refresh()
 }
 async function reloadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();await refresh()}
-async function refresh(){if(!active.value||querying.value)return;const original=active.value;querying.value=true;try{const task=await studioTask(original);if(active.value?.id===original.id&&kind.value===original.kind){accepted(task);error.value=''}}catch(e){if(active.value?.id===original.id)error.value=studioErrorMessage(e)}finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}}
+async function refresh(automatic=false){
+ if(!active.value||querying.value||submitting.value[active.value.id])return
+ const original=active.value;querying.value=true
+ if(!automatic)autoChecks.set(original.id,0)
+ try{
+  const task=await studioTask(original)
+  if(task.id!==original.id||task.kind!==original.kind)throw new StudioError('studio_contract')
+  if(!mounted)return
+  accepted(task,false)
+  const unchanged=task.status===original.status && task.resultCount===original.resultCount && task.billingState===original.billingState
+  feedback.value[original.id]={at:Date.now(),message:unchanged?`已查询原任务，暂无新结果。当前状态：${statusText(task.status)}。`:`原任务已更新：${statusText(task.status)}。`}
+ }catch(e){if(mounted)feedback.value[original.id]={at:Date.now(),message:'本次查询未取得最新状态，保留上次记录。',error:`查询未完成：${studioErrorMessage(e)} 原任务未重新提交。`}}
+ finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}
+}
 function assetKind(file:File):StudioAssetReceipt['kind']|undefined{const value=file.type.split('/')[0];return ['image','video','audio'].includes(value) ? value as StudioAssetReceipt['kind'] : undefined}
 function assetError(error:unknown){
  if(error instanceof Error){
@@ -219,12 +258,25 @@ async function quote(){if(busy.value||active.value||!offer.value||incompatible.v
  }
  if(active.value){quoteConfirm.value=true;revealTask()}
  }catch(e){error.value=studioErrorMessage(e);history.value=await studioHistory(kind.value).catch(()=>history.value)}finally{busy.value=false}}
-async function generate(){if(busy.value||!active.value||active.value.status!=='prepared'||!enabled.value||expired.value)return;
- const task=active.value;quoteConfirm.value=false;busy.value=true;error.value='';attempted.add(task.id);accepted({...task,status:'unknown'});
- try{accepted(await studioGenerate(task))}catch(e){if(e instanceof StudioError&&(e.code.includes('paid_gate_off')||e.code.endsWith('quote_expired'))){attempted.delete(task.id);accepted(task)}error.value=studioErrorMessage(e)}finally{busy.value=false}
+async function generate(){
+ if(busy.value||!active.value||active.value.status!=='prepared'||!enabled.value||expired.value||attempted.has(active.value.id))return
+ const task=active.value;quoteConfirm.value=false;error.value='';attempted.add(task.id);submitting.value[task.id]=Date.now();clock.value=Date.now();accepted({...task,status:'unknown'})
+ try{accepted(await studioGenerate(task),false)}catch(e){
+  if(!mounted)return
+  if(e instanceof StudioError&&(e.code.includes('paid_gate_off')||e.code.endsWith('quote_expired'))){attempted.delete(task.id);accepted(task,false)}
+  feedback.value[task.id]={at:Date.now(),message:'本次提交未取得最终结果。',error:e instanceof StudioError && e.code==='image_binding_unavailable'?'本次请求未取得可确认的结果。请查询原任务；不会重新发送生成请求。':studioErrorMessage(e)}
+ }finally{delete submitting.value[task.id]}
 }
-onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected)}catch(e){error.value=studioErrorMessage(e)}
- if(mounted)timer=setInterval(()=>{clock.value=Date.now();if(!polling&&!busy.value&&active.value&&['unknown','processing','queued','billing_pending'].includes(active.value.status)){polling=true;void refresh().finally(()=>{polling=false})}},3000)
+onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown,restorePending=true;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;restorePending=raw.view!=='compose';if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected,restorePending)}catch(e){error.value=studioErrorMessage(e)}
+ if(mounted)timer=setInterval(()=>{
+  clock.value=Date.now()
+  const task=active.value
+  // Unknown outcomes require explicit recovery. Bound known-state refreshes and
+  // stop after an error; never let polling erase the only visible failure.
+  if(!polling&&!busy.value&&task&&!submitting.value[task.id]&&['processing','queued','billing_pending'].includes(task.status)&&!feedback.value[task.id]?.error&&(autoChecks.get(task.id)||0)<12&&clock.value-(feedback.value[task.id]?.at||0)>=10000){
+   autoChecks.set(task.id,(autoChecks.get(task.id)||0)+1);polling=true;void refresh(true).finally(()=>{polling=false})
+  }
+ },1000)
 })
 onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);window.removeEventListener('pointerdown',clickOutside);uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)})})
 </script>
