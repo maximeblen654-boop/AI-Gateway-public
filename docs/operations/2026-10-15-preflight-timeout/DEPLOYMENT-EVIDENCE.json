@@ -1,0 +1,557 @@
+{
+  "status": "DEPLOYED_IMAGE_DISABLED_PRECHECK_PASSED",
+  "runtime_source_sha": "1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+  "acceptance_script_sha": "3b3698723510c0ccea76ea681698113bd7d983b8",
+  "manifest_sha256": "f1ad7be33ea23d1c3b5ebec2a562fb822eb854b50a3f1564ade70ae8bf0d9f35",
+  "production": true,
+  "maintenance_start": "2026-10-14T20:20:47.930580+00:00",
+  "maintenance_end": "2026-10-14T20:21:25.334968+00:00",
+  "final_check_time": "2026-10-14T20:24:35.273076+00:00",
+  "components": [
+    {
+      "component": "core",
+      "tag": "native-candidate-core:1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+      "manifest_digest": "sha256:422c068739614090c6417223076d9dc8728490d8b8145a26475cba7b53b3cc5e",
+      "config_digest": "sha256:63da522e6fec055511ebe3858159560928bf53fe39e02bb2bf1f1fc8b8d7c08a",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-preflight-1ab3838a-20261015/core-1ab3838a0dc40a32973ae06cc440b210f0a9d842.tar.gz",
+      "sha256": "488a0c5b7fbafb0a3c673957fcd1e0ca5ceacf73dd4da5361835c29bd7b03e83",
+      "size": 307511287
+    },
+    {
+      "component": "bridge",
+      "tag": "native-candidate-bridge:1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+      "manifest_digest": "sha256:597b99e4867fed388bfcce9b09f4ca41bbd0d17de25a65f81c791589656c2c2c",
+      "config_digest": "sha256:5738acb0c36def030432e3aeceb54474e99f2b6e8879b1fcd3fc127d4f2d9fa9",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-preflight-1ab3838a-20261015/bridge-1ab3838a0dc40a32973ae06cc440b210f0a9d842.tar.gz",
+      "sha256": "9975e570262eaea2caaf1588338cbbbdb65a36d041d7fe3370b1933d73049ea8",
+      "size": 95861092
+    },
+    {
+      "component": "bff",
+      "tag": "native-candidate-bff:1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+      "manifest_digest": "sha256:ad938ae7b8997241b84c60cc316774342e64dc23f7386ca94005d3ccbb43257a",
+      "config_digest": "sha256:435fb41d4cab784d0676c21a2ae4a514cfd7b2007823af5564a5569fc258755b",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-preflight-1ab3838a-20261015/bff-1ab3838a0dc40a32973ae06cc440b210f0a9d842.tar.gz",
+      "sha256": "e6447e1812be54423cc99dbe8f87052e7eaca08fd45028123f5afc8f2f94ee83",
+      "size": 617445706
+    }
+  ],
+  "compose": "/home/ubuntu/services/ai-gateway/deploy-preflight-1ab3838a-20261015/compose.override.1ab3838a.json",
+  "environment_changes": {
+    "sub2api": {},
+    "studio-bridge": {},
+    "studio-bff": {}
+  },
+  "runtime_files": {
+    "result": "PASS",
+    "time": "2026-10-14T20:22:05.042615+00:00",
+    "checks": [
+      {
+        "container": "sub2api",
+        "path": "/app/sub2api",
+        "sha256": "c3b8c1fa0c55e2cbef7e97ea51422542a9fd32a3681a01bf0623c3ad1e259a96",
+        "bytes": 135975072
+      },
+      {
+        "container": "studio-v2-bridge",
+        "path": "/app/studio-bridge",
+        "sha256": "2aa7aa5113bc13bf47d90481b9002826418c603e41a202046fa76be025865c2a",
+        "bytes": 37388448
+      },
+      {
+        "container": "studio-v2-bff",
+        "path": "/app/studio/bff/image-server.mjs",
+        "sha256": "7a42aef466f3ddaa8767920d6e8616a8f05b130c8de28d3539d1447da1fc3123",
+        "bytes": 11901
+      }
+    ]
+  },
+  "assets": {
+    "result": "PASS",
+    "time": "2026-10-14T20:24:24.661737+00:00",
+    "checks": [
+      {
+        "path": "/assets/index-cIeRDn5a.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index-cIeRDn5a.js",
+          "sha256": "c4c6e7400cbbb6d7a9daad0ebbc9a2692c7e2ab6a7b4a43f8c9f9a68574d245d",
+          "bytes": 194144,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index-cIeRDn5a.js",
+          "sha256": "c4c6e7400cbbb6d7a9daad0ebbc9a2692c7e2ab6a7b4a43f8c9f9a68574d245d",
+          "bytes": 194144,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eaddcb569e8-SEA",
+            "Age": "5521"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-vue-DeI_Ip_v.js",
+          "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+          "bytes": 113799,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-vue-DeI_Ip_v.js",
+          "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+          "bytes": 113799,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eae5aa679fd-SEA",
+            "Age": "67308"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-i18n-Sz9OaMvZ.js",
+          "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+          "bytes": 63323,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-i18n-Sz9OaMvZ.js",
+          "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+          "bytes": 63323,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eaed9543167-SEA",
+            "Age": "67308"
+          }
+        }
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index-BiOI67aw.css",
+          "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+          "bytes": 293040,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index-BiOI67aw.css",
+          "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+          "bytes": 293040,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eaf4d63df18-SEA",
+            "Age": "33570"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-misc-CeAxBZ0e.js",
+          "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+          "bytes": 279017,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-misc-CeAxBZ0e.js",
+          "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+          "bytes": 279017,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eafcc206e84-SEA",
+            "Age": "67308"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-misc-DB0Q8XAf.css",
+          "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+          "bytes": 3938,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-misc-DB0Q8XAf.css",
+          "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+          "bytes": 3938,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eb03d6e7536-SEA",
+            "Age": "67308"
+          }
+        }
+      },
+      {
+        "path": "/assets/index-DDfo002m.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index-DDfo002m.js",
+          "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+          "bytes": 413892,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index-DDfo002m.js",
+          "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+          "bytes": 413892,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eb0a9216dc4-SEA",
+            "Age": "90469"
+          }
+        }
+      },
+      {
+        "path": "/assets/VideoStudioView-ClyDrYlp.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/VideoStudioView-ClyDrYlp.js",
+          "sha256": "1aaf990b87a4ff16108a2a51f17f0872536f9d99f0851ddfe9b2d2ce88c79d48",
+          "bytes": 44408,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/VideoStudioView-ClyDrYlp.js",
+          "sha256": "1aaf990b87a4ff16108a2a51f17f0872536f9d99f0851ddfe9b2d2ce88c79d48",
+          "bytes": 44408,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4a94eb13a8a4855-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/VideoStudioView-DmaQAYtM.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/VideoStudioView-DmaQAYtM.css",
+          "sha256": "af4910cb4a4fb38946ca0f544a13298c08572b7241a2584da10c30ae10887165",
+          "bytes": 21867,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/VideoStudioView-DmaQAYtM.css",
+          "sha256": "af4910cb4a4fb38946ca0f544a13298c08572b7241a2584da10c30ae10887165",
+          "bytes": 21867,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4a94eb1da3e76ce-SEA",
+            "Age": "67037"
+          }
+        }
+      }
+    ]
+  },
+  "preflight_runs": [
+    {
+      "wall_ms": 1444,
+      "report": {
+        "metrics": {
+          "accounts_validated": 1,
+          "specs_checked": 1870,
+          "timings_ms": {
+            "eligibility_and_storage": 6,
+            "final_dependencies": 32,
+            "initial_dependencies": 45,
+            "native_quotes": 768,
+            "published_validation": 108,
+            "spec_compilation": 229,
+            "total": 1190
+          }
+        },
+        "media": "image",
+        "pass": true,
+        "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+        "checks": [
+          {
+            "code": "billing_eligibility",
+            "pass": true
+          },
+          {
+            "code": "private_result_storage",
+            "pass": true
+          },
+          {
+            "code": "published_specs",
+            "account_id": 77,
+            "pass": true
+          },
+          {
+            "code": "spec_compilation_and_assets",
+            "account_id": 77,
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 77,
+            "path": "text",
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 77,
+            "path": "edit",
+            "pass": true
+          }
+        ],
+        "checked_at": "2026-10-14T20:21:49.725744189Z"
+      }
+    },
+    {
+      "wall_ms": 1300,
+      "report": {
+        "metrics": {
+          "accounts_validated": 1,
+          "specs_checked": 1870,
+          "timings_ms": {
+            "eligibility_and_storage": 4,
+            "final_dependencies": 22,
+            "initial_dependencies": 39,
+            "native_quotes": 664,
+            "published_validation": 99,
+            "spec_compilation": 221,
+            "total": 1052
+          }
+        },
+        "media": "image",
+        "pass": true,
+        "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+        "checks": [
+          {
+            "code": "billing_eligibility",
+            "pass": true
+          },
+          {
+            "code": "private_result_storage",
+            "pass": true
+          },
+          {
+            "code": "published_specs",
+            "account_id": 77,
+            "pass": true
+          },
+          {
+            "code": "spec_compilation_and_assets",
+            "account_id": 77,
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 77,
+            "path": "text",
+            "pass": true
+          },
+          {
+            "code": "native_quote",
+            "account_id": 77,
+            "path": "edit",
+            "pass": true
+          }
+        ],
+        "checked_at": "2026-10-14T20:23:55.123782628Z"
+      }
+    }
+  ],
+  "customer_quotes": [
+    {
+      "path": "text",
+      "status": 200,
+      "ms": 544,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "contract": "published_image_binding_v1",
+      "sale_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "quantity": 1,
+      "quote_issued": true
+    },
+    {
+      "path": "edit",
+      "status": 200,
+      "ms": 554,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 1,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "contract": "published_image_binding_v1",
+      "sale_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "quantity": 1,
+      "quote_issued": true
+    }
+  ],
+  "admin_states": {
+    "image": {
+      "media": "image",
+      "mode": "managed-v1",
+      "requested_enabled": false,
+      "effective_enabled": false,
+      "revision": "",
+      "reason": "closed"
+    },
+    "video": {
+      "media": "video",
+      "mode": "managed-v1",
+      "requested_enabled": false,
+      "effective_enabled": false,
+      "revision": "",
+      "reason": "closed"
+    }
+  },
+  "runtime_paid_state": {
+    "image": {
+      "mode": "managed-v1",
+      "paid_enabled": false
+    },
+    "video": {
+      "mode": "managed-v1",
+      "paid_enabled": false
+    },
+    "sidecars": {
+      "bridge": {
+        "version": "managed-v1",
+        "ready": true,
+        "core_loopback": true,
+        "image_group": 31,
+        "video_group": 31
+      },
+      "bff": {
+        "version": "managed-v1",
+        "ready": true,
+        "image_ready": true,
+        "video_ready": true,
+        "assets": true
+      }
+    },
+    "both_disabled": true
+  },
+  "protection": {
+    "all_account_configs_unchanged": true,
+    "business_before": {
+      "user_funds": "275ff4c82129a8210d74ac30ece54130",
+      "all_accounts": "0b1ca777ee31e1e122937d0c1e3535f5",
+      "usage_last_id": 24,
+      "account77_media": "214806054447d07eda0deeeedab8ee77",
+      "video_last_update": "2026-10-03T18:29:50.979162+08:00",
+      "account77_credentials": "c8419cece0857d29544fb4ab41f556f5"
+    },
+    "business_after": {
+      "user_funds": "275ff4c82129a8210d74ac30ece54130",
+      "all_accounts": "0b1ca777ee31e1e122937d0c1e3535f5",
+      "usage_last_id": 24,
+      "account77_media": "214806054447d07eda0deeeedab8ee77",
+      "video_last_update": "2026-10-03T18:29:50.979162+08:00",
+      "account77_credentials": "c8419cece0857d29544fb4ab41f556f5"
+    },
+    "account77_product_count": 1,
+    "account77_sales_preserved": true,
+    "migration_ledger": {
+      "count": 293,
+      "sha256": "d6a8f75d4ae22b8a460a31de549f4865b710699f18a233d62408491b61f5631f"
+    },
+    "migration_executed": false,
+    "managed_records_unchanged": true,
+    "managed_records_count": 0
+  },
+  "health": {
+    "core": "200",
+    "bridge": "200",
+    "bff": "200"
+  },
+  "rollback": {
+    "performed": false
+  },
+  "rollback_assets": "/home/ubuntu/services/ai-gateway/deploy-preflight-1ab3838a-20261015/before",
+  "screenshots": "Private local production screenshots; not uploaded to public repository because they contain administrator identity and account data.",
+  "supplier_generation_requests_performed": 0,
+  "paid_enable_actions_performed": 0,
+  "customer_quote_records": "Only authorized non-paid local quote records and preflight storage checks; no settlement mutation."
+}
