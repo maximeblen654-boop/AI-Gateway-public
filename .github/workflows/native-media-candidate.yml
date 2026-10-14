@@ -10,7 +10,7 @@ on:
         required: true
         default: build
         type: choice
-        options: [build, accept-existing]
+        options: [build, accept-existing, admin-ui-review, admin-candidate]
       build_source_sha:
         description: 'exact runtime source SHA; empty uses this workflow commit'
         required: false
@@ -26,7 +26,7 @@ on:
         required: false
         type: choice
         default: video
-        options: [video, draft-diagnostics, draft-management, studio-workspace, studio-workspace-artifact]
+        options: [video, draft-diagnostics, draft-management, studio-workspace, studio-workspace-artifact, admin-media-candidate-artifact]
       candidate_run_id:
         description: 'existing candidate run id (accept-existing only)'
         required: false
@@ -130,7 +130,10 @@ jobs:
   accept-existing:
     if: >-
       github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
-      github.ref == 'refs/heads/codex/studio-native-media' &&
+      (github.ref == 'refs/heads/codex/studio-native-media' ||
+       (github.ref == 'refs/heads/codex/admin-media-design-review' &&
+        github.event.inputs.acceptance_scenario == 'admin-media-candidate-artifact' &&
+        github.event.inputs.candidate_source_sha == '15d09689abc0b7e07269692d50e78f83859d1fb6')) &&
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.mode == 'accept-existing'
     runs-on: ubuntu-24.04
@@ -165,7 +168,7 @@ jobs:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
           NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
         run: |
-          if [ "$NATIVE_ACCEPTANCE_SCENARIO" = studio-workspace-artifact ]; then
+          if [ "$NATIVE_ACCEPTANCE_SCENARIO" = studio-workspace-artifact ] || [ "$NATIVE_ACCEPTANCE_SCENARIO" = admin-media-candidate-artifact ]; then
             node tools/native-media-e2e/accept-workspace-artifact.mjs "$RUNNER_TEMP/native-existing-artifact"
           else
             node tools/native-media-e2e/accept-existing.mjs "$RUNNER_TEMP/native-existing-artifact"
@@ -179,3 +182,75 @@ jobs:
           compression-level: 6
           path: |
             ${{ runner.temp }}/native-existing-acceptance-output/*
+
+  admin-ui-review:
+    if: >-
+      github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
+      github.ref == 'refs/heads/codex/admin-media-design-review' &&
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.mode == 'admin-ui-review' || github.event.inputs.mode == 'admin-candidate')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      NATIVE_ACCEPTANCE_SCENARIO: admin-ui-review
+      NATIVE_EXPORT_CANDIDATE: ${{ github.event.inputs.mode == 'admin-candidate' }}
+      NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.build_source_sha || github.sha }}
+      NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.review-runtime
+      NATIVE_REUSE_SOURCE_DIR: ${{ github.workspace }}/.candidate-reuse-source
+      NATIVE_REUSE_ARTIFACT_DIR: ${{ github.workspace }}/.candidate-reuse-artifact
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.build_source_sha || github.sha }}
+          path: .review-runtime
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: b2fcdac93afa6ae194ee81801a9b37813f8f39eb
+          path: .candidate-reuse-source
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+      - uses: docker/setup-buildx-action@v3
+      - name: Reuse existing sidecars in the isolated stack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 38443205417 --repo "$GITHUB_REPOSITORY" --name native-media-candidate-b2fcdac93afa6ae194ee81801a9b37813f8f39eb --dir "$NATIVE_REUSE_ARTIFACT_DIR"
+      - name: Build the exact Core; preserve existing b2 sidecars
+        id: build
+        run: node tools/native-media-e2e/candidate.mjs build
+      - name: Prepare existing browser harness
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          pnpm --dir frontend install --frozen-lockfile
+      - name: Actual Vue and isolated backend integration
+        run: node tools/native-media-e2e/candidate.mjs verify
+      - name: Export the candidate without rebuilding sidecars
+        if: ${{ !cancelled() && github.event.inputs.mode == 'admin-candidate' && steps.build.outcome == 'success' }}
+        run: node tools/native-media-e2e/candidate.mjs export
+      - name: Preserve small review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-implementation-review-${{ github.sha }}
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/native-candidate-output/*.json
+            ${{ runner.temp }}/native-candidate-output/*.png
+
+      - name: Preserve one complete candidate
+        if: ${{ !cancelled() && github.event.inputs.mode == 'admin-candidate' && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-media-candidate-${{ github.event.inputs.build_source_sha || github.sha }}
+          retention-days: 14
+          compression-level: 0
+          path: ${{ runner.temp }}/native-candidate-output/*

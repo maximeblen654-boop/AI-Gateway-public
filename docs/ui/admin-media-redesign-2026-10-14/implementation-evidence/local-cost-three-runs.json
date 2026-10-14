@@ -1,0 +1,109 @@
+{
+  "scope": "Formal Vue with Axios fixture, not backend integration",
+  "stats": {
+    "startTime": "2026-10-14T06:05:52.247Z",
+    "duration": 41035.977,
+    "expected": 12,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "checks": [
+    {
+      "title": "cost estimate 1440 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 1440 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 light: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "cost estimate 390 dark: optional, local only, price preserved",
+      "repeat": 0,
+      "status": "expected",
+      "results": [
+        "passed"
+      ]
+    }
+  ]
+}

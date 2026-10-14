@@ -60,7 +60,7 @@ describe('five-step product wizard', () => {
     expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('5 个价格')
     expect(wrapper.props('product').pricing_rules.every(r => r.sale_price === null)).toBe(true)
     await wrapper.get('[data-test="price-0"]').setValue('0')
-    expect(wrapper.get('.mw-price-state').text()).toContain('明确免费')
+    expect(wrapper.get('.mw-price-state').text()).toContain('需要修正')
     await wrapper.get('[data-test="price-0"]').setValue('-1')
     expect(wrapper.get('[data-test="price-0"]').attributes('aria-invalid')).toBe('true')
     await wrapper.get('[data-test="price-0"]').setValue('')
@@ -192,3 +192,26 @@ describe('reference limits', () => {
     wrapper.unmount()
   })
 })
+
+ it('keeps zero input visible but rejects free image and video quotes', async () => {
+  const product = productFixture(); product.pricing_rules = [{ match: {}, sale_price: { amount: '0', currency: 'CNY', billing_mode: 'per_request' } }]
+  const wrapper = editor(product)
+  expect(wrapper.get('.mw-price-state').text()).toContain('需要修正')
+  expect(wrapper.get('[data-test="pricing-preview"]').text()).not.toContain('总价：0 CNY')
+  await wrapper.setProps({ product: { ...product, media_type: 'video', capabilities: { ...product.capabilities, count: { min: 1, max: 1 } } } })
+  expect(wrapper.get('[data-test="price-0"]').attributes('aria-invalid')).toBe('true')
+  expect(wrapper.get('.mw-price-state').text()).not.toContain('明确免费')
+  expect(wrapper.get('[data-test="pricing-preview"]').text()).not.toContain('总价：0 CNY')
+  expect(wrapper.get('[data-test="wizard-page-4"]').text()).toContain('不能发布或生成')
+  wrapper.unmount()
+ })
+ it('keeps the full capability domain beyond 64 preview samples', async () => {
+  const product = productFixture(); product.capabilities.resolutions = Array.from({ length: 9 }, (_, i) => `${i + 1}K`)
+  product.capabilities.aspect_ratios = ['1:1','2:1','3:1','4:1','5:1','6:1','7:1','8:1']
+  const wrapper = editor(product)
+  await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
+  await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(true)
+  expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('72 个价格')
+  expect(wrapper.props('product').pricing_rules).toHaveLength(72)
+  wrapper.unmount()
+ })

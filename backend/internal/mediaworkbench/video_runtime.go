@@ -39,14 +39,7 @@ type ResolvedVideoOffer struct {
 }
 
 func ValidateVideoSalePrice(p Price) error {
-	if p.Currency != "CNY" || p.BillingMode != "per_request" {
-		return ErrRuntimeBinding
-	}
-	n, err := DecimalAmount(p.Amount)
-	if err != nil || !n.IsPositive() {
-		return ErrRuntimeBinding
-	}
-	return nil
+	return ValidateMediaSalePrice(p)
 }
 
 func PublishedVideoOffers(a *Account) []Offer {

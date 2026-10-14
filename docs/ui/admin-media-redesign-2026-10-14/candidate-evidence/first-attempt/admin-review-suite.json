@@ -1,0 +1,9 @@
+{
+  "failures": [
+    {
+      "scenario": "positive-retail-boundaries",
+      "error": "Command failed: /opt/hostedtoolcache/node/24.21.0/x64/bin/node tools/native-media-e2e/positive-retail.cjs /home/runner/work/_temp/native-media-20261012"
+    }
+  ],
+  "positive_retail": "run"
+}

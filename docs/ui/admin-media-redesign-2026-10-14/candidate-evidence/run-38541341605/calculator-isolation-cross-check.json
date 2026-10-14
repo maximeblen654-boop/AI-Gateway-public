@@ -1,0 +1,37 @@
+{
+  "pass": true,
+  "forbidden_calculator_fields": [
+    "consumption",
+    "credits",
+    "purchase"
+  ],
+  "checked_actual_candidate_records": [
+    "persisted_products",
+    "published_offers",
+    "native-customer-edit-geometry-2k.json:quote",
+    "native-customer-edit-geometry-2k.json:submit",
+    "native-customer-edit-geometry-2k.json:wire-requests",
+    "native-customer-image-geometry-1k.json:quote",
+    "native-customer-image-geometry-1k.json:submit",
+    "native-customer-image-geometry-1k.json:wire-requests",
+    "native-customer-image-geometry-2k-draft.json:quote",
+    "native-customer-image-geometry-2k-draft.json:submit",
+    "native-customer-image-geometry-2k-draft.json:wire-requests",
+    "native-customer-image-geometry-2k-mapping.json:quote",
+    "native-customer-image-geometry-2k-mapping.json:submit",
+    "native-customer-image-geometry-2k-mapping.json:wire-requests",
+    "native-customer-image-geometry-2k-published.json:quote",
+    "native-customer-image-geometry-2k-published.json:submit",
+    "native-customer-image-geometry-2k-published.json:wire-requests",
+    "native-customer-image-geometry-2k-routing.json:quote",
+    "native-customer-image-geometry-2k-routing.json:submit",
+    "native-customer-image-geometry-2k-routing.json:wire-requests",
+    "native-customer-image-geometry-4k.json:quote",
+    "native-customer-image-geometry-4k.json:submit",
+    "native-customer-image-geometry-4k.json:wire-requests",
+    "native-customer-video-compatible.json:quote",
+    "native-customer-video-compatible.json:submit",
+    "native-customer-video-compatible.json:wire-requests"
+  ],
+  "note": "Complements UI save-payload assertion and existing local-storage identity/spec isolation tests; billing Account cost fields remain legitimate."
+}

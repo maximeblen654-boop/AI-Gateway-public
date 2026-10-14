@@ -1,0 +1,32 @@
+{
+  "path": "D:\\AI-Gateway-candidate-15d09689a-final",
+  "verified_at_utc": "2026-10-14T09:38:11.215409+00:00",
+  "manifest_sha256": "9741cb3cec6406354bd1ec829035c9a7746063f8ea802d3ed0707d7a51c26086",
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "acceptance_script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "images": [
+    {
+      "component": "core",
+      "file": "core-15d09689abc0b7e07269692d50e78f83859d1fb6.tar.gz",
+      "bytes": 61950821,
+      "sha256": "2b575e179084d58af2c8b63219ec9b048d1193fd9d9a39292d33cdbca8c66e0e",
+      "cloud_verified_image_id": "sha256:c1496ec64f21dc2a4d7539734f36aa07579feab7f00eba8790bb3620cf4a35a3"
+    },
+    {
+      "component": "bridge",
+      "file": "bridge-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "bytes": 19126414,
+      "sha256": "30ba9310b18f1da057d9d7515d5d4eddea15c32077c234c848a2cbf36c9b4b35",
+      "cloud_verified_image_id": "sha256:dd01aa29e152f589679e5065037459240aeb8ddfe3ec853c16033006fe67acda"
+    },
+    {
+      "component": "bff",
+      "file": "bff-b2fcdac93afa6ae194ee81801a9b37813f8f39eb.tar.gz",
+      "bytes": 120269341,
+      "sha256": "29a1da9fa2ee0229cc352a0bbda2dbaa11735f80f291f65dc7f36a8dac6402f7",
+      "cloud_verified_image_id": "sha256:e498b97225bfc15e286af26bff30ec5c8d84526adfdbcd8231ebf7bad50e3f21"
+    }
+  ],
+  "docker_loaded_locally": false,
+  "rebuilt": false
+}

@@ -17,8 +17,8 @@ func validProduct() Product {
 	return Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true,
 		Capabilities:  Capabilities{Resolutions: []string{"1K"}, AspectRatios: []string{"1:1", "16:9"}, Count: Range{1, 2}, References: References{Image: Range{0, 4}, TotalMax: 4}},
 		AdapterConfig: ImageConfig{SizeMappings: []SizeMapping{{"1K", "1:1", "1024x1024"}, {"1K", "16:9", "1536x864"}}},
-		PricingRules: []PricingRule{{Match: Match{References: &References{TotalMax: 0}}, SalePrice: &Price{Amount: "0", Currency: "USD", BillingMode: "per_request"}},
-			{Match: Match{References: &References{Image: Range{1, 4}, TotalMax: 4}}, SalePrice: &Price{Amount: "0.100000000000000001", Currency: "USD", BillingMode: "per_request"}}}}
+		PricingRules: []PricingRule{{Match: Match{References: &References{TotalMax: 0}}, SalePrice: &Price{Amount: "0.01", Currency: "CNY", BillingMode: "per_request"}},
+			{Match: Match{References: &References{Image: Range{1, 4}, TotalMax: 4}}, SalePrice: &Price{Amount: "0.10", Currency: "CNY", BillingMode: "per_request"}}}}
 }
 func validatorFixture(t *testing.T) (*Service, *memoryRepo) {
 	t.Helper()
@@ -400,9 +400,9 @@ func TestValidatorExcludesDeniedPricingCombination(t *testing.T) {
 	p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings,
 		SizeMapping{"2K", "1:1", "2048x2048"}, SizeMapping{"2K", "16:9", "2560x1440"})
 	p.PricingRules = []PricingRule{
-		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.10", Currency: "USD", BillingMode: "per_request"}},
-		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"high"}}, SalePrice: &Price{Amount: "0.20", Currency: "USD", BillingMode: "per_request"}},
-		{Match: Match{Resolution: []string{"2K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.30", Currency: "USD", BillingMode: "per_request"}},
+		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.10", Currency: "CNY", BillingMode: "per_request"}},
+		{Match: Match{Resolution: []string{"1K"}, Quality: []string{"high"}}, SalePrice: &Price{Amount: "0.20", Currency: "CNY", BillingMode: "per_request"}},
+		{Match: Match{Resolution: []string{"2K"}, Quality: []string{"standard"}}, SalePrice: &Price{Amount: "0.30", Currency: "CNY", BillingMode: "per_request"}},
 	}
 	v, offers := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
 	if !v.PublishReady || len(offers) != 3 {

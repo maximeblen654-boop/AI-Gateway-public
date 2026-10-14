@@ -1,0 +1,69 @@
+[
+  {
+    "run": 38523320929,
+    "source_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38523320929",
+    "jobs": [
+      {
+        "name": "shell",
+        "conclusion": "success"
+      },
+      {
+        "name": "golangci-lint",
+        "conclusion": "success"
+      },
+      {
+        "name": "release-helpers",
+        "conclusion": "success"
+      },
+      {
+        "name": "test",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "run": 38523320928,
+    "source_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38523320928",
+    "jobs": [
+      {
+        "name": "backend-security",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend-security",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "run": 38523316345,
+    "source_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38523316345",
+    "jobs": [
+      {
+        "name": "admin-ui-review",
+        "conclusion": "success"
+      },
+      {
+        "name": "candidate",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "accept-existing",
+        "conclusion": "skipped"
+      }
+    ]
+  }
+]

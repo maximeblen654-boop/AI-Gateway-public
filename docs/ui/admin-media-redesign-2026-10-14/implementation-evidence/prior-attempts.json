@@ -1,0 +1,10 @@
+{
+  "scope": "Nonproduction integration harness iterations; no runtime component edits after 64cc40c4f06dbedd51f748fb9a52a83e99256479",
+  "attempts": [
+    {"run": 38520410066, "result": "FAIL", "reason": "New customer browser used default English locale while harness selected Chinese login labels", "runtime_scenarios_passed": ["image 1K", "edit 2K", "image 4K", "single compatible video"], "fix_commit": "ffcc2e621f5cda8c5fbe8e1231c0c316bb001035"},
+    {"run": 38521259775, "result": "FAIL", "reason": "Catalog-only check incorrectly required model editing to be enabled on a recovered completed task", "fix_commit": "713a65ae94ecc1215b92a4fa798960b6846f7647"},
+    {"run": 38522191496, "result": "FAIL", "reason": "Mapping and routing cases reused the owner whose preceding publish-change task remained unknown and correctly locked; independent cases did not reach quote creation", "passed": ["formal Vue admin", "free image", "zero video filtered", "draft preserves frozen plan", "published change blocked before generation and billing"], "fix": "Separate synthetic users through existing admin/user/key APIs; preserve all rejected tasks"},
+    {"run": 38523154923, "result": "CANCELLED_BEFORE_ACCEPTANCE", "reason": "Static follow-up found onboarding key also needed the new synthetic user identity; cancelled before acceptance and corrected that test-only key", "fix_commit": "f246974afaedf5a3d143bde57cee4378ddf87372"}
+  ],
+  "final_result": "See the final run acceptance.json and contract-cross-check.json; earlier partial evidence is not an overall PASS"
+}

@@ -27,7 +27,7 @@ func TestMediaPublishPostgresDependenciesAndReadiness(t *testing.T) {
 	svc := mediaworkbench.NewService(repo)
 	d, err := svc.Initialize(ctx, a.ID, []string{"image"})
 	require.NoError(t, err)
-	product := mediaworkbench.Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-site", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 1}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.100000000000000001", Currency: "USD", BillingMode: "per_request"}}}}
+	product := mediaworkbench.Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-site", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 1}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.10000001", Currency: "CNY", BillingMode: "per_request"}}}}
 	d, err = svc.SaveDraft(ctx, a.ID, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
 	require.NoError(t, err)
 	require.Equal(t, "PASS", d.Config.Validation.Status)

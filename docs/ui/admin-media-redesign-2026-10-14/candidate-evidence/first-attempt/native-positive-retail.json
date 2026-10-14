@@ -1,0 +1,98 @@
+{
+  "checks": [
+    {
+      "kind": "image",
+      "amount": null,
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    },
+    {
+      "kind": "image",
+      "amount": "0",
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    },
+    {
+      "kind": "image",
+      "amount": "0.00000000",
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    },
+    {
+      "kind": "image",
+      "amount": "0.01",
+      "publish_status": 200,
+      "quote_status": 200,
+      "price": {
+        "amount": "0.01",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "kind": "image",
+      "amount": "1",
+      "publish_status": 200,
+      "quote_status": 200,
+      "price": {
+        "amount": "1",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "kind": "image",
+      "amount": "9.9",
+      "publish_status": 200,
+      "quote_status": 200,
+      "price": {
+        "amount": "9.9",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "kind": "image",
+      "legacy_zero_catalog_excluded": true,
+      "quote_status": 409,
+      "generate_status": 409,
+      "no_new_quote": true
+    },
+    {
+      "kind": "image",
+      "generation_requests": 0,
+      "ledger_changes": 0
+    },
+    {
+      "kind": "video",
+      "amount": null,
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    },
+    {
+      "kind": "video",
+      "amount": "0",
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    },
+    {
+      "kind": "video",
+      "amount": "0.00000000",
+      "draft_saved": true,
+      "db_equal": true,
+      "publish_status": 422,
+      "published_unchanged": true
+    }
+  ],
+  "error": "{\"status\":409,\"body\":{\"error\":\"video_binding_unavailable\"}}\n\n409 !== 200\n"
+}

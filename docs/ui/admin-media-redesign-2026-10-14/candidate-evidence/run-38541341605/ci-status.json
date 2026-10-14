@@ -1,0 +1,90 @@
+[
+  {
+    "run": 38541319551,
+    "source_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38541319551",
+    "jobs": [
+      {
+        "name": "shell",
+        "conclusion": "success"
+      },
+      {
+        "name": "test",
+        "conclusion": "success"
+      },
+      {
+        "name": "release-helpers",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend",
+        "conclusion": "success"
+      },
+      {
+        "name": "golangci-lint",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "run": 38541319603,
+    "source_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38541319603",
+    "jobs": [
+      {
+        "name": "backend-security",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend-security",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "run": 38540092049,
+    "source_sha": "debd2301257991ec3cf383430720269f33cc11c4",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38540092049",
+    "jobs": [
+      {
+        "name": "frontend",
+        "conclusion": "success"
+      },
+      {
+        "name": "release-helpers",
+        "conclusion": "success"
+      },
+      {
+        "name": "golangci-lint",
+        "conclusion": "success"
+      },
+      {
+        "name": "test",
+        "conclusion": "success"
+      },
+      {
+        "name": "shell",
+        "conclusion": "success"
+      }
+    ]
+  },
+  {
+    "run": 38539782940,
+    "source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+    "conclusion": "success",
+    "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38539782940",
+    "jobs": [
+      {
+        "name": "backend-security",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend-security",
+        "conclusion": "success"
+      }
+    ]
+  }
+]

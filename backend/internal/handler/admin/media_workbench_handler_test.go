@@ -107,7 +107,7 @@ func TestMediaPublishHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := mediaworkbench.Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 1}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "1.00", Currency: "USD", BillingMode: "per_request"}}}}
+	p := mediaworkbench.Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 1}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "1.00", Currency: "CNY", BillingMode: "per_request"}}}}
 	d, err = svc.SaveDraft(context.Background(), 7, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,323 @@
+{
+  "scope": "Review evidence only; no production candidate",
+  "tested_source_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+  "workflow_run": 38523316345,
+  "artifact_id": 11874757651,
+  "artifact_expires_at": "2026-10-28T06:47:09Z",
+  "offline_checker": {
+    "path": "tools/native-media-e2e/check-admin-review.mjs",
+    "sha256": "f4036f491533dfc1d7f93ae6cf60eec472ffeec425d3a756d5005818fc9d2082"
+  },
+  "files": [
+    {
+      "path": "ci-security-summary.json",
+      "bytes": 1673,
+      "sha256": "d054b9a6eecc1a4bcfa7add779291d59fd72da397b1937303d40996c034bce29"
+    },
+    {
+      "path": "local-cost-three-runs.json",
+      "bytes": 2474,
+      "sha256": "31284578eba645cb4989fadc1cd66b0e5f95a86b528ee6d40d7cfa1fe57e6317"
+    },
+    {
+      "path": "local-formal-vue.json",
+      "bytes": 3345,
+      "sha256": "47b2d8ce84183c26f5606f8c13982178a3bed5766ee1424f7cc77b3e2595bb39"
+    },
+    {
+      "path": "prior-attempts.json",
+      "bytes": 1567,
+      "sha256": "5118637c79c2e471e0be65c011543044f8a9205c106017031f8c054cc52af0a4"
+    },
+    {
+      "path": "run-38523316345/acceptance.json",
+      "bytes": 1757,
+      "sha256": "ef3aebbee80c323c1144805c5420664455ce12456029135ab47811a7f77809f2"
+    },
+    {
+      "path": "run-38523316345/admin-review-suite.json",
+      "bytes": 43,
+      "sha256": "9045fe398434cc7e3df0e4d43a1e4b9e59b74fe76163f51fd139d33b3ac8ea01"
+    },
+    {
+      "path": "run-38523316345/contract-cross-check.json",
+      "bytes": 4858,
+      "sha256": "cf3303b30377444f5339d552537e9a201116a103261f81d394954be349dbe336"
+    },
+    {
+      "path": "run-38523316345/core-build-metadata.json",
+      "bytes": 15826,
+      "sha256": "791e83bc0acc46e024fe1eb62823985dff0fc271389a65d8a4ddd93c49bff70e"
+    },
+    {
+      "path": "run-38523316345/native-admin-formal-1440-dark.png",
+      "bytes": 475278,
+      "sha256": "db896f22117c0e6c7e65a130434dadb198df3bdcf98effede0aba5e7e414329e"
+    },
+    {
+      "path": "run-38523316345/native-admin-formal-1440-light.png",
+      "bytes": 519764,
+      "sha256": "5bc7b90c9fd53277c0ac5ff5443b760bd060d005f5be0aeb0f5bbc13f741ffc0"
+    },
+    {
+      "path": "run-38523316345/native-admin-formal-390-dark.png",
+      "bytes": 76863,
+      "sha256": "a5ee04f1462f88fed575e6e58aa5d15bd431abd0c22532ca910f7e2db9926c8a"
+    },
+    {
+      "path": "run-38523316345/native-admin-formal-390-light.png",
+      "bytes": 74915,
+      "sha256": "e10c391385532d9360de59aa0195940413db681045b6c244d37ac7b2be67bc3b"
+    },
+    {
+      "path": "run-38523316345/native-admin-ui-review.json",
+      "bytes": 19517,
+      "sha256": "bd58859b7a1c7fd239f5d1c497293338c94456eb40dfb6dabef15bfc431baecb"
+    },
+    {
+      "path": "run-38523316345/native-artifact-edit-geometry-2k-confirmation.png",
+      "bytes": 151673,
+      "sha256": "de9907c8c251b226e6bdc296dad3727dffaecebe4fbd6a7f8d2b5d50ef209298"
+    },
+    {
+      "path": "run-38523316345/native-artifact-edit-geometry-2k-mobile.png",
+      "bytes": 63299,
+      "sha256": "a6bfef0cf1968ed3a134183b32e0835fd1e16658311d3d3d52912a39275d783f"
+    },
+    {
+      "path": "run-38523316345/native-artifact-edit-geometry-2k-result.png",
+      "bytes": 69406,
+      "sha256": "4ea01d770f1ff71d4da12da2ba7d3fa2da1c28136ce2e9b256985898b97d6da2"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-1k-confirmation.png",
+      "bytes": 140422,
+      "sha256": "572168136768f4d95bc8e3981845ef1fb80cae16ab4688d6abee16f2b52f311b"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-1k-mobile.png",
+      "bytes": 61126,
+      "sha256": "969ad54fb85329bd74e02801ac7351f94cf947843163eb981f1023a25ea16767"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-1k-result.png",
+      "bytes": 71508,
+      "sha256": "65e0ddcfe2c047ceeb7355eee86dc5b24105b11520dd0dc3982ee20dc097eb24"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-2k-confirmation.png",
+      "bytes": 141015,
+      "sha256": "397f55d70a78efb45804b26d211946627c9409029f53e0f107bb7e7d6665f95e"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-2k-mobile.png",
+      "bytes": 61829,
+      "sha256": "a2e7788f325715bfb7b9dab3aed5d9e5f819df2c6975deec82643285d094cba5"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-2k-result.png",
+      "bytes": 72270,
+      "sha256": "ecd3149d29e4ee40f84b94a9dc258f7e7146abf217e575b444ed0045f1b7ba5c"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-4k-confirmation.png",
+      "bytes": 158436,
+      "sha256": "2ffb5c443ac084edebd65e65f4aa560d9d2ed6ac6eac28bb5d064a80b6343bf1"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-4k-mobile.png",
+      "bytes": 60185,
+      "sha256": "1ca6c00bf0c6c001943de1f1d91edb53d62c8fb2db49999ae0499936a9d62f7b"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-4k-result.png",
+      "bytes": 71568,
+      "sha256": "d0b329b4539a3da19caec72812dcc57dc1d77e1909cc9071952f9dcde02cbfe1"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-free-confirmation.png",
+      "bytes": 146085,
+      "sha256": "8d97948079ca83f410af3bac44d6bbaae08f40882ee10ce78358be0a634c81e8"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-free-mobile.png",
+      "bytes": 58785,
+      "sha256": "3ff7c8a0f0cbfd6834483259b5cbb7dcaf278d76e916b5b664a65c2e7660114b"
+    },
+    {
+      "path": "run-38523316345/native-artifact-image-geometry-free-result.png",
+      "bytes": 70290,
+      "sha256": "7750e6d63ab58257e6810d4b2119d21efbcfbbcd93e0053d41b0faac27d70abb"
+    },
+    {
+      "path": "run-38523316345/native-artifact-video-compatible-confirmation.png",
+      "bytes": 147429,
+      "sha256": "ad290e2be3736940d8c92ea05f770e0778cb3fb0a347b33832c3f1c78ee64956"
+    },
+    {
+      "path": "run-38523316345/native-artifact-video-compatible-mobile.png",
+      "bytes": 58082,
+      "sha256": "263766f3ddf3f06fcb6ae8a0b20220c5b08ac10ac84e899b032912c1e57ba148"
+    },
+    {
+      "path": "run-38523316345/native-artifact-video-compatible-result.png",
+      "bytes": 74583,
+      "sha256": "8429bfacc8fe99e6e9a92296250b787580f5f21151285c1dbd3da2c1d75ee70d"
+    },
+    {
+      "path": "run-38523316345/native-customer-edit-geometry-2k.json",
+      "bytes": 40285,
+      "sha256": "dab49f07fb88bf1440332813a9bdeb3c379abfd2bbf9a44d5eff8461653252e8"
+    },
+    {
+      "path": "run-38523316345/native-customer-edit-geometry-2k.png",
+      "bytes": 69419,
+      "sha256": "9963f9a6cc5e792c1f00d7ef1811e86da462dc2b52b77291df29771f11640266"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-1k.json",
+      "bytes": 37354,
+      "sha256": "e09e1d7b16a928c83c0b9f26bd8b5b2f3462a164eb4bdfd1eb17b0f99d7cee29"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-1k.png",
+      "bytes": 71521,
+      "sha256": "198841059158476c2abf095052dcc6bfaad3a8f9f9d06717e8de2d9f52956520"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-2k-draft.json",
+      "bytes": 51537,
+      "sha256": "ef2b3bb7f802f1e56cc6319fcdc2e0cde81ada863683eb059617477d5eaec30c"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-2k-mapping.json",
+      "bytes": 30240,
+      "sha256": "66ba29dfdda7dfcdaa51c397b6ce9014fae02a5ff83261ee3b5ea1f63bb150e8"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-2k-published.json",
+      "bytes": 29068,
+      "sha256": "62fd44914be4dbf5943afe4ca5ad37a6f510a379038a74dcdf70acd52594fa74"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-2k-routing.json",
+      "bytes": 34904,
+      "sha256": "6c884488900ecec5ae158c5cc949ec6a4c1a4b7b802ea71086af3d44630424d7"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-2k.png",
+      "bytes": 72294,
+      "sha256": "00ca57a1db1e6ed5d18c7c9fc35162e11d2ea46a4b307090ad126b04a909d969"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-4k.json",
+      "bytes": 40862,
+      "sha256": "38d3b89835cafc4e792640e4f4aaccb99de2fca6dada257e7c178dab6228db7c"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-4k.png",
+      "bytes": 71581,
+      "sha256": "18091823657ce3132d9d0f61773bebc86903d0c2997fa9af7dbd64325ec33896"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-free.json",
+      "bytes": 45060,
+      "sha256": "e91e184589a499d507fa51f57a300bade4ee799433b462f5a81e9391ddf45cdd"
+    },
+    {
+      "path": "run-38523316345/native-customer-image-geometry-free.png",
+      "bytes": 70301,
+      "sha256": "191cc93a2267bb5032fd9087a0122ba3bd490064fe608f77581b9d9c64336f7d"
+    },
+    {
+      "path": "run-38523316345/native-customer-video-compatible.json",
+      "bytes": 41642,
+      "sha256": "58051ebd462fd1490a732555c3a120c8ed8efa82e313bf4bcb916446396bf9be"
+    },
+    {
+      "path": "run-38523316345/native-customer-video-compatible.png",
+      "bytes": 74593,
+      "sha256": "4b906af2bff569cdaee6edfa4e24b4d8e76b6470fcb41222c4ea6a578d3cee30"
+    },
+    {
+      "path": "run-38523316345/native-geometry-browser.json",
+      "bytes": 75952,
+      "sha256": "708fc2375b140c2ddfa67f5b8f994929ffc5294adee0168d4d5c5208a1c8fb68"
+    },
+    {
+      "path": "run-38523316345/native-geometry-dimensions-desktop.png",
+      "bytes": 693585,
+      "sha256": "c4ea555f86a949b4eb7c3221fecee54ba37d814882afc8897f895b03725b4a4d"
+    },
+    {
+      "path": "run-38523316345/native-geometry-dimensions-mobile.png",
+      "bytes": 197160,
+      "sha256": "3750546b4e1e87d16de3a2eeffea7c4734ee47691fdfd5cfd1e51a1bb189936e"
+    },
+    {
+      "path": "run-38523316345/native-geometry-prices-desktop.png",
+      "bytes": 742053,
+      "sha256": "e6f5a06cc32ee24e946f0861f156d0cea4ae697bc55803c485decbc8b2611a66"
+    },
+    {
+      "path": "run-38523316345/native-geometry-review-desktop.png",
+      "bytes": 1055080,
+      "sha256": "44e7fcf2415436dbde8031efeb1651753ca4a5231ee54eb91fbae707177b9790"
+    },
+    {
+      "path": "run-38523316345/native-geometry-same-product-selector.png",
+      "bytes": 664506,
+      "sha256": "39b37e3dc89a6057f6ac35a3fab66bdacb24e8b8876be63ed57306ca25220922"
+    },
+    {
+      "path": "run-38523316345/native-supplier-state.json",
+      "bytes": 12243,
+      "sha256": "b09f72dd78e06efe36080b8f1e4de9ffc74e873ae8b684a37c90870d92a92d89"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-browser.json",
+      "bytes": 9187,
+      "sha256": "28379f90101bdfa5577b95162c7cecb5f9e0eb2aa6646c552d9e2d757124bd1c"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-dimensions-desktop.png",
+      "bytes": 746429,
+      "sha256": "49121842f621319753f06ad6f65eb49ae8717778d73931624a8e861239dedc21"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-dimensions-mobile.png",
+      "bytes": 211141,
+      "sha256": "03e18fc01646547f6e5f1f3e3289ebb3c8435b975d6bd0bd304041704cf6edef"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-prices-desktop.png",
+      "bytes": 670209,
+      "sha256": "ca9028f8a175572a11f1ac2d5f70442aadf5197ff91b8dd77f19b9bec25ef291"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-review-desktop.png",
+      "bytes": 1045385,
+      "sha256": "16c88170dba8d1a1a5a01c7b3a72cd02d434ef3aecc37886bad88912405f147c"
+    },
+    {
+      "path": "run-38523316345/native-video-compatible-same-product-selector.png",
+      "bytes": 688395,
+      "sha256": "38d4e8ca19af0f4dccd2e09a4ed6a131c3611244f5a1b57cf5a82c6c3745b570"
+    },
+    {
+      "path": "run-38523316345/reuse-proof.json",
+      "bytes": 1418,
+      "sha256": "f85c0fdd7cd77791e648ad268769c07db93ba24e32e563129503857510456633"
+    },
+    {
+      "path": "run-38523316345/runtime-files.json",
+      "bytes": 830,
+      "sha256": "2f4ab413e8a732db4f5955c3d199999388b87db36ac4907ff99f68665a070542"
+    },
+    {
+      "path": "visual-review.md",
+      "bytes": 1979,
+      "sha256": "4d6db0afdaadd84af476c4a7bdf82a1c018de12106d38d6a0235278e3fe9d843"
+    }
+  ]
+}

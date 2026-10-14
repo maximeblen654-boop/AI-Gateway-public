@@ -1,0 +1,47 @@
+{
+  "runtime_source_sha": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "tested_by_script_sha": "5c8ee1d4af6fd4e4ea6686e43332049cc0aca218",
+  "runtime_unchanged": true,
+  "changed_test_and_harness_only": [
+    ".github/workflows/native-media-candidate.yml",
+    "backend/internal/handler/admin/media_workbench_handler_test.go",
+    "backend/internal/repository/media_config_repo_integration_test.go",
+    "backend/internal/service/studio_video_runtime_test.go",
+    "tools/native-media-e2e/accept-workspace-artifact.mjs",
+    "tools/native-media-e2e/positive-retail.cjs"
+  ],
+  "equal_objects": [
+    {
+      "path": "frontend/src",
+      "object": "5e84dbaff5c4cf775a4130e2640e41f3a291f8f8"
+    },
+    {
+      "path": "studio",
+      "object": "4bc6e6ffcd16c29b6cb15df96ab1ee65c2932562"
+    },
+    {
+      "path": "deploy/studio",
+      "object": "4a3b3f86e8578754d980d5dd3c5f52ec1886ed13"
+    },
+    {
+      "path": "Dockerfile",
+      "object": "c50c57d4c9ae0f70d2c483cc0b65aa5fcd9aca54"
+    },
+    {
+      "path": "backend/go.mod",
+      "object": "3c147c52013c09891f1292454f68d6d3ff99b4f8"
+    },
+    {
+      "path": "backend/go.sum",
+      "object": "5870b50097539c6fa180db54904d23d67a88214d"
+    },
+    {
+      "path": "frontend/pnpm-lock.yaml",
+      "object": "8ffff7bd06484d3e0a04cd8403977a65fab6e21f"
+    },
+    {
+      "path": "backend/migrations",
+      "object": "6d99c3cf2b61a026fb3f9841e4b4bb017c6df2c2"
+    }
+  ]
+}

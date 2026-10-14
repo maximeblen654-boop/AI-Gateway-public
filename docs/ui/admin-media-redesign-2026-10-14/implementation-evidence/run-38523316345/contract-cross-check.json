@@ -1,0 +1,188 @@
+{
+  "pass": true,
+  "runtime_source_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+  "integration_script_sha": "f246974afaedf5a3d143bde57cee4378ddf87372",
+  "status": "IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED",
+  "results": [
+    {
+      "scenario": "preview-sampling",
+      "samples": 64,
+      "unsampled_resolution_executed": "4K",
+      "full_capabilities_preserved": true
+    },
+    {
+      "scenario": "image-geometry-1k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 3,
+      "price": {
+        "amount": "2.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "1K",
+        "duration_seconds": 0,
+        "aspect_ratio": "1:1",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "edit-geometry-2k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 2,
+      "price": {
+        "amount": "1.80",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "2K",
+        "duration_seconds": 0,
+        "aspect_ratio": "3:2",
+        "quality": "",
+        "count": 2,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "image-geometry-4k",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 1,
+      "price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "video-compatible",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 1,
+      "price": {
+        "amount": "2.00",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "720p",
+        "duration_seconds": 5,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "image-geometry-free",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 1,
+      "price": {
+        "amount": "0",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "1K",
+        "duration_seconds": 0,
+        "aspect_ratio": "1:1",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "image-geometry-2k-draft",
+      "frozen_fields_equal": true,
+      "native_usage_delta": 1,
+      "request_count": 3,
+      "price": {
+        "amount": "2.70",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "2K",
+        "duration_seconds": 0,
+        "aspect_ratio": "3:2",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "read_only_recovery": true
+    },
+    {
+      "scenario": "published",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    },
+    {
+      "scenario": "mapping",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    },
+    {
+      "scenario": "routing",
+      "upstream_requests": 0,
+      "billing_changes": 0,
+      "submit": {
+        "status": 409,
+        "body": {
+          "error": "image_binding_unavailable",
+          "recovery": "GET original task only"
+        }
+      }
+    }
+  ]
+}

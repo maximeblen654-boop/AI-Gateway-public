@@ -1,0 +1,53 @@
+[
+  {
+    "run": 1,
+    "result": "PASS",
+    "checks": [
+      "drawer and row context",
+      "existing decimal helper",
+      "empty zero invalid input",
+      "price retained across steps",
+      "image/video separate values",
+      "model search",
+      "preview-only publish dialog",
+      "dark theme",
+      "390px modal inert/focus exit",
+      "reduced motion",
+      "no external or production requests"
+    ]
+  },
+  {
+    "run": 2,
+    "result": "PASS",
+    "checks": [
+      "drawer and row context",
+      "existing decimal helper",
+      "empty zero invalid input",
+      "price retained across steps",
+      "image/video separate values",
+      "model search",
+      "preview-only publish dialog",
+      "dark theme",
+      "390px modal inert/focus exit",
+      "reduced motion",
+      "no external or production requests"
+    ]
+  },
+  {
+    "run": 3,
+    "result": "PASS",
+    "checks": [
+      "drawer and row context",
+      "existing decimal helper",
+      "empty zero invalid input",
+      "price retained across steps",
+      "image/video separate values",
+      "model search",
+      "preview-only publish dialog",
+      "dark theme",
+      "390px modal inert/focus exit",
+      "reduced motion",
+      "no external or production requests"
+    ]
+  }
+]

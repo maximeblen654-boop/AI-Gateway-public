@@ -267,3 +267,24 @@ func TestVideoCatalogUsesPublishedPriceAndFailsClosed(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, offers)
 }
+
+func TestVideoRuntimeRejectsStoredZeroRetailBeforeSubmit(t *testing.T) {
+	r, _, q, key, _, orders := videoRuntimeFixture(t)
+	calls := 0
+	r.request = func(context.Context, *Account, string, string, []byte) ([]byte, string, error) {
+		calls++
+		return nil, "", nil
+	}
+	q.Binding.Offer.SalePrice.Amount = "0"
+	q.BindingHash = q.Binding.Hash()
+	require.Error(t, q.Validate())
+	_, err := r.Store.Issue(q)
+	require.Error(t, err)
+	// A malformed legacy/tampered stored quote cannot bypass validation on read.
+	require.NoError(t, r.Store.put("quote", "historical-zero-video", q))
+	_, err = r.Submit(context.Background(), q.Binding.Owner, key, "historical-zero-video", "av_zero_retail")
+	require.Error(t, err)
+	require.Zero(t, calls)
+	require.Zero(t, orders.reserves)
+	require.Zero(t, orders.captures)
+}

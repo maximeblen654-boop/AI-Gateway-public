@@ -1,0 +1,3224 @@
+{
+  "cases": [
+    "Five-step UI to actual Core save/validation without protocol input",
+    "Two independently priced products configured by five-step UI without technical size mappings",
+    "Same-name same-type product selector shows stable business distinction without internal IDs",
+    "Saved native product reload preserves specifications and prices",
+    "Isolated account publish and sales enabled through normal UI"
+  ],
+  "http": [
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/3",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/3/draft",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/3/draft",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/3",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/compliance",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/subscriptions/active",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/announcements",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/payment/config",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/system/check-updates",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/suppliers",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/keys",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settings/public",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/media-workbench/accounts/3",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/media-workbench/accounts/3/publish",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/media-workbench/accounts/3/sales",
+      "status": 200
+    }
+  ],
+  "validation": {
+    "draft_revision": "mwd_d6c68b444d499514f1cf7cd3bed3647e78aa31e6459d618d6654c46b80de42eb",
+    "status": "PASS",
+    "publish_ready": true,
+    "checked_at": "2026-10-14T09:20:17.392270749Z",
+    "model_catalog": {
+      "synced_at": "2026-10-14T09:20:03Z",
+      "sha256": "313f37cc434a33dadd04e483b1df113e256c133bc511eaf7dd8beba3897a725f"
+    },
+    "adapter_registry_revision": "media_registry_v1_r1",
+    "diagnostics": [],
+    "dependencies": {
+      "account_id": 3,
+      "routing_sha256": "cb9bc3f1fbd256b3d6f8a065df707cf5dbbbd1b64592094446bfee2446e1a513",
+      "catalog_sha256": "313f37cc434a33dadd04e483b1df113e256c133bc511eaf7dd8beba3897a725f",
+      "mapping_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "binding_sha256": "dae807945a7b1e6daa7e692c307c037924d7304a5f15b4088ea235ee916ada1e",
+      "registry_revision": "media_registry_v1_r1"
+    },
+    "previews": [
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 1,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 1,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 2,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 2,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 2,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 3,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 3,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 3,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 4,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 4,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 4,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 5,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 5,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 5,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 6,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 6,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 6,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 7,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 7,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 7,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 8,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 8,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 8,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 9,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 9,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 9,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 10,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 10,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "1:1",
+          "quality": "",
+          "count": 10,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "1:1",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 1,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 1,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 2,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 2,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 2,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 3,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 3,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 3,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 3,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 4,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 4,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 4,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 4,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 5,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 5,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 5,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 5,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 6,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 6,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 6,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 6,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 7,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 7,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 7,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 7,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 8,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 8,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 8,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 8,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 9,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 9,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 9,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 9,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 10,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 10,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "3:2",
+          "quality": "",
+          "count": 10,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 10,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "16:9",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 1,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "16:9",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 1,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 1,
+          "images": 2,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "16:9",
+          "images": [
+            {
+              "image_url": "<image:1>"
+            },
+            {
+              "image_url": "<image:2>"
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": [
+          {
+            "kind": "image",
+            "count": 2,
+            "representation": "image_url"
+          }
+        ]
+      },
+      {
+        "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+        "spec": {
+          "resolution": "1K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 2,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "encoding": "application/json",
+        "fields": {
+          "aspect_ratio": "16:9",
+          "model": "gpt-image-2",
+          "n": 2,
+          "prompt": "<dry-run-prompt>",
+          "resolution": "1K"
+        },
+        "omitted": [
+          "size",
+          "quality",
+          "style",
+          "images",
+          "mask",
+          "stream"
+        ],
+        "asset_slots": []
+      }
+    ],
+    "case_count": 270
+  },
+  "product": {
+    "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+    "media_type": "image",
+    "site_model": "gpt-image-2",
+    "display_name": "Synthetic geometry image",
+    "upstream_model": "gpt-image-2",
+    "enabled": true,
+    "capabilities": {
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspect_ratios": [
+        "1:1",
+        "3:2",
+        "16:9"
+      ],
+      "qualities": [],
+      "durations_seconds": [],
+      "count": {
+        "min": 1,
+        "max": 10
+      },
+      "references": {
+        "image": {
+          "min": 0,
+          "max": 2
+        },
+        "video": {
+          "min": 0,
+          "max": 0
+        },
+        "audio": {
+          "min": 0,
+          "max": 0
+        },
+        "total_max": 2
+      },
+      "combination_rules": []
+    },
+    "pricing_rules": [
+      {
+        "match": {
+          "resolution": [
+            "1K"
+          ]
+        },
+        "sale_price": {
+          "amount": "0.70",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      },
+      {
+        "match": {
+          "resolution": [
+            "2K"
+          ]
+        },
+        "sale_price": {
+          "amount": "0.90",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      },
+      {
+        "match": {
+          "resolution": [
+            "4K"
+          ]
+        },
+        "sale_price": {
+          "amount": "1.10",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        }
+      }
+    ],
+    "adapter_config": {
+      "size_mappings": []
+    }
+  },
+  "first_save_request_products": [
+    {
+      "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry image",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "adapter_config": {
+        "size_mappings": []
+      },
+      "capabilities": {
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "aspect_ratios": [
+          "1:1",
+          "3:2",
+          "16:9"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {
+            "resolution": [
+              "1K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.70",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "2K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.90",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "4K"
+            ]
+          },
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ]
+    }
+  ],
+  "save_request_products": [
+    {
+      "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry image",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "adapter_config": {
+        "size_mappings": []
+      },
+      "capabilities": {
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "aspect_ratios": [
+          "1:1",
+          "3:2",
+          "16:9"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {
+            "resolution": [
+              "1K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.70",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "2K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.90",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "4K"
+            ]
+          },
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ]
+    },
+    {
+      "product_id": "media-0a331ef8-3f1c-4c30-95d0-a800f0e6fb85",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry independent price",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "adapter_config": {
+        "size_mappings": []
+      },
+      "capabilities": {
+        "resolutions": [
+          "2K"
+        ],
+        "aspect_ratios": [
+          "3:2"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {},
+          "sale_price": {
+            "amount": "1.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "product_id": "media-3871a1fe-1467-47bb-b388-6dc4864a4135",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry image",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "capabilities": {
+        "resolutions": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "aspect_ratios": [
+          "1:1",
+          "3:2",
+          "16:9"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {
+            "resolution": [
+              "1K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.70",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "2K"
+            ]
+          },
+          "sale_price": {
+            "amount": "0.90",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        },
+        {
+          "match": {
+            "resolution": [
+              "4K"
+            ]
+          },
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ],
+      "adapter_config": {
+        "size_mappings": []
+      }
+    },
+    {
+      "product_id": "media-0a331ef8-3f1c-4c30-95d0-a800f0e6fb85",
+      "media_type": "image",
+      "site_model": "gpt-image-2",
+      "display_name": "Synthetic geometry independent price",
+      "upstream_model": "gpt-image-2",
+      "enabled": true,
+      "capabilities": {
+        "resolutions": [
+          "2K"
+        ],
+        "aspect_ratios": [
+          "3:2"
+        ],
+        "qualities": [],
+        "durations_seconds": [],
+        "count": {
+          "min": 1,
+          "max": 10
+        },
+        "references": {
+          "image": {
+            "min": 0,
+            "max": 2
+          },
+          "video": {
+            "min": 0,
+            "max": 0
+          },
+          "audio": {
+            "min": 0,
+            "max": 0
+          },
+          "total_max": 2
+        },
+        "combination_rules": []
+      },
+      "pricing_rules": [
+        {
+          "match": {},
+          "sale_price": {
+            "amount": "1.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          }
+        }
+      ],
+      "adapter_config": {
+        "size_mappings": []
+      }
+    }
+  ],
+  "product_options": [
+    "Synthetic geometry image · 规格 1K/2K/4K · 1:1/3:2/16:9 · 数量 1～10 张 · CNY 0.70 / CNY 0.90 / CNY 1.10 · 已启用",
+    "Synthetic geometry independent price · 规格 2K · 3:2 · 数量 1～10 张 · CNY 1.30 · 已启用"
+  ]
+}

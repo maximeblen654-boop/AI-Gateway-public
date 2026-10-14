@@ -29,6 +29,21 @@ func DecimalAmount(text string) (decimal.Decimal, error) {
 	return n, nil
 }
 
+// ValidateMediaSalePrice gates new publication, quotes and generation. Historical
+// receipt arithmetic below remains nonnegative so old receipts stay recoverable.
+func ValidateMediaSalePrice(p Price) error {
+	if err := ValidateImageSalePrice(p); err != nil {
+		return err
+	}
+	n, err := DecimalAmount(p.Amount)
+	if err != nil || !n.IsPositive() {
+		return ErrRuntimeBinding
+	}
+	return nil
+}
+
+// ValidateImageSalePrice also serves historical receipt/settlement validation.
+// New customer admission must use ValidateMediaSalePrice.
 func ValidateImageSalePrice(p Price) error {
 	if p.Currency != "CNY" || p.BillingMode != "per_request" {
 		return ErrRuntimeBinding
@@ -104,7 +119,7 @@ func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 			config.Execution = config.EditExecution
 		}
 		exec, execErr := PlanImageExecution(config, 1)
-		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.MediaType != "image" || o.AccountID != a.ID || o.MediaType != "image" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateImageSalePrice(o.SalePrice) != nil {
+		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.MediaType != "image" || o.AccountID != a.ID || o.MediaType != "image" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateMediaSalePrice(o.SalePrice) != nil {
 			return r, ErrRuntimeBinding
 		}
 		r = ResolvedImageOffer{ImageBindingVersion, a.Config.Published.Revision, a.Config.Published.Dependencies, o, s, h}
@@ -125,7 +140,7 @@ func PublishedImageOfferQuoteable(a *Account, offerID string) bool {
 		if offer.OfferID != offerID {
 			continue
 		}
-		if offer.MediaType != "image" || ValidateImageSalePrice(offer.SalePrice) != nil {
+		if offer.MediaType != "image" || ValidateMediaSalePrice(offer.SalePrice) != nil {
 			return false
 		}
 		for _, product := range p.Products {

@@ -702,3 +702,29 @@ func TestStudioImageContainerIntegrity(t *testing.T) {
 		})
 	}
 }
+
+// A pre-upgrade zero quote may remain readable, but cannot start a new request.
+func TestStudioImageZeroQuoteCannotStartGeneration(t *testing.T) {
+	r, q, key, _, billing := studioContractFixture(t)
+	calls := 0
+	r.network = func(context.Context, *gin.Context, *Account, []byte, string) ([]byte, string, error) {
+		calls++
+		return nil, "", nil
+	}
+	q.Binding.Offer.SalePrice.Amount = "0"
+	token, err := r.Store.Issue(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	historical, err := r.Store.Quote(token, q.Owner, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err = StudioImagePrices(historical); err != nil {
+		t.Fatal("historical amount unreadable", err)
+	}
+	_, err = r.Dispatch(context.Background(), nil, historical, "zero-retail", "synthetic", nil, key)
+	if err == nil || calls != 0 || billing.applied != 0 {
+		t.Fatalf("zero request admitted: %v calls=%d billing=%d", err, calls, billing.applied)
+	}
+}
