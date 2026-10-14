@@ -10,7 +10,7 @@ on:
         required: true
         default: build
         type: choice
-        options: [build, accept-existing, admin-ui-review]
+        options: [build, accept-existing, admin-ui-review, admin-candidate]
       build_source_sha:
         description: 'exact runtime source SHA; empty uses this workflow commit'
         required: false
@@ -184,12 +184,14 @@ jobs:
     if: >-
       github.repository == 'maximeblen654-boop/AI-Gateway-public' &&
       github.ref == 'refs/heads/codex/admin-media-design-review' &&
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'admin-ui-review'
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.mode == 'admin-ui-review' || github.event.inputs.mode == 'admin-candidate')
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     env:
       NATIVE_ACCEPTANCE_SCENARIO: admin-ui-review
-      NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.sha }}
+      NATIVE_EXPORT_CANDIDATE: ${{ github.event.inputs.mode == 'admin-candidate' }}
+      NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.build_source_sha || github.sha }}
       NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.review-runtime
       NATIVE_REUSE_SOURCE_DIR: ${{ github.workspace }}/.candidate-reuse-source
       NATIVE_REUSE_ARTIFACT_DIR: ${{ github.workspace }}/.candidate-reuse-artifact
@@ -199,7 +201,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.inputs.build_source_sha || github.sha }}
           path: .review-runtime
           persist-credentials: false
       - uses: actions/checkout@v6
@@ -218,7 +220,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 38443205417 --repo "$GITHUB_REPOSITORY" --name native-media-candidate-b2fcdac93afa6ae194ee81801a9b37813f8f39eb --dir "$NATIVE_REUSE_ARTIFACT_DIR"
-      - name: Compile Core for disposable integration tests only
+      - name: Build the exact Core; preserve existing b2 sidecars
+        id: build
         run: node tools/native-media-e2e/candidate.mjs build
       - name: Prepare existing browser harness
         run: |
@@ -227,7 +230,10 @@ jobs:
           pnpm --dir frontend install --frozen-lockfile
       - name: Actual Vue and isolated backend integration
         run: node tools/native-media-e2e/candidate.mjs verify
-      - name: Preserve small review evidence, no image export
+      - name: Export the candidate without rebuilding sidecars
+        if: ${{ !cancelled() && github.event.inputs.mode == 'admin-candidate' && steps.build.outcome == 'success' }}
+        run: node tools/native-media-e2e/candidate.mjs export
+      - name: Preserve small review evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -236,3 +242,12 @@ jobs:
           path: |
             ${{ runner.temp }}/native-candidate-output/*.json
             ${{ runner.temp }}/native-candidate-output/*.png
+
+      - name: Preserve one complete candidate
+        if: ${{ !cancelled() && github.event.inputs.mode == 'admin-candidate' && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-media-candidate-${{ github.event.inputs.build_source_sha || github.sha }}
+          retention-days: 14
+          compression-level: 0
+          path: ${{ runner.temp }}/native-candidate-output/*

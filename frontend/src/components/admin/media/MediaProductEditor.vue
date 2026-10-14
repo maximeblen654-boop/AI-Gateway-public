@@ -49,7 +49,7 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <p class="mw-muted">{{ product.media_type === 'video' ? '视频单条售价须大于 0；0 元视频不能用于客户报价。' : '空白是未配置；明确填写 0 才表示免费图片。' }} 已有价格规则继续保留，由服务端核验。</p>
+      <p class="mw-muted">图片和视频售价均须大于 0 CNY；空白可保存草稿，但不能发布。 已有价格规则继续保留，由服务端核验。</p>
       <div class="mw-price-table" role="table" aria-label="商品单价表">
         <div class="mw-price-table-head" role="row"><span role="columnheader">规格组合</span><span role="columnheader">单{{ unitLabel }}售价 · CNY</span><span role="columnheader">填写状态</span></div>
         <div v-for="(rule, index) in priceRows" :key="index" class="mw-price-row" role="row">
@@ -57,7 +57,7 @@
           <div role="cell"><label class="mw-field"><span class="mw-price-mobile-label">单{{ unitLabel }}售价 · CNY</span>
             <input class="input" inputmode="decimal" placeholder="待填写" :aria-label="`${pricingRuleLabel(rule)} 单${unitLabel}价格（CNY）`" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-invalid="!!priceError(rule)" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
           </label><p v-if="priceError(rule)" class="mw-field-error" role="alert">{{ priceError(rule) }}</p><p v-if="rule.sale_price && (rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原价格 {{ rule.sale_price.currency }} / {{ rule.sale_price.billing_mode }}；重新填写才改为 CNY / {{ unitLabel }}。</p></div>
-          <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '明确免费 · 0 元' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
+          <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
         </div>
       </div>
       <MediaCostCalculator ref="calculator" :active="wizardStep === 4" @toggle="emit('cost-toggle', $event)" :product="product" :account-id="accountId" :admin-id="adminId" :labels="priceRows.map(pricingRuleLabel)" />
@@ -114,7 +114,7 @@ const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = 
 
 const stepLabels = ['可售规格', '参考素材', '计费维度', '填写单价', '确认保存']
 const stepQuestions = ['这个模型可以出售什么规格？', '客户可以上传什么参考素材？', '什么情况需要卖不同的价格？', '每个价格档位卖多少钱？', '确认商品配置并保存']
-const stepDescriptions = computed(() => ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', props.product.media_type === 'video' ? '按整条填写人民币单价，须大于 0。空白是未配置。' : '按张填写人民币单价。空白是未配置，明确填 0 表示免费。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。'])
+const stepDescriptions = computed(() => ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', props.product.media_type === 'video' ? '按整条填写人民币单价，须大于 0。空白是未配置。' : '按张填写人民币单价，须大于 0。空白是未配置。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。'])
 const calculator = ref<InstanceType<typeof MediaCostCalculator>>()
 const wizardStep = ref(1)
 const stepHeading = ref<HTMLElement>()
@@ -280,7 +280,7 @@ function edit(change: (value: Product) => void) {
 function priceError(rule: Product['pricing_rules'][number]): string {
   if (!rule.sale_price) return ''
   if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return '请输入有效金额，最多 8 位小数。'
-  return props.product.media_type === 'video' && /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '视频单条售价须大于 0；当前合同不支持免费视频报价。' : ''
+  return /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '客户售价须大于 0 CNY；0 元可保留在草稿中，但不能发布或生成。' : ''
 }
 function setAmount(index: number, event: Event) {
   edit(next => {

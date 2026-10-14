@@ -76,25 +76,14 @@ const report={checks:[],screenshots:[]}
   report.mapping_rejection=c.validation.diagnostics
   await save(original.draft.products)
   report.checks.push('Valid historical size mapping retained in shared preview; pixel/aspect conflict rejected by real server')
-  // Existing zero video contract is not broadened; inspect actual catalog exclusion.
-  const vp=`/admin/media-workbench/accounts/${fixture.accounts.compatible}`
-  let vc=(await api(vp)).media_workbench_v1;const videoOriginal=structuredClone(vc.draft.products)
-  const zero=structuredClone(videoOriginal);zero[0].pricing_rules.forEach(r=>r.sale_price.amount='0')
-  vc=(await api(vp+'/draft','PUT',{expected_record_version:vc.record_version,draft:{products:zero}})).media_workbench_v1
-  vc=(await api(vp+'/publish','POST',{expected_record_version:vc.record_version,expected_draft_revision:vc.draft.revision})).media_workbench_v1
-  const freeVideoIDs=vc.published.offers.filter(o=>o.product_id===zero[0].product_id).map(o=>o.offer_id);assert(freeVideoIDs.length>0,'published zero offer must actually exist for exclusion test')
-  const user=await browser.newPage({locale:'zh-CN'});await user.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');localStorage.setItem('user_guide_2_user_v4_interactive','true')});await user.goto(base+'/login');await user.getByLabel('邮箱').fill('native-customer@example.invalid');await user.getByLabel('密码').fill('Native-Customer-Only-20261012');await user.getByRole('button',{name:'登录',exact:true}).click();await user.waitForURL('**/dashboard');await user.goto(base+'/video-studio')
-  // A recovered completed video deliberately locks model controls. Catalog reads only need the real authenticated Studio session.
-  await expect.poll(()=>user.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
-  const catalog=await user.evaluate(async()=>{const r=await fetch('/studio-v2/api/video/catalog',{headers:{'X-Studio-Request':'video-binding-v1'}});return {status:r.status,body:await r.json()}})
-  assert.equal(catalog.status,200);assert(Array.isArray(catalog.body.offers));assert(catalog.body.offers.length>0,'positive companion offer must remain visible');assert(!catalog.body.offers.some(o=>o.product_id===zero[0].product_id));assert(catalog.body.offers.some(o=>o.product_id===zero[1].product_id&&o.published_revision===vc.published.revision&&Number(o.sale_price.amount)>0))
-  report.video_zero={filtered_offer_ids:freeVideoIDs,catalog_offer_ids:catalog.body.offers.map(o=>o.offer_id)};await user.close()
-  vc=(await api(vp)).media_workbench_v1;vc=(await api(vp+'/draft','PUT',{expected_record_version:vc.record_version,draft:{products:videoOriginal}})).media_workbench_v1
-  await api(vp+'/publish','POST',{expected_record_version:vc.record_version,expected_draft_revision:vc.draft.revision})
-  report.checks.push('Zero video published historical contract is excluded from actual customer catalog; positive video restored')
-  const free=structuredClone(original.draft.products);free.find(p=>p.product_id===first.product_id).pricing_rules.find(r=>r.match.resolution.includes('1K')).sale_price.amount='0'
-  await publish(await save(free))
-  report.checks.push('Explicit free image set only in synthetic Account for customer quote/generation verification')
+  // Retail price edge cases are exercised separately through the same real Core.
+  // Here verify the exact input stays visible in the final Vue component.
+  await openImage();await w('product-select').selectOption(first.product_id);await w('wizard-step-4').click()
+  await w('price-0').fill('0');await expect(w('price-0')).toHaveValue('0');await expect(w('price-0')).toHaveAttribute('aria-invalid','true')
+  await expect(w('wizard-page-4')).toContainText('不能发布或生成')
+  await page.screenshot({path:`${root}/evidence/native-admin-zero-price.png`,fullPage:false,animations:'disabled'})
+  // No save: zero input and all calculator values remain browser-only in this check.
+  await w('price-0').fill('0.70')
   assert.deepEqual(errors,[]);report.assets=await proof();report.pass=true
  }catch(e){report.error=e.message;await page.screenshot({path:`${root}/evidence/native-admin-review-failure.png`,fullPage:true});throw e}
  finally{fs.writeFileSync(`${root}/evidence/native-admin-ui-review.json`,JSON.stringify(report,null,2));await browser.close()}

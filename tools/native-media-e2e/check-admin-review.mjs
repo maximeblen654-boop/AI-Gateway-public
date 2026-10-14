@@ -6,7 +6,8 @@ const root = path.resolve(process.argv[2] || '')
 const read = name => JSON.parse(fs.readFileSync(path.join(root, name), 'utf8'))
 const acceptance = read('acceptance.json')
 assert.equal(acceptance.status, 'PASS')
-assert.equal(acceptance.scope, 'admin-ui-implementation-review-not-candidate')
+const candidate=acceptance.scope==='admin-media-candidate'
+assert(candidate || acceptance.scope==='admin-ui-implementation-review-not-candidate')
 const admin = read('native-admin-ui-review.json')
 assert.equal(admin.pass, true)
 assert.equal(admin.preview_count, 64)
@@ -20,7 +21,7 @@ assert(geometry.products.some(p => p.capabilities.resolutions.includes('4K')))
 const owners = ['draft','published','mapping','routing'].map(kind => read('native-customer-image-geometry-2k-'+kind+'.json').customer.id)
 assert.equal(new Set(owners).size, 4, 'Dependency counterexamples must use independent synthetic owners')
 const results = [{ scenario: 'preview-sampling', samples: 64, unsampled_resolution_executed: '4K', full_capabilities_preserved: true }]
-for (const name of ['image-geometry-1k', 'edit-geometry-2k', 'image-geometry-4k', 'video-compatible', 'image-geometry-free', 'image-geometry-2k-draft']) {
+for (const name of ['image-geometry-1k', 'edit-geometry-2k', 'image-geometry-4k', 'video-compatible', ...(candidate?[]:['image-geometry-free']), 'image-geometry-2k-draft']) {
   const r = read(`native-customer-${name}.json`)
   assert.equal(r.pass, true, name)
   const q = r.quote, actual = r.submit.body
@@ -52,6 +53,7 @@ for (const kind of ['published', 'mapping', 'routing']) {
   if (kind === 'published') assert.notEqual(r.dependency_change.published_before, r.dependency_change.published_after)
   results.push({ scenario: kind, upstream_requests: 0, billing_changes: 0, submit: r.submit })
 }
-const report = { pass: true, runtime_source_sha: acceptance.source_sha, integration_script_sha: acceptance.script_sha, status: 'IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED', results }
+if(candidate){const retail=read('native-positive-retail.json');assert.equal(retail.pass,true);for(const kind of ['image','video']){for(const amount of [null,'0','0.00000000','0.01','1','9.9']){const c=retail.checks.find(c=>c.kind===kind&&c.amount===amount);assert(c);if(amount===null||Number(amount)===0)assert(c.publish_status>=400);else assert.equal(c.quote_status,200)}const legacy=retail.checks.find(c=>c.kind===kind&&c.legacy_zero_catalog_excluded);assert.equal(legacy.quote_status,409);assert.equal(legacy.generate_status,409)}results.push({scenario:'strict-positive-retail',checks:retail.checks})}
+const report = { pass: true, runtime_source_sha: acceptance.source_sha, integration_script_sha: acceptance.script_sha, status: candidate?'CANDIDATE_READY_NOT_DEPLOYED':'IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED', results }
 fs.writeFileSync(path.join(root, 'contract-cross-check.json'), JSON.stringify(report, null, 2)+'\n')
 console.log(JSON.stringify(report, null, 2))

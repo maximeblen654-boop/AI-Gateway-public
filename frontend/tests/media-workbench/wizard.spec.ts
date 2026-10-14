@@ -104,7 +104,7 @@ test('reference legacy zero, immediate safety limit and unsaved leave prompt', a
   expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
 })
 
-test('denied combination gives five rows; missing, free and conflicting prices remain explicit', async ({ page }, info) => {
+test('denied combination gives five rows; missing, zero and conflicting prices remain explicit', async ({ page }, info) => {
   await openWizard(page, 'WIZARD_DENY')
   await page.getByTestId('wizard-step-3').click()
   await page.getByTestId('pricing-dimension-resolution').check()
@@ -112,12 +112,12 @@ test('denied combination gives five rows; missing, free and conflicting prices r
   await expect(page.getByTestId('expected-prices')).toContainText('5 个价格')
   await page.getByTestId('wizard-next').click()
   await page.getByTestId('price-0').fill('0')
-  await expect(page.locator('.mw-price-state').first()).toContainText('明确免费')
+  await expect(page.locator('.mw-price-state').first()).toContainText('需要修正')
   await expect(page.getByTestId('price-1')).toHaveValue('')
   await page.getByTestId('price-1').fill('-1')
   await expect(page.getByTestId('price-1')).toHaveAttribute('aria-invalid', 'true')
   await page.getByTestId('price-1').fill('1.20')
-  await capture(page, info, 'missing-free-and-configured')
+  await capture(page, info, 'missing-zero-and-configured')
   await page.getByTestId('wizard-back').click()
   page.once('dialog', dialog => dialog.dismiss())
   await page.getByTestId('pricing-dimension-aspect_ratio').click()

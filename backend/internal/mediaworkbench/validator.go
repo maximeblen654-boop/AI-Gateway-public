@@ -17,9 +17,7 @@ import (
 const maxCases = 32768
 const maxPreviews = 64
 
-var amountPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)(\.[0-9]+)?$`)
 var dimensionPattern = regexp.MustCompile(`^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$`)
-var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
 // resolveAccountModel is the workbench's read-only view of the Account's
 // canonical model mapping. The exact/wildcard precedence is delegated to the
@@ -251,7 +249,7 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 				add("UI_FIXABLE", "MISSING_PRICE", pid, path+".sale_price", "An explicit sale price is required")
 				v.Diagnostics[len(v.Diagnostics)-1].Match = &p.PricingRules[i].Match
 			} else if !validPrice(*r.SalePrice) {
-				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Use an exact nonnegative decimal, a three-letter currency and per_request billing")
+				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Customer sale price must be greater than 0 CNY, with at most 8 decimal places and per_request billing")
 			}
 		}
 		if len(v.Diagnostics) != start {
@@ -355,7 +353,7 @@ func Validate(a *Account, d Draft, now time.Time) (Validation, []Offer) {
 }
 
 func validPrice(p Price) bool {
-	return len(p.Amount) <= 80 && amountPattern.MatchString(p.Amount) && currencyPattern.MatchString(p.Currency) && p.BillingMode == "per_request"
+	return ValidateMediaSalePrice(p) == nil
 }
 func validRange(r Range, max int) bool { return r.Min >= 0 && r.Max >= r.Min && r.Max <= max }
 func validStrings(values []string) bool {
