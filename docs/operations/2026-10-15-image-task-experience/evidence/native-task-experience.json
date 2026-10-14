@@ -1,0 +1,731 @@
+{
+  "production": false,
+  "api_mocking": false,
+  "checks": [
+    "502 retains unknown receipt, zero charge; text/edit/video navigation and refresh stay usable; query has loading, timestamp and persistent offline failure",
+    "Two explicit independent image tasks and frozen prices; edit outputs delivered and original hash verified; exactly one native settlement per completed task; no replay on query/download/relogin; video submissions unchanged"
+  ],
+  "screenshots": [
+    "native-task-query-loading-desktop.png",
+    "native-task-query-error-desktop.png",
+    "native-task-waiting-desktop.png",
+    "native-task-continue-desktop.png",
+    "native-task-results-1440.png",
+    "native-task-unknown-1440.png",
+    "native-task-continue-1440.png",
+    "native-task-results-390.png",
+    "native-task-unknown-390.png",
+    "native-task-continue-390.png"
+  ],
+  "tasks": [
+    {
+      "id": "img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "prompt": "SYNTHETIC_UNKNOWN_502 original three outputs",
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "3.30",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "id": "img_5b0b2d47a129f5e6aaa38dbd58a1cad8",
+      "prompt": "SYNTHETIC_WAIT first independent task",
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "ledger": {
+        "usage": 1,
+        "dedup": 1,
+        "cost": 1.1
+      }
+    },
+    {
+      "id": "img_77df8361fc39169aae630dc3a631b8b4",
+      "prompt": "SYNTHETIC second independent edit",
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 2,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "2.20",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "ledger": {
+        "usage": 1,
+        "dedup": 1,
+        "cost": 2.2
+      }
+    }
+  ],
+  "http": [
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "path": "/studio-v2/api/session/exchange",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_25fd9e4cd0ef0c25df844f27aad671fa/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_cc3aaffc61c942a1adbd9220bb3acf40/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_25fd9e4cd0ef0c25df844f27aad671fa/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_cc3aaffc61c942a1adbd9220bb3acf40/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/assets/uploads",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/quotes",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/prepare",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_77df8361fc39169aae630dc3a631b8b4/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_77df8361fc39169aae630dc3a631b8b4/results/1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_5b0b2d47a129f5e6aaa38dbd58a1cad8/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_25fd9e4cd0ef0c25df844f27aad671fa/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_cc3aaffc61c942a1adbd9220bb3acf40/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_77df8361fc39169aae630dc3a631b8b4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_77df8361fc39169aae630dc3a631b8b4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 401
+    },
+    {
+      "path": "/studio-v2/api/session/exchange",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_5b0b2d47a129f5e6aaa38dbd58a1cad8/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_77df8361fc39169aae630dc3a631b8b4/results/0",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_377dafbc67cd52be3f62bccc7d1b2f7b",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "before": {
+    "image_posts": 5,
+    "video_posts": 1,
+    "balance": 94.1
+  },
+  "after_balance": 90.8,
+  "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+  "requests": [
+    {
+      "path": "/v1/images/generations",
+      "model": "gpt-image-2",
+      "n": 1,
+      "prompt": "SYNTHETIC_UNKNOWN_502 original three outputs"
+    },
+    {
+      "path": "/v1/images/generations",
+      "model": "gpt-image-2",
+      "n": 1,
+      "prompt": "SYNTHETIC_WAIT first independent task"
+    },
+    {
+      "path": "/v1/images/edits",
+      "model": "gpt-image-2",
+      "n": 1,
+      "prompt": "SYNTHETIC second independent edit"
+    },
+    {
+      "path": "/v1/images/edits",
+      "model": "gpt-image-2",
+      "n": 1,
+      "prompt": "SYNTHETIC second independent edit"
+    }
+  ],
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DMdrJ7Ef.js",
+        "bytes": 194144,
+        "sha256": "c77ade0641f9ab1f8e1dfe318a59d8e3a6a60d2b53c46bdfa6e9c2d5273892f3",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DDfo002m.js",
+        "bytes": 413892,
+        "sha256": "c460c15e150f15f4431f271f74216883dbd5d15103893a224b1e02b2c60d3e58",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-DhEkaHwn.css",
+        "bytes": 508,
+        "sha256": "e1a547e6e2a48ac77b7e78648aba36e1cff355613de73f332c9c35b5139445af",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge-BmkiKxf7.css",
+        "bytes": 1401,
+        "sha256": "7ad582c21fe51460913dfdb03ca27b6c1e34e0c151b89d7f6aa62c7121183b8f",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-mYEDiWCN.css",
+        "bytes": 200,
+        "sha256": "96de8eb2802f0665e11e1cfd66ac0fcebd9d351c19c8051dd3913876ebc8af38",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-BzhzuTyy.js",
+        "bytes": 17928,
+        "sha256": "1acb50007d6032040f69d92e44b9ac2afcb78039399529a0660cc9b01d5bab9d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-B_R5Ggxv.js",
+        "bytes": 917,
+        "sha256": "05cad16db2bfbc69a47f440dee746867832c1bf275d59284fd13be7090a2e880",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-CXgASPM2.js",
+        "bytes": 2420,
+        "sha256": "122328f6bc3a55f9d00abe1ecba36f03fb310620572fa8c9243008fc507cef64",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-DguofCfw.js",
+        "bytes": 16271,
+        "sha256": "0f641059eb07dd9a84e8cadc78b602aa9a0c38cf0c2067b6e314403dbabbf4d5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/oauthAffiliate-CrlUwkd1.js",
+        "bytes": 1197,
+        "sha256": "1ba453f05da3a376c7fed82fc6850b45a6f8c0d4a600bff7938917804806af89",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-B3eTsnkK.js",
+        "bytes": 10787,
+        "sha256": "76e23fa104bbeab873f538457674dd5fe66083575dd8f9c7972b3c49e25d47bb",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/apiError-zX02PgX9.js",
+        "bytes": 1212,
+        "sha256": "2b13e47dc6627eb34e647e3d20bf06c6817dc8831c6e0f1aed9c5823bd7eded3",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-B6ZiYKjM.css",
+        "bytes": 523,
+        "sha256": "fd702f466c23c7eaec04f358d8631d348075d1563df805687a1b0a5ca796b782",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DashboardView-CexTjFQU.js",
+        "bytes": 27006,
+        "sha256": "1d7d51135f1f6715b823c244faa7dffc625c093f6c796ba3379d53f66d84dc4b",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/usage-BIfFN_rp.js",
+        "bytes": 1882,
+        "sha256": "1caeb6aa6011a5eb3b5e6677b77c1195234c51e79bede7e3a705457c1a0e7c24",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend-Ci85YOuO.css",
+        "bytes": 9161,
+        "sha256": "f566e2ca595ffb156f0135b7b0864c1432f4170d015bbae4bc5b50e8cfa7d4a1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DT-rtrW_.css",
+        "bytes": 267,
+        "sha256": "d65d063476e8e82f9b0fc783eb879d9c067a4416f877de4b80162013ddf326ce",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-vfjFHKfA.css",
+        "bytes": 9840,
+        "sha256": "f7d4a7bc7d47b6a2fe4ca6b91b25d7dd239b6f92f8df8377a5577c4d926d4ac4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-B9nrdUzf.css",
+        "bytes": 22628,
+        "sha256": "453a197243a1e1db9fd2649e9892b9165d72c81a21bda2783a4adb36b5aacda0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-DfyUczpO.js",
+        "bytes": 47826,
+        "sha256": "0847254d50a982ae84b4ee9d0d89def4358c4402a9ac9ff7c26590600bc5e04a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CnS9HPXe.js",
+        "bytes": 104141,
+        "sha256": "1e6d03c04295897c1d2a140437dc3a8fc284aa3b669ed236b58e8566e6d40b12",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DZFkDJmK.js",
+        "bytes": 828,
+        "sha256": "83754d34856cc4a7126136a8a24c440d28a8486011f9781ef227e49954016385",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CPV73PcG.js",
+        "bytes": 2345,
+        "sha256": "6b3e7e0764b4c510687c7b872ba44da882dde95cb272ebad1ab47252a9aa625c",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-BARHcw0q.js",
+        "bytes": 8018,
+        "sha256": "3b86f92bacae4163672767c9c84299c6434df432ab9efeeb287fa0ef85a7298a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-chart-BykZcwza.js",
+        "bytes": 178340,
+        "sha256": "366e4c225173b9c986439842af0a76522ed4b8d54a120dad3bf5cc27b07e4b88",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-BKisLAD5.js",
+        "bytes": 8032,
+        "sha256": "5c688ff6515e26b1a00e014090ebb49c05ec596a225efa901cdcb3bd6f8b2cee",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-BQ961Oo6.js",
+        "bytes": 1709,
+        "sha256": "185516e3b1b1aa12836230e124517a4275758dd6e0a5209d90b3cede1e7c45ad",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/user-DEzCCI4g.js",
+        "bytes": 2057,
+        "sha256": "22e437044af6f2a0b25a601d0af22390f771810281813decaaccfdcbe77d4c8b",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": [
+      {
+        "path": "/assets/LoadingSpinner-DZFkDJmK.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CPV73PcG.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/user-DEzCCI4g.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-BQ961Oo6.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/Select-BKisLAD5.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-BARHcw0q.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CnS9HPXe.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      },
+      {
+        "path": "/assets/vendor-chart-BykZcwza.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      }
+    ]
+  },
+  "pass": true
+}

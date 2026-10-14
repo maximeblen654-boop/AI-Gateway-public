@@ -1,0 +1,229 @@
+{
+  "native-customer-image-geometry-1k.json": {
+    "scenario": "image-geometry-1k",
+    "pass": true,
+    "before": {
+      "supplier": {
+        "image_posts": 0,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 100,
+        "frozen_balance": 0,
+        "usage": 0,
+        "video_captured": 0
+      }
+    },
+    "after": {
+      "supplier": {
+        "image_posts": 3,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      }
+    },
+    "actual_submits": [
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k 284b8871-0a44-4eef-9523-82b228a87455",
+          "resolution": "1K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k 284b8871-0a44-4eef-9523-82b228a87455",
+          "resolution": "1K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k 284b8871-0a44-4eef-9523-82b228a87455",
+          "resolution": "1K"
+        }
+      }
+    ],
+    "expected_spec": {
+      "resolution": "1K",
+      "ratio": "1:1",
+      "cents": 70,
+      "count": 3
+    },
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "after_refresh_download": {
+      "supplier": {
+        "image_posts": 3,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      }
+    }
+  },
+  "native-customer-edit-geometry-2k.json": {
+    "scenario": "edit-geometry-2k",
+    "pass": true,
+    "before": {
+      "supplier": {
+        "image_posts": 3,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 97.9,
+        "frozen_balance": 0,
+        "usage": 1,
+        "video_captured": 0
+      }
+    },
+    "after": {
+      "supplier": {
+        "image_posts": 5,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      }
+    },
+    "actual_submits": [
+      {
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native edit-geometry-2k ee9d49a5-4bdb-4f0b-bfdd-a93bedf7ef4d",
+          "resolution": "2K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native edit-geometry-2k ee9d49a5-4bdb-4f0b-bfdd-a93bedf7ef4d",
+          "resolution": "2K"
+        }
+      }
+    ],
+    "expected_spec": {
+      "resolution": "2K",
+      "ratio": "3:2",
+      "cents": 90,
+      "count": 2,
+      "edit": true
+    },
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "after_refresh_download": {
+      "supplier": {
+        "image_posts": 5,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      }
+    }
+  },
+  "native-customer-video-compatible.json": {
+    "scenario": "video-compatible",
+    "pass": true,
+    "before": {
+      "supplier": {
+        "image_posts": 5,
+        "video_posts": 0
+      },
+      "ledger": {
+        "balance": 96.1,
+        "frozen_balance": 0,
+        "usage": 2,
+        "video_captured": 0
+      }
+    },
+    "after": {
+      "supplier": {
+        "image_posts": 5,
+        "video_posts": 1
+      },
+      "ledger": {
+        "balance": 94.1,
+        "frozen_balance": 0,
+        "usage": 3,
+        "video_captured": 1
+      }
+    },
+    "actual_submit": {
+      "method": "POST",
+      "path": "/v1/videos",
+      "auth": "bearer",
+      "body": {
+        "model": "synthetic-compatible-video",
+        "prompt": "SYNTHETIC native video-compatible 8972ecf7-9b9b-4c8f-8083-3b242c63161a",
+        "duration": 5,
+        "resolution": "720p",
+        "ratio": "16:9",
+        "face_direct": false
+      }
+    },
+    "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "repeat_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "playback_verified": true,
+    "after_refresh_download": {
+      "supplier": {
+        "image_posts": 5,
+        "video_posts": 1
+      },
+      "ledger": {
+        "balance": 94.1,
+        "frozen_balance": 0,
+        "usage": 3,
+        "video_captured": 1
+      }
+    }
+  }
+}

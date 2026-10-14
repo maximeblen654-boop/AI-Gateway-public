@@ -1,0 +1,66 @@
+{
+  "runs": [
+    {
+      "conclusion": "success",
+      "createdAt": "2026-10-14T22:26:06Z",
+      "databaseId": 38647616053,
+      "headSha": "d893690abe47f891aacde8876837ccc0c8b653ac",
+      "name": "Native media candidate (no deployment)",
+      "status": "completed",
+      "updatedAt": "2026-10-14T22:35:56Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38647616053"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-10-14T22:33:13Z",
+      "databaseId": 38648428557,
+      "headSha": "465d05f35ad2e6d0a3c3fe6e12ec884b927caa0c",
+      "name": "CI",
+      "status": "completed",
+      "updatedAt": "2026-10-14T22:45:10Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38648428557"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-10-14T22:33:13Z",
+      "databaseId": 38648428594,
+      "headSha": "465d05f35ad2e6d0a3c3fe6e12ec884b927caa0c",
+      "name": "Security Scan",
+      "status": "completed",
+      "updatedAt": "2026-10-14T22:33:44Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38648428594"
+    },
+    {
+      "conclusion": "success",
+      "createdAt": "2026-10-14T22:23:52Z",
+      "databaseId": 38647356199,
+      "headSha": "d893690abe47f891aacde8876837ccc0c8b653ac",
+      "name": "Security Scan",
+      "status": "completed",
+      "updatedAt": "2026-10-14T22:24:29Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38647356199"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 11933676059,
+      "name": "native-media-evidence-d893690abe47f891aacde8876837ccc0c8b653ac",
+      "size_in_bytes": 10623171,
+      "expires_at": "2026-10-28T22:35:12Z",
+      "expired": false
+    },
+    {
+      "id": 11933596314,
+      "name": "native-media-candidate-d893690abe47f891aacde8876837ccc0c8b653ac",
+      "size_in_bytes": 212559395,
+      "expires_at": "2026-10-28T22:35:14Z",
+      "expired": false
+    }
+  ],
+  "runtime_source_sha": "d893690abe47f891aacde8876837ccc0c8b653ac",
+  "test_source_sha": "465d05f35ad2e6d0a3c3fe6e12ec884b927caa0c",
+  "runtime_diff_after_candidate": [
+    "backend/internal/repository/studio_image_billing_test.go"
+  ],
+  "production_action": false
+}
