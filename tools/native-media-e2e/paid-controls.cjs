@@ -10,6 +10,16 @@ assert.equal(compose.services.postgres.environment.POSTGRES_DB,'sub2api');assert
 const report={phase,checks:[],screenshots:[],http_errors:[],production:false,supplier:'local simulator only'}
 const stats=()=>JSON.parse(fs.readFileSync(root+'/evidence/native-supplier-state.json'))
 const dc=(...args)=>execFileSync('docker',['compose','-p','ai-gateway-native-20261012','-f',root+'/compose.json',...args],{stdio:'pipe'})
+// Isolated dependency-fault injection only. Native Account update automatically
+// launches an unrelated Responses capability probe; do not mistake that for a
+// preflight request or weaken the zero-network assertion. Positive product flows
+// continue through the real Vue/API paths.
+const setMapping=(id,mapping)=>{
+ assert.equal(id,fixture.accounts.openai);assert(Number.isSafeInteger(id));assert.equal(compose.services.postgres.environment.POSTGRES_DB,'sub2api')
+ const value=JSON.stringify(mapping).replace(/'/g,"''")
+ const changed=dc('exec','-T','postgres','psql','-U','native','-d','sub2api','-At','-v','ON_ERROR_STOP=1','-c',`UPDATE accounts SET credentials=jsonb_set(credentials,'{model_mapping}','${value}'::jsonb) WHERE id=${id} AND name LIKE 'Synthetic %' RETURNING id`).toString()
+ assert(changed.split(/\r?\n/).includes(String(id)))
+}
 const p='/admin/media-workbench/paid-controls/'
 ;(async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true})
@@ -27,7 +37,7 @@ const p='/admin/media-workbench/paid-controls/'
   if(phase==='seed'){
    // Synthetic only. Reproduce #77's shape: catalog model plus unrelated aliases.
    const a=await api('/admin/accounts/'+fixture.accounts.openai)
-   await api('/admin/accounts/'+a.id,'PUT',{credentials:{...a.credentials,model_mapping:{'legacy-image':'other-image'}}})
+   setMapping(a.id,{'legacy-image':'other-image'})
    const user=await api('/auth/me');assert.equal(user.email,'native-admin@example.invalid')
    await api('/admin/users/'+user.id,'PUT',{allowed_groups:Object.values(fixture.groups)})
    const funded=await api('/admin/users/'+user.id+'/balance','POST',{balance:100,operation:'set',notes:'Isolated preflight fixture only'});assert.equal(Number(funded.balance),100)
@@ -44,7 +54,7 @@ const p='/admin/media-workbench/paid-controls/'
     assert.equal((await media(kind,'readiness')).body.paid_enabled,false)
     assert.equal((await media(kind,'tasks','POST',{})).status,503)
    }
-   const before=stats()
+   const before=stats();report.supplier_before_checks=before
    const catalogResponse=await media('image','catalog');assert.equal(catalogResponse.status,200,JSON.stringify(catalogResponse))
    const catalog=catalogResponse.body;assert(Array.isArray(catalog.offers),JSON.stringify(catalog))
    const offer=catalog.offers.find(o=>o.upstream_model==='gpt-image-2'&&o.spec.resolution.includes('1K'));assert(offer)
@@ -53,6 +63,17 @@ const p='/admin/media-workbench/paid-controls/'
     assert.equal(r.status,200,JSON.stringify(r));report.checks.push((images?'edit':'text')+' real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping')
    }
    assert.deepEqual(stats(),before,'closed quote must not reach supplier')
+   // Native permission/balance failure must stay closed and retain a safe category.
+   const admin=await api('/auth/me');assert.equal(admin.email,'native-admin@example.invalid')
+   await api('/admin/users/'+admin.id+'/balance','POST',{balance:100,operation:'subtract',notes:'Isolated refusal test'})
+   try{
+    for(const images of [0,1]){
+     const denied=await media('image','quotes','POST',{offer_id:offer.offer_id,spec:{resolution:'1K',aspect_ratio:'1:1',count:1,images,videos:0,audio:0,duration_seconds:0,quality:''}})
+     assert.equal(denied.status,409);assert.equal(denied.body.diagnostic_stage,'billing_eligibility')
+    }
+    assert.equal((await api(p+'image/check','POST',{})).pass,false);assert.equal((await current('image')).effective_enabled,false)
+   }finally{await api('/admin/users/'+admin.id+'/balance','POST',{balance:100,operation:'add',notes:'Restore isolated preflight fixture'})}
+   report.checks.push('Native insufficient balance rejects both quotes and preflight without opening; safe billing diagnostic preserved')
    const imageCheck=await check('image'),videoCheck=await check('video')
    assert(imageCheck.checks.some(c=>c.code==='native_quote'&&c.path==='edit'&&c.pass));assert(imageCheck.checks.some(c=>c.code==='native_quote'&&c.path==='text'&&c.pass))
    assert.deepEqual(stats(),before,'preflight must not contact supplier')
@@ -77,7 +98,7 @@ const p='/admin/media-workbench/paid-controls/'
    }
    // Drift the synthetic mapping only; quote errors must carry a safe stage.
    const original=await api('/admin/accounts/'+fixture.accounts.openai)
-   await api('/admin/accounts/'+original.id,'PUT',{credentials:{...original.credentials,model_mapping:{'gpt-image-2':'different-upstream'}}})
+   setMapping(original.id,{'gpt-image-2':'different-upstream'})
    assert.equal((await current('image')).effective_enabled,false)
    await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','catalog')).status,{message:'Real UI session exchange and catalog must finish before direct contract checks'}).toBe(200)
    for(const images of [0,1]){
@@ -86,12 +107,12 @@ const p='/admin/media-workbench/paid-controls/'
    }
    const failed=await api(p+'image/check','POST',{});assert.equal(failed.pass,false)
    assert.equal((await change('image',true,imageCheck)).status,409)
-   await api('/admin/accounts/'+original.id,'PUT',{credentials:original.credentials})
+   setMapping(original.id,original.credentials.model_mapping)
    assert.equal((await current('image')).effective_enabled,false,'restoring a dependency does not restore old PASS')
    // A real sidecar outage fails the server opening action, not merely the UI.
    dc('stop','bff')
    try{assert.equal((await change('image',true,imageCheck)).status,409);assert.equal((await current('image')).effective_enabled,false)}finally{dc('up','-d','--no-deps','--wait','--wait-timeout','60','bff')}
-   assert.deepEqual(stats(),before,'all checks, rejects and drift tests remain non-paid')
+   report.supplier_after_checks=stats();assert.deepEqual(report.supplier_after_checks,before,'all checks, rejects and drift tests remain non-paid')
    const ready=await check('image');assert.equal((await change('image',true,ready)).status,200)
    assert.equal((await current('image')).effective_enabled,true);assert.equal((await current('video')).effective_enabled,false)
    // Open video independently, solely for the following existing simulated E2E.
