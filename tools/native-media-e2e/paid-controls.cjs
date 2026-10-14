@@ -50,14 +50,23 @@ const p='/admin/media-workbench/paid-controls/'
    const accountPath='/admin/media-workbench/accounts/'+fixture.accounts.openai
    let detail=await api(accountPath),config=detail.media_workbench_v1
    const products=structuredClone(config.draft.products)
-   assert.equal(products.filter(p=>p.media_type==='image').length,1)
-   const product=products.find(p=>p.media_type==='image')
+   // The existing geometry browser fixture deliberately creates two independent
+   // image products. Preserve both records; make only the target sellable for
+   // this exact 1,870-domain performance case (isolated database only).
+   const imageProducts=products.filter(p=>p.media_type==='image')
+   assert.equal(imageProducts.length,2)
+   const product=imageProducts[0]
+   const siblingBefore=structuredClone(imageProducts[1])
+   imageProducts[1].enabled=false
+   report.scale_fixture={target_product_id:product.product_id,preserved_sibling_id:siblingBefore.product_id,sibling_disabled_only_in_isolation:true}
    assert.equal(product.upstream_model,'gpt-image-2')
    Object.assign(product.capabilities,{resolutions:['4K'],aspect_ratios:['1:1','16:9','4:5','5:4','21:9','3:4','4:3','2:3','3:2','9:16','9:21'],qualities:[],durations_seconds:[],count:{min:1,max:10},references:{image:{min:0,max:16},video:{min:0,max:0},audio:{min:0,max:0},total_max:16},combination_rules:[]})
    product.adapter_config.size_mappings=[]
    product.pricing_rules=[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}]
    detail=await api(accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products}})
    config=detail.media_workbench_v1
+   assert.equal(config.draft.products.length,products.length)
+   assert.deepEqual(config.draft.products.find(p=>p.product_id===siblingBefore.product_id),{...siblingBefore,enabled:false})
    assert.equal(config.validation.publish_ready,true,JSON.stringify(config.validation.diagnostics))
    assert.equal(config.validation.case_count,1870)
    await api(accountPath+'/publish','POST',{expected_record_version:config.record_version,expected_draft_revision:config.draft.revision})
