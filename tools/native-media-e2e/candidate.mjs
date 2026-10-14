@@ -148,10 +148,18 @@ if (mode === 'build') {
       compose.services.bridge.environment.STUDIO_IMAGE_GROUP_ID = String(fixture.groups.openai)
       fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
       dc(['up', '-d', '--no-deps', '--force-recreate', '--wait', '--wait-timeout', '90', 'bridge'])
-      for (const scenario of ['image-geometry-1k', 'edit-geometry-2k', 'image-geometry-4k', 'video-compatible']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, scenario])
-      run(process.execPath, ['tools/native-media-e2e/admin-ui-review.cjs', root])
-      run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'image-geometry-free'])
-      for (const change of ['draft', 'published', 'mapping', 'routing']) run(process.execPath, ['tools/native-media-e2e/customer.cjs', root, 'image-geometry-2k'], {env:{...process.env,NATIVE_QUOTE_DRIFT:change}})
+      const failures = []
+      const check = (label, args, options) => {
+        try { run(process.execPath, args, options); return true }
+        catch (error) { failures.push({ scenario: label, error: error.message }); return false }
+      }
+      for (const scenario of ['image-geometry-1k', 'edit-geometry-2k', 'image-geometry-4k', 'video-compatible']) check(scenario, ['tools/native-media-e2e/customer.cjs', root, scenario])
+      const adminPassed = check('admin-ui', ['tools/native-media-e2e/admin-ui-review.cjs', root])
+      if (adminPassed) check('image-free', ['tools/native-media-e2e/customer.cjs', root, 'image-geometry-free'])
+      // Independent quote dependency cases continue even if another UI assertion fails.
+      for (const change of ['draft', 'published', 'mapping', 'routing']) check('quote-'+change, ['tools/native-media-e2e/customer.cjs', root, 'image-geometry-2k'], {env:{...process.env,NATIVE_QUOTE_DRIFT:change}})
+      fs.writeFileSync(path.join(out, 'admin-review-suite.json'), JSON.stringify({ failures, free_image: adminPassed ? 'run' : 'blocked by admin fixture setup' }, null, 2))
+      assert.equal(failures.length, 0, JSON.stringify(failures))
     } else if (workspaceArtifact) {
       assert.equal(await fetch('http://127.0.0.1:4295/').then(() => true).catch(() => false), false, 'Vite must not be running')
       for (const script of ['seed.mjs', 'customer-keys.mjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])

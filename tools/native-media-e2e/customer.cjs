@@ -19,7 +19,7 @@ const geometryCases = {
   'edit-geometry-4k': { resolution:'4K', ratio:'16:9', cents:110, count:1, edit:true },
   'image-geometry-independent': { resolution:'2K', ratio:'3:2', cents:130, count:1, independent:true }
 }
-const geometry = geometryCases[scenario]
+const geometry = geometryCases[scenario] ? { ...geometryCases[scenario], ...(process.env.NATIVE_QUOTE_DRIFT === 'draft' ? { count: 3 } : {}) } : undefined
 assert(geometry || ['image', 'edit', 'video', 'video-compatible', 'video-seedance'].includes(scenario))
 const videoMode = scenario === 'video-seedance' ? 'seedance' : scenario === 'video-compatible' ? 'compatible' : scenario === 'video' ? 'grok' : null
 const video = Boolean(videoMode); const kind = video ? 'video' : 'image'; const count = geometry ? geometry.count : video ? 1 : scenario === 'edit' ? 2 : 3
