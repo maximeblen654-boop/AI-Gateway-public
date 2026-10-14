@@ -1,0 +1,37 @@
+{
+  "status": "BLOCKED_IMAGE_QUOTE_BINDING_BOTH_DISABLED",
+  "observed_at": "2026-10-14T16:33:53.237Z",
+  "core_source": "15d09689abc0b7e07269692d50e78f83859d1fb6",
+  "bridge_source": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+  "bff_source": "b2fcdac93afa6ae194ee81801a9b37813f8f39eb",
+  "final_readiness": {
+    "image": {
+      "status": 200,
+      "paid_enabled": false
+    },
+    "video": {
+      "status": 200,
+      "paid_enabled": false
+    }
+  },
+  "temporary_image_readiness": true,
+  "video_remained_closed": true,
+  "image_offers": 1,
+  "quote_text_status": 409,
+  "quote_edit_status": 409,
+  "quote_error": "image_binding_unavailable",
+  "real_vue_quote_reproduced": true,
+  "root_cause": "UNKNOWN",
+  "history_count": 0,
+  "download": "NOT_TESTED_NO_EXISTING_RESULT",
+  "account77_product_count": 1,
+  "account77_sales_enabled": true,
+  "account77_config_unchanged": true,
+  "image_identity_unchanged": true,
+  "mounts_unchanged": true,
+  "migration_ledger_unchanged": true,
+  "rollback_performed": true,
+  "generated_tasks_by_agent": 0,
+  "paid_supplier_calls_by_agent": 0,
+  "next_stage_ui_preflight": "REQUIREMENT_RECORDED_NOT_IMPLEMENTED"
+}
