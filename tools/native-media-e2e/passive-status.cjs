@@ -71,6 +71,27 @@ async function holdNativeAggregator(){
   sql(metric('openai',group,model,49,0));await inspect('insufficient')
   sql(`UPDATE channel_monitor_v2_metrics_rollup SET success_requests=80,error_requests=20 WHERE bucket_seconds=300 AND platform='openai' AND group_id=${group} AND model=${literal(model)}`)
   await inspect('observed',0.2)
+
+  const {chromium,expect}=require('../../frontend/node_modules/@playwright/test')
+  const browser=await chromium.launch({channel:'chrome',headless:true})
+  report.screenshots=[]
+  try{
+   const page=await browser.newPage({locale:'zh-CN',viewport:{width:1440,height:1000}})
+   const assetProof=require('./artifact-assets.cjs')(page)
+   await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');localStorage.setItem('admin_guide_1_admin_v4_interactive','true')})
+   await page.goto(base+'/login');await page.getByLabel('邮箱').fill(env.ADMIN_EMAIL);await page.getByLabel('密码').fill(env.ADMIN_PASSWORD);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard')
+   for(const width of [1440,390])for(const theme of ['light','dark']){
+    await page.setViewportSize({width,height:900});await page.evaluate(theme=>localStorage.setItem('theme',theme),theme)
+    await page.goto(base+'/video-studio');await expect(page.getByTestId('studio-model-toggle')).toBeEnabled();await page.getByTestId('studio-model-toggle').click()
+    const row=page.locator('.picker-list li').filter({has:page.locator(`[data-offer-id="${target.offer_id}"]`)})
+    await expect(row.locator('.picker-status')).toContainText('错误 20%');await row.locator('.picker-status').click()
+    await expect(page.locator('#studio-model-observation')).toContainText('不代表某个具体渠道')
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'final UI mobile overflow')
+    const name=`native-model-status-${width}-${theme}.png`;await page.screenshot({path:root+'/evidence/'+name,fullPage:true,animations:'disabled'});report.screenshots.push(name)
+    await page.keyboard.press('Escape');await expect(page.getByTestId('studio-model-toggle')).toBeFocused()
+   }
+   report.assets=await assetProof()
+  }finally{await browser.close()}
   const videoObserved=await catalog(cookie,'video');assert.equal(hash(plain(videoObserved)),videoHash)
   for(const o of videoObserved){assert(o.passive_status);if(o.model!==model)assert.notEqual(o.passive_status.state,'observed','image observation must not leak into different video model')}
   watermark(true);await inspect('stale')

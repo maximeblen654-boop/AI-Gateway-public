@@ -7,7 +7,7 @@
 - 该 Account 为现有 OpenAI-compatible API Key 类型；原生 `ForwardImages` 支持生成与编辑合同、Account模型解析，已实现目录模型无匹配映射时直通。无需 Studio 第二份 mapping 或管理员协议选择。
 - 现有 Group31 同时包含多个上游 Account；未发现 `banana-test` 命名的 Group 或测试 Key。不修改 Group31、Account77、已有 GPT 商品。
 - 用户已确认的 1:4、4:1、1:8、8:1 作为通用可选快捷比例接受。本轮没有据此给任何商品自动添加能力。
-- 公开文档 https://image2pro.top/api-docs 的图片合同展示 `/v1/images/generations`、`/v1/images/edits`、`resolution`、`aspect_ratio`、`n`，但此次取得的公开内容没有精确 `Nano-banana-2.1` 的单请求多张输出保证。通用 n 参数及输入参考图数量不能证明此模型原生多输出。
+- 公开文档 https://image2pro.top/api-docs 的图片合同展示 `/v1/images/generations`、`/v1/images/edits`、`resolution`、`aspect_ratio`、`n`，但此次取得的公开内容没有精确 `Nano-banana-2.1` 的单请求多张输出保证。通用合同将 n 定义为1～4、默认1；这不是该精确模型的多输出保证，输入参考图上限也不能当作输出数量。
 
 ## 用户后续配置清单
 | 项目 | 准备值/待确认 |

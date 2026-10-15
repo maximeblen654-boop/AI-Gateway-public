@@ -22,6 +22,7 @@ assert.match(scriptSha, /^[a-f0-9]{40}$/)
 const sha = process.env.NATIVE_CANDIDATE_SOURCE_SHA || scriptSha
 assert.match(sha, /^[a-f0-9]{40}$/)
 const source = path.resolve(process.env.NATIVE_CANDIDATE_SOURCE_DIR || process.cwd())
+const mediaOptions = focusedEntry && fs.existsSync(path.join(source, 'backend/internal/service/studio_passive_status.go'))
 const workspaceArtifact = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'studio-workspace'
 if (workspaceArtifact) assert.equal(sha, '40310e2961a5e8150e0c9df4cc86bb8087406c06')
 const reuseSha = 'b2fcdac93afa6ae194ee81801a9b37813f8f39eb'
@@ -190,12 +191,15 @@ if (mode === 'load-existing') {
       fs.writeFileSync(path.join(root,'compose.json'),JSON.stringify(compose))
       dc(['up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','90','bridge'])
       if (focusedEntry) run(process.execPath,['tools/native-media-e2e/studio-entry.cjs',root,'before'])
+      if (mediaOptions) run(process.execPath,['tools/native-media-e2e/aspect-options.cjs',root,'configure'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'verify'])
+      if (mediaOptions) run(process.execPath,['tools/native-media-e2e/aspect-options.cjs',root,'execute'])
       for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
       run(process.execPath,['tools/native-media-e2e/task-experience.cjs',root])
       if (focusedEntry) run(process.execPath,['tools/native-media-e2e/studio-entry.cjs',root,'verify'])
       else run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
       if(focusedEntry) run(process.execPath,['tools/native-media-e2e/image-finality.cjs',root])
+      if (mediaOptions) run(process.execPath,['tools/native-media-e2e/passive-status.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       if (!focusedEntry) run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
       // The old d893 baseline has no sample-evidence UI; require it for repaired sources.

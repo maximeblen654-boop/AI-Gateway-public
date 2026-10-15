@@ -83,7 +83,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
     await customerPage();await customer.getByTestId(edit?'studio-mode-edit':'studio-mode-text').click();await customer.getByTestId('studio-model-toggle').click()
     const catalog=await media('catalog');assert.equal(catalog.status,200)
     const offer=catalog.body.offers.find(o=>o.product_id===report.saved_product.product_id&&o.spec.resolution.includes('1K'));assert(offer)
-    await customer.getByTestId('studio-offer-select').selectOption(offer.offer_id)
+    await customer.locator(`[data-offer-id="${offer.offer_id}"]`).click()
     await customer.getByTestId('studio-resolution').click();await customer.locator('#studio-resolution-menu [data-value]').filter({hasText:/^1K$/}).click()
     await customer.getByTestId('studio-ratio-toggle').click();await customer.locator('[data-ratio="3:5"]').click();await customer.getByTestId('studio-count').click();await customer.locator('#studio-count-menu [data-value="1"]').click()
     if(edit)await customer.getByTestId('studio-asset-input').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:png})
