@@ -1,3 +1,5 @@
+> 2026-10-15 22:24后续事实：用户已单独授权并完成三笔历史502零收费终态修正，3笔failed/not_charged，0跳过，原件/claim/资金保护通过；生产仍4f10，图片true/视频false。见[一次性执行报告](HISTORICAL-FINALIZATION.md)。下方“三笔历史未改”仅描述部署时点，当前以本段为准。
+
 ## 2026-10-15 生产部署更新
 
 固定4f10be20已完成授权生产部署：**DEPLOYED_IMAGE_STATE_PRESERVED_VIDEO_DISABLED**。图片requested/effective=true，视频false。1870生产预检及开启二次检查通过，三笔历史unknown未改。详见[实际部署报告](DEPLOYMENT.md)。旧2bd对新增终态的降级限制与归档位置见该报告；不将供应商502标为已解决。以下候选证据保留追溯。

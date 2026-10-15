@@ -1,0 +1,472 @@
+{
+  "state": "HISTORICAL_502_FINALIZATION_COMPLETED",
+  "runtime_source": "4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+  "maintenance_source": "6345982383229afdb682c671f851c7cdd396bd53",
+  "ci_run": 38749576935,
+  "ci": "PASS",
+  "security_run": 38749576985,
+  "security": "PASS",
+  "first_runtime_guard_test_ci": 38747886956,
+  "tasks": [
+    {
+      "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+      "core_request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+      "owner": {
+        "user_id": 2,
+        "api_key_id": 3,
+        "group_id": 31
+      },
+      "account_id": 77,
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "receipt_before": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46",
+      "receipt_after": "499070da2d70e04cb5bd5f9e2dac73d378a8d439b5e8a55fa8977b5d0e6da1e9",
+      "status": "failed",
+      "billing_state": "not_charged",
+      "delivered_count": 0,
+      "failed_count": 3,
+      "native_billing_rows": {
+        "usage_logs": 0,
+        "usage_billing_dedup": 0,
+        "usage_billing_dedup_archive": 0
+      },
+      "original_claims_preserved": true,
+      "request_and_quote_preserved": true,
+      "files": [
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/unit-response-f12f934049eaec2a0ad106351060f8183580f2a3dd2cdf14ffbfbabf401699aa",
+          "before": "b50460361f52464ffa08433145cfc38f15e6a1e8918e51f29cb2226214fcd439",
+          "after": "bc5281d276040e6671cc1b57f34c00f471039efe992a279d8cc368edad9bd1c7"
+        },
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/task-bd27e05083b90461cb8f059229c43a1a1a58f61cec1d09b1ae419da8ea6a7512",
+          "before": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46",
+          "after": "499070da2d70e04cb5bd5f9e2dac73d378a8d439b5e8a55fa8977b5d0e6da1e9"
+        },
+        {
+          "file": "/var/lib/ai-gateway/studio-v2/images/journal/task-e3e1802beac7ac980744fffa1e0a25537749be3b92a929faf0afb962d461ea5f.json",
+          "before": "a96ecb9f1b0452c9fa124e798245611bc7a1b0fb9a1ee928e19264f5d57a34f6",
+          "after": "ea6ee031e6dfa6ce4ad44ad2fa1c7be90126bd22c7baa2882016a87f207f6241"
+        }
+      ]
+    },
+    {
+      "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+      "core_request_id": "55bb1465-791b-4783-ab6c-822e3f19a710",
+      "owner": {
+        "user_id": 2,
+        "api_key_id": 3,
+        "group_id": 31
+      },
+      "account_id": 77,
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "4:3",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "receipt_before": "bcfd21f11cc1794710c89c78194df24ba9524fe481ec7bbb316546a3ff110cce",
+      "receipt_after": "bb82740bfe70d156563a2c3ca0d04f82bc02b6664145fb3d4ad445e3507dfdab",
+      "status": "failed",
+      "billing_state": "not_charged",
+      "delivered_count": 0,
+      "failed_count": 1,
+      "native_billing_rows": {
+        "usage_logs": 0,
+        "usage_billing_dedup": 0,
+        "usage_billing_dedup_archive": 0
+      },
+      "original_claims_preserved": true,
+      "request_and_quote_preserved": true,
+      "files": [
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/unit-response-c901a7cfd8eff4e16649b52dbc5090fe7a4aead4951a5a8522dfe0a75d9f6a27",
+          "before": "6ddae4aebc663e9839ba66c47590621a3f14d57c35f830c623259c018ce1019c",
+          "after": "745203a2824bebe644e831ef3bd2e17f75c4f8d9b0f7d85312ff3692c551e254"
+        },
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/task-9afcefc1f4a0fdf1a8429e1dbd618cec29144f80192aa31a0512bc69165118cf",
+          "before": "bcfd21f11cc1794710c89c78194df24ba9524fe481ec7bbb316546a3ff110cce",
+          "after": "bb82740bfe70d156563a2c3ca0d04f82bc02b6664145fb3d4ad445e3507dfdab"
+        },
+        {
+          "file": "/var/lib/ai-gateway/studio-v2/images/journal/task-86d06a12627bf064dc5efdaf1461c7babc5152b61a6667b6e495be5a53a14d56.json",
+          "before": "38254ee74a16ac16cff06eba01fb6d19cc63ca4c1661f95d3d40f1ff1b1b4e9d",
+          "after": "a9496bad27afa219aecc4a10ce0ae263cd1f2646610ffb7da635482866cf34b9"
+        }
+      ]
+    },
+    {
+      "task_id": "img_f372e5916f913ebc4358129c65add930",
+      "core_request_id": "c49b9bed-0527-498e-ad5b-8819a2db4073",
+      "owner": {
+        "user_id": 1,
+        "api_key_id": 4,
+        "group_id": 31
+      },
+      "account_id": 77,
+      "spec": {
+        "resolution": "4K",
+        "duration_seconds": 0,
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "receipt_before": "c6928ef9f87521a15c5647d3a0df4d353a1f23e41b5b642c041a5075fc524206",
+      "receipt_after": "756ecf57fb9ddc62883023d9131605c7e70a190b9d065196c58bd97c0e6e5cda",
+      "status": "failed",
+      "billing_state": "not_charged",
+      "delivered_count": 0,
+      "failed_count": 1,
+      "native_billing_rows": {
+        "usage_logs": 0,
+        "usage_billing_dedup": 0,
+        "usage_billing_dedup_archive": 0
+      },
+      "original_claims_preserved": true,
+      "request_and_quote_preserved": true,
+      "files": [
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/unit-response-26186ff6e315015546d234de87f74d19d372b7244f290ad09248d3da500403a8",
+          "before": "2a8654c3040ad9f7a0d409399f4ab750eabf895c6d2173e31842f2c1673a078b",
+          "after": "fa27189c4d950047db9c40967b1710caa57b6239d92a3bcea75487b03dff1095"
+        },
+        {
+          "file": "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings/task-be743ff509e538c851893fb45c0c016e0d1b8cac7413e4d3fecf1c783c184738",
+          "before": "c6928ef9f87521a15c5647d3a0df4d353a1f23e41b5b642c041a5075fc524206",
+          "after": "756ecf57fb9ddc62883023d9131605c7e70a190b9d065196c58bd97c0e6e5cda"
+        },
+        {
+          "file": "/var/lib/ai-gateway/studio-v2/images/journal/task-902849285826e82fc4623bea8820e249675b8cfca69756d9070a6637f3164448.json",
+          "before": "6b4504744db66a338a7a518ac69b9ed2aaa9c5dece190f21d2e08ace5e03716c",
+          "after": "c237eed0c6b3325154ecfc1fa239aa71414e07260b8cb46ae5567623f7cb9160"
+        }
+      ]
+    }
+  ],
+  "skipped": [],
+  "started_at": "2026-10-15T14:16:10.167780+00:00",
+  "finished_at": "2026-10-15T14:16:15.669702+00:00",
+  "pause_seconds": 2.390903,
+  "funds": {
+    "balances_unchanged": true,
+    "frozen_balances_unchanged_and_zero": true,
+    "inflight_holds_zero": true,
+    "native_request_settlement_zero": true,
+    "usage_dedup_unchanged": true
+  },
+  "business": {
+    "protected_tables": {
+      "usage_logs": {
+        "before": {
+          "count": 24,
+          "digest": "e29a803160e081aabd87c4ab576c95a8"
+        },
+        "after": {
+          "count": 24,
+          "digest": "e29a803160e081aabd87c4ab576c95a8"
+        }
+      },
+      "usage_billing_dedup": {
+        "before": {
+          "count": 24,
+          "digest": "44f61751ae39a18037d9f8deb74d5006"
+        },
+        "after": {
+          "count": 24,
+          "digest": "44f61751ae39a18037d9f8deb74d5006"
+        }
+      },
+      "usage_billing_dedup_archive": {
+        "before": {
+          "count": 0,
+          "digest": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 0,
+          "digest": "d41d8cd98f00b204e9800998ecf8427e"
+        }
+      },
+      "studio_video_orders": {
+        "before": {
+          "count": 2,
+          "digest": "5b144b98a9e3ccc36cc87fe76aedd6d0"
+        },
+        "after": {
+          "count": 2,
+          "digest": "5b144b98a9e3ccc36cc87fe76aedd6d0"
+        }
+      },
+      "groups": {
+        "before": {
+          "count": 31,
+          "digest": "9b24e2abb4ae2eedf67d04d2d3a051d3"
+        },
+        "after": {
+          "count": 31,
+          "digest": "9b24e2abb4ae2eedf67d04d2d3a051d3"
+        }
+      }
+    },
+    "all_accounts_during_paused_operation": {
+      "count": 77,
+      "digest": "89bc550d5d1b58053cd238a66dc7df40"
+    },
+    "all_accounts_before_after_pause_equal": true,
+    "account77_full_fields_verified": true,
+    "background_metadata": "Other Accounts16/26 extra+updated_at changed before apply; native billing-probe metadata. Full accounts compared equal during the frozen operation. No claim that the entire observation window was unchanged.",
+    "native_key_read_effects": [
+      {
+        "id": 3,
+        "user_id": 2,
+        "group_id": 31,
+        "last_used_at": "2026-10-15T22:23:47.91116+08:00",
+        "updated_at": "2026-10-15T22:23:47.91116+08:00",
+        "created_at": "2026-09-30T03:53:56.450242+08:00",
+        "status": "active"
+      },
+      {
+        "id": 4,
+        "user_id": 1,
+        "group_id": 31,
+        "last_used_at": "2026-10-15T22:23:48.128065+08:00",
+        "updated_at": "2026-10-15T22:23:48.128065+08:00",
+        "created_at": "2026-10-03T23:21:14.280596+08:00",
+        "status": "active"
+      }
+    ],
+    "native_key_read_effects_explanation": "Authorized original-task GET authentication updates last_used_at/updated_at through existing TouchLastUsed. API Key full-table hash therefore differs after read verification. No key/owner/group/permission/price/balance mutation by maintenance."
+  },
+  "storage": {
+    "changed_core_files": 6,
+    "changed_bff_files": 3,
+    "other_durable_files_unchanged": true,
+    "original_results_unchanged": true,
+    "backups_verified": 21,
+    "private_backup_directory": "/home/ubuntu/services/ai-gateway/maintenance-historical-502-20261015/originals",
+    "audit_sha256": {
+      "intent.json": "38e9741c10112d7df71c2635653eb6ccdfd5f0ebc99851db36ba6fa86cd60a2d",
+      "applied.json": "31e3939fc10740641311f11b1e6470197d4576e3e44220d57e28bf1a048d508c",
+      "execute_historical_image_502.py": "c41d3c30aa5f91a05a3e732379b940b86a3dfccca719f7c2af6e3bb7a1d3898b",
+      "historical_image_502.py": "5e2a24c4e6d29fce1db5f7bc8807ad073e39b5e3452bd6b74bda07dc25b2c036"
+    }
+  },
+  "runtime_verification": {
+    "time": "2026-10-15T14:23:47.739941+00:00",
+    "core_reads": [
+      {
+        "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 3,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 3,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "task_id": "img_f372e5916f913ebc4358129c65add930",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "task_id": "img_f372e5916f913ebc4358129c65add930",
+        "http": 200,
+        "status": "failed",
+        "billing_state": "not_charged",
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      }
+    ],
+    "bff_views": [
+      {
+        "ownerId": 1,
+        "task_id": "img_f372e5916f913ebc4358129c65add930",
+        "status": "failed",
+        "billing_state": "not_charged",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "ownerId": 2,
+        "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+        "status": "failed",
+        "billing_state": "not_charged",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "4:3",
+          "quality": "",
+          "count": 1,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "delivered_count": 0,
+        "failed_count": 1,
+        "failure_code": "upstream_http_502_no_delivery"
+      },
+      {
+        "ownerId": 2,
+        "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+        "status": "failed",
+        "billing_state": "not_charged",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 3,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "delivered_count": 0,
+        "failed_count": 3,
+        "failure_code": "upstream_http_502_no_delivery"
+      }
+    ],
+    "health": {
+      "sub2api": {
+        "id": "fa1db455c273623fb45a3510bc8f9e8ab93feea363c517a8e74428cc6e3ec6ac",
+        "image": "sha256:fb7b46046f8abf255ad7013c4296de24cc956b6b18e44313b7d9af38aeeae1c0",
+        "started": "2026-10-15T13:01:11.878109781Z",
+        "paused": false,
+        "health": "healthy"
+      },
+      "studio-v2-bridge": {
+        "id": "fe7315785de9d4ef6033f18520ca883ad71972c7e398ef3e419075cc7b9eaeb8",
+        "image": "sha256:3d3c0a4c07ca4fc92fe5af0865d50b47f2c9783a3acb70bdc209cb5b423aded6",
+        "started": "2026-10-15T13:01:18.799005255Z",
+        "paused": false,
+        "health": "healthy"
+      },
+      "studio-v2-bff": {
+        "id": "6d05e53a1dd5d91c554c2dff0e63eb45c424e0061e553acc69ebbee948b00b91",
+        "image": "sha256:c0496b56b01c7f87886e53e5d010380e3f7b73b93355f1042bbf9877da02c686",
+        "started": "2026-10-15T13:01:39.644411749Z",
+        "paused": false,
+        "health": "healthy"
+      }
+    },
+    "generation_post_log_count": 0
+  },
+  "paid": {
+    "time": "2026-10-15T14:25:58.722Z",
+    "states": {
+      "image": {
+        "requested_enabled": true,
+        "effective_enabled": true
+      },
+      "video": {
+        "requested_enabled": false,
+        "effective_enabled": false
+      }
+    }
+  },
+  "browser": {
+    "scope": "Authenticated User1 task3 desktop/mobile; User2 views verified through deployed BFF reader and original owner native Core GET. No User2 browser session claimed.",
+    "visible_status": "生成失败",
+    "visible_billing": "实际结算：\n未收费",
+    "query_feedback": "22:21:41 · 已查询原任务，暂无新结果。当前状态：生成失败。",
+    "query_finished": true,
+    "screenshots": [
+      "customer-finality-1440.png",
+      "customer-finality-390.png"
+    ],
+    "generation_post": 0
+  },
+  "deployed": false,
+  "restarted": false,
+  "manual_sql_writes": false,
+  "supplier_refund_asserted": false,
+  "response_body_or_hash_invented": false,
+  "rollback_note": "No downgrade to 2bd or restore-unknown over final records; preserve 4f10-compatible finality."
+}

@@ -1,0 +1,133 @@
+[
+  {
+    "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+    "core_request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+    "archived_file": "output\\image-task-20261015\\log-detail.json",
+    "archived_sha256": "9533442085e1111391e5cd970ae3b456009801d9301dd8e3ea1b96dab616a9dc",
+    "events": [
+      {
+        "request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+        "model": "gpt-image-2",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T04:47:22.142+0800\tINFO\thandler/security_audit_helper.go:133\tsecurity_audit.gateway_check_start\t"
+      },
+      {
+        "request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T04:47:22.142+0800\tINFO\thandler/security_audit_helper.go:145\tsecurity_audit.gateway_check_done\t"
+      },
+      {
+        "component": "service.openai_gateway",
+        "prefix": "2026-10-15T04:47:22.424+0800\tINFO\tservice/openai_images.go:599\t[OpenAI] Images request routing request_model=gpt-image-2 upstream_model=gpt-image-2 endpoint=/v1/images/generations account_type=apikey\t"
+      },
+      {
+        "account_id": 77,
+        "status_code": 502,
+        "prefix": "2026-10-15T04:47:47.458+0800\tWARN\tslog\tlogger/slog_handler.go:55\taccount_upstream_error\t"
+      },
+      {
+        "request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+        "status_code": 409,
+        "latency_ms": 25348,
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "http.access",
+        "prefix": "2026-10-15T04:47:47.463+0800\tINFO\tmiddleware/logger.go:82\thttp request completed\t"
+      }
+    ],
+    "response_body_preserved": false,
+    "supplier_refund_asserted": false
+  },
+  {
+    "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+    "core_request_id": "55bb1465-791b-4783-ab6c-822e3f19a710",
+    "archived_file": "output\\image-failure-1141-20261015\\locate.json",
+    "archived_sha256": "cfe31eeafdbc06713d80ff0bd19a72588ce044a5e67a26b40971123841b52c9c",
+    "events": [
+      {
+        "request_id": "55bb1465-791b-4783-ab6c-822e3f19a710",
+        "user_id": 2,
+        "model": "gpt-image-2",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T11:40:57.237+0800\tINFO\thandler/security_audit_helper.go:133\tsecurity_audit.gateway_check_start\t"
+      },
+      {
+        "request_id": "55bb1465-791b-4783-ab6c-822e3f19a710",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T11:40:57.237+0800\tINFO\thandler/security_audit_helper.go:145\tsecurity_audit.gateway_check_done\t"
+      },
+      {
+        "component": "service.openai_gateway",
+        "prefix": "2026-10-15T11:40:57.511+0800\tINFO\tservice/openai_images.go:599\t[OpenAI] Images request routing request_model=gpt-image-2 upstream_model=gpt-image-2 endpoint=/v1/images/generations account_type=apikey\t"
+      },
+      {
+        "request_id": "55bb1465-791b-4783-ab6c-822e3f19a710",
+        "status_code": 409,
+        "latency_ms": 40083,
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "http.access",
+        "prefix": "2026-10-15T11:41:37.295+0800\tINFO\tmiddleware/logger.go:82\thttp request completed\t"
+      },
+      {
+        "account_id": 77,
+        "status_code": 502,
+        "prefix": "2026-10-15T11:41:37.291+0800\tWARN\tslog\tlogger/slog_handler.go:55\taccount_upstream_error\t"
+      }
+    ],
+    "response_body_preserved": false,
+    "supplier_refund_asserted": false
+  },
+  {
+    "task_id": "img_f372e5916f913ebc4358129c65add930",
+    "core_request_id": "c49b9bed-0527-498e-ad5b-8819a2db4073",
+    "archived_file": "output\\image-failure-1141-20261015\\locate-1148.json",
+    "archived_sha256": "d57d68ab9e020ca883854cf3867eda07c4b817ee76a13e61b70455f14d823efe",
+    "events": [
+      {
+        "request_id": "c49b9bed-0527-498e-ad5b-8819a2db4073",
+        "user_id": 1,
+        "model": "gpt-image-2",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T11:47:55.617+0800\tINFO\thandler/security_audit_helper.go:133\tsecurity_audit.gateway_check_start\t"
+      },
+      {
+        "request_id": "c49b9bed-0527-498e-ad5b-8819a2db4073",
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "handler.studio_images",
+        "prefix": "2026-10-15T11:47:55.617+0800\tINFO\thandler/security_audit_helper.go:145\tsecurity_audit.gateway_check_done\t"
+      },
+      {
+        "component": "service.openai_gateway",
+        "prefix": "2026-10-15T11:47:55.896+0800\tINFO\tservice/openai_images.go:599\t[OpenAI] Images request routing request_model=gpt-image-2 upstream_model=gpt-image-2 endpoint=/v1/images/generations account_type=apikey\t"
+      },
+      {
+        "request_id": "c49b9bed-0527-498e-ad5b-8819a2db4073",
+        "status_code": 409,
+        "latency_ms": 35350,
+        "method": "POST",
+        "path": "/v1/studio/images/tasks",
+        "component": "http.access",
+        "prefix": "2026-10-15T11:48:30.945+0800\tINFO\tmiddleware/logger.go:82\thttp request completed\t"
+      },
+      {
+        "account_id": 77,
+        "status_code": 502,
+        "prefix": "2026-10-15T11:48:30.940+0800\tWARN\tslog\tlogger/slog_handler.go:55\taccount_upstream_error\t"
+      }
+    ],
+    "response_body_preserved": false,
+    "supplier_refund_asserted": false
+  }
+]
