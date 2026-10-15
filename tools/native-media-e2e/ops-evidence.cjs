@@ -19,7 +19,7 @@ const report={production:false,api_mocking:false,screenshots:[],snapshots:[]}
    await expect(page.getByTestId('ops-sla-samples')).toBeVisible();await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true)
    const name=`native-ops-${width}-${dark?'dark':'light'}.png`;await page.screenshot({path:root+'/evidence/'+name,fullPage:true,animations:'disabled'});report.screenshots.push(name)
   }
-  for(const o of report.snapshots){assert.equal(o.request_count_sla,o.success_count+o.error_count_sla);if(o.request_count_sla>0)assert(Math.abs(o.error_rate-o.error_count_sla/o.request_count_sla)<1e-6)}
+  for(const o of report.snapshots){assert.equal(o.request_count_sla,o.success_count+o.error_count_sla);if(o.request_count_sla>0){/* Native ops_repo_dashboard rounds ratios to four decimal places. */ assert.equal(o.error_rate,Number((o.error_count_sla/o.request_count_sla).toFixed(4)));assert.equal(o.sla,Number((o.success_count/o.request_count_sla).toFixed(4)))}}
   report.assets=await proof();report.pass=true
  }catch(e){report.error=e.stack;await page.screenshot({path:root+'/evidence/native-ops-failure.png'}).catch(()=>{});throw e}
  finally{fs.writeFileSync(root+'/evidence/native-ops.json',JSON.stringify(report,null,2));await browser.close()}
