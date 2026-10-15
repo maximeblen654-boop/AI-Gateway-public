@@ -105,6 +105,17 @@ jobs:
       - name: Build only this commit, using existing component recipes
         id: build
         run: node tools/native-media-e2e/candidate.mjs build
+      - uses: actions/setup-go@v6
+        if: hashFiles('.candidate-runtime/backend/cmd/media-published-recovery/main.go') != ''
+        with:
+          go-version-file: .candidate-runtime/backend/go.mod
+          cache-dependency-path: .candidate-runtime/backend/go.sum
+      - name: Package the pinned one-off recovery tool (never execute against production)
+        if: hashFiles('.candidate-runtime/backend/cmd/media-published-recovery/main.go') != ''
+        working-directory: .candidate-runtime/backend
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$RUNNER_TEMP/native-candidate-output/media-published-recovery" ./cmd/media-published-recovery
+          node -e 'const fs=require("fs"),crypto=require("crypto"),p=process.env.RUNNER_TEMP+"/native-candidate-output/";fs.writeFileSync(p+"maintenance-tool.json",JSON.stringify({source_sha:process.env.NATIVE_CANDIDATE_SOURCE_SHA,file:"media-published-recovery",sha256:crypto.createHash("sha256").update(fs.readFileSync(p+"media-published-recovery")).digest("hex"),platform:"linux/amd64",executed_in_production:false},null,2))'
       - name: Install browser test dependencies
         run: |
           sudo apt-get update

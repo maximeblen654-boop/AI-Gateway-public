@@ -105,6 +105,7 @@ const p='/admin/media-workbench/paid-controls/'
    report.scale.apply={wall_ms:elapsed,report:result.report}
    assert.equal((await current('video')).effective_enabled,false)
    assert.deepEqual(stats(),before,'all 1870 checks and enable recheck must make zero supplier calls')
+   if(process.env.NATIVE_CATALOG_RECOVERY==='true') report.catalog_dependencies=await require('./catalog-dependencies.cjs')({fixture,dc,api,current,check,change,media,page,base,accountPath,p,stats,before})
    assert.equal((await change('image',false)).status,200)
    assert.equal((await current('image')).effective_enabled,false)
    report.assets=await proof()

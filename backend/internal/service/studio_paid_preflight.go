@@ -158,7 +158,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		}
 		// Exclude unpublished Draft and live usage counters. Every frozen Published,
 		// mapping, routing, auth, Account-cost and permission dependency participates.
-		parts = append(parts, []any{a.ID, a.Status, a.Schedulable, a.RuntimeReady, mediaworkbench.DependenciesFor(&a), a.Config.Sales, a.Config.Published, studioCredentialFingerprint(native), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
+		parts = append(parts, []any{a.ID, a.Status, a.Schedulable, a.RuntimeReady, mediaworkbench.PublishedDependenciesFor(&a), a.Config.Sales, a.Config.Published, studioCredentialFingerprint(native), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
 		out.accounts = append(out.accounts, a)
 	}
 	if len(out.accounts) == 0 {

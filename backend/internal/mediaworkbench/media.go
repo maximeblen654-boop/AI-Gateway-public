@@ -558,7 +558,7 @@ func (s *Service) Publish(ctx context.Context, id, expected int64, revision stri
 				products = append(products, product)
 			}
 		}
-		p := &Published{SourceDraftRevision: revision, PublishedAt: now, Products: products, Offers: offers, Dependencies: v.Dependencies}
+		p := &Published{SourceDraftRevision: revision, PublishedAt: now, Products: products, Offers: offers, Dependencies: dependenciesForProducts(a, products)}
 		p.Revision = publishedRevision(p)
 		a.Config.Published = p
 	}

@@ -476,6 +476,32 @@ func DependenciesFor(a *Account) Dependencies {
 	return Dependencies{AccountID: a.ID, RoutingSHA256: hash([]string{a.Platform, a.Type, endpoint, a.RoutingFingerprint}), CatalogSHA256: hash(a.Catalog), MappingSHA256: hash(a.ModelMapping), BindingSHA256: hash(bindings), RegistryRevision: RegistryRevision}
 }
 
+// Published dependency checks only bind catalog membership of the models sold.
+// Draft validation/CAS deliberately keep the complete snapshot in DependenciesFor.
+const publishedCatalogPrefix = "published-models-v1:"
+
+func dependenciesForProducts(a *Account, products []Product) Dependencies {
+	d := DependenciesFor(a)
+	models := map[string]bool{}
+	for _, p := range products {
+		if p.Enabled {
+			models[p.UpstreamModel] = a.Catalog != nil && slices.Contains(a.Catalog.Models, p.UpstreamModel)
+		}
+	}
+	d.CatalogSHA256 = publishedCatalogPrefix + hash(models)
+	return d
+}
+
+// Legacy snapshots retain exact comparison until explicitly revalidated. Unknown
+// scopes fail closed; reading a snapshot never rewrites it or upgrades its scope.
+func PublishedDependenciesFor(a *Account) Dependencies {
+	d := DependenciesFor(a)
+	if a.Config != nil && a.Config.Published != nil && strings.HasPrefix(a.Config.Published.Dependencies.CatalogSHA256, publishedCatalogPrefix) {
+		return dependenciesForProducts(a, a.Config.Published.Products)
+	}
+	return d
+}
+
 func publishedRevision(p *Published) string {
 	return "mwp_" + hash(struct {
 		Source       string
@@ -493,7 +519,7 @@ func publishedReadyContext(ctx context.Context, a *Account) bool {
 		return false
 	}
 	p := a.Config.Published
-	if p == nil || len(p.Offers) == 0 || p.Dependencies != DependenciesFor(a) || p.Revision != publishedRevision(p) {
+	if p == nil || len(p.Offers) == 0 || p.Dependencies != PublishedDependenciesFor(a) || p.Revision != publishedRevision(p) {
 		return false
 	}
 	// Validate the immutable Published products rather than a newer/incomplete
