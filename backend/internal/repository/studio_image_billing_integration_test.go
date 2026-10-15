@@ -82,3 +82,40 @@ func TestStudioQuotedBillingPostgresSeparationAndReplay(t *testing.T) {
 	require.Equal(t, "0.3500000000", stats)
 	require.Equal(t, "1.0000", rate)
 }
+
+// Audit the existing native post-delivery contract, not a reservation system.
+// A valid first settlement may overdraw a balance spent while delivery was pending.
+func TestStudioQuotedLateFirstSettlementUsesNativeInsufficientBalanceContract(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	user := mustCreateUser(t, client, &service.User{Email: fmt.Sprintf("studio-late-%d@example.invalid", time.Now().UnixNano()), PasswordHash: "synthetic", Balance: 0.25})
+	group := mustCreateGroup(t, client, &service.Group{Name: fmt.Sprintf("studio-late-%d", time.Now().UnixNano()), Platform: service.PlatformOpenAI})
+	key := mustCreateApiKey(t, client, &service.APIKey{UserID: user.ID, GroupID: &group.ID, Key: fmt.Sprintf("sk-synthetic-late-%d", time.Now().UnixNano()), Quota: 100})
+	account := mustCreateAccount(t, client, &service.Account{Name: "synthetic late settlement", Type: service.AccountTypeAPIKey, Platform: service.PlatformOpenAI, Extra: map[string]any{"quota_limit": 100.0}})
+	t.Cleanup(func() {
+		for _, c := range []struct {
+			query string
+			id    int64
+		}{
+			{"DELETE FROM usage_logs WHERE api_key_id=$1", key.ID}, {"DELETE FROM usage_billing_dedup WHERE api_key_id=$1", key.ID}, {"DELETE FROM usage_billing_dedup_archive WHERE api_key_id=$1", key.ID}, {"DELETE FROM api_keys WHERE id=$1", key.ID}, {"DELETE FROM accounts WHERE id=$1", account.ID}, {"DELETE FROM groups WHERE id=$1", group.ID}, {"DELETE FROM users WHERE id=$1", user.ID},
+		} {
+			_, err := integrationDB.ExecContext(ctx, c.query, c.id)
+			require.NoError(t, err)
+		}
+	})
+	receipt := quotedBillingFixture(t, user.ID, key.ID, account.ID, group.ID)
+	repo := NewUsageBillingRepository(client, integrationDB)
+	applied, err := service.SettleQuotedImage(ctx, repo, receipt)
+	require.NoError(t, err)
+	require.True(t, applied.Applied)
+	var balance, frozen string
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT balance::text,frozen_balance::text FROM users WHERE id=$1", user.ID).Scan(&balance, &frozen))
+	require.Equal(t, "-0.55000000", balance)
+	require.Equal(t, "0.00000000", frozen)
+	replay, err := service.SettleQuotedImage(ctx, repo, receipt)
+	require.NoError(t, err)
+	require.False(t, replay.Applied)
+	var count int
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT count(*) FROM usage_logs WHERE api_key_id=$1", key.ID).Scan(&count))
+	require.Equal(t, 1, count)
+}
