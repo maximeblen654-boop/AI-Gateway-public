@@ -1,0 +1,614 @@
+{
+  "production": false,
+  "api_mocking": false,
+  "supplier": "local simulator only",
+  "source_sha": "6f02fdc17a923aa17576f0803305b925b29e36dd",
+  "checks": [
+    "Independent native customer API Key executes gpt-image-1 through original native endpoint on the same Account while its Studio product is unlisted or not ready; protected Image2Pro canvas-image-01 still requires Studio task flow",
+    "Actual admin publication selects one product from a 53-model catalog with two Published products and an unfinished third Draft; the unfinished and unselected products are not published",
+    "Single product unlist/archive/restore/relist preserves saved Draft, Published snapshot, Account sales and shared paid gate",
+    "Frozen old quote rejected while unlisted; independent never-attempted old quote first submitted after relist also rejects with no supplier call, usage, dedup or balance change; archive restore stays unlisted",
+    "Healthy sibling completes through actual BFF/Bridge/Core, downloads original bytes and settles once; duplicate and reads do not regenerate; unlisting that delivered product preserves original task/result bytes and ledger",
+    "Missing native catalog model isolates only the affected product; same Account model and same Group peer Account remain quotable",
+    "Final embedded admin confirmation and customer unavailable prompt exercised without API mocks or Vite"
+  ],
+  "screenshots": [
+    "native-model-lifecycle-admin-confirm.png",
+    "native-model-lifecycle-customer-unavailable.png",
+    "native-model-lifecycle-customer-unavailable-390.png",
+    "native-model-lifecycle-admin-archived-list.png",
+    "native-model-lifecycle-admin-archived-list-390.png",
+    "native-model-lifecycle-53-model-catalog.png",
+    "native-model-lifecycle-selected-publish.png"
+  ],
+  "actions": [
+    {
+      "action": "unlist",
+      "via": "final admin UI",
+      "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+      "state": "unlisted"
+    },
+    {
+      "action": "archive",
+      "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+      "record_version": 22,
+      "state": "archived"
+    },
+    {
+      "action": "restore",
+      "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+      "record_version": 23,
+      "state": "unlisted"
+    },
+    {
+      "action": "relist",
+      "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+      "record_version": 24,
+      "state": "active"
+    },
+    {
+      "action": "unlist",
+      "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+      "record_version": 25,
+      "state": "unlisted"
+    },
+    {
+      "action": "relist",
+      "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+      "record_version": 26,
+      "state": "active"
+    },
+    {
+      "action": "unlist",
+      "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+      "record_version": 27,
+      "state": "unlisted"
+    },
+    {
+      "action": "relist",
+      "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+      "record_version": 28,
+      "state": "active"
+    }
+  ],
+  "native_cost": {
+    "channel_id": 3,
+    "original_account_wildcard_preserved": true,
+    "peer_account_rule_added": true
+  },
+  "fixture": {
+    "account": 3,
+    "group": 4,
+    "peer_account": 6,
+    "target": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+    "healthy_sibling": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+    "peer_product": "synthetic-lifecycle-peer",
+    "published_revision": "mwp_e81556415834d6dc39222f15120b65032e93a73519c7f9ea4482da9c95b139ad",
+    "draft_revision": "mwd_22b0bc5147a88f3058e12861b2572e8f78465c1725c9cbeb16886fc63b9f00bf",
+    "saved_unpublished_sentinel": true
+  },
+  "old_task_id": "img_48bebbf3b1fa64224e35736c4adfd2b9",
+  "old_unattempted_task_id": "img_c7757ed635a8adeda3f3064e58e7a812",
+  "supplier_posts_before": 35,
+  "old_quote_rejected": {
+    "quote_status": 409,
+    "submit_status": 409,
+    "no_supplier_call": true,
+    "ledger": {
+      "request_id": "35a51b507d12c7f8bab65d73cf874c24f549b9f89f90aaa90ddb2e28635c145c",
+      "usage": 0,
+      "dedup": 0,
+      "cost": "0",
+      "account_id": null,
+      "user_id": null,
+      "image_count": null
+    }
+  },
+  "task_id": "img_cdb7d6f6e384bf55ca3958ba761298f0",
+  "healthy_delivery": {
+    "task_id": "img_cdb7d6f6e384bf55ca3958ba761298f0",
+    "quote": {
+      "contract": "published_image_binding_v1",
+      "execution": {
+        "mode": "single",
+        "max_output_images": 1,
+        "units": [
+          {
+            "index": 0,
+            "output_offset": 0,
+            "output_count": 1,
+            "mode": "single"
+          }
+        ]
+      },
+      "expires_at": "2026-10-15T22:16:10.547610723Z",
+      "quantity": 1,
+      "quote_token": "[REDACTED]",
+      "sale_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "spec": {
+        "resolution": "1024x1024",
+        "duration_seconds": 0,
+        "aspect_ratio": "1:1",
+        "quality": "",
+        "count": 1,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "total_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    "balance_before": {
+      "balance": "100.00000000",
+      "frozen_balance": "0.00000000",
+      "usage": 0
+    },
+    "balance_after": {
+      "balance": "99.97500000",
+      "frozen_balance": "0.00000000",
+      "usage": 1
+    },
+    "ledger": {
+      "request_id": "c97c152f04312e88b04721993225cdbf4a1690c62ef5895e3e9f1058c13f96ec",
+      "usage": 1,
+      "dedup": 1,
+      "cost": "0.0250000000",
+      "account_id": 3,
+      "user_id": 1,
+      "image_count": 1
+    },
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "supplier_requests": [
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "model": "gpt-image-1",
+          "n": 1,
+          "prompt": "SYNTHETIC_LIFECYCLE_HEALTHY_27581034-1265-4c1b-99f9-d4ba8d546b29",
+          "size": "1024x1024"
+        }
+      }
+    ],
+    "duplicate_status": 200
+  },
+  "old_unattempted_quote_expiry": {
+    "expires_at": "2026-10-15T22:15:58.822063852Z",
+    "remaining_ms_at_first_submit": 106838
+  },
+  "old_quote_after_relist": {
+    "task_id": "img_c7757ed635a8adeda3f3064e58e7a812",
+    "first_submit_after_full_lifecycle": true,
+    "status": 409,
+    "supplier_posts": 0,
+    "ledger": {
+      "request_id": "bbdfc72f19a8d0874bc65fa8bd1ca3d96178592f6e1e9f1492ee64b1b39cb3ec",
+      "usage": 0,
+      "dedup": 0,
+      "cost": "0",
+      "account_id": null,
+      "user_id": null,
+      "image_count": null
+    },
+    "balance_unchanged": true
+  },
+  "history_after_unlist": {
+    "task_id": "img_cdb7d6f6e384bf55ca3958ba761298f0",
+    "status": "completed",
+    "download_status": 200,
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "ledger_unchanged": true,
+    "balance_unchanged": true,
+    "no_regeneration": true
+  },
+  "model_disappearance": {
+    "missing_target_rejected": true,
+    "other_model_same_account_quotable": true,
+    "same_group_other_account_quotable": true,
+    "shared_gate_unchanged": true,
+    "original_catalog_restored": true
+  },
+  "native_api_independence": {
+    "key_created": true,
+    "protected_model_rejected_without_supplier_call": true,
+    "studio_headers": false,
+    "receipt_headers": false,
+    "requests": [
+      {
+        "state": "Studio Published product unlisted",
+        "status": 200,
+        "api_key_id": 9,
+        "user_id": 2,
+        "account_id": 3,
+        "model": "gpt-image-1",
+        "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+        "native_usage": 1,
+        "supplier_calls": 1,
+        "studio_quote_status": 409,
+        "studio_ledger_unchanged": true
+      },
+      {
+        "state": "Studio Published product not ready after catalog model removal",
+        "status": 200,
+        "api_key_id": 9,
+        "user_id": 2,
+        "account_id": 3,
+        "model": "gpt-image-1",
+        "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+        "native_usage": 2,
+        "supplier_calls": 1,
+        "studio_quote_status": 409,
+        "studio_ledger_unchanged": true
+      }
+    ],
+    "supplier_posts": 2
+  },
+  "selected_publication": {
+    "catalog_count": 53,
+    "catalog_source": "isolated synthetic snapshot injection",
+    "published_before": 2,
+    "draft_products": 3,
+    "selected_product_ids": [
+      "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+    ],
+    "publish_status": 200,
+    "published_after": 2,
+    "unfinished_remained_draft": true,
+    "unselected_published_unchanged": true,
+    "unselected_draft_unchanged": true,
+    "supplier_posts": 0
+  },
+  "admin_writes": [
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 20,
+        "action": "unlist",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 20,
+        "action": "archive",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 21,
+        "action": "archive",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 22,
+        "action": "restore",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 23,
+        "action": "relist",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 24,
+        "action": "unlist",
+        "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 25,
+        "action": "relist",
+        "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 26,
+        "action": "archive",
+        "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 26,
+        "action": "unlist",
+        "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/lifecycle",
+      "method": "POST",
+      "body": {
+        "expected_version": 27,
+        "action": "relist",
+        "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836"
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/draft",
+      "method": "PUT",
+      "body": {
+        "expected_record_version": 28,
+        "draft": {
+          "products": [
+            {
+              "product_id": "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac",
+              "media_type": "image",
+              "site_model": "gpt-image-2",
+              "display_name": "Synthetic explicitly selected publication",
+              "upstream_model": "gpt-image-2",
+              "enabled": true,
+              "capabilities": {
+                "resolutions": [
+                  "1024x1024"
+                ],
+                "aspect_ratios": [
+                  "1:1"
+                ],
+                "qualities": [],
+                "durations_seconds": [],
+                "count": {
+                  "min": 1,
+                  "max": 1
+                },
+                "references": {
+                  "image": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "video": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "audio": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "total_max": 0
+                },
+                "combination_rules": []
+              },
+              "pricing_rules": [
+                {
+                  "match": {},
+                  "sale_price": {
+                    "amount": "0.025",
+                    "currency": "CNY",
+                    "billing_mode": "per_request"
+                  }
+                }
+              ],
+              "adapter_config": {
+                "version": 1,
+                "size_mappings": [],
+                "model_family": "openai_json",
+                "execution": {
+                  "mode": "single",
+                  "max_output_images": 1
+                }
+              }
+            },
+            {
+              "product_id": "media-58fa3c6e-84d2-4fef-9cdf-6583d7c2d836",
+              "media_type": "image",
+              "site_model": "gpt-image-1",
+              "display_name": "UNPUBLISHED lifecycle sentinel",
+              "upstream_model": "gpt-image-1",
+              "enabled": true,
+              "capabilities": {
+                "resolutions": [
+                  "1024x1024"
+                ],
+                "aspect_ratios": [
+                  "1:1"
+                ],
+                "qualities": [],
+                "durations_seconds": [],
+                "count": {
+                  "min": 1,
+                  "max": 1
+                },
+                "references": {
+                  "image": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "video": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "audio": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "total_max": 0
+                },
+                "combination_rules": []
+              },
+              "pricing_rules": [
+                {
+                  "match": {},
+                  "sale_price": {
+                    "amount": "9.99",
+                    "currency": "CNY",
+                    "billing_mode": "per_request"
+                  }
+                }
+              ],
+              "adapter_config": {
+                "version": 1,
+                "size_mappings": [],
+                "model_family": "openai_json",
+                "execution": {
+                  "mode": "single",
+                  "max_output_images": 1
+                }
+              }
+            },
+            {
+              "product_id": "synthetic-unfinished-publication",
+              "media_type": "image",
+              "site_model": "synthetic-catalog-only-01",
+              "display_name": "Synthetic unfinished draft must remain unpublished",
+              "upstream_model": "synthetic-catalog-only-01",
+              "enabled": true,
+              "capabilities": {
+                "resolutions": [
+                  "1024x1024"
+                ],
+                "aspect_ratios": [
+                  "1:1"
+                ],
+                "qualities": [],
+                "durations_seconds": [],
+                "count": {
+                  "min": 1,
+                  "max": 1
+                },
+                "references": {
+                  "image": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "video": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "audio": {
+                    "min": 0,
+                    "max": 0
+                  },
+                  "total_max": 0
+                },
+                "combination_rules": []
+              },
+              "pricing_rules": [],
+              "adapter_config": {
+                "version": 1,
+                "size_mappings": [],
+                "model_family": "openai_json",
+                "execution": {
+                  "mode": "single",
+                  "max_output_images": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/api/v1/admin/media-workbench/accounts/3/publish",
+      "method": "POST",
+      "body": {
+        "expected_record_version": 30,
+        "expected_draft_revision": "mwd_8ebd9a3e827994c78d6df5b03556472be121ab78a941e4b60622b0430a87fecf",
+        "product_ids": [
+          "media-7f54449f-e3b1-46ae-a31c-cab199bfb1ac"
+        ]
+      }
+    }
+  ],
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BbCtuMc3.js",
+        "bytes": 194144,
+        "sha256": "f1c21e391028a055dd19384f33e3fbfff486101ccc4b6e524560c416ec1cb3c4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-Y0bcKx5T.js",
+        "bytes": 414176,
+        "sha256": "e5deddc8af71e400e4dfb4bc1818b49e1f4786f8411baad54b32b893b0b23b2a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-DRyy2t_f.css",
+        "bytes": 25354,
+        "sha256": "e988555d2a7b24cc94d39458702cf88d280c565e619ee55bbf270c48186dfbfd",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-D1XqLK9w.js",
+        "bytes": 55000,
+        "sha256": "03cefa8e8d561e178bb8cb96de5ddd02212a67f7d8fe25f0d4553027572fa070",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": []
+  },
+  "supplier_posts_after": 38,
+  "pass": true
+}

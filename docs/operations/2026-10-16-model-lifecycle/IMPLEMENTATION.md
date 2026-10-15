@@ -1,6 +1,6 @@
 # Model lifecycle and per-product isolation
 
-Status: implemented; final container candidate acceptance pending. No production action.
+Status: CANDIDATE_READY_NOT_DEPLOYED. Final container acceptance 38814836926 PASS. No production action.
 
 - Admin CAS lifecycle: unlist, explicit validated relist, archive, restore-as-unlisted, hide unconfigured model. Existing Account/Draft/Published products are retained. Model bulk actions reject divergent Draft/Published model identities; explicit product actions show both identities. Archived products stay in save payloads and are excluded from a later explicit publication.
 - New publications persist per-product dependency snapshots. Account routing/auth remains mandatory; canonical mapping and catalog membership are scoped to the sold product. A sibling product change does not change a healthy product's frozen quote. Lifecycle revision invalidates old quotes even after relisting.
@@ -24,7 +24,7 @@ New lifecycle/Published JSON fields are not readable by old strict decoders. Aft
 
 ## Candidate acceptance
 
-Existing GitHub-hosted native-media-candidate workflow, paid-controls focused scope. New model-lifecycle harness uses final Core embedded frontend, real Core/Bridge/BFF/PostgreSQL/Redis, local simulated supplier. It covers same Account and same Group isolation, old quote refusal, admin CAS, unpublished Draft sentinel, original download and native one-time settlement. No Vite/API mocks, no repeat 104-task campaign. Final run/manifest/screenshots will be recorded after actual completion.
+Existing GitHub-hosted native-media-candidate workflow, paid-controls focused scope. New model-lifecycle harness uses final Core embedded frontend, real Core/Bridge/BFF/PostgreSQL/Redis, local simulated supplier. It covers same Account and same Group isolation, old quote refusal, admin CAS, unpublished Draft sentinel, original download and native one-time settlement. No Vite/API mocks, no repeat 104-task campaign. Final run 38814836926 PASS; manifest, sanitized reports and screenshots are in this directory.
 
 ## Selected publication and accurate status (latest scope)
 

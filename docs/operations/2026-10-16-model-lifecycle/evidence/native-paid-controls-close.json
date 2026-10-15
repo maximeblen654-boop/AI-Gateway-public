@@ -1,0 +1,11 @@
+{
+  "phase": "close",
+  "checks": [
+    "Both synthetic paid gates closed after simulated task acceptance"
+  ],
+  "screenshots": [],
+  "http_errors": [],
+  "production": false,
+  "supplier": "local simulator only",
+  "pass": true
+}
