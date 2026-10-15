@@ -192,6 +192,8 @@ if (mode === 'load-existing') {
       run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
+      // The old d893 baseline has no sample-evidence UI; require it for repaired sources.
+      if(fs.readFileSync(path.join(source,'frontend/src/views/admin/ops/components/OpsDashboardHeader.vue'),'utf8').includes('ops-sla-samples')) run(process.execPath,['tools/native-media-e2e/ops-evidence.cjs',root])
     } else if (adminReview) {
       assert.equal(await fetch('http://127.0.0.1:4295/').then(() => true).catch(() => false), false)
       for (const script of ['seed.mjs', 'customer-keys.mjs']) run(process.execPath, [`tools/native-media-e2e/${script}`, root])

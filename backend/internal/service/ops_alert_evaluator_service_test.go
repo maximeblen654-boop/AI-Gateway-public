@@ -309,7 +309,7 @@ func TestOpsAlertLifecycleNoDataAndSustainedRecovery(t *testing.T) {
 			require.NotNil(t, repo.active)
 			require.Zero(t, repo.resolved)
 			repo.err = nil
-			repo.overview = &OpsDashboardOverview{RequestCountSLA: 1, RequestCountTotal: 9, ErrorCountSLA: 1, ErrorRate: 1, UpstreamErrorRate: 1, SLA: 0}
+			repo.overview = &OpsDashboardOverview{RequestCountSLA: 1, RequestCountTotal: 9, ErrorCountSLA: 1, UpstreamErrorCountExcl429529: 1, ErrorRate: 1, UpstreamErrorRate: 1, SLA: 0}
 			svc.evaluateOnce(time.Minute)
 			require.NotNil(t, repo.active, "a breached sample after reset must not resolve an existing incident")
 			require.Zero(t, repo.resolved)
@@ -327,7 +327,7 @@ func TestOpsAlertLifecycleNoDataAndSustainedRecovery(t *testing.T) {
 			require.Nil(t, repo.active)
 			require.Equal(t, 1, repo.resolved)
 			// New incidents still require the configured sustained duration.
-			repo.overview = &OpsDashboardOverview{RequestCountSLA: 1, RequestCountTotal: 9, ErrorCountSLA: 1, ErrorRate: 1, UpstreamErrorRate: 1}
+			repo.overview = &OpsDashboardOverview{RequestCountSLA: 1, RequestCountTotal: 9, ErrorCountSLA: 1, UpstreamErrorCountExcl429529: 1, ErrorRate: 1, UpstreamErrorRate: 1}
 			svc.evaluateOnce(time.Minute)
 			require.Nil(t, repo.active)
 			svc.evaluateOnce(time.Minute)
@@ -335,6 +335,7 @@ func TestOpsAlertLifecycleNoDataAndSustainedRecovery(t *testing.T) {
 			require.Equal(t, 1, repo.created)
 			require.Equal(t, int64(1), repo.active.Dimensions["request_count_sla"])
 			require.Equal(t, int64(1), repo.active.Dimensions["error_count_sla"])
+			require.Equal(t, int64(1), repo.active.Dimensions["upstream_error_count_excl_429_529"])
 			require.Equal(t, int64(0), repo.active.Dimensions["success_count"])
 			require.Contains(t, repo.active.Description, "1 requests, 0 successful, 1 SLA errors")
 			require.NotEmpty(t, repo.active.Dimensions["window_start"])
