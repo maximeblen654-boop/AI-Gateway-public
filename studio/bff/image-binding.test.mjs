@@ -205,3 +205,32 @@ for(const stage of ['account_admission','https://secret.invalid/token']) test('q
  const call=createPublishedImageClient({baseUrl:'http://127.0.0.1:1',serviceToken:'x'.repeat(32),fetchImpl:async()=>new Response(JSON.stringify({diagnostic_stage:stage,message:'secret-key-and-internal-route'}),{status:409})});
  await assert.rejects(call(owner,'POST','quotes',{}),e=>{assert.equal(e.stage,stage==='account_admission'?stage:undefined);assert(!JSON.stringify(e).includes('secret'));assert(!e.message.includes('internal-route'));return true;});
 });
+
+
+test('authorized historical finality keeps BFF identity and dispatch claim, no POST on query/retry',async t=>{
+ const f=fixture(t,{lost:true});await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
+ const task=f.tasks.prepare(owner,f.input).task;
+ await assert.rejects(f.tasks.dispatch(owner,{task_id:task.task_id}));
+ const dir=path.join(f.root,'journal');
+ const filename=fs.readdirSync(dir).find(n=>/^task-.*\.json$/.test(n));
+ const file=path.join(dir,filename),before=JSON.parse(fs.readFileSync(file,'utf8'));
+ const claim=fs.readFileSync(file+'.sync-dispatch');
+ const receipt={version:'published_image_receipt_v3',task_id:task.task_id,status:'unknown',billing_state:'pending',expected_count:1,pending_count:1,
+  quote:{owner:{user_id:1,api_key_id:42},binding:{spec:before.quote.spec}},
+  units:[{id:'fixture-unit',payload_hash:'fixture-hash',index:0,output_offset:0,output_count:1,status:'pending'}]};
+ const outcome={id:'fixture-unit',payload_hash:'fixture-hash',state:'unknown',upstream_id:''};
+ const py=process.platform==='win32'?'python':'python3';
+ const changed=JSON.parse(execFileSync(py,['-B','tools/maintenance/historical_image_502.py'],{input:JSON.stringify({receipt,outcome,journal:before}),cwd:path.resolve(import.meta.dirname,'../..'),encoding:'utf8'}));
+ fs.writeFileSync(file,JSON.stringify(changed.journal));
+ let gets=0;
+ const runtime=createImageTaskRuntime({rootDir:dir,results:f.results,call:async(_s,method)=>{
+  assert.equal(method,'GET');gets++;
+  return {payload:{...changed.receipt,contract:IMAGE_BINDING_CONTRACT,receipt_version:'published_image_receipt_v3',failure_code:'upstream_http_502_no_delivery',result_available:false}};
+ }});
+ for(let i=0;i<3;i++) {const v=await runtime.recover(owner,task.task_id);assert.equal(v.status,'failed');assert.equal(v.billing_state,'not_charged');assert.equal(v.failed_count,1);}
+ const v=await runtime.dispatch(owner,{task_id:task.task_id});assert.equal(v.billing_state,'not_charged');assert.equal(gets,4);
+ assert.equal(runtime.history(owner).tasks[0].failure_code,'upstream_http_502_no_delivery');
+ assert.deepEqual(fs.readFileSync(file+'.sync-dispatch'),claim);
+ const after=JSON.parse(fs.readFileSync(file));for(const k of ['owner','keyRef','task_id','request','requestHash','quote'])assert.deepEqual(after[k],before[k]);
+ await assert.rejects(runtime.recover({ownerId:2},task.task_id));assert.equal(f.stats().posts,1);
+});
