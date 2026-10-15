@@ -28,4 +28,23 @@ class MaintenanceTest(unittest.TestCase):
         v=transition(*fixture())
         with self.assertRaises(AssertionError):transition(v["receipt"],v["outcome"],v["journal"])
 
+class AtomicMaintenanceTest(unittest.TestCase):
+    @unittest.skipUnless(__import__('os').name=='posix','production POSIX fsync/CAS test runs on GitHub Ubuntu')
+    def test_atomic_cas_backup_and_stale_input(self):
+        import tempfile
+        from pathlib import Path
+        from execute_historical_image_502 import atomic,exclusive,sha
+        with tempfile.TemporaryDirectory() as root:
+            p=Path(root)/'receipt';p.write_bytes(b'original');p.chmod(0o600)
+            backup=Path(root)/'backup';exclusive(backup,p.read_bytes())
+            atomic(p,b'final',sha(b'original'))
+            self.assertEqual(backup.read_bytes(),b'original')
+            self.assertEqual(p.read_bytes(),b'final')
+            self.assertEqual(p.stat().st_mode & 0o777,0o600)
+            with self.assertRaises(AssertionError):atomic(p,b'wrong',sha(b'original'))
+            self.assertEqual(p.read_bytes(),b'final')
+            with self.assertRaises(FileExistsError):exclusive(backup,b'overwrite')
+            self.assertEqual(backup.read_bytes(),b'original')
+            self.assertEqual(sorted(x.name for x in Path(root).iterdir()),['backup','receipt'])
+
 if __name__=="__main__":unittest.main()
