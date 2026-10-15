@@ -1,0 +1,287 @@
+{
+  "scope": "isolated final Core/Bridge/BFF; no production writes; no real upstream",
+  "source_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+  "candidate_run": 38797352846,
+  "ci_run": 38797295333,
+  "security_run": 38797294947,
+  "all_runs": "PASS",
+  "specs": 1870,
+  "runs": [
+    {
+      "wall_ms": 864,
+      "metrics": {
+        "accounts_validated": 1,
+        "specs_checked": 1870,
+        "timings_ms": {
+          "eligibility_and_storage": 2,
+          "final_dependencies": 13,
+          "initial_dependencies": 23,
+          "native_quotes": 296,
+          "published_validation": 48,
+          "spec_compilation": 112,
+          "total": 497
+        }
+      },
+      "pass": true
+    },
+    {
+      "wall_ms": 736,
+      "metrics": {
+        "accounts_validated": 1,
+        "specs_checked": 1870,
+        "timings_ms": {
+          "eligibility_and_storage": 108,
+          "final_dependencies": 13,
+          "initial_dependencies": 12,
+          "native_quotes": 368,
+          "published_validation": 46,
+          "spec_compilation": 101,
+          "total": 651
+        }
+      },
+      "pass": true
+    },
+    {
+      "wall_ms": 589,
+      "metrics": {
+        "accounts_validated": 1,
+        "specs_checked": 1870,
+        "timings_ms": {
+          "eligibility_and_storage": 2,
+          "final_dependencies": 11,
+          "initial_dependencies": 15,
+          "native_quotes": 302,
+          "published_validation": 78,
+          "spec_compilation": 115,
+          "total": 526
+        }
+      },
+      "pass": true
+    }
+  ],
+  "enable_second_check": {
+    "wall_ms": 697,
+    "metrics": {
+      "accounts_validated": 1,
+      "specs_checked": 1870,
+      "timings_ms": {
+        "eligibility_and_storage": 9,
+        "final_dependencies": 17,
+        "initial_dependencies": 13,
+        "native_quotes": 339,
+        "published_validation": 57,
+        "spec_compilation": 138,
+        "total": 576
+      }
+    },
+    "pass": true
+  },
+  "catalog_dependencies": {
+    "pass": true,
+    "specs": 1870,
+    "quotes": [
+      {
+        "contract": "published_image_binding_v1",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 3,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "quantity": 3,
+        "unit_price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "total_price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "execution": {
+          "mode": "single",
+          "max_output_images": 1,
+          "units": [
+            {
+              "index": 0,
+              "output_offset": 0,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 1,
+              "output_offset": 1,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 2,
+              "output_offset": 2,
+              "output_count": 1,
+              "mode": "single"
+            }
+          ]
+        }
+      },
+      {
+        "contract": "published_image_binding_v1",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 3,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "quantity": 3,
+        "unit_price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "total_price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "execution": {
+          "mode": "single",
+          "max_output_images": 1,
+          "units": [
+            {
+              "index": 0,
+              "output_offset": 0,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 1,
+              "output_offset": 1,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 2,
+              "output_offset": 2,
+              "output_count": 1,
+              "mode": "single"
+            }
+          ]
+        }
+      },
+      {
+        "contract": "published_image_binding_v1",
+        "spec": {
+          "resolution": "4K",
+          "duration_seconds": 0,
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "count": 3,
+          "images": 16,
+          "videos": 0,
+          "audio": 0
+        },
+        "quantity": 3,
+        "unit_price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "total_price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "execution": {
+          "mode": "single",
+          "max_output_images": 1,
+          "units": [
+            {
+              "index": 0,
+              "output_offset": 0,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 1,
+              "output_offset": 1,
+              "output_count": 1,
+              "mode": "single"
+            },
+            {
+              "index": 2,
+              "output_offset": 2,
+              "output_count": 1,
+              "mode": "single"
+            }
+          ]
+        }
+      }
+    ],
+    "irrelevant_changes_preserved_grant": true,
+    "model_deletion_closed_and_rejected": true,
+    "restore_required_explicit_recheck": true,
+    "all_product_config_unchanged": true,
+    "supplier_calls": 0
+  },
+  "regressions": {
+    "native-paid-controls-verify": {
+      "pass": true,
+      "checks": [
+        "text real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping",
+        "edit real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping",
+        "Native insufficient balance rejects both quotes and preflight without opening; safe billing diagnostic preserved",
+        "Server recheck rejects stale PASS; native permission rejects customer; mapping drift invalidates text/edit; BFF outage blocks opening; independent video enable; no supplier activity during any preflight"
+      ]
+    },
+    "native-image-finality": {
+      "pass": true,
+      "checks": [
+        "Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks",
+        "Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity",
+        "transport-unknown remains unknown; explicit scoped 502 ends without charge, not declared supplier-refunded",
+        "No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint"
+      ],
+      "counts": {
+        "502": 4,
+        "OK": 4,
+        "PARTIAL502": 4,
+        "DISCONNECT": 4,
+        "TIMEOUT": 4
+      }
+    },
+    "native-task-experience": {
+      "pass": true,
+      "checks": [
+        "Generic transport/unknown receipt remains uncharged; text/edit/video navigation, refresh and persistent query feedback pass. Scoped Image2Pro explicit 502 finality is verified separately in native-image-finality.",
+        "Two explicit independent tasks; originals and exactly one native settlement verified; queries/download/relogin do not replay generation."
+      ]
+    },
+    "native-passive-status": {
+      "pass": true,
+      "checks": [
+        "Real authenticated catalog: V1 disabled, no watermark, wrong Group/platform/model, insufficient samples, observed aggregate and stale states",
+        "Catalog identities/specs/prices unchanged; no private counts, credentials, raw errors or Account-health claim; image/video scope isolated"
+      ]
+    },
+    "native-studio-entry": {
+      "pass": true,
+      "checks": [
+        "No pre-created customer keys; Vue login prepares native personal keys without bypassing Group permissions.",
+        "Text/edit/single-video delivery uses final Core/Bridge/BFF and native settlement.",
+        "No 104-request rerun. This candidate separately runs the 1870 catalog dependency regression."
+      ]
+    },
+    "aspect-options": {
+      "configuration_pass": true,
+      "execution_pass": true
+    }
+  }
+}

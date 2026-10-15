@@ -1,0 +1,108 @@
+{
+  "source_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+  "build_run_id": "38797352846",
+  "acceptance_run_id": "38797352846",
+  "deployment_state": "CANDIDATE_READY_NOT_DEPLOYED",
+  "required_production_flags": {
+    "STUDIO_IMAGE_PUBLISHED_SUBMISSION": false,
+    "STUDIO_VIDEO_ACCOUNT_SUBMISSION": false,
+    "IMAGE_RECEIPT_WORKER_ENABLED": false
+  },
+  "build_script_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+  "acceptance_script_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+  "acceptance_scope": "published-catalog-dependencies-and-media-regression",
+  "production_action": false,
+  "acceptance": "PASS",
+  "images": [
+    {
+      "archive_identity": {
+        "config_digest": "sha256:015b9e2314faedf7fbc7187459084840dcdf33993ff798c83a970f0b7bbaf6d5",
+        "config_file": "blobs/sha256/015b9e2314faedf7fbc7187459084840dcdf33993ff798c83a970f0b7bbaf6d5",
+        "repo_tags": [
+          "native-candidate-core:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:70e5c57e6959c29dc72891ddc0511f30ea4d70b4244746225a955405bf44bcb4",
+            "config_digest": "sha256:015b9e2314faedf7fbc7187459084840dcdf33993ff798c83a970f0b7bbaf6d5"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "core",
+      "source_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "disposition": "built",
+      "image_id": "sha256:015b9e2314faedf7fbc7187459084840dcdf33993ff798c83a970f0b7bbaf6d5",
+      "config_digest": "sha256:015b9e2314faedf7fbc7187459084840dcdf33993ff798c83a970f0b7bbaf6d5",
+      "run_id": "38797352846",
+      "artifact": {
+        "name": "native-media-candidate-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-core:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "tar": "core-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c.tar.gz",
+      "sha256": "46d3e6064b9a3a871e7ff0d96fe8987ab1b519425b0a0982e1a288ee3e64fead",
+      "bytes": 62005605
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:aadb2d61867cc52c7be1d3e0aafd9c6f789fc302eec114a94864353c5d1c1330",
+        "config_file": "blobs/sha256/aadb2d61867cc52c7be1d3e0aafd9c6f789fc302eec114a94864353c5d1c1330",
+        "repo_tags": [
+          "native-candidate-bridge:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:5b776c0eff476516fba9eebad763ba0c3f7815061a30e60db1ac93a1b11ef21a",
+            "config_digest": "sha256:aadb2d61867cc52c7be1d3e0aafd9c6f789fc302eec114a94864353c5d1c1330"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bridge",
+      "source_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "disposition": "built",
+      "image_id": "sha256:aadb2d61867cc52c7be1d3e0aafd9c6f789fc302eec114a94864353c5d1c1330",
+      "config_digest": "sha256:aadb2d61867cc52c7be1d3e0aafd9c6f789fc302eec114a94864353c5d1c1330",
+      "run_id": "38797352846",
+      "artifact": {
+        "name": "native-media-candidate-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bridge:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "tar": "bridge-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c.tar.gz",
+      "sha256": "fa53e62cf50ac304ee54536ee20db0c5cbf578453142a4a9d91b6e9833970fbb",
+      "bytes": 19127715
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:bc65c5733f518492f60f81b1a04591c629a0fc742872efae5664d4569ae69bc5",
+        "config_file": "blobs/sha256/bc65c5733f518492f60f81b1a04591c629a0fc742872efae5664d4569ae69bc5",
+        "repo_tags": [
+          "native-candidate-bff:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:dc4ff73734a23ad64948d3e39baf77c69df0249ca31b61154ff909c7658e8f4b",
+            "config_digest": "sha256:bc65c5733f518492f60f81b1a04591c629a0fc742872efae5664d4569ae69bc5"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bff",
+      "source_sha": "3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "disposition": "built",
+      "image_id": "sha256:bc65c5733f518492f60f81b1a04591c629a0fc742872efae5664d4569ae69bc5",
+      "config_digest": "sha256:bc65c5733f518492f60f81b1a04591c629a0fc742872efae5664d4569ae69bc5",
+      "run_id": "38797352846",
+      "artifact": {
+        "name": "native-media-candidate-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bff:3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c",
+      "tar": "bff-3b4a44ec881c6d4954ac2b9bb56973b5d80bf88c.tar.gz",
+      "sha256": "cf19830b4432a6ee39d9b69efb9b95129e728e066f1bf20bf53c6a009924991d",
+      "bytes": 120272124
+    }
+  ]
+}

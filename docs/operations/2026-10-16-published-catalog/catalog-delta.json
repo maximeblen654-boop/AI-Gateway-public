@@ -1,0 +1,20 @@
+{
+  "old_sha": "7a23bb397161bfa30e7194dd6675d6de3b1e3c9e71aa9f0cec493369c3c80e38",
+  "old_source": "upstream",
+  "old_time": "2026-10-13T16:33:40Z",
+  "new_time": "2026-10-15T15:47:27Z",
+  "old_count": 46,
+  "new_count": 53,
+  "added": [
+    "Claude-Haiku-4-5",
+    "Gemini-4-argon-high",
+    "Nano-banana-2.1",
+    "Nano-banana-3-Pro",
+    "Nano-banana-3.1-Flash",
+    "①福利Deepseek-V4.1-Flash",
+    "②福利Deepseek-V4.1-Flash"
+  ],
+  "removed": [],
+  "order_changed": true,
+  "gpt_present_both": true
+}
