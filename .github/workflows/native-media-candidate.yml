@@ -184,6 +184,7 @@ jobs:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
           NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.candidate-runtime
           NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
+          NATIVE_FOCUSED_ENTRY: ${{ github.event.inputs.focused_entry || 'false' }}
         run: |
           if [ "$NATIVE_ACCEPTANCE_SCENARIO" = paid-controls ]; then
             node tools/native-media-e2e/candidate.mjs load-existing "$RUNNER_TEMP/native-existing-artifact"

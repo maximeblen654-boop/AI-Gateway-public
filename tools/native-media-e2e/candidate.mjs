@@ -61,7 +61,7 @@ if (mode === 'load-existing') {
   space(10)
   const dir=path.resolve(process.argv[3]), manifestPath=path.join(dir,'manifest.json')
   const prior=JSON.parse(fs.readFileSync(manifestPath,'utf8'))
-  assert.equal(prior.source_sha,sha);assert.equal(prior.production_action,false);assert.equal(prior.acceptance_scope,'paid-controls')
+  assert.equal(prior.source_sha,sha);assert.equal(prior.production_action,false);assert.equal(prior.acceptance_scope,acceptanceScope)
   assert.deepEqual(prior.images.map(i=>i.component).sort(),[...components].sort())
   for(const i of prior.images){
     assert.equal(i.source_sha,sha);assert.equal(i.tag,tag(i.component));assert.equal(path.basename(i.tar),i.tar)
