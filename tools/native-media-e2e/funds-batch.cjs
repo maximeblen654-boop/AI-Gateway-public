@@ -53,6 +53,8 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
     for(let i=0;i<3;i++){const r=await media(user,'tasks/'+record.id);assert([200,409].includes(r.status),JSON.stringify(r));latest=r;await sleep(100)}
     record.latest=latest;record.elapsed_ms=Date.now()-start;record.after=snapshot(user.id);record.ledger=ledger(record.id)
     const delivered=['OK','PARTIAL','LATE','DUPLICATE'].includes(scenario),expected=delivered?110000000:0
+    assert.equal(latest.body.status,scenario==='PARTIAL'?'partial':scenario==='REJECT'?'failed':delivered?'completed':'unknown')
+    assert.equal(money(record.frozen_price.amount),(scenario==='PARTIAL'?3:1)*110000000)
     assert.equal(money(record.ledger.cost),expected,JSON.stringify(record));assert.equal(record.ledger.usage,delivered?1:0);assert.equal(record.ledger.dedup,delivered?1:0)
     if(delivered){assert.equal(record.ledger.user_id,user.id);assert.equal(record.ledger.image_count,1)}
     assert.equal(money(record.before.balance)-money(record.after.balance),expected)
@@ -76,10 +78,13 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  execFileSync('sudo',['nsenter','-t',pid,'-n','ip','addr','replace','203.0.113.10/32','dev','lo'])
  dc('up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','90','bridge','bff','simulator')
  for(const u of users)await session(u)
- for(const t of report.tasks){const user=users.find(u=>u.id===t.user_id);t.restarted_query=await media(user,'tasks/'+t.id);assert([200,409].includes(t.restarted_query.status));assert.deepEqual(ledger(t.id),t.ledger)}
+ for(const t of report.tasks){const user=users.find(u=>u.id===t.user_id);t.restarted_query=await media(user,'tasks/'+t.id);assert([200,409].includes(t.restarted_query.status));assert.deepEqual(ledger(t.id),t.ledger);assert.equal(t.restarted_query.body.status,t.latest.body.status)}
  assert.equal(stats().image_posts,beforeRestart);report.after=users.map(u=>({user_id:u.id,...snapshot(u.id)}));
  for(const u of users){const charged=report.tasks.filter(t=>t.user_id===u.id).reduce((s,t)=>s+money(t.ledger.cost),0);assert.equal(10000000000-money(snapshot(u.id).balance),charged);assert.equal(money(snapshot(u.id).frozen_balance),0)}
  report.counts=Object.fromEntries([...new Set(report.tasks.map(t=>t.scenario))].map(k=>[k,report.tasks.filter(t=>t.scenario===k).length]))
  report.checks.push('Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks','Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity','Client timeout with late result settles delivered original task once; unknown supplier result remains unknown and uncharged, not declared refunded','No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint')
+ const columns=['id','user_id','scenario','status','before_balance','quoted','charged','after_balance','hold','released','usage','dedup','supplier_posts']
+ const rows=report.tasks.map(t=>[t.id,t.user_id,t.scenario,t.latest.body.status,t.before.balance,t.frozen_price.amount,t.ledger.cost,t.after.balance,t.after.frozen_balance,t.released,t.ledger.usage,t.ledger.dedup,t.upstream_requests.length])
+ fs.writeFileSync(root+'/evidence/native-funds-batch.csv',[columns,...rows].map(row=>row.join(',')).join('\n')+'\n')
  report.pass=true;save();console.log(JSON.stringify({pass:true,tasks:report.tasks.length,counts:report.counts}))
 })().catch(e=>{report.error=e.stack;save();console.error(e);process.exitCode=1})
