@@ -41,7 +41,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
  let baseline,postsBefore,catalogChanged=false
  try{
   const source=await api('/admin/accounts/'+id),owner=await api('/auth/me')
-  assert(source.name.startsWith('Synthetic '));assert.equal(source.credentials.api_key,'synthetic-native-only');assert.equal(owner.email,'native-admin@example.invalid');assert(Number.isSafeInteger(owner.id))
+  assert(source.name.startsWith('Synthetic '));assert.equal(query(`SELECT credentials->>'api_key'='synthetic-native-only' FROM accounts WHERE id=${id} AND name LIKE 'Synthetic %'`),'t','isolated fixture must retain its synthetic key');assert.equal(owner.email,'native-admin@example.invalid');assert(Number.isSafeInteger(owner.id))
   // The preceding finality fixture uses the provider hostname pinned to this
   // runner's simulator. Verify that pin before restoring the generic local URL.
   if(source.credentials.base_url==='https://api.image2pro.top/v1'){
