@@ -39,7 +39,7 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  assert.equal(config.validation.publish_ready,true,JSON.stringify(config.validation))
  await core(admin,accountPath+'/publish','POST',{expected_record_version:config.record_version,expected_draft_revision:config.draft.revision})
  const paid='/admin/media-workbench/paid-controls/image',check=await core(admin,paid+'/check','POST',{});assert.equal(check.pass,true,JSON.stringify(check))
- const state=await core(admin,paid);const applied=await core(admin,paid,'PUT',{enabled:true,expected_revision:state.revision,fingerprint:check.fingerprint});assert.equal(applied.effective_enabled,true)
+ const state=await core(admin,paid);const applied=await core(admin,paid,'PUT',{enabled:true,expected_revision:state.revision,fingerprint:check.fingerprint});assert.equal(applied.state.effective_enabled,true);assert.equal(applied.report.pass,true)
 
  for(let i=0;i<4;i++){const email=`finality-${i}@example.invalid`,password='Isolated-Funds-Batch-Only-20261015';const u=await core(admin,'/admin/users','POST',{email,password,balance:100,concurrency:5,allowed_groups:[fixture.groups.openai]});u.token=await login(email,password);await core(u.token,'/keys','POST',{name:'Synthetic funds audit',group_id:fixture.groups.openai});await session(u);users.push(u)}
  const product=JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json')).products.find(p=>p.display_name==='Synthetic geometry image')
