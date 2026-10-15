@@ -7,7 +7,8 @@ import assert from 'node:assert/strict'
 
 const root = process.env.NATIVE_EVIDENCE_ROOT || '/evidence'
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
-const state = { requests: [], image_posts: 0, video_posts: 0, tasks: {} }
+const statePath = path.join(root, 'native-supplier-state.json')
+const state = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, 'utf8')) : { requests: [], image_posts: 0, video_posts: 0, tasks: {} }
 const save = () => fs.writeFileSync(path.join(root, 'native-supplier-state.json'), JSON.stringify(state, null, 2))
 https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')), cert: fs.readFileSync(path.join(root, 'simulator-cert.pem')) }, async (req, res) => {
   const reply = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)) }
@@ -35,6 +36,18 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
       state.image_posts++; save()
       assert.equal(auth, 'bearer'); assert.equal(typeof body.prompt, 'string'); assert(Number.isInteger(body.n) && body.n >= 1 && body.n <= 10)
       // Bounded fault/latency fixtures for task recovery UX; this simulator never forwards externally.
+      if (body.prompt.startsWith('BATCH_FUNDS_')) {
+        // Only the local simulator injects faults; never forward these requests.
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const scenario = body.prompt.split(':')[0]
+        if (scenario === 'BATCH_FUNDS_REJECT') return reply(422, { error: 'synthetic_rejected_before_generation' })
+        if (scenario === 'BATCH_FUNDS_502') return reply(502, { error: 'synthetic_final_outcome_unavailable' })
+        if (scenario === 'BATCH_FUNDS_DISCONNECT') return req.socket.destroy()
+        if (scenario === 'BATCH_FUNDS_TIMEOUT') await new Promise(resolve => setTimeout(resolve, 25000))
+        if (scenario === 'BATCH_FUNDS_LATE') await new Promise(resolve => setTimeout(resolve, 3000))
+        const attempts = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt).length
+        if (scenario === 'BATCH_FUNDS_PARTIAL' && attempts === 2) return reply(422, { error: 'synthetic_second_unit_rejected' })
+      }
       if (body.prompt.startsWith('SYNTHETIC_UNKNOWN_502')) return reply(502, { error: 'synthetic_upstream_outcome_unknown' })
       if (body.prompt.startsWith('SYNTHETIC_WAIT')) await new Promise(resolve => setTimeout(resolve, 15000))
       const calls = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt)

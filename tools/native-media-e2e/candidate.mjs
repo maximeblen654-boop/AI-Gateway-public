@@ -144,6 +144,8 @@ if (mode === 'load-existing') {
   }
   if (paidControls) {
     for (const c of components) Object.assign(compose.services[c].environment, {STUDIO_PAID_CONTROL_MODE:'managed-v1',STUDIO_IMAGE_PUBLISHED_SUBMISSION:'false',STUDIO_VIDEO_ACCOUNT_SUBMISSION:'false',IMAGE_RECEIPT_WORKER_ENABLED:'false'})
+    compose.services.core.environment.GATEWAY_RESPONSE_HEADER_TIMEOUT='20'
+    compose.services.core.environment.GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT='20'
     compose.services.core.environment.STUDIO_CONTROL_BFF_URL='http://127.0.0.1:4173'
   }
   if (draftManagement || workspaceArtifact || adminReview || paidControls) compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = 'https://203.0.113.10:19090'
@@ -187,6 +189,7 @@ if (mode === 'load-existing') {
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'verify'])
       for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
       run(process.execPath,['tools/native-media-e2e/task-experience.cjs',root])
+      run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
     } else if (adminReview) {
