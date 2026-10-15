@@ -1,0 +1,309 @@
+{
+  "production": false,
+  "api_mocking": false,
+  "source_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "checks": [
+    "Real authenticated catalog: V1 disabled, no watermark, wrong Group/platform/model, insufficient samples, observed aggregate and stale states",
+    "Catalog identities/specs/prices unchanged; no private counts, credentials, raw errors or Account-health claim; image/video scope isolated"
+  ],
+  "observations": [
+    {
+      "state": "unavailable",
+      "offer_count": 4,
+      "status": {
+        "state": "unavailable",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "reason": "monitor_disabled"
+      }
+    },
+    {
+      "state": "no_data",
+      "offer_count": 4,
+      "status": {
+        "state": "no_data",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "data_through": "2026-10-15T17:00:00Z"
+      }
+    },
+    {
+      "state": "no_data",
+      "offer_count": 4,
+      "status": {
+        "state": "no_data",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "data_through": "2026-10-15T18:26:28.510277Z",
+        "computed_at": "2026-10-15T18:27:28.510277Z"
+      }
+    },
+    {
+      "state": "insufficient",
+      "offer_count": 4,
+      "status": {
+        "state": "insufficient",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "data_through": "2026-10-15T18:26:28.510277Z",
+        "computed_at": "2026-10-15T18:27:28.510277Z"
+      }
+    },
+    {
+      "state": "observed",
+      "offer_count": 4,
+      "status": {
+        "state": "observed",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "data_through": "2026-10-15T18:26:28.510277Z",
+        "computed_at": "2026-10-15T18:27:28.510277Z",
+        "error_rate": 0.2
+      }
+    },
+    {
+      "state": "stale",
+      "offer_count": 4,
+      "status": {
+        "state": "stale",
+        "scope": "platform_group_requested_model",
+        "window_seconds": 5400,
+        "data_through": "2026-10-15T18:07:34.234596Z",
+        "computed_at": "2026-10-15T18:07:34.234596Z"
+      }
+    }
+  ],
+  "pass": true,
+  "screenshots": [
+    "native-model-status-1440-light.png",
+    "native-model-status-1440-dark.png",
+    "native-model-status-390-light.png",
+    "native-model-status-390-dark.png"
+  ],
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-DwkaHCCa.js",
+        "bytes": 194144,
+        "sha256": "886dd39d02baaaab817dd677bc9eb55b68f7b67e3b8de21418afa43536d481ed",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-Y0bcKx5T.js",
+        "bytes": 414176,
+        "sha256": "e5deddc8af71e400e4dfb4bc1818b49e1f4786f8411baad54b32b893b0b23b2a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-DhEkaHwn.css",
+        "bytes": 508,
+        "sha256": "e1a547e6e2a48ac77b7e78648aba36e1cff355613de73f332c9c35b5139445af",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-1Dy0Gtxq.js",
+        "bytes": 17928,
+        "sha256": "a79af25a57fe2d7007e51eaf7ccce58adbc4e0b6a6002f7fb80dd46172c4ca5e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-CPooFyCc.js",
+        "bytes": 917,
+        "sha256": "cdebbf9a817dc4067bb0e0d9ffbf47555f2e21a05ef55b723c447ad1dad6315f",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-CvJrvf4a.js",
+        "bytes": 2420,
+        "sha256": "744cb3d1bf85be5b2213a4596426b126dd532aa85f925033e3c2bf55f0db5f55",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-B6ZiYKjM.css",
+        "bytes": 523,
+        "sha256": "fd702f466c23c7eaec04f358d8631d348075d1563df805687a1b0a5ca796b782",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-Dqo5V0i9.js",
+        "bytes": 16271,
+        "sha256": "85bc9dcda4d0cf3bae73f53807a0c4117a0408574464ba102e89d910e42e8932",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/oauthAffiliate-CrlUwkd1.js",
+        "bytes": 1197,
+        "sha256": "1ba453f05da3a376c7fed82fc6850b45a6f8c0d4a600bff7938917804806af89",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge-BmkiKxf7.css",
+        "bytes": 1401,
+        "sha256": "7ad582c21fe51460913dfdb03ca27b6c1e34e0c151b89d7f6aa62c7121183b8f",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-mYEDiWCN.css",
+        "bytes": 200,
+        "sha256": "96de8eb2802f0665e11e1cfd66ac0fcebd9d351c19c8051dd3913876ebc8af38",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-BGNPNDxa.js",
+        "bytes": 10787,
+        "sha256": "76a0d9d3dc7c4a74fe6365f43c244fa0b72d7812beeb9aff8ed0fc6e89c0c05a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/apiError-zX02PgX9.js",
+        "bytes": 1212,
+        "sha256": "2b13e47dc6627eb34e647e3d20bf06c6817dc8831c6e0f1aed9c5823bd7eded3",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DashboardView-DyChV5NS.js",
+        "bytes": 27006,
+        "sha256": "1a0ba0f0b4c3def4cfff5b4eecb66522a45b0c82d53c8168738324ec86136297",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DT-rtrW_.css",
+        "bytes": 267,
+        "sha256": "d65d063476e8e82f9b0fc783eb879d9c067a4416f877de4b80162013ddf326ce",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend-Ci85YOuO.css",
+        "bytes": 9161,
+        "sha256": "f566e2ca595ffb156f0135b7b0864c1432f4170d015bbae4bc5b50e8cfa7d4a1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-vfjFHKfA.css",
+        "bytes": 9840,
+        "sha256": "f7d4a7bc7d47b6a2fe4ca6b91b25d7dd239b6f92f8df8377a5577c4d926d4ac4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/usage-CJdY1n4z.js",
+        "bytes": 1882,
+        "sha256": "e439564c42c1b53662a5aada5bdf8c492f3e1001ec75d8ee81fce5482b444ed1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-BnlNPJ6u.js",
+        "bytes": 2345,
+        "sha256": "44cb6beea1b555525043a041386caa81952cc74de053b85d486e4fdca52ffbc7",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-QHQAAkZO.js",
+        "bytes": 828,
+        "sha256": "843635d21fb1c9ee8e971d379dc860f73b31d9c4db123d26ee6c1344052355af",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-Dfupi1D-.js",
+        "bytes": 8018,
+        "sha256": "9b824e45d73f03640cc7df80d054c54c5662f0ee392d12112e707020a2cf0f3d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-fMNFLoMa.js",
+        "bytes": 8032,
+        "sha256": "554ba2b8cfd35fa48a5fc437414eccd3971bbac3f217b8bb597aed317eb0714c",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-BXmEeHZ8.js",
+        "bytes": 104141,
+        "sha256": "d567f511f572a3ed60b34981dc70f4836f34d3b4afb2e2ea8df9f121f4a2aeaf",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-Qb8mgFd6.js",
+        "bytes": 1709,
+        "sha256": "2d9e1273b18ce29abfe97efaaab89d45986de0153402914659ca39afb70b1050",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/user-B1rmkUNe.js",
+        "bytes": 2057,
+        "sha256": "486924f826e762cbfc2f0a450402ca9d89b4ee8c2a8a5a0f540d0e56b40afa70",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-chart-BykZcwza.js",
+        "bytes": 178340,
+        "sha256": "366e4c225173b9c986439842af0a76522ed4b8d54a120dad3bf5cc27b07e4b88",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-DRyy2t_f.css",
+        "bytes": 25354,
+        "sha256": "e988555d2a7b24cc94d39458702cf88d280c565e619ee55bbf270c48186dfbfd",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-Bh6--baL.js",
+        "bytes": 52868,
+        "sha256": "1c13bfe5a9f1c368a903a3f68e5a34e0ea9f4a8d9d6c2bc1db7d4900111bc057",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": []
+  },
+  "terminal_502": {
+    "expected": 4,
+    "logical_error_rows": 4,
+    "requested_model": "gpt-image-2",
+    "identity_preserved": true,
+    "duplicate_queries_not_counted": true
+  },
+  "fixture_restored": true
+}

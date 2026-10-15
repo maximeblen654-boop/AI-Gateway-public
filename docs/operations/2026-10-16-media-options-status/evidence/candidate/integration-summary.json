@@ -1,0 +1,100 @@
+{
+  "source_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "script_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "production_action": false,
+  "api_mocking": false,
+  "aspect": {
+    "configuration_pass": true,
+    "execution_pass": true,
+    "checks": [
+      "Real UI save and API re-read preserve product IDs/prices/sibling/video; unpublished ratio excluded from catalog and rejected by quote; isolated publish admits text/edit quotes without size mappings",
+      "Custom ratio reaches real simulated text/edit POST unchanged; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle"
+    ],
+    "executions": [
+      {
+        "mode": "text",
+        "actual_requests": [
+          {
+            "method": "POST",
+            "path": "/v1/images/generations",
+            "parameters": {
+              "aspect_ratio": "3:5",
+              "model": "gpt-image-2",
+              "n": 1,
+              "resolution": "1K"
+            }
+          }
+        ],
+        "download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+        "synthetic_settlement_verification": {
+          "unit_price_cny": "0.70",
+          "charged_once": true,
+          "native_usage_delta": 1,
+          "native_dedup_delta": 1,
+          "no_hold": true
+        }
+      },
+      {
+        "mode": "edit",
+        "actual_requests": [
+          {
+            "method": "POST",
+            "path": "/v1/images/edits",
+            "parameters": {
+              "aspect_ratio": "3:5",
+              "model": "gpt-image-2",
+              "n": 1,
+              "resolution": "1K"
+            }
+          }
+        ],
+        "download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+        "synthetic_settlement_verification": {
+          "unit_price_cny": "0.70",
+          "charged_once": true,
+          "native_usage_delta": 1,
+          "native_dedup_delta": 1,
+          "no_hold": true
+        }
+      }
+    ]
+  },
+  "finality": {
+    "pass": true,
+    "counts": {
+      "502": 4,
+      "OK": 4,
+      "PARTIAL502": 4,
+      "DISCONNECT": 4,
+      "TIMEOUT": 4
+    },
+    "checks": [
+      "Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks",
+      "Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity",
+      "transport-unknown remains unknown; explicit scoped 502 ends without charge, not declared supplier-refunded",
+      "No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint"
+    ],
+    "modes": {
+      "text": 10,
+      "edit": 10
+    }
+  },
+  "native-task-experience.json": {
+    "pass": true,
+    "checks": [
+      "502 retains unknown receipt, zero charge; text/edit/video navigation and refresh stay usable; query has loading, timestamp and persistent offline failure",
+      "Two explicit independent image tasks and frozen prices; edit outputs delivered and original hash verified; exactly one native settlement per completed task; no replay on query/download/relogin; video submissions unchanged"
+    ]
+  },
+  "native-studio-entry.json": {
+    "pass": true,
+    "checks": [
+      "Zero pre-created customer keys; actual Vue login/catalog prepares one native key per configured Group",
+      "Text/edit/single-video delivery and download use real Core/Bridge/BFF and native settlement",
+      "Account switch, refresh and query preserve identities; upstream 502 remains unknown with zero settlement",
+      "Native error status, Account, message, request ID and timing retained by real Ops middleware",
+      "104-request funds suite and 1870 scale suite reused, not rerun"
+    ]
+  },
+  "evidence_origin": "GitHub-hosted isolated synthetic PostgreSQL and mock upstream only; not production users, requests, balances or supplier traffic. Per-record identities and balances omitted from public summary."
+}

@@ -1,0 +1,54 @@
+{
+  "scope": "isolated synthetic acceptance only; do not deploy this configuration",
+  "source_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "script_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "frontend": "Core embedded resources",
+  "vite": false,
+  "browser_api_mocking": false,
+  "services": {
+    "postgres": {
+      "image": "postgres:18-alpine"
+    },
+    "redis": {
+      "image": "redis:8-alpine"
+    },
+    "core": {
+      "image": "native-candidate-core:15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+      "depends_on": {
+        "postgres": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "simulator": {
+      "image": "node:22-alpine",
+      "network_mode": "shares verified Core namespace",
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "bridge": {
+      "image": "native-candidate-bridge:15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+      "network_mode": "shares verified Core namespace",
+      "depends_on": {
+        "core": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "bff": {
+      "image": "native-candidate-bff:15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+      "network_mode": "shares verified Core namespace",
+      "depends_on": {
+        "bridge": {
+          "condition": "service_started"
+        }
+      }
+    }
+  }
+}

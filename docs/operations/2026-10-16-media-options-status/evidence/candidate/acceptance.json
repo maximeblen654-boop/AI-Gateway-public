@@ -1,0 +1,27 @@
+{
+  "source_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "script_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "scope": "studio-entry-and-image-502-finality",
+  "status": "PASS",
+  "containers": [
+    {
+      "image": "sha256:b458b116708d7824e1ec1399625479fd21618c3defc832a90c1a9ae35e2fa317",
+      "health": "healthy",
+      "network": "isolated bridge",
+      "component": "core"
+    },
+    {
+      "image": "sha256:c327e3b6fcf172e518b91bdce524f76db812698e169ae7a23b701fad3abc0332",
+      "health": "healthy",
+      "network": "shares verified Core namespace",
+      "component": "bridge"
+    },
+    {
+      "image": "sha256:378533b6cec626c4712d511d2b1630ae99b0bb74e47b9b2e40b60b9618e0918e",
+      "health": "healthy",
+      "network": "shares verified Core namespace",
+      "component": "bff"
+    }
+  ],
+  "evidence_origin": "Isolated GitHub runner, not production."
+}
