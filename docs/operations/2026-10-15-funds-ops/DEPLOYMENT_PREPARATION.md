@@ -1,3 +1,5 @@
+> 后续：用户已明确授权预检通过后恢复原图片开启状态；部署及生产核验已完成，见 [DEPLOYMENT.md](DEPLOYMENT.md)。以下保留准备阶段历史证据。
+
 # ac8923ab 生产部署准备：尚未切换
 
 状态：`PREPARED_NOT_SWITCHED_AWAITING_IMAGE_RESTORE_AUTHORIZATION`。

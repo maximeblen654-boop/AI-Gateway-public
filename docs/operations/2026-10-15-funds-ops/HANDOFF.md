@@ -1,3 +1,9 @@
+# 当前生产执行状态
+
+2026-10-15：ac8923ab已部署，图片恢复原开启状态，视频关闭。**DEPLOYED_IMAGE_STATE_PRESERVED_VIDEO_DISABLED**。详见 [生产部署报告](DEPLOYMENT.md)。下文是本次候选验收历史记录，不再作为“未部署”阶段指令。
+
+---
+
 # 104笔资金核验与原生运维监控修复
 
 **CANDIDATE_READY_NOT_DEPLOYED**。104笔资金核验、三组件隔离验收、CI和Security均PASS；未部署。原生迟到首次结算/负余额边界仍存在，详见下文，不宣称已消除。

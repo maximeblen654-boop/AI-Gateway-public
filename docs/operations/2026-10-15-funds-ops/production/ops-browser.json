@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "source_sha": "ac8923ab666a77acc3675024c286ff2effff9546",
+  "time": "2026-10-15T02:35:26.936Z",
+  "sampleText": "本窗口 SLA 样本 0 笔：成功 0，失败 0。 小样本百分比不代表大范围故障；无样本不代表已恢复。",
+  "snapshots": [],
+  "screenshots": [
+    "production-ops-panel-1440.png"
+  ],
+  "api_mocking": false,
+  "production": true,
+  "screenshot_scope": "Statistics panel captured directly in browser; account header excluded."
+}
