@@ -1,0 +1,35 @@
+{
+  "source_sha": "ac8923ab666a77acc3675024c286ff2effff9546",
+  "script_sha": "6a3c6e3a0116829abe0364adb973ac7ccc529fce",
+  "run_id": 38665574538,
+  "tasks": 104,
+  "counts": {
+    "502": 16,
+    "OK": 24,
+    "PARTIAL": 12,
+    "REJECT": 12,
+    "DISCONNECT": 12,
+    "TIMEOUT": 12,
+    "LATE": 8,
+    "DUPLICATE": 8
+  },
+  "states": {
+    "completed": 40,
+    "partial": 12,
+    "failed": 12,
+    "unknown": 40
+  },
+  "charged_cny": "57.2000000000",
+  "usage_rows": 52,
+  "dedup_rows": 52,
+  "supplier_posts": 116,
+  "frozen_balance": "0",
+  "released": "0",
+  "balance_before": "400.00000000",
+  "balance_after": "342.80000000",
+  "restart_all_task_states_equal": true,
+  "production_action": false,
+  "money_runtime_changed": false,
+  "late_first_settlement_may_overdraw": true,
+  "pass": true
+}
