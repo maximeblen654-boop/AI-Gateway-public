@@ -149,6 +149,10 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 		studioError(c, err)
 		return
 	}
+	// Attribute the native attempt to the already frozen Account and model,
+	// as the ordinary gateway handlers do before forwarding.
+	setOpsRequestContext(c, q.Binding.Offer.SiteModel, false)
+	setOpsSelectedAccount(c, q.Binding.Offer.AccountID)
 	receipt, err := h.studioImage.Dispatch(c.Request.Context(), c, q, input.TaskID, input.Prompt, input.References, key)
 	if err != nil {
 		studioError(c, err)
