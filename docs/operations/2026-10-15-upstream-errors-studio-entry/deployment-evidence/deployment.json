@@ -1,0 +1,1060 @@
+{
+  "status": "DEPLOYED_IMAGE_STATE_PRESERVED_VIDEO_DISABLED",
+  "source_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+  "artifact_id": 11949808833,
+  "run_id": 38684702740,
+  "manifest_sha256": "1eeb32fa2edf72297aaa95da2b6bd24e4670dbd0bd65c34fbc1270f5b3140c51",
+  "timeline": {
+    "first_local_deployment_evidence": "2026-10-15T08:01:51.403260+00:00",
+    "switch_start": "2026-10-15T08:23:27.437497+00:00",
+    "switch_end": "2026-10-15T08:24:04.580430+00:00",
+    "switch_seconds": 37.142933,
+    "protected_acceptance_completed": "2026-10-15T08:27:28.915838+00:00",
+    "final_readonly_check": "2026-10-15T08:28:15.813492+00:00",
+    "report_generated": "2026-10-15T08:32:18.519476+00:00",
+    "evidence_to_report_seconds": 1827.116216
+  },
+  "images": [
+    {
+      "archive_identity": {
+        "config_digest": "sha256:e860718a1a04e98ed0adf40a9a15750d6a6519e01efa39c9b8498f2e6a1c2a92",
+        "config_file": "blobs/sha256/e860718a1a04e98ed0adf40a9a15750d6a6519e01efa39c9b8498f2e6a1c2a92",
+        "repo_tags": [
+          "native-candidate-core:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:b395aa9c0e6e8877e9c7ab65af31403c144dc987d42225b3c0323db2f169896e",
+            "config_digest": "sha256:e860718a1a04e98ed0adf40a9a15750d6a6519e01efa39c9b8498f2e6a1c2a92"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "core",
+      "source_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "disposition": "built",
+      "image_id": "sha256:e860718a1a04e98ed0adf40a9a15750d6a6519e01efa39c9b8498f2e6a1c2a92",
+      "config_digest": "sha256:e860718a1a04e98ed0adf40a9a15750d6a6519e01efa39c9b8498f2e6a1c2a92",
+      "run_id": "38684702740",
+      "artifact": {
+        "name": "native-media-candidate-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-core:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "tar": "core-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4.tar.gz",
+      "sha256": "98bddf03218d92aa541b69c3dc7f127fb0dd15581981c4be1be379aae4a06608",
+      "bytes": 62003532
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:7b7cc6d5102c503a2f6290e86a36f786ebedbd1c7498c40f8d9a69d85d21617f",
+        "config_file": "blobs/sha256/7b7cc6d5102c503a2f6290e86a36f786ebedbd1c7498c40f8d9a69d85d21617f",
+        "repo_tags": [
+          "native-candidate-bridge:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:707c9d10b5f92fc90b4eca0218166dba89efe37991804b4f08acd25ba5e81cef",
+            "config_digest": "sha256:7b7cc6d5102c503a2f6290e86a36f786ebedbd1c7498c40f8d9a69d85d21617f"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bridge",
+      "source_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "disposition": "built",
+      "image_id": "sha256:7b7cc6d5102c503a2f6290e86a36f786ebedbd1c7498c40f8d9a69d85d21617f",
+      "config_digest": "sha256:7b7cc6d5102c503a2f6290e86a36f786ebedbd1c7498c40f8d9a69d85d21617f",
+      "run_id": "38684702740",
+      "artifact": {
+        "name": "native-media-candidate-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bridge:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "tar": "bridge-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4.tar.gz",
+      "sha256": "70ef76555f40b15c3babe0929128aac3fcaff782ffc0920816866a46a65850e7",
+      "bytes": 19126258
+    },
+    {
+      "archive_identity": {
+        "config_digest": "sha256:b9bf09545ee3b0e6f428950b5f6ef0bfa6b58231ff67846813aa924012762c8c",
+        "config_file": "blobs/sha256/b9bf09545ee3b0e6f428950b5f6ef0bfa6b58231ff67846813aa924012762c8c",
+        "repo_tags": [
+          "native-candidate-bff:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+        ],
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:419036b446058624174f8f46cfff4bbe206771818874dca1f84e9e6a123caf9a",
+            "config_digest": "sha256:b9bf09545ee3b0e6f428950b5f6ef0bfa6b58231ff67846813aa924012762c8c"
+          }
+        ],
+        "format": "OCI plus Docker archive"
+      },
+      "component": "bff",
+      "source_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "disposition": "built",
+      "image_id": "sha256:b9bf09545ee3b0e6f428950b5f6ef0bfa6b58231ff67846813aa924012762c8c",
+      "config_digest": "sha256:b9bf09545ee3b0e6f428950b5f6ef0bfa6b58231ff67846813aa924012762c8c",
+      "run_id": "38684702740",
+      "artifact": {
+        "name": "native-media-candidate-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4"
+      },
+      "platform": "linux/amd64",
+      "tag": "native-candidate-bff:2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "tar": "bff-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4.tar.gz",
+      "sha256": "38138a730c9b33406d7766b862c97a5acd684d4735c0ec60bbb758e15e872881",
+      "bytes": 120271129
+    }
+  ],
+  "effective_compose": "/home/ubuntu/services/ai-gateway/deploy-studio-entry-2bdbe3e8-20261015/compose.override.2bdbe3e8.json",
+  "compose_sha256": "80488b20c61e50866e150617fc450407165134e1725b75ca479cacb9daf6ae56",
+  "environment_changes": {
+    "sub2api": {},
+    "studio-bridge": {},
+    "studio-bff": {}
+  },
+  "running_health": {
+    "sub2api": {
+      "id": "62f95474e70b5089f21be7fa00ffb3794049edc98e7ccff53288008be61e8042",
+      "image": "sha256:b395aa9c0e6e8877e9c7ab65af31403c144dc987d42225b3c0323db2f169896e",
+      "health": "healthy",
+      "network": "deploy_sub2api-network"
+    },
+    "studio-v2-bridge": {
+      "id": "1d449c75a3f94247f814c69ec2b3c9fec97d881cfa1ea174e20b0f0439bcd084",
+      "image": "sha256:707c9d10b5f92fc90b4eca0218166dba89efe37991804b4f08acd25ba5e81cef",
+      "health": "healthy",
+      "network": "container:62f95474e70b5089f21be7fa00ffb3794049edc98e7ccff53288008be61e8042"
+    },
+    "studio-v2-bff": {
+      "id": "f811fb7f8a0223d636a62df7c4d43bec27c8813f45d192eb402d407fc684a851",
+      "image": "sha256:419036b446058624174f8f46cfff4bbe206771818874dca1f84e9e6a123caf9a",
+      "health": "healthy",
+      "network": "container:62f95474e70b5089f21be7fa00ffb3794049edc98e7ccff53288008be61e8042"
+    }
+  },
+  "dependencies": {
+    "sub2api-postgres": {
+      "unchanged": true,
+      "health": "healthy"
+    },
+    "sub2api-redis": {
+      "unchanged": true,
+      "health": "healthy"
+    },
+    "caddy": "active"
+  },
+  "runtime_files": {
+    "result": "PASS",
+    "time": "2026-10-15T08:24:42.609760+00:00",
+    "checks": [
+      {
+        "container": "sub2api",
+        "path": "/app/sub2api",
+        "sha256": "e42f6dedb1fe33b8a4b2c2353f6933778dae26324a98b8064e8b6889692001e2",
+        "bytes": 135995552
+      },
+      {
+        "container": "studio-v2-bridge",
+        "path": "/app/studio-bridge",
+        "sha256": "2f806fc62e96d5b54e24a75d19820ac9357215e660aae504f4399938ee36a5f7",
+        "bytes": 37388448
+      },
+      {
+        "container": "studio-v2-bff",
+        "path": "/app/studio/bff/image-server.mjs",
+        "sha256": "7a42aef466f3ddaa8767920d6e8616a8f05b130c8de28d3539d1447da1fc3123",
+        "bytes": 11901
+      }
+    ]
+  },
+  "managed_state": {
+    "time": "2026-10-15T08:28:58.716Z",
+    "states": {
+      "image": {
+        "media": "image",
+        "mode": "managed-v1",
+        "requested_enabled": true,
+        "effective_enabled": true,
+        "revision": "4c8dabc837ccfa51162ba09a9b1b2b8b2e41173d788c170011fdb18bb814c5b2",
+        "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+        "reason": "open"
+      },
+      "video": {
+        "media": "video",
+        "mode": "managed-v1",
+        "requested_enabled": false,
+        "effective_enabled": false,
+        "revision": "",
+        "reason": "closed"
+      }
+    }
+  },
+  "sidecar_contract": {
+    "image": {
+      "mode": "managed-v1",
+      "paid_enabled": true
+    },
+    "video": {
+      "mode": "managed-v1",
+      "paid_enabled": false
+    },
+    "sidecars": {
+      "bridge": {
+        "version": "managed-v1",
+        "ready": true,
+        "core_loopback": true,
+        "image_group": 31,
+        "video_group": 31
+      },
+      "bff": {
+        "version": "managed-v1",
+        "ready": true,
+        "image_ready": true,
+        "video_ready": true,
+        "assets": true
+      }
+    },
+    "both_disabled": false
+  },
+  "preflight": {
+    "metrics": {
+      "accounts_validated": 1,
+      "specs_checked": 1870,
+      "timings_ms": {
+        "eligibility_and_storage": 4,
+        "final_dependencies": 25,
+        "initial_dependencies": 34,
+        "native_quotes": 634,
+        "published_validation": 134,
+        "spec_compilation": 265,
+        "total": 1099
+      }
+    },
+    "media": "image",
+    "pass": true,
+    "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "path": "edit",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-15T08:26:24.307196812Z"
+  },
+  "preflight_wall_ms": 1362,
+  "restoration_preflight": {
+    "metrics": {
+      "accounts_validated": 1,
+      "specs_checked": 1870,
+      "timings_ms": {
+        "eligibility_and_storage": 3,
+        "final_dependencies": 22,
+        "initial_dependencies": 25,
+        "native_quotes": 603,
+        "published_validation": 98,
+        "spec_compilation": 231,
+        "total": 983
+      }
+    },
+    "media": "image",
+    "pass": true,
+    "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+        "path": "edit",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-15T08:26:51.360300423Z"
+  },
+  "quotes": [
+    {
+      "path": "text",
+      "status": 200,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "issued": true
+    },
+    {
+      "path": "edit",
+      "status": 200,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 3,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "issued": true
+    }
+  ],
+  "business_fingerprints": {
+    "before": {
+      "user_funds": "275ff4c82129a8210d74ac30ece54130",
+      "all_accounts": "0b1ca777ee31e1e122937d0c1e3535f5",
+      "usage_last_id": 24,
+      "account77_media": "214806054447d07eda0deeeedab8ee77",
+      "video_last_update": "2026-10-03T18:29:50.979162+08:00",
+      "account77_credentials": "c8419cece0857d29544fb4ab41f556f5"
+    },
+    "after": {
+      "user_funds": "275ff4c82129a8210d74ac30ece54130",
+      "all_accounts": "0b1ca777ee31e1e122937d0c1e3535f5",
+      "usage_last_id": 24,
+      "account77_media": "214806054447d07eda0deeeedab8ee77",
+      "video_last_update": "2026-10-03T18:29:50.979162+08:00",
+      "account77_credentials": "c8419cece0857d29544fb4ab41f556f5"
+    },
+    "unchanged": true
+  },
+  "all_accounts_fingerprint": {
+    "before": {
+      "sha256_input_md5": "0c2bdda22cdf72c5e7d7ec8467ccb655"
+    },
+    "after": {
+      "sha256_input_md5": "0c2bdda22cdf72c5e7d7ec8467ccb655"
+    },
+    "unchanged": true
+  },
+  "three_original_receipts": {
+    "sha256": {
+      "img_246553331bf3e4639ab4adbe94fcccc2": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46",
+      "img_66c5f21b1cc78570f98ae244b7ce67a1": "bcfd21f11cc1794710c89c78194df24ba9524fe481ec7bbb316546a3ff110cce",
+      "img_f372e5916f913ebc4358129c65add930": "c6928ef9f87521a15c5647d3a0df4d353a1f23e41b5b642c041a5075fc524206"
+    },
+    "unchanged": true
+  },
+  "migration": {
+    "count": 293,
+    "sha256": "d6a8f75d4ae22b8a460a31de549f4865b710699f18a233d62408491b61f5631f",
+    "unchanged": true,
+    "executed": false
+  },
+  "native_entry": {
+    "production_preparation_responses": [
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "video"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      },
+      {
+        "status": 200,
+        "media": "image"
+      }
+    ],
+    "existing_user_key_counts_unchanged": true,
+    "zero_key_production_test": "Not manufactured: both real users already have Group31 credentials. Exact candidate isolated zero-key evidence retained.",
+    "isolated_zero_key_evidence": "../evidence/native-studio-entry.json"
+  },
+  "browser": {
+    "modes": [
+      {
+        "mode": "text",
+        "width": 1440,
+        "composer_visible": true,
+        "paid_enabled": true
+      },
+      {
+        "mode": "edit",
+        "width": 1440,
+        "composer_visible": true,
+        "paid_enabled": true
+      },
+      {
+        "mode": "video",
+        "width": 1440,
+        "composer_visible": true,
+        "paid_enabled": false
+      },
+      {
+        "mode": "text",
+        "width": 390,
+        "composer_visible": true,
+        "paid_enabled": true
+      },
+      {
+        "mode": "edit",
+        "width": 390,
+        "composer_visible": true,
+        "paid_enabled": true
+      },
+      {
+        "mode": "video",
+        "width": 390,
+        "composer_visible": true,
+        "paid_enabled": false
+      }
+    ],
+    "page_errors": [],
+    "non_get_requests": [
+      {
+        "method": "POST",
+        "path": "/api/v1/admin/media-workbench/paid-controls/image/check"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/studio-media-ticket"
+      },
+      {
+        "method": "POST",
+        "path": "/studio-v2/api/session/exchange"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/studio-v2/api/image/quotes"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/studio-v2/api/image/quotes"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1/admin/media-workbench/paid-controls/image"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/keys/studio-access"
+      }
+    ],
+    "blocked_recovery_requests": [
+      {
+        "path": "/studio-v2/api/image/tasks/img_f372e5916f913ebc4358129c65add930",
+        "method": "GET"
+      }
+    ],
+    "paid_generation_requests": 0
+  },
+  "public_assets": {
+    "result": "PASS",
+    "time": "2026-10-15T08:27:23.490705+00:00",
+    "checks": [
+      {
+        "path": "/assets/index--sXV5Mue.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index--sXV5Mue.js",
+          "sha256": "a3a25f26c21f452940e7c8de3dc616133f2f93fc9bdfb14d48271c7ed4af118b",
+          "bytes": 194144,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index--sXV5Mue.js",
+          "sha256": "a3a25f26c21f452940e7c8de3dc616133f2f93fc9bdfb14d48271c7ed4af118b",
+          "bytes": 194144,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b80bf56dc4-SEA",
+            "Age": "198"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-i18n-Sz9OaMvZ.js",
+          "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+          "bytes": 63323,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-i18n-Sz9OaMvZ.js",
+          "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+          "bytes": 63323,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b86dc9afcf-SEA",
+            "Age": "110686"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-misc-DB0Q8XAf.css",
+          "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+          "bytes": 3938,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-misc-DB0Q8XAf.css",
+          "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+          "bytes": 3938,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b8c84977a3-SEA",
+            "Age": "110686"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-vue-DeI_Ip_v.js",
+          "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+          "bytes": 113799,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-vue-DeI_Ip_v.js",
+          "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+          "bytes": 113799,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b92c4bc96d-SEA",
+            "Age": "110686"
+          }
+        }
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index-BiOI67aw.css",
+          "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+          "bytes": 293040,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index-BiOI67aw.css",
+          "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+          "bytes": 293040,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b99e7e90db-SEA",
+            "Age": "76949"
+          }
+        }
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/vendor-misc-CeAxBZ0e.js",
+          "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+          "bytes": 279017,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/vendor-misc-CeAxBZ0e.js",
+          "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+          "bytes": 279017,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71b9fe06681b-SEA",
+            "Age": "1306"
+          }
+        }
+      },
+      {
+        "path": "/assets/index-Y0bcKx5T.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/index-Y0bcKx5T.js",
+          "sha256": "e5deddc8af71e400e4dfb4bc1818b49e1f4786f8411baad54b32b893b0b23b2a",
+          "bytes": 414176,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/index-Y0bcKx5T.js",
+          "sha256": "e5deddc8af71e400e4dfb4bc1818b49e1f4786f8411baad54b32b893b0b23b2a",
+          "bytes": 414176,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71ba68ab06ac-SEA",
+            "Age": "21152"
+          }
+        }
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-2pAE0g6y.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/AppLayout.vue_vue_type_script_setup_true_lang-2pAE0g6y.js",
+          "sha256": "db62def1ea1d31d33a671db0177803632ee545b0fe01c85505ca4822aa7a1076",
+          "bytes": 104141,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/AppLayout.vue_vue_type_script_setup_true_lang-2pAE0g6y.js",
+          "sha256": "db62def1ea1d31d33a671db0177803632ee545b0fe01c85505ca4822aa7a1076",
+          "bytes": 104141,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71bad83ee17a-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-wsKW_x5w.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-wsKW_x5w.js",
+          "sha256": "3ab73e32ab999b0d41d1656ab93d0d5c047cda525fe3748f399a90ce0ffea666",
+          "bytes": 1535,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-wsKW_x5w.js",
+          "sha256": "3ab73e32ab999b0d41d1656ab93d0d5c047cda525fe3748f399a90ce0ffea666",
+          "bytes": 1535,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71bb7d40ba06-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/LocaleSwitcher-xc0wt_99.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/LocaleSwitcher-xc0wt_99.js",
+          "sha256": "97c3d383f67f91cfe6814ecba9feba30b5ca4f66acdf7a35ee988cac2f5fe83a",
+          "bytes": 2345,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/LocaleSwitcher-xc0wt_99.js",
+          "sha256": "97c3d383f67f91cfe6814ecba9feba30b5ca4f66acdf7a35ee988cac2f5fe83a",
+          "bytes": 2345,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71bc38eac383-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/LocaleSwitcher-CjvPxOhx.css",
+          "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+          "bytes": 228,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/LocaleSwitcher-CjvPxOhx.css",
+          "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+          "bytes": 228,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71bcb98b4b76-SEA",
+            "Age": "110686"
+          }
+        }
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/AppHeader-C7aWrA1h.css",
+          "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+          "bytes": 13615,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/AppHeader-C7aWrA1h.css",
+          "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+          "bytes": 13615,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71bd0d7a97e3-SEA",
+            "Age": "110686"
+          }
+        }
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-BwzGhhIj.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/MediaWorkbenchView-BwzGhhIj.css",
+          "sha256": "b57f1402f1d68cd8e66c9ae44e07f4aecf8ce0034ed242242384bbb49c469441",
+          "bytes": 34868,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/MediaWorkbenchView-BwzGhhIj.css",
+          "sha256": "b57f1402f1d68cd8e66c9ae44e07f4aecf8ce0034ed242242384bbb49c469441",
+          "bytes": 34868,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71bd6c1d3f00-SEA",
+            "Age": "30387"
+          }
+        }
+      },
+      {
+        "path": "/assets/useClipboard-EW8yQDro.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/useClipboard-EW8yQDro.js",
+          "sha256": "adc49445d7da9c0e681d47fb7eb8bdb0b9b6e8099e562194f207826cc205cd31",
+          "bytes": 917,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/useClipboard-EW8yQDro.js",
+          "sha256": "adc49445d7da9c0e681d47fb7eb8bdb0b9b6e8099e562194f207826cc205cd31",
+          "bytes": 917,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71bdcc15c379-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/MediaWorkbenchView-B2CR1kbH.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/MediaWorkbenchView-B2CR1kbH.js",
+          "sha256": "931364c6f1b265632767c010c325bdb8df06e4bae7ebac9f30f7c347b38f570d",
+          "bytes": 116227,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/MediaWorkbenchView-B2CR1kbH.js",
+          "sha256": "931364c6f1b265632767c010c325bdb8df06e4bae7ebac9f30f7c347b38f570d",
+          "bytes": 116227,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71be6cfef3ea-SEA"
+          }
+        }
+      },
+      {
+        "path": "/assets/VideoStudioView-B9nrdUzf.css",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/VideoStudioView-B9nrdUzf.css",
+          "sha256": "453a197243a1e1db9fd2649e9892b9165d72c81a21bda2783a4adb36b5aacda0",
+          "bytes": 22628,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/VideoStudioView-B9nrdUzf.css",
+          "sha256": "453a197243a1e1db9fd2649e9892b9165d72c81a21bda2783a4adb36b5aacda0",
+          "bytes": 22628,
+          "headers": {
+            "Content-Type": "text/css; charset=utf-8",
+            "CF-Cache-Status": "HIT",
+            "CF-Ray": "a4ad71bef8b816ae-SEA",
+            "Age": "30387"
+          }
+        }
+      },
+      {
+        "path": "/assets/VideoStudioView-C4YZcdp3.js",
+        "origin": {
+          "status": 200,
+          "url": "http://127.0.0.1:8080/assets/VideoStudioView-C4YZcdp3.js",
+          "sha256": "42dcbbf6527871358deedb0a602ffae5a676f5c53ac7428fd4c0bc7b459b99e4",
+          "bytes": 47929,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8"
+          }
+        },
+        "public": {
+          "status": 200,
+          "url": "https://laifufu.top/assets/VideoStudioView-C4YZcdp3.js",
+          "sha256": "42dcbbf6527871358deedb0a602ffae5a676f5c53ac7428fd4c0bc7b459b99e4",
+          "bytes": 47929,
+          "headers": {
+            "Content-Type": "text/javascript; charset=utf-8",
+            "CF-Cache-Status": "MISS",
+            "CF-Ray": "a4ad71bf79e26a65-SEA"
+          }
+        }
+      }
+    ]
+  },
+  "rollback": {
+    "performed": false
+  },
+  "rollback_assets": "/home/ubuntu/services/ai-gateway/deploy-studio-entry-2bdbe3e8-20261015/before",
+  "rollback_images": {
+    "sub2api": {
+      "id": "sha256:e78166bf05b68299c9bd839ab5431ff051d02def730165d9f492ddca1097b7e2",
+      "available": true
+    },
+    "studio-v2-bridge": {
+      "id": "sha256:65142a7635c34b2c6675117ed0870e93acbd977363a2fcfac021a3598273b242",
+      "available": true
+    },
+    "studio-v2-bff": {
+      "id": "sha256:fbe06459ecd03646a3bea837ff10ebcdf540c5ff4a5aafb803b29d680b696836",
+      "available": true
+    }
+  },
+  "constraints_sha256": "88f1088b2f7c99d3461b93749211ca02ec624adb74c14b9ff6628cf32a5bafea",
+  "supplier_502_resolved": false
+}

@@ -1,3 +1,5 @@
+> 2026-10-15生产部署更新：固定 `2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4` 已完成授权部署，图片requested/effective=true、视频false；1870预检及开启二次检查PASS。详见 [DEPLOYMENT.md](DEPLOYMENT.md)。下文保留原候选/诊断交接作为历史证据；不将供应商502标为已解决。
+
 # 真实图片 502 与网页登录入口：本轮交接
 
 状态：**CANDIDATE_READY_NOT_DEPLOYED**。A/B已完成定向修复及真实三组件隔离验收，未部署。生产仍为 `ac8923ab666a77acc3675024c286ff2effff9546`，本轮只读观察图片开启、视频关闭。没有供应商调用、生产业务写入或开关调整。
