@@ -22,6 +22,7 @@ import (
 
 type StudioVideoRuntime struct {
 	PaidControl       *StudioPaidControl
+	Monitor           *ChannelMonitorV2Service
 	Core              *OpenAIGatewayService
 	Media             mediaworkbench.Repository
 	Orders            StudioVideoOrderRepository
@@ -54,7 +55,7 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 						mode = model.Mode
 					}
 				}
-				entry := StudioImageCatalogOffer{InputMode: mode, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel, OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: rows[i].Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice}
+				entry := StudioImageCatalogOffer{statusPlatform: studioPassivePlatform(a, key), InputMode: mode, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel, OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: rows[i].Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice}
 
 				for _, product := range rows[i].Config.Published.Products {
 					if product.ProductID == o.ProductID && product.AdapterConfig.Version == 1 {
@@ -67,6 +68,7 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 			}
 		}
 	}
+	attachStudioPassiveStatuses(ctx, r.Monitor, owner, key, out)
 	return out, nil
 }
 

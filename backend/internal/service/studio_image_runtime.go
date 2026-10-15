@@ -21,6 +21,7 @@ import (
 
 type StudioImageRuntime struct {
 	PaidControl *StudioPaidControl
+	Monitor     *ChannelMonitorV2Service
 	Core        *OpenAIGatewayService
 	Gemini      *GeminiMessagesCompatService
 	Media       mediaworkbench.Repository
@@ -33,17 +34,19 @@ type StudioImageRuntime struct {
 var studioImageTaskID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 type StudioImageCatalogOffer struct {
-	InputMode     string                 `json:"input_mode,omitempty"`
-	DisplayName   string                 `json:"display_name"`
-	UpstreamModel string                 `json:"upstream_model"`
-	OfferID       string                 `json:"offer_id"`
-	ProductID     string                 `json:"product_id"`
-	Model         string                 `json:"model"`
-	Revision      string                 `json:"published_revision"`
-	Spec          mediaworkbench.Match   `json:"spec"`
-	Excluded      []mediaworkbench.Match `json:"excluded"`
-	Price         mediaworkbench.Price   `json:"sale_price"`
-	VideoProfile  *videoplan.Model       `json:"video_profile,omitempty"`
+	PassiveStatus  *StudioPassiveStatus `json:"passive_status,omitempty"`
+	statusPlatform string
+	InputMode      string                 `json:"input_mode,omitempty"`
+	DisplayName    string                 `json:"display_name"`
+	UpstreamModel  string                 `json:"upstream_model"`
+	OfferID        string                 `json:"offer_id"`
+	ProductID      string                 `json:"product_id"`
+	Model          string                 `json:"model"`
+	Revision       string                 `json:"published_revision"`
+	Spec           mediaworkbench.Match   `json:"spec"`
+	Excluded       []mediaworkbench.Match `json:"excluded"`
+	Price          mediaworkbench.Price   `json:"sale_price"`
+	VideoProfile   *videoplan.Model       `json:"video_profile,omitempty"`
 }
 
 func (r *StudioImageRuntime) Catalog(ctx context.Context, owner StudioImageOwner, key *APIKey) ([]StudioImageCatalogOffer, error) {
@@ -68,9 +71,10 @@ func (r *StudioImageRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 			if !mediaworkbench.PublishedImageOfferQuoteable(a, o.OfferID) {
 				continue
 			}
-			out = append(out, StudioImageCatalogOffer{OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: a.Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel})
+			out = append(out, StudioImageCatalogOffer{statusPlatform: studioPassivePlatform(original, key), OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: a.Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel})
 		}
 	}
+	attachStudioPassiveStatuses(ctx, r.Monitor, owner, key, out)
 	return out, nil
 }
 
