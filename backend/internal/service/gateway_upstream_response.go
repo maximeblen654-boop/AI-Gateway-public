@@ -309,8 +309,14 @@ func extractUpstreamErrorMessage(body []byte) string {
 		return d
 	}
 
-	// 兜底：尝试顶层 message
-	return gjson.GetBytes(body, "message").String()
+	// Preserve existing structured-message precedence before accepting a scalar error.
+	if m := gjson.GetBytes(body, "message").String(); strings.TrimSpace(m) != "" {
+		return m
+	}
+	if e := gjson.GetBytes(body, "error"); e.Type == gjson.String {
+		return e.String()
+	}
+	return ""
 }
 
 func extractUpstreamErrorCode(body []byte) string {
