@@ -69,12 +69,16 @@ def containers(before):
 def finances(before):
  for t,expected in before['fingerprints'].items():
   got=sql("SELECT json_build_object('count',count(*),'digest',md5(COALESCE(string_agg(md5(row_to_json(t)::text),'|' ORDER BY md5(row_to_json(t)::text)),''))) FROM "+t+" t")[0]
-  assert got==expected,'business drift '+t
+  if t=='accounts':
+   account_digest=got
+   fields=sql("SELECT json_build_object('fields',(SELECT json_object_agg(key,md5(value::text)) FROM jsonb_each(to_jsonb(a)))) FROM accounts a WHERE id=77")[0]['fields']
+   assert fields==before['account77_fields'],'Account77 drift'
+  else:assert got==expected,'business drift '+t
  funds=sql("SELECT json_build_object('id',id,'balance',balance,'frozen_balance',frozen_balance) FROM users WHERE id IN(1,2) ORDER BY id")
  assert funds==before['funds'] and all(x['frozen_balance']==0 for x in funds),'funds drift/hold'
  tx=sql("SELECT json_build_object('prepared',(SELECT count(*) FROM pg_prepared_xacts),'active',(SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND state='active'))")[0]
  assert tx=={'prepared':0,'active':0},'active database transaction'
- return {'funds':funds,'transactions':tx,'fingerprints_unchanged':True}
+ return {'funds':funds,'transactions':tx,'protected_fingerprints_unchanged':True,'all_accounts':account_digest}
 def control_and_holds(before):
  import urllib.request
  c=json.loads(run(['docker','inspect','sub2api']))[0]
@@ -178,6 +182,8 @@ def main():
      entries.append({'file':str(path),'before':sha(original),'after':sha(data)})
     report['tasks'].append({'task_id':plan['task_id'],'status':'failed','billing_state':'not_charged','delivered_count':0,'files':entries})
     exclusive(HERE/(plan['task_id']+'.committed.json'),encode(report['tasks'][-1]))
+   report['finance_after']=finances(before)
+   assert report['finance_after']==report['finance_check'],'database changed during maintenance'
   finally:
    resume_errors=[]
    for name in reversed(paused):

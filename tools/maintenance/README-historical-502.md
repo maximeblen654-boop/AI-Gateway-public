@@ -11,3 +11,5 @@ Backups and write intent are fsynced before mutation. Each task commits unit env
 The historical upstream body/hash and upstream request ID were not saved. `response_hash` is empty and no upstream ID is fabricated. External audit links the verified Core request ID and native502 archive; the public message is the existing fixed safe failure message.
 
 Before executing, review the current source and production evidence; do not rerun an old operation directory. New IDs require new explicit authorization. Keep the backup private (original journals contain user input and quote identifiers). Publish only redacted hashes and results.
+
+The initial whole-accounts snapshot drifted before any apply. Two read-only samples identified unrelated Accounts 16/26 extra+updated_at updates (existing native upstream billing probe metadata). Account77 had not changed. The operation therefore freezes and compares the entire accounts table immediately before/after its writes, while separately requiring every Account77 field and all other protected business tables to match the sealed preflight. No probe settings are changed or probes invoked.
