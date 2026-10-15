@@ -90,3 +90,14 @@ Account77已有脱敏离线投影1870规格验证PASS；原Products/Offers、两
 **回退限制：新生命周期和逐商品依赖JSON写入后，旧4f/3b严格解码器不兼容，禁止盲目降级或整库恢复。** 部署前必须重新确认现场兼容回退条件；写入后使用兼容版本并保留业务数据。无新增数据库schema或migration。原生迟到首次结算/负余额合同保持不变。
 
 [实施范围](IMPLEMENTATION.md) · [构建溯源](BUILD.md) · [发布守卫适用性](RELEASE_CHECKS.md)。本轮完成后停止，等待单独生产授权。
+
+
+## 最新生产状态：6f02 模型生命周期候选已部署并恢复 Account #77 GPT（2026-10-16）
+
+状态：`DEPLOYED_GPT_RECOVERED_IMAGE_ENABLED_VIDEO_DISABLED`。固定运行源码 `6f02fdc17a923aa17576f0803305b925b29e36dd` 已按受控流程部署，三组件健康，Bridge/BFF 已附着新 Core；图片 `requested/effective=true`，视频 `requested/effective=false`，Channel Monitor 保持 V1，未发送真实供应商生成请求。
+
+Account #77 恢复工具 dry-run 和生产复核均通过 1,870 个组合。原 Published 仅 GPT 商品，Products、Offers、商品 ID、规格、售价和执行绑定一致；CAS 原子恢复 record_version 32→33，Published revision 为 `mwp_a2ba7043fbb0b9a9528879ba1f8d0fa32df963102bacdf803eb51e29da30f589`。GPT+Nano-banana-2.1 两份 Draft 与 validation 保持不变，Banana 未发布。
+
+生产非付费预检通过：服务端约 1.07 秒，浏览器约 1.39 秒；文生图和参考图编辑报价 HTTP 200，4K/16:9/3 张总价 0.075 CNY。图片二次检查通过后恢复图片开关。4 个新比例、自定义比例入口、Oil UI 中性状态、单商品发布确认及桌面/手机页面完成只读验收；未修改真实商品。
+
+资金、usage/dedup、权限、mapping、历史任务、原片和持久化挂载保护指纹通过；未回退。原始部署拦截及逐字段漂移证据保留在 `D:/AI-Gateway/.codex-tmp/deploy-model-lifecycle-6f02-20261016/`。候选 manifest SHA256 `65d80ee5639b5133f93355a20610177bd50978e59820aa2b4aabbf9cdbce499a`，Artifact `12006959480`。Constraints 原文未改。
