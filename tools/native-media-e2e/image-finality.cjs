@@ -41,7 +41,7 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  const paid='/admin/media-workbench/paid-controls/image',check=await core(admin,paid+'/check','POST',{});assert.equal(check.pass,true,JSON.stringify(check))
  const state=await core(admin,paid);const applied=await core(admin,paid,'PUT',{enabled:true,expected_revision:state.revision,fingerprint:check.fingerprint});assert.equal(applied.state.effective_enabled,true);assert.equal(applied.report.pass,true)
 
- for(let i=0;i<4;i++){const email=`finality-${i}@example.invalid`,password='Isolated-Funds-Batch-Only-20261015';const u=await core(admin,'/admin/users','POST',{email,password,balance:100,concurrency:5,allowed_groups:[fixture.groups.openai]});u.token=await login(email,password);await core(u.token,'/keys','POST',{name:'Synthetic funds audit',group_id:fixture.groups.openai});await session(u);users.push(u)}
+ for(let i=0;i<4;i++){const email=`finality-${i}@example.invalid`,password='Isolated-Funds-Batch-Only-20261015';const u=await core(admin,'/admin/users','POST',{email,password,balance:100,concurrency:5,allowed_groups:[fixture.groups.openai]});u.token=await login(email,password);await core(u.token,'/keys','POST',{name:'Synthetic funds audit',group_id:fixture.groups.openai});await session(u);const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');const upload=await fetch(base+'/studio-v2/api/assets/uploads',{method:'POST',headers:{Connection:'close',Origin:base,Cookie:u.cookie,'Content-Type':'image/png','X-Studio-Request':'asset-intake-v1','X-Studio-Asset-Kind':'image','X-Content-SHA256':createHash('sha256').update(bytes).digest('hex')},body:bytes});assert.equal(upload.status,201);u.asset=(await upload.json()).asset_ref;users.push(u)}
  const product=JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json')).products.find(p=>p.display_name==='Synthetic geometry image')
  const offer=ok(await media(users[0],'catalog')).offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('4K'));assert(offer)
  report.before=users.map(u=>({user_id:u.id,...snapshot(u.id)}));report.posts_before=stats().image_posts
@@ -51,9 +51,9 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
   for(let offset=0;offset<n;offset+=4){
    const cohort=[]
    for(let slot=0;slot<4;slot++){
-    const user=users[slot],count=scenario==='PARTIAL502'?3:1,prompt=`BATCH_FUNDS_${scenario}:${report.tasks.length}`,spec={resolution:'4K',aspect_ratio:'16:9',duration_seconds:0,quality:'',count,images:0,videos:0,audio:0}
-    const quote=await quoteAfterNativeCooldown(user,offer.offer_id,spec);const prepared=ok(await media(user,'prepare',{quote_token:quote.quote_token,client_key:randomUUID(),prompt,asset_refs:[]}))
-    const record={id:prepared.task_id,user_id:user.id,scenario,prompt,quantity:count,frozen_price:prepared.total_price||prepared.sale_price,before:snapshot(user.id),balance_samples:[],released:'0',hold_contract:'Studio image delivery settlement; no reserve/capture/release hold'}
+    const user=users[slot],edit=slot%2===1,count=scenario==='PARTIAL502'?3:1,prompt=`BATCH_FUNDS_${scenario}:${report.tasks.length}`,spec={resolution:'4K',aspect_ratio:'16:9',duration_seconds:0,quality:'',count,images:edit?1:0,videos:0,audio:0}
+    const quote=await quoteAfterNativeCooldown(user,offer.offer_id,spec);const prepared=ok(await media(user,'prepare',{quote_token:quote.quote_token,client_key:randomUUID(),prompt,asset_refs:edit?[user.asset]:[]}))
+    const record={id:prepared.task_id,user_id:user.id,scenario,edit,prompt,quantity:count,frozen_price:prepared.total_price||prepared.sale_price,before:snapshot(user.id),balance_samples:[],released:'0',hold_contract:'Studio image delivery settlement; no reserve/capture/release hold'}
     assert.equal(money(record.before.frozen_balance),0);assert.equal(ledger(record.id).dedup,0);report.tasks.push(record);cohort.push({user,record})
    }
    const sampler=setInterval(()=>{for(const {user,record} of cohort)record.balance_samples.push(snapshot(user.id))},500)
@@ -75,7 +75,7 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
     assert.equal(money(record.before.balance)-money(record.after.balance),expected)
     for(const snap of [...record.balance_samples,record.after])assert.equal(money(snap.frozen_balance),0)
     const calls=stats().requests.filter(r=>r.method==='POST'&&r.body.prompt===record.prompt);record.upstream_requests=calls.map(r=>({method:r.method,path:r.path,model:r.body.model,n:r.body.n,size:r.body.size}))
-    assert.equal(calls.length,scenario==='PARTIAL502'?2:1,JSON.stringify(record));assert(calls.every(c=>c.body.model==='gpt-image-2'))
+    assert.equal(calls.length,scenario==='PARTIAL502'?2:1,JSON.stringify(record));assert(calls.every(c=>c.body.model==='gpt-image-2'));assert(calls.every(c=>c.path===(record.edit?'/v1/images/edits':'/v1/images/generations')))
     const wrongOwner=users[(users.indexOf(user)+1)%users.length]
     const denied=await media(wrongOwner,'tasks/'+record.id);record.cross_owner_status=denied.status
     assert([403,404,409].includes(denied.status));assert.notEqual(denied.body.task_id,record.id)
@@ -102,6 +102,7 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  for(const t of report.tasks){const user=users.find(u=>u.id===t.user_id);t.restarted_query=await media(user,'tasks/'+t.id);assert([200,409].includes(t.restarted_query.status));assert.deepEqual(ledger(t.id),t.ledger);assert.equal(t.restarted_query.body.status,t.latest.body.status)}
  assert.equal(stats().image_posts,beforeRestart);report.after=users.map(u=>({user_id:u.id,...snapshot(u.id)}));
  for(const u of users){const charged=report.tasks.filter(t=>t.user_id===u.id).reduce((s,t)=>s+money(t.ledger.cost),0);assert.equal(10000000000-money(snapshot(u.id).balance),charged);assert.equal(money(snapshot(u.id).frozen_balance),0)}
+ report.modes={text:report.tasks.filter(t=>!t.edit).length,edit:report.tasks.filter(t=>t.edit).length};assert.equal(report.modes.edit,10)
  report.counts=Object.fromEntries([...new Set(report.tasks.map(t=>t.scenario))].map(k=>[k,report.tasks.filter(t=>t.scenario===k).length]))
  report.checks.push('Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks','Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity','transport-unknown remains unknown; explicit scoped 502 ends without charge, not declared supplier-refunded','No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint')
  const columns=['id','user_id','scenario','status','before_balance','quoted','charged','after_balance','hold','released','usage','dedup','supplier_posts']
