@@ -1,0 +1,36 @@
+{
+  "customer": 2,
+  "keys_before": [],
+  "production": false,
+  "browser_api_mocking": false,
+  "keys_after": [
+    {
+      "id": 3,
+      "user_id": 2,
+      "group_id": 4,
+      "status": "active"
+    },
+    {
+      "id": 4,
+      "user_id": 2,
+      "group_id": 3,
+      "status": "active"
+    }
+  ],
+  "diagnostics": {
+    "request_id": "564106a9-b8d3-4ddf-8ade-a1c8b2e31f1e",
+    "account_id": 3,
+    "upstream_status_code": 502,
+    "upstream_latency_ms": 3,
+    "upstream_request_id": "synthetic-studio-unknown-502",
+    "message_preserved": true
+  },
+  "checks": [
+    "Zero pre-created customer keys; actual Vue login/catalog prepares one native key per configured Group",
+    "Text/edit/single-video delivery and download use real Core/Bridge/BFF and native settlement",
+    "Account switch, refresh and query preserve identities; upstream 502 remains unknown with zero settlement",
+    "Native error status, Account, message, request ID and timing retained by real Ops middleware",
+    "104-request funds suite and 1870 scale suite reused, not rerun"
+  ],
+  "pass": true
+}

@@ -1,0 +1,173 @@
+{
+  "observed_at_utc": "2026-10-15T04:12:54.987891+00:00",
+  "production_source_sha": "ac8923ab666a77acc3675024c286ff2effff9546",
+  "production_mutations": false,
+  "supplier_calls": 0,
+  "correlation": [
+    {
+      "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+      "account_id": 77,
+      "frozen_credential_matches_current": true,
+      "key_tail_matches": true,
+      "proxy_present": false,
+      "request_parameters": {
+        "model": "gpt-image-2",
+        "n": 3,
+        "resolution": "4K",
+        "aspect_ratio": "16:9"
+      },
+      "payload_hash_matches": true,
+      "receipt_sha256": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46"
+    },
+    {
+      "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+      "account_id": 77,
+      "frozen_credential_matches_current": true,
+      "key_tail_matches": true,
+      "proxy_present": false,
+      "request_parameters": {
+        "model": "gpt-image-2",
+        "n": 1,
+        "resolution": "4K",
+        "aspect_ratio": "4:3"
+      },
+      "payload_hash_matches": true,
+      "receipt_sha256": "bcfd21f11cc1794710c89c78194df24ba9524fe481ec7bbb316546a3ff110cce"
+    },
+    {
+      "task_id": "img_f372e5916f913ebc4358129c65add930",
+      "account_id": 77,
+      "frozen_credential_matches_current": true,
+      "key_tail_matches": true,
+      "proxy_present": false,
+      "request_parameters": {
+        "model": "gpt-image-2",
+        "n": 1,
+        "resolution": "4K",
+        "aspect_ratio": "16:9"
+      },
+      "payload_hash_matches": true,
+      "receipt_sha256": "c6928ef9f87521a15c5647d3a0df4d353a1f23e41b5b642c041a5075fc524206"
+    }
+  ],
+  "paid_state": {
+    "image": {
+      "mode": "managed-v1",
+      "paid_enabled": true
+    },
+    "video": {
+      "mode": "managed-v1",
+      "paid_enabled": false
+    },
+    "sidecars": {
+      "bridge": {
+        "version": "managed-v1",
+        "ready": true,
+        "core_loopback": true,
+        "image_group": 31,
+        "video_group": 31
+      },
+      "bff": {
+        "version": "managed-v1",
+        "ready": true,
+        "image_ready": true,
+        "video_ready": true,
+        "assets": true
+      }
+    },
+    "both_disabled": false
+  },
+  "funds": [
+    {
+      "observed_at_utc": "2026-10-15T03:47:17.184240+00:00",
+      "task_id": "img_66c5f21b1cc78570f98ae244b7ce67a1",
+      "usage_rows": 0,
+      "dedup_rows": 0,
+      "archived_dedup_rows": 0,
+      "receipt": {
+        "sha256": "bcfd21f11cc1794710c89c78194df24ba9524fe481ec7bbb316546a3ff110cce",
+        "status": "unknown",
+        "billing_state": "pending",
+        "delivered_count": null,
+        "pending_count": 1,
+        "result_hash": null
+      },
+      "units": [
+        {
+          "id": "c327cddcd1c5018069d765385aea9d7b641c632ef5c43cbfc80465c1cb3889be",
+          "state": "unknown",
+          "response_present": false,
+          "upstream_id_present": false,
+          "sha256": "6ddae4aebc663e9839ba66c47590621a3f14d57c35f830c623259c018ce1019c"
+        }
+      ],
+      "pg_transactions": [
+        {
+          "prepared_count": 0,
+          "long_running_transactions": 0
+        }
+      ],
+      "inflight": {
+        "zcard": "0",
+        "hcount": "0",
+        "ttl": "-2",
+        "exact_requests": {
+          "a6b4fe865657d5cdf6eacdf43911ebceab7f2d016c435a3843dc07716e84c866": "",
+          "55bb1465-791b-4783-ab6c-822e3f19a710": "",
+          "img_66c5f21b1cc78570f98ae244b7ce67a1": ""
+        }
+      }
+    },
+    {
+      "observed_at_utc": "2026-10-15T04:10:13.434092+00:00",
+      "task_id": "img_f372e5916f913ebc4358129c65add930",
+      "usage_rows": 0,
+      "dedup_rows": 0,
+      "archived_dedup_rows": 0,
+      "receipt": {
+        "sha256": "c6928ef9f87521a15c5647d3a0df4d353a1f23e41b5b642c041a5075fc524206",
+        "status": "unknown",
+        "billing_state": "pending",
+        "delivered_count": null,
+        "pending_count": 1,
+        "result_hash": null
+      },
+      "units": [
+        {
+          "id": "e86a712f73eac7a25410327bf2343259e0b2af7ea76c1888b76c8c52c686adf8",
+          "state": "unknown",
+          "response_present": false,
+          "upstream_id_present": false,
+          "sha256": "2a8654c3040ad9f7a0d409399f4ab750eabf895c6d2173e31842f2c1673a078b"
+        }
+      ],
+      "pg_transactions": [
+        {
+          "prepared_count": 0,
+          "long_running_transactions": 0
+        }
+      ],
+      "inflight": {
+        "zcard": "0",
+        "hcount": "0",
+        "ttl": "-2",
+        "exact_requests": {
+          "7dd50423b956049f53f4207cd56d0d8a0530b48a51abbed6fd92ba83072cccf2": "",
+          "c49b9bed-0527-498e-ad5b-8819a2db4073": "",
+          "img_f372e5916f913ebc4358129c65add930": ""
+        }
+      }
+    }
+  ],
+  "private_evidence_sha256": {
+    "locate.json": "cfe31eeafdbc06713d80ff0bd19a72588ce044a5e67a26b40971123841b52c9c",
+    "receipt.json": "10b9947434234703b2c03568f34f266ba67cc3bdc93f05f2cc837128ce7f1c27",
+    "funds.json": "cd064b448e1b8554c7b5e3ae48ac9d6b7dd984826e893d6a3ad568356113b39c",
+    "details.json": "d1cba2698207924d6ee89e2108b7685744b84a086f636fa20da8028d00725bc8",
+    "locate-1148.json": "d57d68ab9e020ca883854cf3867eda07c4b817ee76a13e61b70455f14d823efe",
+    "receipt-1148.json": "56cb2ac9d593d4b0088a98355a87d089d2d2fcf8a79d3ce061a05c7b3dc3dc3e",
+    "funds-1148.json": "f487e527cbe68639bbab6dde6b50696cb69d1c9990f9de9bc029b28e5132dda6",
+    "correlation.json": "946f7d6d0d2923e9771a33f5f00d94160edbabc78b34f64779c0e99753bb8d1b",
+    "paid-status.json": "7c74dd0898382e5cb52f957920374cd8c444c1f86a42adc8e282229ab7c4e44b"
+  }
+}

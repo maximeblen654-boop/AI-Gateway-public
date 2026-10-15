@@ -1,0 +1,888 @@
+{
+  "runtime_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+  "acceptance_script_sha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+  "runs": {
+    "candidate": {
+      "conclusion": "success",
+      "createdAt": "2026-10-15T05:03:13Z",
+      "databaseId": 38684702740,
+      "headSha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "jobs": [
+        {
+          "completedAt": "2026-10-15T05:12:06Z",
+          "conclusion": "success",
+          "databaseId": 116256789490,
+          "name": "candidate",
+          "startedAt": "2026-10-15T05:03:16Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:19Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:23Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:27Z",
+              "conclusion": "success",
+              "name": "Checkout the frozen runtime source separately from acceptance scripts",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:23Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:27Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v6",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:31Z",
+              "conclusion": "success",
+              "name": "Run pnpm/action-setup@v6",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:43Z",
+              "conclusion": "success",
+              "name": "Run docker/setup-buildx-action@v3",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:43Z",
+              "conclusion": "skipped",
+              "name": "Checkout the pinned sidecar source for reuse comparison",
+              "number": 7,
+              "startedAt": "2026-10-15T05:03:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:43Z",
+              "conclusion": "skipped",
+              "name": "Fetch existing sidecar archives without rebuilding",
+              "number": 8,
+              "startedAt": "2026-10-15T05:03:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:08:12Z",
+              "conclusion": "success",
+              "name": "Build only this commit, using existing component recipes",
+              "number": 9,
+              "startedAt": "2026-10-15T05:03:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:08:54Z",
+              "conclusion": "success",
+              "name": "Install browser test dependencies",
+              "number": 10,
+              "startedAt": "2026-10-15T05:08:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:11:13Z",
+              "conclusion": "success",
+              "name": "Real candidate startup and non-paid business acceptance",
+              "number": 11,
+              "startedAt": "2026-10-15T05:08:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:11:27Z",
+              "conclusion": "success",
+              "name": "Export images and exact identities (manifest records acceptance status)",
+              "number": 12,
+              "startedAt": "2026-10-15T05:11:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:11:28Z",
+              "conclusion": "success",
+              "name": "Save small reports and screenshots separately",
+              "number": 13,
+              "startedAt": "2026-10-15T05:11:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:11:32Z",
+              "conclusion": "success",
+              "name": "Save final candidate and non-secret evidence only",
+              "number": 14,
+              "startedAt": "2026-10-15T05:11:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:03Z",
+              "conclusion": "success",
+              "name": "Post Run docker/setup-buildx-action@v3",
+              "number": 24,
+              "startedAt": "2026-10-15T05:11:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:03Z",
+              "conclusion": "success",
+              "name": "Post Run pnpm/action-setup@v6",
+              "number": 25,
+              "startedAt": "2026-10-15T05:12:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:03Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v6",
+              "number": 26,
+              "startedAt": "2026-10-15T05:12:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:03Z",
+              "conclusion": "success",
+              "name": "Post Checkout the frozen runtime source separately from acceptance scripts",
+              "number": 27,
+              "startedAt": "2026-10-15T05:12:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:04Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 28,
+              "startedAt": "2026-10-15T05:12:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:12:04Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 29,
+              "startedAt": "2026-10-15T05:12:04Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684702740/job/116256789490"
+        },
+        {
+          "completedAt": "2026-10-15T05:03:14Z",
+          "conclusion": "skipped",
+          "databaseId": 116256790469,
+          "name": "accept-existing",
+          "startedAt": "2026-10-15T05:03:14Z",
+          "status": "completed",
+          "steps": [],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684702740/job/116256790469"
+        },
+        {
+          "completedAt": "2026-10-15T05:03:14Z",
+          "conclusion": "skipped",
+          "databaseId": 116256790787,
+          "name": "admin-ui-review",
+          "startedAt": "2026-10-15T05:03:14Z",
+          "status": "completed",
+          "steps": [],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684702740/job/116256790787"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-10-15T05:12:07Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684702740"
+    },
+    "ci": {
+      "conclusion": "success",
+      "createdAt": "2026-10-15T05:02:59Z",
+      "databaseId": 38684683408,
+      "headSha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "jobs": [
+        {
+          "completedAt": "2026-10-15T05:07:16Z",
+          "conclusion": "success",
+          "databaseId": 116256722952,
+          "name": "golangci-lint",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:03Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:07Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:20Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-go@v6",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:20Z",
+              "conclusion": "success",
+              "name": "Verify Go version",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:07:13Z",
+              "conclusion": "success",
+              "name": "golangci-lint",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:07:13Z",
+              "conclusion": "success",
+              "name": "Post golangci-lint",
+              "number": 8,
+              "startedAt": "2026-10-15T05:07:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:07:13Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-go@v6",
+              "number": 9,
+              "startedAt": "2026-10-15T05:07:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:07:14Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 10,
+              "startedAt": "2026-10-15T05:07:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:07:14Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 11,
+              "startedAt": "2026-10-15T05:07:14Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408/job/116256722952"
+        },
+        {
+          "completedAt": "2026-10-15T05:03:28Z",
+          "conclusion": "success",
+          "databaseId": 116256723171,
+          "name": "shell",
+          "startedAt": "2026-10-15T05:03:08Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:09Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:17Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:25Z",
+              "conclusion": "success",
+              "name": "Check deployment scripts",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:26Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:25Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:26Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 7,
+              "startedAt": "2026-10-15T05:03:26Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408/job/116256723171"
+        },
+        {
+          "completedAt": "2026-10-15T05:07:00Z",
+          "conclusion": "success",
+          "databaseId": 116256723179,
+          "name": "frontend",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:03Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:07Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:11Z",
+              "conclusion": "success",
+              "name": "Setup pnpm",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:15Z",
+              "conclusion": "success",
+              "name": "Setup Node.js",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:19Z",
+              "conclusion": "success",
+              "name": "Install frontend dependencies",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:04:49Z",
+              "conclusion": "success",
+              "name": "Frontend typecheck and critical vitest",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:19Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:27Z",
+              "conclusion": "success",
+              "name": "Isolated product wizard browser acceptance",
+              "number": 7,
+              "startedAt": "2026-10-15T05:04:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:28Z",
+              "conclusion": "success",
+              "name": "Upload isolated wizard screenshots and results",
+              "number": 8,
+              "startedAt": "2026-10-15T05:06:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:32Z",
+              "conclusion": "success",
+              "name": "Synthetic usage display fixture regression",
+              "number": 9,
+              "startedAt": "2026-10-15T05:06:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:32Z",
+              "conclusion": "success",
+              "name": "Local fixture isolation checks",
+              "number": 10,
+              "startedAt": "2026-10-15T05:06:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:58Z",
+              "conclusion": "success",
+              "name": "Published media BFF contract tests (no supplier calls)",
+              "number": 11,
+              "startedAt": "2026-10-15T05:06:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:58Z",
+              "conclusion": "success",
+              "name": "Post Setup Node.js",
+              "number": 20,
+              "startedAt": "2026-10-15T05:06:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:58Z",
+              "conclusion": "success",
+              "name": "Post Setup pnpm",
+              "number": 21,
+              "startedAt": "2026-10-15T05:06:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:58Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 22,
+              "startedAt": "2026-10-15T05:06:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:06:58Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-15T05:06:58Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408/job/116256723179"
+        },
+        {
+          "completedAt": "2026-10-15T05:03:13Z",
+          "conclusion": "success",
+          "databaseId": 116256723284,
+          "name": "release-helpers",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:03Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:07Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:07Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v6",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:10Z",
+              "conclusion": "success",
+              "name": "Run python -m pip install -r .github/release-tools/requirements-release.txt",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:11Z",
+              "conclusion": "success",
+              "name": "Run python -m unittest discover -s .github/release-tools -p 'test_release_matrix.py'",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:10Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:11Z",
+              "conclusion": "success",
+              "name": "Run bash -n .github/release-tools/release-images.sh",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:11Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v6",
+              "number": 11,
+              "startedAt": "2026-10-15T05:03:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:12Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 12,
+              "startedAt": "2026-10-15T05:03:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:12Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 13,
+              "startedAt": "2026-10-15T05:03:12Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408/job/116256723284"
+        },
+        {
+          "completedAt": "2026-10-15T05:14:40Z",
+          "conclusion": "success",
+          "databaseId": 116256723321,
+          "name": "test",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:04Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:09Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:10Z",
+              "conclusion": "success",
+              "name": "Check Docker Compose simple mode environment",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-go@v6",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:10Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Verify Go version",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v6",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:45Z",
+              "conclusion": "success",
+              "name": "Install local media test tools",
+              "number": 7,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:10:33Z",
+              "conclusion": "success",
+              "name": "Unit tests",
+              "number": 8,
+              "startedAt": "2026-10-15T05:03:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:14:36Z",
+              "conclusion": "success",
+              "name": "Integration tests",
+              "number": 9,
+              "startedAt": "2026-10-15T05:10:33Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:14:36Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v6",
+              "number": 16,
+              "startedAt": "2026-10-15T05:14:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:14:36Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-go@v6",
+              "number": 17,
+              "startedAt": "2026-10-15T05:14:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:14:37Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 18,
+              "startedAt": "2026-10-15T05:14:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:14:37Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 19,
+              "startedAt": "2026-10-15T05:14:37Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408/job/116256723321"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-10-15T05:14:40Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683408"
+    },
+    "security": {
+      "conclusion": "success",
+      "createdAt": "2026-10-15T05:02:59Z",
+      "databaseId": 38684683411,
+      "headSha": "2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "jobs": [
+        {
+          "completedAt": "2026-10-15T05:03:25Z",
+          "conclusion": "success",
+          "databaseId": 116256723140,
+          "name": "frontend-security",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:04Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:08Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:12Z",
+              "conclusion": "success",
+              "name": "Set up pnpm",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:17Z",
+              "conclusion": "success",
+              "name": "Set up Node.js",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:20Z",
+              "conclusion": "success",
+              "name": "Install dependencies",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:21Z",
+              "conclusion": "success",
+              "name": "Run pnpm audit",
+              "number": 6,
+              "startedAt": "2026-10-15T05:03:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:21Z",
+              "conclusion": "success",
+              "name": "Check audit exceptions",
+              "number": 7,
+              "startedAt": "2026-10-15T05:03:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Post Set up Node.js",
+              "number": 12,
+              "startedAt": "2026-10-15T05:03:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Post Set up pnpm",
+              "number": 13,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 14,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:22Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "startedAt": "2026-10-15T05:03:22Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683411/job/116256723140"
+        },
+        {
+          "completedAt": "2026-10-15T05:03:33Z",
+          "conclusion": "success",
+          "databaseId": 116256723212,
+          "name": "backend-security",
+          "startedAt": "2026-10-15T05:03:02Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-15T05:03:04Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-15T05:03:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:08Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-15T05:03:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:21Z",
+              "conclusion": "success",
+              "name": "Set up Go",
+              "number": 3,
+              "startedAt": "2026-10-15T05:03:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:21Z",
+              "conclusion": "success",
+              "name": "Verify Go version",
+              "number": 4,
+              "startedAt": "2026-10-15T05:03:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:30Z",
+              "conclusion": "success",
+              "name": "Run govulncheck",
+              "number": 5,
+              "startedAt": "2026-10-15T05:03:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:30Z",
+              "conclusion": "success",
+              "name": "Post Set up Go",
+              "number": 9,
+              "startedAt": "2026-10-15T05:03:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:31Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 10,
+              "startedAt": "2026-10-15T05:03:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-15T05:03:31Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 11,
+              "startedAt": "2026-10-15T05:03:31Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683411/job/116256723212"
+        }
+      ],
+      "status": "completed",
+      "updatedAt": "2026-10-15T05:03:34Z",
+      "url": "https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/38684683411"
+    }
+  },
+  "artifacts": [
+    {
+      "id": 11949808833,
+      "name": "native-media-candidate-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "size_in_bytes": 211837178,
+      "expired": false,
+      "expires_at": "2026-10-29T05:11:29Z",
+      "digest": "sha256:9d494f1ff128248e02a6a7676f144164b606bbe1eaf67d7f4b3c1393f5ff13d1"
+    },
+    {
+      "id": 11949474388,
+      "name": "native-media-evidence-2bdbe3e8d6f1c5a02dafca393484f457cf99cbf4",
+      "size_in_bytes": 9927537,
+      "expired": false,
+      "expires_at": "2026-10-29T05:11:27Z",
+      "digest": "sha256:7291d71cb02b98a8a21e30c856c44dea6e0cbc367c6f82044e363a5cafdfe0ad"
+    }
+  ],
+  "local_complete_tar_downloaded": false,
+  "local_evidence_path": "D:\\AI-Gateway\\output\\studio-entry-2bdbe3e8-final",
+  "production_action": false
+}
