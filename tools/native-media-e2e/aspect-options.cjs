@@ -66,7 +66,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    const draftCatalog=await media('catalog');assert.equal(draftCatalog.status,200);assert.deepEqual(draftCatalog.body.offers,catalogBefore.body.offers,'Unpublished ratios must not enter customer catalog')
    const spec={resolution:'1K',aspect_ratio:'3:5',count:1,images:0,videos:0,audio:0,duration_seconds:0,quality:''}
    const refused=await media('quotes','POST',{offer_id:oldOffer.offer_id,spec});assert(refused.status>=400&&refused.status<500,JSON.stringify(refused));report.unpublished_quote=refused
-   await w('return-models').click();await w('publish').click();await expect(w('confirm-publish')).toBeVisible();await w('confirm-publish').click();await expect(w('sales')).toBeEnabled()
+   await w('wizard-step-5').click();await w('return-models').click();await w('publish').click();await expect(w('confirm-publish')).toBeVisible();await w('confirm-publish').click();await expect(w('sales')).toBeEnabled()
    const published=(await api(accountPath)).media_workbench_v1;assert.deepEqual(published.published.products.find(p=>p.product_id===product.product_id),expected)
    await customerPage();const catalog=await media('catalog');assert.equal(catalog.status,200)
    const offer=catalog.body.offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('1K'));assert(offer&&offer.spec.aspect_ratio.includes('3:5')&&offer.spec.aspect_ratio.includes('1:4'))
