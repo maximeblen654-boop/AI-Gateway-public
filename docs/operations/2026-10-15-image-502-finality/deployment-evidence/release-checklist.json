@@ -1,0 +1,29 @@
+{
+  "candidate_source": "4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+  "manifest_sha256": "a5fc9bcbd846d0e11cf7b958ae2393e1c96caf74e5b91e9e807f0cddc38dc657",
+  "before": {
+    "PUB-01": "PASS existing HTTPS routes and unchanged Caddy fingerprint",
+    "PUB-02": "PASS no challenge, valid status/content types",
+    "PUB-03": "PASS HTML asset references; no full HTML equivalence claim",
+    "PUB-04": "PASS current origin/public bytes",
+    "PUB-05": "PASS prior components healthy and authenticated admin baseline",
+    "PUB-06": "PASS 2bd images available, private config backup, conditional rollback gate",
+    "ART-01": "PASS exact artifact/server TAR SHA, OCI-config identity and accepted real runtime files"
+  },
+  "after": {
+    "PUB-01": "PASS production HTTPS and authenticated pages",
+    "PUB-02": "PASS 17 assets status/type/no-challenge",
+    "PUB-03": "PASS production Core resource identities",
+    "PUB-04": "PASS 17 origin/public resource digests equal",
+    "PUB-05": "PASS 3 healthy, namespaces, 1440/390 login pages, native quotes and 1870 preflight",
+    "PUB-06": "PASS old images/config preserved; no new finality at final scan; future new finality forbids automatic downgrade",
+    "ART-01": "PASS exact three running file hashes match accepted candidate"
+  },
+  "sources": [
+    "public-before.json",
+    "public-assets.json",
+    "runtime-files.json",
+    "prepared-check.json",
+    "deployment.json"
+  ]
+}

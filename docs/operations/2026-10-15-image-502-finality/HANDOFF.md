@@ -1,3 +1,7 @@
+## 2026-10-15 生产部署更新
+
+固定4f10be20已完成授权生产部署：**DEPLOYED_IMAGE_STATE_PRESERVED_VIDEO_DISABLED**。图片requested/effective=true，视频false。1870生产预检及开启二次检查通过，三笔历史unknown未改。详见[实际部署报告](DEPLOYMENT.md)。旧2bd对新增终态的降级限制与归档位置见该报告；不将供应商502标为已解决。以下候选证据保留追溯。
+
 # Image2Pro HTTP 502 customer finality
 
 Status: CANDIDATE_READY_NOT_DEPLOYED.
