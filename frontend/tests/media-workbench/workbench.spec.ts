@@ -104,13 +104,13 @@ for (const scenario of ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'PAUSED', 
 test('native Publish dialog traps focus; Escape cancels without publishing', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 }); await openEditor(page, 'theme=lavender&mode=dark')
   await page.getByTestId('return-models').click()
-  await page.getByTestId('publish').click(); const dialog = page.getByRole('dialog', { name: '发布这次修改？' }); await expect(dialog).toBeVisible()
+  await page.getByTestId('publish').click(); const dialog = page.getByRole('dialog', { name: '发布选中的商品？' }); await expect(dialog).toBeVisible()
   for (let index = 0; index < 8; index++) { await page.keyboard.press('Tab'); expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true) }
   await page.screenshot({ path: testInfo.outputPath('publish-dialog.png'), fullPage: true })
   await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(page.getByTestId('publish')).toBeFocused()
 })
 for (const [state, label] of [
-  ['SELLING', '媒体销售中'], ['PUBLISHED_NOT_READY', '已发布配置暂未满足销售条件'],
+  ['SELLING', '媒体销售中'], ['PUBLISHED_NOT_READY', '已发布配置当前不可售'],
   ['ACCOUNT_RUNTIME_BLOCKED', '账户暂时无法提供服务，请打开账户详情处理']
 ]) {
   test(`Phase-2A effective state ${state}`, async ({ page }) => {

@@ -3,8 +3,8 @@
     <h3>{{ label }}</h3>
     <p v-if="saveState === 'saved'">草稿已保存。当前 Published 和历史订单保持原版本。</p>
     <p v-if="state === 'PASS'">后台检查通过；未发送真实生成请求。</p>
-    <p v-else-if="state === 'UNKNOWN'">后台检查暂不可用，当前不能发布。</p>
-    <p v-else-if="state === 'STALE'">检查结果不属于当前草稿，请保存草稿获取最新检查。</p>
+    <p v-else-if="state === 'UNKNOWN'">整份草稿检查暂不可用。已确认保存后，可明确选择商品，在发布时单独检查。</p>
+    <p v-else-if="state === 'STALE'">整份草稿检查结果不属于当前版本。先保存未保存修改，再明确选择商品进行发布检查。</p>
     <ul v-if="diagnostics.length">
       <li v-for="(diagnostic, index) in diagnostics" :key="`${diagnostic.code}-${index}`">
         <button type="button" class="mw-diagnostic" @click="emit('locate', diagnostic)">

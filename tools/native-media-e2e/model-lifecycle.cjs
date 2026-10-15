@@ -42,6 +42,9 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
  try{
   const source=await api('/admin/accounts/'+id),owner=await api('/auth/me')
   assert(source.name.startsWith('Synthetic '));assert.equal(source.credentials.base_url,'https://localhost:19090');assert.equal(owner.email,'native-admin@example.invalid');assert(Number.isSafeInteger(owner.id))
+  // Native API admission uses its own explicit model mapping. This synthetic
+  // fixture does not borrow Studio's Published-model context or task headers.
+  await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,model_mapping:{...source.credentials.model_mapping,'native-openai-image':'native-openai-image'}}})
   const original=await config(),products=structuredClone(original.draft.products)
   assert.equal(products.length,2);assert(products.every(p=>p.media_type==='image'))
   const [a,b]=products
@@ -53,7 +56,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   let c=await saveDraft(accountPath,products);assert.equal(c.validation.publish_ready,true,JSON.stringify(c.validation));await publish(accountPath,c);await salesOn(accountPath)
   // A separate Account in the same real Group proves isolation is not merely
   // a different customer or a different Group. Credentials target only localhost.
-  const peer=await api('/admin/accounts','POST',{name:'Synthetic lifecycle peer',platform:'openai',type:'apikey',credentials:{api_key:'synthetic-native-only',base_url:'https://localhost:19090'},extra:{quota_limit:100},concurrency:5,priority:1,group_ids:[gid],upstream_billing_probe_enabled:false})
+  const peer=await api('/admin/accounts','POST',{name:'Synthetic lifecycle peer',platform:'openai',type:'apikey',credentials:{api_key:'synthetic-native-only',base_url:'https://localhost:19090',model_mapping:{'gpt-image-2':'gpt-image-2'}},extra:{quota_limit:100},concurrency:5,priority:1,group_ids:[gid],upstream_billing_probe_enabled:false})
   assert(Number.isSafeInteger(peer.id));const peerPath='/admin/media-workbench/accounts/'+peer.id
   // Group channel costs are Account-specific. Preserve the original wildcard
   // rule (covers both models on Account A), append a peer rule to that same
@@ -151,7 +154,8 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   await page.setViewportSize({width:1440,height:1000})
   offers=ok(await catalog()).offers;assert(!offers.some(o=>o.product_id===a.product_id))
   // One real healthy sibling task while the target is archived. This is the
-  // only new supplier generation; no 104-task funds batch is repeated here.
+  // only Studio supplier generation; independent native API calls are counted
+  // separately below, after all original delivery/ledger assertions.
   const peerQuote=ok(await quote(offerC));assert(peerQuote.quote_token)
   const healthyQuote=ok(await quote(offerB));assert.equal(money(healthyQuote.total_price?.amount||healthyQuote.sale_price?.amount||healthyQuote.unit_price?.amount),2500000)
   const beforeBalance=snapshot(owner.id),prompt='SYNTHETIC_LIFECYCLE_HEALTHY_'+randomUUID()
@@ -216,6 +220,101 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const peerAfter=await config(peerPath);assert.equal(peerAfter.sales.enabled,true);assert.equal(peerAfter.product_lifecycle?.[peerProduct.product_id]?.state||'active','active')
   assert(observedWrites.length>=5);assert(!observedWrites.some(w=>w.path.endsWith('/publish')),'lifecycle UI/action republished Draft')
   report.model_disappearance={missing_target_rejected:true,other_model_same_account_quotable:true,same_group_other_account_quotable:true,shared_gate_unchanged:true,original_catalog_restored:true}
+  // Independent native API Key, native middleware/scheduler/billing and the
+  // same Account/model. No Studio/receipt headers or protected-model bypass.
+  // Run after the existing one-Studio-call assertions so its ledger is unchanged.
+  assert(Number.isSafeInteger(fixture.customer)&&fixture.customer!==owner.id)
+  const coreOrigin='http://127.0.0.1:28180'
+  assert(compose.services.core.ports.includes('127.0.0.1:28180:8080'))
+  const loginResponse=await fetch(coreOrigin+'/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'native-customer@example.invalid',password:'Native-Customer-Only-20261012'})})
+  assert.equal(loginResponse.status,200,'isolated native customer login failed')
+  const loginBody=await loginResponse.json();assert.equal(loginBody.code,0);assert(loginBody.data.access_token)
+  const keyResponse=await fetch(coreOrigin+'/api/v1/keys',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+loginBody.data.access_token},body:JSON.stringify({name:'Synthetic lifecycle independent native key',group_id:gid})})
+  assert.equal(keyResponse.status,200,'isolated independent native key creation failed')
+  const keyBody=await keyResponse.json();assert.equal(keyBody.code,0)
+  const nativeKey=keyBody.data;assert(Number.isSafeInteger(nativeKey.id));assert.equal(nativeKey.user_id,fixture.customer);assert.equal(nativeKey.group_id,gid);assert(nativeKey.key)
+  const nativeLedger=()=>JSON.parse(query(`SELECT json_build_object('usage',(SELECT count(*) FROM usage_logs WHERE api_key_id=${nativeKey.id}),'accounts',(SELECT COALESCE(json_agg(DISTINCT account_id),'[]'::json) FROM usage_logs WHERE api_key_id=${nativeKey.id}))`))
+  assert.equal(nativeLedger().usage,0)
+  const nativeBaseline={posts:stats().image_posts,studio_owner:snapshot(owner.id),studio_ledger:ledger(prepared.task_id)}
+  const nativeRequest=async model=>{
+   const prompt='SYNTHETIC_LIFECYCLE_NATIVE_'+randomUUID()
+   const response=await fetch(coreOrigin+'/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+nativeKey.key},body:JSON.stringify({model,prompt,n:1,size:'1024x1024',response_format:'b64_json'})})
+   return {status:response.status,body:await response.json(),prompt}
+  }
+  const protectedRejected=await nativeRequest('canvas-image-01')
+  assert.equal(protectedRejected.status,400);assert.equal(protectedRejected.body.error?.type,'studio_task_required')
+  assert.equal(stats().image_posts,nativeBaseline.posts,'protected model reached upstream')
+  const nativeProof=[]
+  const proveNative=async(label,expectedCalls)=>{
+   assert.equal((await quote(offerB)).status,409,'Studio product must be unavailable during native request')
+   assert.equal((await current('image')).effective_enabled,true)
+   const result=await nativeRequest('native-openai-image')
+   assert.equal(result.status,200,`${label}: native endpoint returned ${result.status}`)
+   assert.equal(result.body.data?.length,1);assert.equal(digest(Buffer.from(result.body.data[0].b64_json,'base64')),digest(expectedPNG))
+   await expect.poll(()=>nativeLedger().usage,{timeout:30000}).toBe(expectedCalls)
+   const usage=nativeLedger();assert.deepEqual(usage.accounts,[id],'native route must use the same Account as the Studio product')
+   const calls=stats().requests.filter(r=>r.method==='POST'&&r.body?.prompt===result.prompt)
+   assert.equal(calls.length,1);assert.equal(calls[0].path,'/v1/images/generations');assert.equal(calls[0].body.model,'native-openai-image');assert.equal(calls[0].auth,'bearer')
+   assert.equal(stats().image_posts,nativeBaseline.posts+expectedCalls)
+   assert.deepEqual(snapshot(owner.id),nativeBaseline.studio_owner);assert.deepEqual(ledger(prepared.task_id),nativeBaseline.studio_ledger)
+   nativeProof.push({state:label,status:result.status,api_key_id:nativeKey.id,user_id:fixture.customer,account_id:id,model:'native-openai-image',original_sha256:digest(expectedPNG),native_usage:usage.usage,supplier_calls:1,studio_quote_status:409,studio_ledger_unchanged:true})
+  }
+  await lifecycle('unlist',b.product_id)
+  await proveNative('Studio Published product unlisted',1)
+  await lifecycle('relist',b.product_id)
+  setCatalog({...nativeCatalog,models:nativeCatalog.models.filter(model=>model!=='native-openai-image')});catalogChanged=true
+  await proveNative('Studio Published product not ready after catalog model removal',2)
+  setCatalog(nativeCatalog);catalogChanged=false
+  assert.equal((await quote(offerB)).status,200)
+  report.native_api_independence={key_created:true,protected_model_rejected_without_supplier_call:true,studio_headers:false,receipt_headers:false,requests:nativeProof,supplier_posts:2}
+  save()
+
+  // Real admin selected publication against 53 catalog entries, two existing
+  // Published products and one deliberately incomplete saved Draft product.
+  // These extra catalog records are isolated fixture injection, never advertised
+  // as a supplier sync result. No generation or billing operation occurs here.
+  const extraModels=Array.from({length:53},(_,i)=>'synthetic-catalog-only-'+String(i+1).padStart(2,'0'))
+  const largeCatalog={...nativeCatalog,models:[...new Set([...nativeCatalog.models,...extraModels])].slice(0,53)}
+  assert.equal(largeCatalog.models.length,53)
+  setCatalog(largeCatalog);catalogChanged=true
+  const selectionBefore=await config(),selectionDraft=structuredClone(selectionBefore.draft.products),unselectedBefore=structuredClone(selectionBefore.published.products.find(product=>product.product_id===b.product_id))
+  assert.equal(selectionBefore.published.products.length,2)
+  const selectedProduct=selectionDraft.find(product=>product.product_id===a.product_id)
+  selectedProduct.display_name='Synthetic explicitly selected publication'
+  const unfinished=structuredClone(selectedProduct)
+  Object.assign(unfinished,{product_id:'synthetic-unfinished-publication',display_name:'Synthetic unfinished draft must remain unpublished',site_model:extraModels[0],upstream_model:extraModels[0],pricing_rules:[]})
+  selectionDraft.push(unfinished)
+  const savedSelection=await saveDraft(accountPath,selectionDraft)
+  assert.equal(savedSelection.draft.products.length,3);assert.equal(savedSelection.validation.publish_ready,false,'unfinished product must prevent whole-Draft publication')
+  const selectionPosts=stats().image_posts,selectionOwner=snapshot(owner.id)
+  await page.goto(base+'/admin/media');await page.locator('[data-test="account-search"]').fill(String(id));await page.locator(`[data-test="supplier-${id}"]`).click()
+  await expect(page.locator('.mw-model-list .mw-model-row')).toHaveCount(53)
+  await shot(page,'native-model-lifecycle-53-model-catalog.png')
+  await page.locator('[data-test="model-gpt-image-2"]').click()
+  await page.getByRole('button',{name:'← 返回模型列表',exact:true}).first().click()
+  await expect(page.locator('[data-test="publish"]')).toBeEnabled()
+  await page.locator('[data-test="publish"]').click()
+  await expect(page.locator('[data-test="publish-products"] input[type="checkbox"]')).toHaveCount(3)
+  for(const product of selectionDraft)await page.locator(`[data-test="publish-product-${product.product_id}"]`).setChecked(product.product_id===a.product_id)
+  await expect(page.locator('[data-test="publish-scope"]')).toContainText('1 份商品')
+  await shot(page,'native-model-lifecycle-selected-publish.png')
+  const selectedPublishResponse=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith(accountPath+'/publish'))
+  await page.locator('[data-test="confirm-publish"]').click()
+  const selectedResponse=await selectedPublishResponse;assert.equal(selectedResponse.status(),200)
+  const selectedBody=await selectedResponse.json();assert.equal(selectedBody.code,0)
+  assert.deepEqual(selectedResponse.request().postDataJSON().product_ids,[a.product_id])
+  const selectionAfter=await config()
+  assert.equal(selectionAfter.published.products.length,2);assert(!selectionAfter.published.products.some(product=>product.product_id===unfinished.product_id))
+  assert.equal(selectionAfter.published.products.find(product=>product.product_id===a.product_id).display_name,selectedProduct.display_name)
+  assert.deepEqual(selectionAfter.published.products.find(product=>product.product_id===b.product_id),unselectedBefore)
+  assert.deepEqual(selectionAfter.draft,savedSelection.draft,'selected publish changed another saved Draft')
+  assert.deepEqual(selectionAfter.published.offers.filter(offer=>offer.product_id===b.product_id),selectionBefore.published.offers.filter(offer=>offer.product_id===b.product_id))
+  assert.equal(stats().image_posts,selectionPosts);assert.deepEqual(snapshot(owner.id),selectionOwner)
+  const selectedOffers=ok(await catalog()).offers;assert(!selectedOffers.some(offer=>offer.product_id===unfinished.product_id))
+  report.selected_publication={catalog_count:53,catalog_source:'isolated synthetic snapshot injection',published_before:2,draft_products:3,selected_product_ids:[a.product_id],publish_status:selectedResponse.status(),published_after:2,unfinished_remained_draft:true,unselected_published_unchanged:true,unselected_draft_unchanged:true,supplier_posts:0}
+  setCatalog(nativeCatalog);catalogChanged=false
+  report.checks.push('Independent native customer API Key executes native-openai-image through original native endpoint on the same Account while its Studio product is unlisted or not ready; protected Image2Pro canvas-image-01 still requires Studio task flow','Actual admin publication selects one product from a 53-model catalog with two Published products and an unfinished third Draft; the unfinished and unselected products are not published')
+
   report.checks.push('Single product unlist/archive/restore/relist preserves saved Draft, Published snapshot, Account sales and shared paid gate','Frozen old quote rejected while unlisted; independent never-attempted old quote first submitted after relist also rejects with no supplier call, usage, dedup or balance change; archive restore stays unlisted','Healthy sibling completes through actual BFF/Bridge/Core, downloads original bytes and settles once; duplicate and reads do not regenerate; unlisting that delivered product preserves original task/result bytes and ledger','Missing native catalog model isolates only the affected product; same Account model and same Group peer Account remain quotable','Final embedded admin confirmation and customer unavailable prompt exercised without API mocks or Vite')
   report.admin_writes=observedWrites;report.assets=await proof();report.supplier_posts_after=stats().image_posts;report.pass=true;save();return report
  }catch(error){report.error=error.stack;await shot(customer,'native-model-lifecycle-failure.png').catch(()=>{});throw error}

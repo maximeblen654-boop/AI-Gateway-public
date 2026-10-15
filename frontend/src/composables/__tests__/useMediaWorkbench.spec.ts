@@ -31,11 +31,11 @@ describe('Media Workbench request lifecycle', () => {
     expect(state.config.value!.published!.products![0]!.capabilities.count).toEqual({ min: 1, max: 1 })
     expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
   })
-  it('renders server readiness and rejects stale validation revisions', async () => {
+  it('keeps Draft validation freshness separate from selected publication', async () => {
     await start(); expect(state.canPublish.value).toBe(true)
-    state.config.value!.validation.draft_revision = 'old'; expect(state.canPublish.value).toBe(false)
+    state.config.value!.validation.draft_revision = 'old'; expect(state.validationCurrent.value).toBe(false); expect(state.canPublish.value).toBe(true)
     state.config.value!.validation.draft_revision = 'mwd_a'; state.config.value!.validation.publish_ready = false
-    expect(state.canPublish.value).toBe(false)
+    expect(state.canPublish.value).toBe(true)
   })
   it('never derives readiness from prices or capabilities', async () => {
     const dto = supplier(); dto.media_workbench_v1!.validation.publish_ready = false; api.detail.mockResolvedValue(dto)
@@ -52,12 +52,14 @@ describe('Media Workbench request lifecycle', () => {
   })
   it('a saved validation FAIL remains a successfully saved Draft', async () => {
     await start(); api.saveDraft.mockResolvedValue(saved('FAIL')); expect(await state.saveDraft()).toBe(true)
-    expect(state.saveState.value).toBe('saved'); expect(state.dirty.value).toBe(false); expect(state.canPublish.value).toBe(false)
+    expect(state.saveState.value).toBe('saved'); expect(state.dirty.value).toBe(false); expect(state.canPublish.value).toBe(true)
     expect(state.diagnostics.value[0]?.code).toBe('MISSING_PRICE')
   })
-  it('UNKNOWN disables Publish without removing a saved Draft', async () => {
-    await start(); api.saveDraft.mockResolvedValue(saved('UNKNOWN')); await state.saveDraft()
-    expect(state.saveState.value).toBe('saved'); expect(state.products.value).toHaveLength(1); expect(state.canPublish.value).toBe(false)
+  it.each(['UNKNOWN', 'PENDING', 'FAIL'])('confirmed saved Draft %s allows selected server validation', async status => {
+    await start(); api.saveDraft.mockResolvedValue(saved(status)); await state.saveDraft()
+    expect(state.saveState.value).toBe('saved'); expect(state.products.value).toHaveLength(1); expect(state.canPublish.value).toBe(true)
+    api.publish.mockResolvedValue(saved()); expect(await state.publish(['canvas-1'])).toBe(true)
+    expect(api.publish).toHaveBeenCalledWith(77, 4, 'mwd_b', ['canvas-1'])
   })
   it('409 preserves local changes and never retries the old CAS', async () => {
     await start(); state.products.value[0]!.display_name = '未保存'; api.saveDraft.mockRejectedValue({ status: 409 })
@@ -94,17 +96,54 @@ describe('Media Workbench request lifecycle', () => {
   })
   it('publish double clicks send one request with exact expected versions', async () => {
     await start(); let resolve!: (dto: ReturnType<typeof saved>) => void
-    api.publish.mockReturnValue(new Promise(r => { resolve = r })); const publishing = state.publish(); await state.publish()
-    expect(api.publish).toHaveBeenCalledTimes(1); expect(api.publish).toHaveBeenCalledWith(77, 3, 'mwd_a')
+    api.publish.mockReturnValue(new Promise(r => { resolve = r })); const publishing = state.publish(['canvas-1']); await state.publish(['canvas-1'])
+    expect(api.publish).toHaveBeenCalledTimes(1); expect(api.publish).toHaveBeenCalledWith(77, 3, 'mwd_a', ['canvas-1'])
     resolve(saved()); await publishing
   })
-  it('422 Publish rereads diagnostics and blocks stale PASS', async () => {
-    await start(); api.publish.mockRejectedValue({ status: 422 }); api.detail.mockResolvedValue(supplier(77, 'FAIL'))
-    await state.publish(); expect(state.canPublish.value).toBe(false); expect(state.diagnostics.value[0]?.class).toBe('UI_FIXABLE')
+  it('legacy Published recovery rejection is a definite no-write, not a conflict or unknown save', async () => {
+    await start(); api.saveDraft.mockResolvedValue(saved()); await state.saveDraft()
+    const originalConfig = copy(state.config.value)
+    const originalProducts = copy(state.products.value)
+    api.publish.mockRejectedValue({ status: 409, reason: 'MEDIA_PUBLISHED_RECOVERY_REQUIRED', message: 'Historical published configuration requires controlled revalidation' })
+    expect(await state.publish(['canvas-1'])).toBe(false)
+    expect(state.message.value).toBe('历史已发布配置需先受控校验恢复；没有发布本次草稿。')
+    expect(state.errorStatus.value).toBe(409)
+    expect(state.conflict.value).toBe(false)
+    expect(state.saveState.value).toBe('saved')
+    expect(state.validationUnavailable.value).toBe(false)
+    expect(state.canPublish.value).toBe(true)
+    expect(state.config.value).toEqual(originalConfig)
+    expect(state.products.value).toEqual(originalProducts)
+    expect(api.publish).toHaveBeenCalledTimes(1)
+    expect(api.detail).toHaveBeenCalledTimes(1)
+  })
+  it('ordinary publish CAS rejection still blocks publishing until reload', async () => {
+    await start(); api.publish.mockRejectedValue({ status: 409, reason: 'MEDIA_WORKBENCH_STALE' })
+    expect(await state.publish(['canvas-1'])).toBe(false)
+    expect(state.conflict.value).toBe(true)
+    expect(state.canPublish.value).toBe(false)
+    expect(state.message.value).toContain('配置已被其他页面修改')
+  })
+  it('422 selected publish keeps server diagnostics and allows another explicit selection', async () => {
+    await start(); api.publish.mockRejectedValue({ status: 422, metadata: { diagnostics: supplier(77, 'FAIL').media_workbench_v1!.validation.diagnostics } })
+    await state.publish(['canvas-1']); expect(state.canPublish.value).toBe(true); expect(state.diagnostics.value[0]?.class).toBe('UI_FIXABLE')
+  })
+  it('keeps selected publish validation separate from the saved whole-Draft validation', async () => {
+    await start()
+    const dto = supplier(77, 'FAIL')
+    dto.publish_validation = { ...dto.media_workbench_v1!.validation, diagnostics: [{ ...dto.media_workbench_v1!.validation.diagnostics[0]!, scope: 'canvas-1', message: '本次选中商品价格冲突' }] }
+    api.publish.mockRejectedValue({ status: 422, data: dto })
+    expect(await state.publish(['canvas-1'])).toBe(false)
+    expect(state.publishValidation.value?.diagnostics[0]?.message).toBe('本次选中商品价格冲突')
+    expect(state.config.value!.validation.diagnostics[0]?.message).toBe('4K 条件缺少售价')
+    expect(state.canPublish.value).toBe(true)
+    api.publish.mockResolvedValue(saved())
+    expect(await state.publish(['canvas-1'])).toBe(true)
+    expect(state.publishValidation.value).toBeNull()
   })
   it('revision-only Publish acknowledgement refreshes the editor exactly once', async () => {
     await start(); api.publish.mockResolvedValue({ record_version: 4, published_revision: 'mwp_b' }); api.detail.mockResolvedValue(saved())
-    await state.publish(); expect(api.detail).toHaveBeenCalledTimes(2); expect(state.config.value!.record_version).toBe(4)
+    await state.publish(['canvas-1']); expect(api.detail).toHaveBeenCalledTimes(2); expect(state.config.value!.record_version).toBe(4)
   })
   it('slow supplier responses cannot replace the current supplier', async () => {
     await start(); let resolve!: (dto: ReturnType<typeof supplier>) => void
@@ -118,7 +157,7 @@ describe('Media Workbench request lifecycle', () => {
     api.detail.mockReturnValueOnce(new Promise(r => { resolve = r })); await vi.advanceTimersByTimeAsync(1000)
     const b = saved('FAIL'); b.media_workbench_v1!.draft.revision = 'mwd_c'; b.media_workbench_v1!.validation.draft_revision = 'mwd_c'
     api.saveDraft.mockResolvedValueOnce(b); await state.saveDraft(); resolve(saved('PASS')); await flushPromises()
-    expect(state.config.value!.draft.revision).toBe('mwd_c'); expect(state.config.value!.validation.status).toBe('FAIL'); expect(state.canPublish.value).toBe(false)
+    expect(state.config.value!.draft.revision).toBe('mwd_c'); expect(state.config.value!.validation.status).toBe('FAIL'); expect(state.canPublish.value).toBe(true)
   })
   it('new product defaults never infer model specs or a price', async () => {
     await start(); state.selectModel('new-model'); state.addProduct('image')
@@ -242,4 +281,22 @@ describe('explicit lifecycle mutations', () => {
     expect(state.products.value).toHaveLength(1); expect(state.dirty.value).toBe(false)
     expect(api.publish).not.toHaveBeenCalled(); expect(api.saveDraft).not.toHaveBeenCalled()
   })
+})
+
+
+it('requires nonempty known unique selected product identities before publication',async()=>{
+ await start()
+ for(const ids of [[],['unknown'],['canvas-1','canvas-1']])expect(await state.publish(ids)).toBe(false)
+ expect(api.publish).not.toHaveBeenCalled()
+})
+it('allows selected-product validation despite another saved draft failing, while preserving unconfirmed write and dirty guards',async()=>{
+ const dto=supplier(77,'FAIL');api.detail.mockResolvedValue(dto);api.publish.mockResolvedValue(dto)
+ await start();expect(await state.publish(['canvas-1'])).toBe(true)
+ expect(api.publish).toHaveBeenCalledWith(77,3,'mwd_a',['canvas-1'])
+ state.products.value[0]!.display_name='未保存';expect(await state.publish(['canvas-1'])).toBe(false)
+ state.discard();state.config.value!.validation.status='UNKNOWN';expect(await state.publish(['canvas-1'])).toBe(true)
+ api.publish.mockRejectedValue({status:503});expect(await state.publish(['canvas-1'])).toBe(false)
+ expect(state.saveState.value).toBe('unconfirmed');expect(await state.publish(['canvas-1'])).toBe(false)
+ expect(api.publish).toHaveBeenCalledTimes(3)
+ await state.selectSupplier(77);expect(state.canPublish.value).toBe(true)
 })

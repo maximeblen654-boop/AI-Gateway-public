@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget } from '@/api/admin/mediaWorkbench'
+import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 export function useMediaWorkbench() {
@@ -13,6 +13,7 @@ export function useMediaWorkbench() {
   const message = ref('')
   const errorStatus = ref(0)
   const errorDiagnostics = ref<Diagnostic[]>([])
+  const publishValidation = ref<Validation | null>(null)
   const deleted = ref(false)
   const conflict = ref(false)
   const validationUnavailable = ref(false)
@@ -28,8 +29,8 @@ export function useMediaWorkbench() {
   const dirty = computed(() => JSON.stringify(draftInput(products.value).products) !== baseline)
   const product = computed(() => products.value.find(p => p.product_id === selectedProduct.value))
   const validationCurrent = computed(() => !!config.value && config.value.validation.draft_revision === config.value.draft.revision)
-  const canPublish = computed(() => !pending.value && !loading.value && !dirty.value && !deleted.value && !conflict.value && !validationUnavailable.value &&
-    validationCurrent.value && config.value?.validation.status === 'PASS' && config.value.validation.publish_ready)
+  const canPublish = computed(() => !pending.value && !loading.value && !dirty.value && !deleted.value && !conflict.value && saveState.value !== 'unconfirmed' &&
+    !!config.value && Number.isInteger(config.value.record_version) && config.value.record_version >= 0 && !!config.value.draft.revision && !!config.value.draft.products.length)
   const diagnostics = computed(() => errorDiagnostics.value.length ? errorDiagnostics.value : validationCurrent.value ? config.value?.validation.diagnostics ?? [] : [])
 
   function stopPolling() { validationSequence++; clearTimeout(pollTimer) }
@@ -48,11 +49,19 @@ export function useMediaWorkbench() {
       selectedProduct.value = products.value.find(p => p.upstream_model === selectedModel.value)?.product_id ?? ''
     }
   }
-  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = [] }
+  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null }
+  function requiresPublishedRecovery(error: unknown) {
+    const e = error as { status?: number; reason?: string }
+    return e.status === 409 && e.reason === 'MEDIA_PUBLISHED_RECOVERY_REQUIRED'
+  }
   function failure(error: unknown, affectsCurrentAccount = true) {
     const e = error as { status?: number; message?: string; metadata?: { diagnostics?: Diagnostic[] } }
     errorStatus.value = e.status ?? 0
     errorDiagnostics.value = e.metadata?.diagnostics ?? []
+    if (requiresPublishedRecovery(error)) {
+      message.value = '历史已发布配置需先受控校验恢复；没有发布本次草稿。'
+      return
+    }
     if (e.status === 409) { conflict.value = true; stopPolling() }
     if ((e.status === 404 || e.status === 410) && affectsCurrentAccount) { deleted.value = true; stopPolling() }
     message.value = ({
@@ -178,28 +187,34 @@ export function useMediaWorkbench() {
     } catch (e) { saveState.value = 'unconfirmed'; validationUnavailable.value = true; failure(e); return false }
     finally { pending.value = '' }
   }
-  async function publish() {
-    if (!canPublish.value || !detail.value || !config.value) return
+  async function publish(productIds: string[]): Promise<boolean> {
+    if (!canPublish.value || !detail.value || !config.value) return false
+    if (!productIds.length || new Set(productIds).size !== productIds.length || productIds.some(id => !config.value!.draft.products.some(p => p.product_id === id))) {
+      message.value = '请明确选择本次要发布的已保存草稿商品。'
+      return false
+    }
     pending.value = 'publish'; clearError(); stopPolling()
     const id = detail.value.id
     try {
-      const result = await mediaWorkbenchAPI.publish(id, config.value.record_version, config.value.draft.revision)
+      const result = await mediaWorkbenchAPI.publish(id, config.value.record_version, config.value.draft.revision, [...productIds])
       // Accept either the editor DTO or the documented revision acknowledgement.
       // One authoritative DTO update refreshes the editor and all list counts.
       apply('media_workbench_v1' in result && result.id === id ? result : await mediaWorkbenchAPI.detail(id), true)
+      return true
     } catch (e) {
-      validationUnavailable.value = true
       failure(e)
-      // Phase 2A returns the committed validation and CAS receipt in 422 data.
-      // Preserve local edits while adopting that authoritative editor state.
+      if (requiresPublishedRecovery(e)) return false
+      // A definite selected-product validation rejection did not publish the
+      // Draft. Keep other selections available; ambiguous writes require reload.
+      validationUnavailable.value = errorStatus.value !== 422
+      if (errorStatus.value !== 422) saveState.value = 'unconfirmed'
       const receipt = (e as { data?: SupplierDetail }).data
       if (errorStatus.value === 422 && receipt?.id === id && receipt.media_workbench_v1) {
         apply(receipt, false)
-        validationUnavailable.value = false
-      } else if (errorStatus.value === 422 || errorStatus.value === 503) {
-        validationUnavailable.value = true
-        try { apply(await mediaWorkbenchAPI.detail(detail.value.id), false) } catch { /* preserve Draft and original error */ }
+        publishValidation.value = receipt.publish_validation ?? null
+        if (publishValidation.value) errorDiagnostics.value = []
       }
+      return false
     } finally { pending.value = '' }
   }
   async function sales(enabled: boolean) {
@@ -243,7 +258,7 @@ export function useMediaWorkbench() {
   function discard() { if (detail.value) apply(detail.value, true) }
   onBeforeUnmount(() => { disposed = true; loadSequence++; stopPolling() })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
-    errorStatus, diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    errorStatus, diagnostics, publishValidation, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
 }

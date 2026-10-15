@@ -182,9 +182,13 @@ func TestVideoProductsUseSameLifecycleIsolation(t *testing.T) {
 	q.ProductID = "other-video-product"
 	q.SiteModel = "other-video"
 	q.UpstreamModel = q.SiteModel
-	d, e = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{p, q}})
+	half := q
+	half.ProductID = "incomplete-video"
+	half.PricingRules = nil
+	d, e = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{p, q, half}})
 	require.NoError(t, e)
-	d, e = s.Publish(ctx, 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	require.False(t, d.Config.Validation.PublishReady)
+	d, e = s.PublishSelected(ctx, 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID, q.ProductID})
 	require.NoError(t, e)
 	_, e = s.SetSales(ctx, 7, d.Config.RecordVersion, true)
 	require.NoError(t, e)

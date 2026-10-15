@@ -46,8 +46,9 @@ func (h *MediaWorkbenchHandler) Publish(c *gin.Context) {
 		return
 	}
 	var in struct {
-		Expected *int64  `json:"expected_record_version"`
-		Revision *string `json:"expected_draft_revision"`
+		Expected *int64   `json:"expected_record_version"`
+		Revision *string  `json:"expected_draft_revision"`
+		Products []string `json:"product_ids"`
 	}
 	if !decodeMediaInput(c, &in) {
 		return
@@ -56,7 +57,13 @@ func (h *MediaWorkbenchHandler) Publish(c *gin.Context) {
 		response.ErrorFrom(c, mediaworkbench.ErrInvalid)
 		return
 	}
-	v, err := h.service.Publish(c.Request.Context(), id, *in.Expected, *in.Revision)
+	var v *mediaworkbench.Detail
+	var err error
+	if in.Products == nil {
+		v, err = h.service.Publish(c.Request.Context(), id, *in.Expected, *in.Revision)
+	} else {
+		v, err = h.service.PublishSelected(c.Request.Context(), id, *in.Expected, *in.Revision, in.Products)
+	}
 	if errors.Is(err, mediaworkbench.ErrValidation) {
 		c.JSON(http.StatusUnprocessableEntity, response.Response{Code: 422, Reason: "MEDIA_VALIDATION_FAILED", Message: "Draft validation prevents publishing", Data: v})
 		return

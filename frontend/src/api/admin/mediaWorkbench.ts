@@ -49,7 +49,13 @@ export interface MediaConfig {
   published: { revision: string; source_draft_revision: string; products?: Product[]; offers?: unknown[] } | null
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
 }
+export interface ProductState {
+  product_id: string; display_name: string; upstream_model: string; media_type: string
+  published: boolean; published_ready: boolean; state: string; reason: string; action: string
+}
 export interface SupplierDetail {
+  publish_validation?: Validation
+  product_states?: ProductState[]
   product_removal?: Record<string, { allowed: boolean; reason: string }>
   native_adapters?: Record<string, NativeAdapter>
   id: number; name: string; host: string; platform: string; type: string; status: string; schedulable: boolean
@@ -110,9 +116,9 @@ export const mediaWorkbenchAPI = {
       expected_record_version: version, draft: { ...draftInput(products), ...(removeProductIds.length ? { remove_product_ids: [...removeProductIds] } : {}) }
     })).data
   },
-  async publish(id: number, version: number, revision: string): Promise<SupplierDetail | PublishAcknowledgement> {
+  async publish(id: number, version: number, revision: string, productIds: string[]): Promise<SupplierDetail | PublishAcknowledgement> {
     return (await apiClient.post<SupplierDetail | PublishAcknowledgement>(`${accountPath(id)}/publish`, {
-      expected_record_version: version, expected_draft_revision: revision
+      expected_record_version: version, expected_draft_revision: revision, product_ids: [...productIds]
     })).data
   },
   async sales(id: number, version: number, enabled: boolean): Promise<SupplierDetail> {

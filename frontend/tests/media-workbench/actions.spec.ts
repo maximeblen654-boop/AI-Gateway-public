@@ -9,7 +9,7 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.getByTestId('supplier-77').click()
     const publication = page.getByTestId('account-publication')
     await expect(page.locator('.mw-model-row')).toHaveCount(33)
-    await expect(publication).toContainText('所有草稿商品，不限于当前搜索结果')
+    await expect(publication).toContainText('后台仅校验并发布勾选项')
     await expect(publication).toContainText('发布配置不会自动开启销售')
     await expect(page.getByTestId('publish')).toBeInViewport()
     const card = (await publication.boundingBox())!
@@ -18,8 +18,11 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
     await page.screenshot({ path: info.outputPath('publication.png') })
     await page.getByTestId('publish').click()
-    const dialog = page.getByRole('dialog', { name: '发布这次修改？' })
-    await expect(dialog).toContainText('当前 Account')
+    const dialog = page.getByRole('dialog', { name: '发布选中的商品？' })
+    await expect(dialog).toContainText('Account #77')
+    await expect(page.getByTestId('confirm-publish')).toBeDisabled()
+    await page.getByTestId('publish-product-canvas-1').check()
+    await expect(page.getByTestId('confirm-publish')).toBeEnabled()
     await expect(page.getByTestId('confirm-publish')).toBeVisible()
     await page.keyboard.press('Escape')
     await page.getByTestId('model-image-native-1').click()
@@ -44,11 +47,15 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
   })
 }
 
-test('failed validation still prevents publishing from the relocated action', async ({ page }) => {
+test('Draft validation failure permits explicit selected-product server validation', async ({ page }) => {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
   await page.goto('/tests/media-workbench/index.html?scenario=UI_FIXABLE')
   await page.getByTestId('account-search').fill('#77')
   await page.getByTestId('supplier-77').click()
-  await expect(page.getByTestId('publish')).toBeDisabled()
-  await expect(page.getByTestId('confirm-publish')).toHaveCount(0)
+  await expect(page.getByTestId('publish')).toBeEnabled()
+  await page.getByTestId('publish').click()
+  await expect(page.getByTestId('confirm-publish')).toBeDisabled()
+  await page.getByTestId('publish-product-canvas-1').check()
+  await expect(page.getByTestId('confirm-publish')).toBeEnabled()
+  await expect(page.getByTestId('publish-scope')).toContainText('后台只校验这些商品')
 })

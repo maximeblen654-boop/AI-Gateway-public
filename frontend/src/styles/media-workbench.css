@@ -41,7 +41,7 @@
 .mw-selection-feedback span { font-weight: 700; overflow-wrap: anywhere; }
 .mw-selection-feedback small { color: var(--mw-muted); }
 .mw-back { margin-bottom: 1rem; }
-.media-workbench :is(.mw-back, .mw-return-models) { min-width: 10rem; min-height: 44px; padding: .7rem 1.1rem; font-size: .9rem; font-weight: 600; line-height: 1.4; white-space: nowrap; flex-shrink: 0; }
+.media-workbench :is(.mw-back, .mw-return-models).btn { min-width: 10rem; min-height: 44px; padding: .7rem 1.1rem; font-size: .9rem; font-weight: 600; line-height: 1.4; white-space: nowrap; flex-shrink: 0; }
 .mw-model-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: .75rem 0 1.2rem; }
 .mw-model-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .75rem; }
 .mw-model-row { position: relative; min-height: 8rem; margin: 0; padding: 1rem; gap: .45rem; }

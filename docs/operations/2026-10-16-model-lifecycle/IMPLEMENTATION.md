@@ -25,3 +25,11 @@ New lifecycle/Published JSON fields are not readable by old strict decoders. Aft
 ## Candidate acceptance
 
 Existing GitHub-hosted native-media-candidate workflow, paid-controls focused scope. New model-lifecycle harness uses final Core embedded frontend, real Core/Bridge/BFF/PostgreSQL/Redis, local simulated supplier. It covers same Account and same Group isolation, old quote refusal, admin CAS, unpublished Draft sentinel, original download and native one-time settlement. No Vite/API mocks, no repeat 104-task campaign. Final run/manifest/screenshots will be recorded after actual completion.
+
+## Selected publication and accurate status (latest scope)
+
+- The administrator explicitly selects saved product IDs. Only those products are revalidated; unselected Published products, offers and dependency grants remain unchanged. A 53-model catalog does not require 53 configured products. Incomplete or UNKNOWN validation of another saved draft does not block selected validation; uncertain save outcomes and unsaved changes still require resolution.
+- Full Draft validation is retained separately from `publish_validation`. A subset PASS is not a whole-Draft PASS. Unselected changed prices remain Draft and are not mislabeled Published.
+- Read-only `product_states` explains the actual affected product and repair action. Saved Draft, validation, Published, Account sales and global paid conditions are distinct. Legacy snapshots clearly require controlled original-Published recovery, not implicit approval of changed dependencies.
+- Existing standalone API Key/native scheduling is unchanged; protected Studio image restrictions remain. The final isolated harness verifies native requests against the local simulator while the same Studio product is unlisted/not ready, using a separate synthetic customer Key.
+- The earlier intermediate run 38805449296 was canceled before acceptance when this scope was added. Its CI found an omitted lifecycle route test entry and test/static lint issues; these are corrected in the final source. It is not an accepted candidate.

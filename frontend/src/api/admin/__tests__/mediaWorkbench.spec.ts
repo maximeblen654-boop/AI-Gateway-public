@@ -57,9 +57,9 @@ describe('strict Media Workbench API boundary', () => {
     expect(draftInput([p]).products[0]!.adapter_config).toEqual({ size_mappings: [] })
   })
   it('uses documented initialize, publish and sales payloads', async () => {
-    await mediaWorkbenchAPI.initialize(77, ['image', 'video']); await mediaWorkbenchAPI.publish(77, 3, 'mwd_a'); await mediaWorkbenchAPI.sales(77, 4, false)
+    await mediaWorkbenchAPI.initialize(77, ['image', 'video']); await mediaWorkbenchAPI.publish(77, 3, 'mwd_a', ['canvas-1']); await mediaWorkbenchAPI.sales(77, 4, false)
     expect(client.post).toHaveBeenCalledWith('/admin/media-workbench/accounts/77/initialize', { media_types: ['image', 'video'] })
-    expect(client.post).toHaveBeenCalledWith('/admin/media-workbench/accounts/77/publish', { expected_record_version: 3, expected_draft_revision: 'mwd_a' })
+    expect(client.post).toHaveBeenCalledWith('/admin/media-workbench/accounts/77/publish', { expected_record_version: 3, expected_draft_revision: 'mwd_a', product_ids: ['canvas-1'] })
     expect(client.put).toHaveBeenCalledWith('/admin/media-workbench/accounts/77/sales', { expected_record_version: 4, enabled: false })
   })
   it('reuses native Account model synchronization', async () => {

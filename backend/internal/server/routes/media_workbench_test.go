@@ -18,14 +18,14 @@ func TestMediaWorkbenchRoutesInheritAdminBoundary(t *testing.T) {
 	// A nil service would panic if the auth boundary allowed execution.
 	h := &handler.Handlers{Admin: &handler.AdminHandlers{MediaWorkbench: admin.NewMediaWorkbenchHandler(nil)}}
 	registerMediaWorkbenchRoutes(group, h)
-	for _, route := range []struct{ method, path string }{{"GET", "/suppliers"}, {"GET", "/accounts/7"}, {"POST", "/accounts/7/initialize"}, {"PUT", "/accounts/7/draft"}, {"PUT", "/accounts/7/sales"}, {"POST", "/accounts/7/publish"}, {"PUT", "/accounts/7/video-adapter"}} {
+	for _, route := range []struct{ method, path string }{{"GET", "/suppliers"}, {"GET", "/accounts/7"}, {"POST", "/accounts/7/initialize"}, {"PUT", "/accounts/7/draft"}, {"PUT", "/accounts/7/sales"}, {"POST", "/accounts/7/publish"}, {"PUT", "/accounts/7/video-adapter"}, {"POST", "/accounts/7/lifecycle"}} {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, httptest.NewRequest(route.method, "/api/v1/admin/media-workbench"+route.path, nil))
 		if w.Code != 401 {
 			t.Fatalf("%s: %d", route.path, w.Code)
 		}
 	}
-	if len(r.Routes()) != 7 {
+	if len(r.Routes()) != 8 {
 		t.Fatal("unexpected media surface")
 	}
 }

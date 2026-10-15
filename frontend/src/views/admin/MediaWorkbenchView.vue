@@ -13,7 +13,7 @@
         </nav>
       </header>
 
-      <MediaPaidControls v-if="step === 'suppliers'" />
+      <MediaPaidControls v-if="step === 'suppliers'" :suppliers="suppliers" />
       <div v-if="step === 'suppliers'" class="mw-statistics">
         <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
         <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
@@ -64,13 +64,34 @@
             <div><p class="mw-eyebrow">模型管理 · Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
             <div class="mw-selection-feedback" data-test="selected-account-summary"><strong>已选择账号</strong><span>#{{ detail.id }} · {{ detail.name }}</span></div>
           </div>
-          <section class="mw-account-publication" aria-label="Account 级配置发布" data-test="account-publication">
+          <section class="mw-account-publication" aria-label="选择商品发布配置" data-test="account-publication">
             <div class="mw-publication-description">
               <h3>发布 Account 配置</h3>
-              <p class="mw-muted">包含此 Account 的所有草稿商品，不限于当前搜索结果。发布前仍需通过校验并再次确认。</p>
+              <p class="mw-muted">明确选择本次要发布的商品；后台仅校验并发布勾选项。其他商品的已发布配置和草稿保留。</p>
               <p class="mw-publication-note">发布配置不会自动开启销售</p>
             </div>
-            <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="publishDialog = true">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+            <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+          </section>
+          <section class="mw-product-management" aria-label="配置与销售状态" data-test="publication-layers">
+            <strong>分别核对配置与销售状态</strong>
+            <p>草稿：{{ dirty ? '有未保存修改' : config ? '已保存' : '尚未建立' }} · 草稿校验：{{ draftValidationLabel }}</p>
+            <p>已发布：{{ config?.published ? '有已发布版本' : '尚未发布' }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
+            <p class="mw-muted">草稿校验通过只说明保存的草稿通过检查。商品的已发布配置、Account 销售、全局付费开关和客户原生权限仍分别生效；全局开关请返回来源与账号查看。</p>
+            <p class="mw-muted" data-test="native-api-boundary">商品保存、发布、上下架与归档只管理 Studio 配置和销售状态，不修改独立 API Key 的原生权限或路由；受保护的图片任务接口仍保留原有访问限制。</p>
+          </section>
+          <section class="mw-product-management" aria-label="逐商品销售条件" data-test="product-readiness-list">
+            <h3>逐商品销售条件</h3>
+            <p class="mw-muted">以下结论来自已保存的服务端状态，按商品分别核对；就绪不代表全局付费开关或每个客户的原生权限已经通过。</p>
+            <p v-if="!detail?.product_states?.length" class="mw-muted">后台尚未返回逐商品状态，请重新读取后核对；不能由草稿校验通过推断当前可售。</p>
+            <div v-for="item in detail?.product_states ?? []" :key="item.product_id" :data-test="`readiness-${item.product_id}`">
+              <p><strong>Account #{{ detail?.id }} · {{ availabilityName(item) }}</strong> · {{ availabilityLabel(item) }}</p>
+              <p>{{ item.reason }}</p><p class="mw-muted">{{ item.action }}</p>
+              <div class="mw-product-type-actions">
+                <button v-if="products.some(p => p.product_id === item.product_id)" class="btn btn-secondary" :disabled="busy" @click="navigate(() => editAvailability(item))">编辑此商品</button>
+                <button v-if="item.state === 'UPSTREAM_REMOVED'" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="sync">同步上游目录</button>
+                <router-link v-if="item.state === 'ACCOUNT_UNAVAILABLE' && detail" :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
+              </div>
+            </div>
           </section>
           <div v-if="detail" class="mw-model-toolbar">
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
@@ -141,6 +162,11 @@
             </section>
             <section v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
               <div class="mw-section-heading"><strong>正在编辑的商品</strong><span class="mw-badge" data-test="product-status">{{ lifecycleLabel(product) }} · {{ product.enabled ? '草稿：已启用' : '草稿：已停用' }}</span></div>
+              <div v-if="productStateById.get(product.product_id)" data-test="selected-product-readiness">
+                <p><strong>Account #{{ detail.id }} · {{ availabilityName(productStateById.get(product.product_id)!) }}</strong> · {{ availabilityLabel(productStateById.get(product.product_id)!) }}</p>
+                <p>{{ productStateById.get(product.product_id)?.reason }}</p><p class="mw-muted">{{ productStateById.get(product.product_id)?.action }}</p>
+                <p class="mw-muted">这是已保存的商品状态；当前草稿编辑不会自动发布。全局付费开关与客户原生权限独立核验。</p>
+              </div>
               <label v-if="modelProducts.length > 1" class="mw-field">切换商品（此模型共 {{ modelProducts.length }} 份）<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label>
               <p v-else class="mw-muted">{{ productDisplayTitle(product) }} · {{ product.media_type === 'video' ? '视频' : '图片' }}</p>
               <p v-if="modelProducts.length > 1" class="mw-product-description mw-muted" data-test="selected-product-description">当前：{{ productOptionLabel(product, modelProducts.indexOf(product)) }}</p>
@@ -199,7 +225,7 @@
         <p v-else-if="lifecycleRequest.action === 'relist'">后台重新检查所有未归档商品的原已发布版本；任一不满足条件则整笔不生效。已归档商品保持归档，仅有草稿的商品仍未发布；Account 销售开关独立生效。</p>
         <p v-else>下架或归档后停止对应商品的新报价和新提交；已归档商品不会因下架恢复。配置、历史订单与恢复关联会保留。</p>
         <p v-if="lifecycleModelAmbiguous" role="alert">此模型的草稿与已发布商品使用不同模型，请在具体商品中操作并核对两份配置。</p>
-        <p class="mw-muted">此操作立即保存生命周期状态，不发布整个 Account 的草稿。</p>
+        <p class="mw-muted">此操作立即保存 Studio 生命周期状态，不发布其他草稿，也不修改独立 API Key 的原生权限、路由或受保护图片任务接口的访问限制。</p>
       </template>
       <template #actions><button class="btn btn-primary" data-test="confirm-lifecycle" :disabled="lifecycleDisabled || lifecycleModelAmbiguous" @click="confirmLifecycle">确认{{ lifecycleActionLabel(lifecycleRequest?.action) }}</button></template>
     </MediaDialog>
@@ -219,11 +245,13 @@
       <p>保存草稿后切换，或放弃当前未保存修改。</p>
       <template #actions><button class="btn btn-primary" data-test="save-navigate" :disabled="!!pending || conflict || deleted" @click="saveAndNavigate">保存草稿后切换</button><button class="btn btn-secondary" data-test="discard-navigate" :disabled="!!pending" @click="discardAndNavigate">放弃修改</button></template>
     </MediaDialog>
-    <MediaDialog :show="publishDialog" title="发布这次修改？" :busy="pending === 'publish'" @close="publishDialog = false">
-      <p>这次会发布当前 Account 下列产品的草稿：</p>
-      <ul class="mw-dialog-list"><li v-for="p in config?.draft.products ?? []" :key="p.product_id">{{ productDisplayTitle(p) }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</li></ul>
-      <p>发布配置不会自动开启销售，已有订单不会改变，也不会发送真实生成请求。</p>
-      <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish" @click="confirmPublish">确认发布配置</button></template>
+    <MediaDialog :show="publishDialog" title="发布选中的商品？" :busy="pending === 'publish'" @close="publishDialog = false">
+      <p data-test="publish-scope">Account #{{ detail?.id }} · {{ detail?.name }}。仅发布本次勾选的 {{ publishProductIds.length }} 份商品，后台只校验这些商品；未勾选商品的已发布配置和草稿保持原状。</p>
+      <div class="mw-dialog-list" data-test="publish-products"><label v-for="p in config?.draft.products ?? []" :key="p.product_id" class="mw-product-toggle"><input v-model="publishProductIds" type="checkbox" :value="p.product_id" :data-test="`publish-product-${p.product_id}`" :disabled="busy" /><span>{{ productDisplayTitle(p) }} · {{ p.upstream_model }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</span></label></div>
+      <p>发布配置不会自动开启销售或全局付费开关，已有订单不会改变，也不会发送真实生成请求。独立 API Key 的原生权限和路由保持原状。</p>
+      <p v-if="message" role="alert">{{ message }}</p>
+      <section v-if="publishValidation" data-test="publish-validation"><h3>本次选中商品的发布检查</h3><MediaValidationPanel :validation="publishValidation" :current="true" :unavailable="false" save-state="" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="publishDialog = false; locate($event)" @message="message = $event" /></section>
+      <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish || !publishProductIds.length" @click="confirmPublish">确认发布选中商品</button></template>
     </MediaDialog>
     <MediaDialog :show="salesDialog" :title="config?.sales.enabled ? '暂停媒体销售？' : '开启媒体销售？'" :busy="pending === 'sales'" @close="salesDialog = false">
       <p>下列已发布产品将一起受到 Account 级销售开关影响：</p>
@@ -249,13 +277,13 @@ import MediaDialog from '@/components/admin/media/MediaDialog.vue'
 import MediaProductEditor from '@/components/admin/media/MediaProductEditor.vue'
 import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.vue'
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
-import type { Product, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
+import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
 import '@/styles/media-workbench.css'
 
 const costOpen = ref(false)
 const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
-  diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+  diagnostics, publishValidation, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
 const step = ref('suppliers')
@@ -269,6 +297,7 @@ const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
 const modelsScrollPosition = ref({ top: 0, left: 0 })
 const publishDialog = ref(false)
+const publishProductIds = ref<string[]>([])
 const salesDialog = ref(false)
 const reloadDialog = ref(false)
 const newProductType = ref('')
@@ -284,7 +313,7 @@ const busy = computed(() => !!pending.value || loading.value)
 const managementDisabled = computed(() => busy.value || deleted.value || conflict.value || saveState.value === 'unconfirmed')
 const publishedCount = computed(() => suppliers.value.reduce((n, s) => n + s.models.filter(m => m.state === 'PUBLISHED').length, 0))
 const accountStates: Record<string, string> = {
-  SELLING: '媒体销售中', SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '发布未就绪',
+  SELLING: '媒体销售中', SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '已发布配置当前不可售',
   NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）',
   NOT_INITIALIZED: '未开启销售', ACCOUNT_INACTIVE: '账户已停用', ACCOUNT_UNSCHEDULABLE: '不可调度',
   ACCOUNT_RUNTIME_BLOCKED: '运行受限', UNSUPPORTED_ACCOUNT_TYPE: '类型不支持', ACTIVE: '媒体销售中',
@@ -334,6 +363,24 @@ async function confirmLifecycle() {
 watch([showArchived, selectedModel], () => {
   if (!dirty.value && !modelProducts.value.some(p => p.product_id === selectedProduct.value)) selectedProduct.value = modelProducts.value[0]?.product_id ?? ''
 })
+const productStateById = computed(() => new Map((detail.value?.product_states ?? []).map(item => [item.product_id, item])))
+const draftValidationLabel = computed(() => !config.value ? '尚未检查' : !validationCurrent.value || validationUnavailable.value ? '结果待确认' : ({ PASS: '通过（仅草稿）', FAIL: '草稿有待修复项，可选择商品单独校验发布', UNKNOWN: '检查暂不可用', PENDING: '检查中', VALIDATING: '检查中', RUNNING: '检查中' } as Record<string, string>)[config.value.validation.status] ?? '结果待确认')
+function availabilityName(item: ProductState) {
+  const p = config.value?.published?.products?.find(p => p.product_id === item.product_id) ?? products.value.find(p => p.product_id === item.product_id)
+  if (p) return productDisplayTitle({ ...p, display_name: item.display_name || p.display_name })
+  const name = item.display_name?.trim()
+  return name && !/^media[-_]/.test(name) ? name : item.upstream_model || '商品名称待读取'
+}
+function availabilityLabel(item: ProductState) {
+  if (item.state === 'READY' && (!item.published || !item.published_ready)) return '已发布配置条件待确认'
+  return ({ READY: '已发布配置与 Account 销售已就绪', NOT_PUBLISHED: '尚未发布', UNLISTED: '已下架', ARCHIVED: '已归档', ACCOUNT_SALES_OFF: 'Account 销售已关闭', ACCOUNT_UNAVAILABLE: 'Account 当前不可用', UPSTREAM_REMOVED: '上游目录已移除此模型', DEPENDENCIES_CHANGED: '发布依赖已变化', PUBLISHED_INVALID: '已发布配置当前不可售' } as Record<string, string>)[item.state] ?? '状态待确认'
+}
+async function editAvailability(item: ProductState) {
+  const draft = products.value.find(p => p.product_id === item.product_id)
+  if (!draft) return
+  if (lifecycleState(draft) === 'archived') showArchived.value = true
+  await openEditor(draft.upstream_model); selectedProduct.value = draft.product_id
+}
 const diagnosticProducts = computed(() => (config.value?.draft.products ?? []).map((p, index) => ({
   product_id: p.product_id,
   label: `${productDisplayTitle(p)} · ${p.media_type === 'video' ? '视频' : '图片'} · 商品 ${index + 1}`
@@ -377,7 +424,7 @@ function clearAccountFilters() { accountSearch.value = ''; accountFilter.value =
 function toggleSource(host: string) { if (accountSearch.value || accountFilter.value || platformFilter.value) return; const next = new Set(collapsedSources.value); if (next.has(host)) next.delete(host); else next.add(host); collapsedSources.value = next }
 function sourceOpen(host: string) { return !!accountSearch.value || !!accountFilter.value || !!platformFilter.value || !collapsedSources.value.has(host) }
 function modelLabel(state: string) { return ({ ARCHIVED: '已归档', UNLISTED: '已下架', PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
-function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
+function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置当前不可售', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
 function productDisplayTitle(p: Product) {
@@ -464,7 +511,8 @@ async function discardAndNavigate() {
   resolveRoute?.(true)
   await action?.()
 }
-async function confirmPublish() { await publish(); publishDialog.value = false }
+function openPublish() { publishProductIds.value = config.value?.draft.products.some(p => p.product_id === selectedProduct.value) ? [selectedProduct.value] : []; publishDialog.value = true }
+async function confirmPublish() { if (await publish(publishProductIds.value)) publishDialog.value = false }
 async function confirmSales() { if (config.value) await sales(!config.value.sales.enabled); salesDialog.value = false }
 async function reload() {
   const accountId = detail.value?.id

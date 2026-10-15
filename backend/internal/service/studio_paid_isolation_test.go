@@ -166,7 +166,11 @@ func paidPreflightFixture(t *testing.T) (*studioPaidPreflight, *studioMediaFixtu
 	t.Setenv("STUDIO_CONTROL_BRIDGE_URL", server.URL)
 	t.Setenv("STUDIO_CONTROL_BFF_URL", server.URL)
 	video := &StudioVideoRuntime{Store: &StudioVideoStore{Root: t.TempDir()}, Orders: &videoOrderFixture{orders: map[string]*StudioVideoOrder{}}}
-	return &studioPaidPreflight{image: image, video: video, keys: &APIKeyService{apiKeyRepo: paidPreflightKeys{key: key}}}, image.Media.(*studioMediaFixture), key
+	media, ok := image.Media.(*studioMediaFixture)
+	if !ok {
+		t.Fatal("invalid media fixture")
+	}
+	return &studioPaidPreflight{image: image, video: video, keys: &APIKeyService{apiKeyRepo: paidPreflightKeys{key: key}}}, media, key
 }
 
 func TestStudioPaidPreflightIsolatesNativeOfferFailure(t *testing.T) {
@@ -233,9 +237,17 @@ func TestStudioPaidSnapshotScopesCostAndMapping(t *testing.T) {
 	if err != nil || len(before.grants) != 1 {
 		t.Fatalf("initial snapshot: %v", err)
 	}
-	ch := p.image.Core.channelService.repo.(*studioChannelFixture).channel
+	channelRepo, ok := p.image.Core.channelService.repo.(*studioChannelFixture)
+	if !ok {
+		t.Fatal("invalid channel fixture")
+	}
+	ch := channelRepo.channel
 	ch.AccountStatsPricingRules = append(ch.AccountStatsPricingRules, AccountStatsPricingRule{ID: 99, AccountIDs: []int64{99}, Pricing: []ChannelModelPricing{{Models: []string{"unrelated"}}}})
-	native := p.image.Core.accountRepo.(*studioAccountFixture).a
+	accountRepo, ok := p.image.Core.accountRepo.(*studioAccountFixture)
+	if !ok {
+		t.Fatal("invalid account fixture")
+	}
+	native := accountRepo.a
 	native.Credentials["model_mapping"] = map[string]any{"unrelated": "new-model"}
 	after, err := p.snapshot(ctx, "image", 1)
 	if err != nil || before.fingerprint != after.fingerprint || studioHash(before.grants) != studioHash(after.grants) {

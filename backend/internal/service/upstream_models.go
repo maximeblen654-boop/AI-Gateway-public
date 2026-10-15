@@ -1469,8 +1469,7 @@ func requireCompleteModelCatalog(body []byte, link string) error {
 			count += len(entries)
 		}
 	}
-	var inspect func(map[string]json.RawMessage) error
-	inspect = func(fields map[string]json.RawMessage) error {
+	inspect := func(fields map[string]json.RawMessage) error {
 		for _, key := range []string{"has_more", "hasMore", "incomplete", "partial"} {
 			var flag bool
 			if json.Unmarshal(fields[key], &flag) == nil && flag {

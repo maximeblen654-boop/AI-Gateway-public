@@ -104,7 +104,7 @@ describe('Media Workbench page flow', () => {
     expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]))
   })
 
-  it('shows separate save, publish, and sales actions with account-wide publish scope', async () => {
+  it('shows separate save, publish, and sales actions with an explicit product publication scope', async () => {
     await openEditor()
     expect(wrapper.get('[data-test="save"]').text()).toContain('保存草稿')
     expect(wrapper.find('[data-test="publish"]').exists()).toBe(false)
@@ -525,4 +525,73 @@ it('shows both Draft and Published model identities and blocks ambiguous bulk ac
   expect(wrapper.find('dialog[open]').text()).toContain('草稿与已发布商品使用不同模型')
   expect(wrapper.get('[data-test="confirm-lifecycle"]').attributes('disabled')).toBeDefined()
   expect(api.lifecycle).not.toHaveBeenCalled()
+})
+
+
+describe('Per-product readiness and explicit publication',()=>{
+ it('associates real reasons with separate product identities on the same model without exposing internal IDs',async()=>{
+  const dto=supplier();const first=dto.media_workbench_v1!.draft.products[0]!
+  const second=structuredClone(first);second.product_id='private-product-b';second.display_name='Banana 独立商品'
+  dto.media_workbench_v1!.draft.products.push(second);dto.effective_state='PUBLISHED_NOT_READY'
+  dto.product_states=[
+   {product_id:first.product_id,display_name:'画布图片',upstream_model:first.upstream_model,media_type:'image',published:true,published_ready:true,state:'READY',reason:'此商品已发布配置与账号销售已就绪。',action:'仍需核验全局开关与客户原生权限。'},
+   {product_id:second.product_id,display_name:second.display_name,upstream_model:second.upstream_model,media_type:'image',published:true,published_ready:false,state:'PUBLISHED_INVALID',reason:'此商品已发布的价格无效。',action:'修复此商品价格后，明确选择此商品重新发布。'}]
+  api.detail.mockResolvedValue(dto)
+  await mountWorkbench();await selectAccount()
+  expect(wrapper.text()).toContain('已发布配置当前不可售');expect(wrapper.text()).not.toContain('发布未就绪')
+  const row=wrapper.get('[data-test="readiness-private-product-b"]')
+  expect(row.text()).toContain('Account #77 · Banana 独立商品');expect(row.text()).toContain('已发布的价格无效')
+  expect(row.text()).not.toContain('private-product-b')
+  expect(wrapper.get('[data-test="publication-layers"]').text()).toContain('通过（仅草稿）')
+  expect(wrapper.get('[data-test="publication-layers"]').text()).toContain('全局付费开关和客户原生权限仍分别生效')
+  await row.get('button').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-test="selected-product-readiness"]').text()).toContain('Banana 独立商品')
+  expect(wrapper.get('[data-test="selected-product-readiness"]').text()).toContain('价格无效')
+  expect(api.publish).not.toHaveBeenCalled();expect(api.sync).not.toHaveBeenCalled()
+ })
+ it('defaults publication only to the selected product while another incomplete draft remains unselected',async()=>{
+  const dto=supplier(77,'FAIL');const c=dto.media_workbench_v1!
+  const banana=structuredClone(c.draft.products[0]!);banana.product_id='banana-draft';banana.display_name='Banana 未完成草稿';banana.upstream_model='banana-image';banana.pricing_rules=[]
+  c.draft.products.push(banana);dto.models.push({model_id:'banana-image',state:'DRAFT'})
+  api.detail.mockResolvedValue(dto);api.publish.mockResolvedValue(dto)
+  await openEditor();await wrapper.get('.mw-back').trigger('click');await flushPromises()
+  await wrapper.get('[data-test="model-search"]').setValue('image-native-1')
+  expect(wrapper.get('[data-test="publish"]').attributes('disabled')).toBeUndefined()
+  await wrapper.get('[data-test="publish"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-test="publish-products"]').text()).toContain('Banana 未完成草稿')
+  expect(wrapper.get('[data-test="publish-product-canvas-1"]').element).toHaveProperty('checked',true)
+  expect(wrapper.get('[data-test="publish-product-banana-draft"]').element).toHaveProperty('checked',false)
+  expect(wrapper.get('[data-test="publish-scope"]').text()).toContain('仅发布本次勾选的 1 份商品')
+  await wrapper.get('[data-test="confirm-publish"]').trigger('click');await flushPromises()
+  expect(api.publish).toHaveBeenCalledWith(77,3,'mwd_a',['canvas-1'])
+  expect(api.saveDraft).not.toHaveBeenCalled();expect(api.sales).not.toHaveBeenCalled()
+ })
+ it('requires explicit checking when no current product is selected and permits independent multi-selection',async()=>{
+  const dto=supplier();const extra=structuredClone(dto.media_workbench_v1!.draft.products[0]!);extra.product_id='second';extra.display_name='第二商品';dto.media_workbench_v1!.draft.products.push(extra)
+  api.detail.mockResolvedValue(dto);api.publish.mockResolvedValue(dto)
+  await mountWorkbench();await selectAccount();await wrapper.get('[data-test="publish"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-test="confirm-publish"]').attributes('disabled')).toBeDefined()
+  await wrapper.get('[data-test="publish-product-canvas-1"]').setValue(true)
+  await wrapper.get('[data-test="publish-product-second"]').setValue(true)
+  await wrapper.get('[data-test="confirm-publish"]').trigger('click');await flushPromises()
+  expect(api.publish).toHaveBeenCalledWith(77,3,'mwd_a',['canvas-1','second'])
+ })
+ it('shows selected publish diagnostics in the confirmation without masking them with another Draft failure',async()=>{
+  const dto=supplier(77,'FAIL')
+  dto.publish_validation={...dto.media_workbench_v1!.validation,diagnostics:[{...dto.media_workbench_v1!.validation.diagnostics[0]!,scope:'canvas-1',message:'本次商品报价存在冲突',action:'请修复当前商品的重复价格。'}]}
+  api.publish.mockRejectedValue({status:422,data:dto})
+  await openEditor();await wrapper.get('.mw-back').trigger('click');await flushPromises()
+  await wrapper.get('[data-test="publish"]').trigger('click');await wrapper.get('[data-test="confirm-publish"]').trigger('click');await flushPromises()
+  const feedback=wrapper.get('[data-test="publish-validation"]')
+  expect(feedback.text()).toContain('本次商品报价存在冲突');expect(feedback.text()).toContain('修复当前商品的重复价格')
+  expect(feedback.text()).not.toContain('4K 条件缺少售价');expect(feedback.text()).not.toContain('canvas-1')
+  expect(wrapper.get('[data-test="confirm-publish"]').attributes('disabled')).toBeUndefined()
+  expect(wrapper.find('dialog[open]').exists()).toBe(true)
+ })
+ it('does not infer product readiness from Draft PASS when per-product evidence is absent',async()=>{
+  await mountWorkbench();await selectAccount()
+  expect(wrapper.get('[data-test="product-readiness-list"]').text()).toContain('后台尚未返回逐商品状态')
+  expect(wrapper.get('[data-test="native-api-boundary"]').text()).toContain('不修改独立 API Key 的原生权限或路由')
+  expect(wrapper.get('[data-test="native-api-boundary"]').text()).toContain('受保护的图片任务接口')
+ })
 })

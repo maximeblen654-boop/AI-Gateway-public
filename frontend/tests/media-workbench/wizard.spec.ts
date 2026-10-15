@@ -73,7 +73,7 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.getByTestId('return-models').click()
     await expect(page.getByTestId('publish')).toBeEnabled()
     await page.getByTestId('publish').click()
-    await expect(page.getByRole('dialog', { name: '发布这次修改？' })).toContainText('不会自动开启销售')
+    await expect(page.getByRole('dialog', { name: '发布选中的商品？' })).toContainText('不会自动开启销售')
     await page.keyboard.press('Escape')
     expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(1)
     await page.getByTestId('model-image-native-1').click()
@@ -128,13 +128,16 @@ test('denied combination gives five rows; missing, zero and conflicting prices r
   await expect(page.getByTestId('price-0')).toHaveValue('')
 })
 
-test('unsupported Account remains diagnosed and cannot be published', async ({ page }, info) => {
+test('unsupported Account remains diagnosed before explicit server validation', async ({ page }, info) => {
   await openWizard(page, 'WIZARD_UNSUPPORTED')
   await expect(page.getByTestId('adapter-status')).toContainText('尚未接通')
   await capture(page, info, 'unsupported-adapter-specifications')
   await page.getByTestId('wizard-step-5').click()
   await expect(page.getByTestId('copy-codex')).toBeVisible()
   await page.getByTestId('return-models').click()
-  await expect(page.getByTestId('publish')).toBeDisabled()
+  await expect(page.getByTestId('publish')).toBeEnabled()
+  await page.getByTestId('publish').click()
+  await expect(page.getByTestId('publish-product-canvas-1')).toBeChecked()
+  await expect(page.getByTestId('publish-scope')).toContainText('后台只校验这些商品')
   expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
 })

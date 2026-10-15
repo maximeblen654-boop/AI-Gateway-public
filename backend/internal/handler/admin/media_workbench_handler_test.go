@@ -221,3 +221,45 @@ func TestMediaLifecycleHTTPUsesExplicitCASAndPreservesDraft(t *testing.T) {
 		t.Fatal("lifecycle changed publication/sales/draft")
 	}
 }
+
+func TestMediaSelectedPublishHTTPContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mediaHandlerRepo{a: mediaworkbench.Account{ID: 7, Type: "apikey", Platform: "openai", Status: "active", Schedulable: true, RuntimeReady: true, Catalog: &mediaworkbench.Catalog{Models: []string{"gpt-image-2"}, SyncedAt: "2026-10-05T00:00:00Z"}}}
+	svc := mediaworkbench.NewService(repo)
+	r := gin.New()
+	r.POST("/accounts/:id/publish", NewMediaWorkbenchHandler(svc).Publish)
+	d, err := svc.Initialize(context.Background(), 7, []string{"image"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := mediaworkbench.Product{ProductID: "ready", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Count: mediaworkbench.Range{Min: 1, Max: 1}}, PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "1.00", Currency: "CNY", BillingMode: "per_request"}}}}
+	half := p
+	half.ProductID = "incomplete"
+	half.PricingRules = nil
+	d, err = svc.SaveDraft(context.Background(), 7, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p, half}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Config.Validation.PublishReady {
+		t.Fatal("incomplete draft must not pass")
+	}
+	call := func(ids []string, status int, reason string) {
+		t.Helper()
+		body, _ := json.Marshal(map[string]any{"expected_record_version": repo.a.Config.RecordVersion, "expected_draft_revision": repo.a.Config.Draft.Revision, "product_ids": ids})
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest("POST", "/accounts/7/publish", strings.NewReader(string(body))))
+		if w.Code != status || !strings.Contains(w.Body.String(), reason) {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+	}
+	call([]string{}, 400, "INVALID_MEDIA_CONFIG")
+	call([]string{"ready"}, 200, "publish_validation")
+	if len(repo.a.Config.Published.Products) != 1 || repo.a.Config.Published.Products[0].ProductID != "ready" || repo.a.Config.Validation.PublishReady {
+		t.Fatal("selective publication changed unrelated draft validation")
+	}
+	version := repo.a.Config.RecordVersion
+	call([]string{"incomplete"}, 422, "MISSING_PRICE")
+	if repo.a.Config.RecordVersion != version {
+		t.Fatal("failed selected publication wrote state")
+	}
+}

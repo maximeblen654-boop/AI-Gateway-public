@@ -19,6 +19,7 @@ const ExtraKey = "media_workbench_v1"
 const CatalogKey = "upstream_model_catalog_snapshot"
 
 var (
+	ErrLegacyPublish = apperrors.New(409, "MEDIA_PUBLISHED_RECOVERY_REQUIRED", "Historical published configuration requires controlled revalidation before selective publishing; no draft was published")
 	ErrNotFound      = apperrors.New(404, "MEDIA_ACCOUNT_NOT_FOUND", "Account not found or deleted")
 	ErrStale         = apperrors.New(409, "STALE_MEDIA_CONFIG", "Media configuration changed; reload before saving")
 	ErrInvalid       = apperrors.New(400, "INVALID_MEDIA_CONFIG", "Invalid media configuration")
@@ -211,6 +212,8 @@ type ModelState struct {
 	State   string `json:"state"`
 }
 type Detail struct {
+	ProductStates     []ProductState `json:"product_states"`
+	PublishValidation *Validation    `json:"publish_validation,omitempty"`
 	*Account
 	NativeAdapters map[string]AdapterDescriptor `json:"native_adapters"`
 	ProductRemoval map[string]DraftRemoval      `json:"product_removal"`
@@ -254,6 +257,7 @@ func (s *Service) Suppliers(ctx context.Context) ([]Detail, error) {
 }
 func describe(a *Account) *Detail {
 	d := &Detail{Account: a, Models: []ModelState{}, EffectiveState: "NOT_INITIALIZED"}
+	d.ProductStates = describeProducts(a)
 	d.ProductRemoval = draftRemovalOptions(a.Config)
 	d.NativeAdapters = map[string]AdapterDescriptor{}
 	for _, mediaType := range []string{"image", "video"} {
@@ -321,7 +325,7 @@ func describe(a *Account) *Detail {
 					if a.Catalog == nil {
 						states[p.UpstreamModel] = "MODEL_SYNC_REQUIRED"
 					}
-				} else if states[p.UpstreamModel] == "PENDING" || (states[p.UpstreamModel] == "DRAFT" && c.Draft.Revision == c.Published.SourceDraftRevision) {
+				} else if states[p.UpstreamModel] == "PENDING" || (states[p.UpstreamModel] == "DRAFT" && draftProductMatchesPublished(c.Draft, p)) {
 					states[p.UpstreamModel] = "PUBLISHED"
 				}
 			}
