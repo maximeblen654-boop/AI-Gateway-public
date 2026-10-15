@@ -10,7 +10,8 @@ const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQU
 const statePath = path.join(root, 'native-supplier-state.json')
 const state = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, 'utf8')) : { requests: [], image_posts: 0, video_posts: 0, tasks: {} }
 const save = () => fs.writeFileSync(path.join(root, 'native-supplier-state.json'), JSON.stringify(state, null, 2))
-https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')), cert: fs.readFileSync(path.join(root, 'simulator-cert.pem')) }, async (req, res) => {
+const tlsOptions={ key: fs.readFileSync(path.join(root, 'simulator-key.pem')), cert: fs.readFileSync(path.join(root, 'simulator-cert.pem')) }
+const handle=async (req, res) => {
   const reply = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)) }
   try {
     const url = new URL(req.url, 'https://localhost:19090')
@@ -46,6 +47,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
         if (scenario === 'BATCH_FUNDS_TIMEOUT') await new Promise(resolve => setTimeout(resolve, 25000))
         if (scenario === 'BATCH_FUNDS_LATE') await new Promise(resolve => setTimeout(resolve, 3000))
         const attempts = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt).length
+        if (scenario === 'BATCH_FUNDS_PARTIAL502' && attempts === 2) return reply(502, { error: 'synthetic_second_unit_502' })
         if (scenario === 'BATCH_FUNDS_PARTIAL' && attempts === 2) return reply(422, { error: 'synthetic_second_unit_rejected' })
       }
       if (body.prompt.startsWith('SYNTHETIC_UNKNOWN_502')) { res.setHeader('x-request-id', 'synthetic-studio-unknown-502'); return reply(502, { error: 'synthetic_upstream_outcome_unknown' }) }
@@ -89,6 +91,8 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
     }
     return reply(404, { error: 'synthetic_route_not_supported' })
   } catch (error) { return reply(422, { error: 'synthetic_contract', message: error.message }) }
-}).listen(19090, '0.0.0.0')
+}
+https.createServer(tlsOptions,handle).listen(19090, '0.0.0.0')
+if(process.env.NATIVE_IMAGE_FINALITY==='true')https.createServer(tlsOptions,handle).listen(443,'0.0.0.0')
 http.createServer((_req, res) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(state)) }).listen(19091, '127.0.0.1')
 console.log('Synthetic native media upstream listening; external forwarding disabled')

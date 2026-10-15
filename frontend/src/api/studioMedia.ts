@@ -13,7 +13,7 @@ export interface StudioTask {
   offerId: string; model: string; spec: Record<string, unknown>; price: StudioPrice; resultCount: number
   unitPrice?: StudioPrice; quantity?: number; totalPrice?: StudioPrice
   expectedCount?: number; deliveredCount?: number; failedCount?: number; pendingCount?: number
-  billingState?: string; settledPrice?: StudioPrice
+  billingState?: string; settledPrice?: StudioPrice; failureCode?: string
   execution?: Record<string, unknown>
 }
 export class StudioError extends Error {
@@ -55,6 +55,7 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
   const settledPrice = v.settled_price === undefined ? undefined : studioPrice(v.settled_price)
   return { id, kind, status, createdAt: typeof v.created_at === 'string' ? v.created_at : '', expiresAt: typeof v.expires_at === 'string' ? v.expires_at : '',
     offerId: typeof v.offer_id === 'string' ? v.offer_id : '', model: typeof v.model === 'string' ? v.model : '', spec, price: totalPrice, unitPrice, quantity, totalPrice,
+    failureCode: v.failure_code === "upstream_http_502_no_delivery" ? v.failure_code : undefined,
     expectedCount, deliveredCount, failedCount, pendingCount, billingState: typeof v.billing_state === 'string' ? v.billing_state : undefined, settledPrice,
     execution: v.execution && typeof v.execution === 'object' ? v.execution as Record<string, unknown> : undefined,
     resultCount: !['completed','partial'].includes(status) ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : deliveredCount }

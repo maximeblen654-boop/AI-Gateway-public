@@ -44,7 +44,8 @@
           <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
           <div><strong>{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
         </div>
-        <p v-if="['failed','released'].includes(active.status)" role="alert" class="studio-error">{{ active.status === 'released' ? '本次生成未成功，服务端报告费用已释放。' : '本次生成未成功；费用状态以实际结算回执为准。' }}原任务已保留，不会自动再次生成。</p>
+        <p v-if="['failed','released'].includes(active.status)" role="alert" class="studio-error">{{ active.billingState === 'not_charged' ? '生成失败，未收费。' : active.status === 'released' ? '本次生成未成功，服务端报告费用已释放。' : '本次生成未成功；费用状态以实际结算回执为准。' }}原任务已保留，不会自动再次生成。</p>
+        <p v-if="active.failureCode === 'upstream_http_502_no_delivery'" class="studio-error" data-testid="studio-http-failure">图片服务返回 HTTP 502，未取得图片的执行单元已终结，不会补扣这些单元的费用。已交付作品仍按实际结算回执计费。</p>
         <p v-if="taskFeedback?.message" role="status" class="studio-query-feedback" data-testid="studio-query-feedback"><time :datetime="new Date(taskFeedback.at).toISOString()">{{ new Date(taskFeedback.at).toLocaleTimeString() }}</time> · {{ taskFeedback.message }}</p>
         <p v-if="taskFeedback?.error" role="alert" class="studio-error" data-testid="studio-query-error">{{ taskFeedback.error }}</p>
         <div v-if="hasResults(active)" class="studio-results" data-testid="studio-results">

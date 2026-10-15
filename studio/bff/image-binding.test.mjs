@@ -61,9 +61,9 @@ test('legacy v2 completed receipts use frozen-total semantics without invented c
 test('versioned receipt counters distinguish zero delivery from missing legacy fields',async t=>{
   const f=fixture(t,{count:5,frozen:true,lost:true});await f.tasks.quote(owner,{offer_id:'multi',spec:{count:5,images:0}});
   const id=f.tasks.prepare(owner,f.input).task.task_id;await assert.rejects(f.tasks.dispatch(owner,{task_id:id}));
-  const receipt={contract:IMAGE_BINDING_CONTRACT,receipt_version:'published_image_receipt_v3',task_id:id,status:'failed',billing_state:'not_charged',result_available:false,expected_count:5,delivered_count:0,failed_count:5,pending_count:0};
+  const receipt={contract:IMAGE_BINDING_CONTRACT,receipt_version:'published_image_receipt_v3',task_id:id,status:'failed',billing_state:'not_charged',failure_code:'upstream_http_502_no_delivery',http_failure:{message:'private supplier detail'},result_available:false,expected_count:5,delivered_count:0,failed_count:5,pending_count:0};
   const runtime=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async(_s,method)=>{assert.equal(method,'GET');return {payload:receipt}}});
-  const zero=await runtime.recover(owner,id);assert.equal(zero.delivered_count,0);assert.equal(zero.results.length,0);assert.equal(zero.billing_state,'not_charged');
+  const zero=await runtime.recover(owner,id);assert.equal(zero.delivered_count,0);assert.equal(zero.results.length,0);assert.equal(zero.billing_state,'not_charged');assert.equal(zero.failure_code,'upstream_http_502_no_delivery');assert(!JSON.stringify(zero).includes('private supplier detail'));
   for(const change of [{status:'completed'},{status:'partial'},{delivered_count:undefined},{receipt_version:'published_image_receipt_v2'},{receipt_version:'invalid'}]) {
     const invalid=createImageTaskRuntime({rootDir:path.join(f.root,'journal'),results:f.results,call:async()=>({payload:{...receipt,...change}})});
     await assert.rejects(invalid.recover(owner,id),/Receipt/);

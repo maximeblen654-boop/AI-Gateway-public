@@ -12,7 +12,7 @@ assert.equal(process.env.RUNNER_OS, 'Linux')
 assert.equal(process.env.GITHUB_REPOSITORY, 'maximeblen654-boop/AI-Gateway-public')
 const paidControls = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'paid-controls'
 const focusedEntry = paidControls && process.env.NATIVE_FOCUSED_ENTRY === 'true'
-const acceptanceScope = focusedEntry ? 'studio-entry-upstream-diagnostics' : 'paid-controls'
+const acceptanceScope = focusedEntry ? 'studio-entry-and-image-502-finality' : 'paid-controls'
 const adminReview = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'admin-ui-review'
 assert.equal(process.env.GITHUB_REF, paidControls ? 'refs/heads/codex/media-paid-controls' : adminReview ? 'refs/heads/codex/admin-media-design-review' : 'refs/heads/codex/studio-native-media')
 const adminCandidate = adminReview && process.env.NATIVE_EXPORT_CANDIDATE === 'true'
@@ -151,11 +151,12 @@ if (mode === 'load-existing') {
     compose.services.core.environment.STUDIO_CONTROL_BFF_URL='http://127.0.0.1:4173'
   }
   if (draftManagement || workspaceArtifact || adminReview || paidControls) compose.services.simulator.environment.NATIVE_RESULT_ORIGIN = 'https://203.0.113.10:19090'
+  if(focusedEntry){compose.services.core.extra_hosts={'api.image2pro.top':'127.0.0.1'};compose.services.simulator.environment.NATIVE_IMAGE_FINALITY='true'}
   fs.writeFileSync(path.join(root, 'compose.json'), JSON.stringify(compose))
   fs.mkdirSync(path.join(root, 'runtime'), { recursive: true })
   fs.copyFileSync('tools/native-media-e2e/simulator.mjs', path.join(root, 'runtime/simulator.mjs'))
   run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=localhost',
-    '-addext', (draftManagement || workspaceArtifact || adminReview || paidControls) ? 'subjectAltName=DNS:localhost,IP:203.0.113.10' : 'subjectAltName=DNS:localhost', '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
+    '-addext', (draftManagement || workspaceArtifact || adminReview || paidControls) ? 'subjectAltName=DNS:localhost,DNS:api.image2pro.top,IP:203.0.113.10' : 'subjectAltName=DNS:localhost', '-keyout', path.join(evidence, 'simulator-key.pem'), '-out', path.join(evidence, 'simulator-cert.pem')])
   fs.copyFileSync(path.join(evidence, 'simulator-cert.pem'), path.join(evidence, 'simulator-ca.crt'))
   run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=64x64:r=10', '-t', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', path.join(evidence, 'synthetic-original.mp4')])
   dc(['up', '-d', '--wait', '--wait-timeout', '180', 'core'])
@@ -194,6 +195,7 @@ if (mode === 'load-existing') {
       run(process.execPath,['tools/native-media-e2e/task-experience.cjs',root])
       if (focusedEntry) run(process.execPath,['tools/native-media-e2e/studio-entry.cjs',root,'verify'])
       else run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
+      if(focusedEntry) run(process.execPath,['tools/native-media-e2e/image-finality.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       if (!focusedEntry) run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'])
       // The old d893 baseline has no sample-evidence UI; require it for repaired sources.

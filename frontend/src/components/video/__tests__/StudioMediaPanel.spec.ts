@@ -254,3 +254,13 @@ describe('Task-local asynchronous feedback',()=>{
   vi.useFakeTimers();wrapper=mount(StudioMediaPanel);await flushPromises();const pending=deferred<StudioTask>();api.generate.mockReturnValueOnce(pending.promise);await wrapper.get('[data-testid="studio-generate"]').trigger('click');await vi.advanceTimersByTimeAsync(61000);expect(wrapper.get('[data-testid="studio-elapsed"]').text()).toContain('1 分');expect(wrapper.get('[data-testid="studio-waiting"]').text()).toContain('仍未返回');expect(wrapper.get('[data-testid="studio-new"]').attributes('disabled')).toBeUndefined();pending.resolve({...prepared,status:'unknown'});await flushPromises()
  })
 })
+
+
+describe('Explicit HTTP failure finality',()=>{
+ it('shows no charge and the fixed reason without claiming a supplier refund',async()=>{
+  const task={...prepared,id:'img_'+'d'.repeat(32),kind:'image' as const,status:'failed',billingState:'not_charged',failureCode:'upstream_http_502_no_delivery',resultCount:0}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.text()).toContain('生成失败，未收费');expect(wrapper.get('[data-testid="studio-http-failure"]').text()).toContain('HTTP 502');expect(wrapper.text()).not.toContain('供应商已退款')
+  await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(api.generate).not.toHaveBeenCalled();expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('未收费')
+ })
+})

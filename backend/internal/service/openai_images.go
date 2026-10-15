@@ -679,6 +679,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		_ = resp.Body.Close()
 		respBody = s.redactAgentIdentitySensitiveBody(upstreamCtx, account, respBody)
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
+		recordStudioImageHTTPFailure(c, account, resp.StatusCode, resp.Header.Get("x-request-id"), respBody)
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 		if isOpenAIImagesInsufficientBalance(respBody) {

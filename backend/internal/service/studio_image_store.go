@@ -57,17 +57,18 @@ type StudioImageQuote struct {
 }
 
 type StudioImageUnitReceipt struct {
-	ID           string `json:"id"`
-	Index        int    `json:"index"`
-	OutputOffset int    `json:"output_offset"`
-	OutputCount  int    `json:"output_count"`
-	Endpoint     string `json:"endpoint"`
-	PayloadHash  string `json:"payload_hash"`
-	UpstreamID   string `json:"upstream_id,omitempty"`
-	ResultHash   string `json:"result_hash,omitempty"`
-	ActualCount  int    `json:"actual_count"`
-	Status       string `json:"status"`
-	Error        string `json:"error,omitempty"`
+	ID           string                  `json:"id"`
+	Index        int                     `json:"index"`
+	OutputOffset int                     `json:"output_offset"`
+	OutputCount  int                     `json:"output_count"`
+	Endpoint     string                  `json:"endpoint"`
+	PayloadHash  string                  `json:"payload_hash"`
+	UpstreamID   string                  `json:"upstream_id,omitempty"`
+	ResultHash   string                  `json:"result_hash,omitempty"`
+	ActualCount  int                     `json:"actual_count"`
+	Status       string                  `json:"status"`
+	Error        string                  `json:"error,omitempty"`
+	HTTPFailure  *StudioImageHTTPFailure `json:"http_failure,omitempty"`
 }
 
 type StudioImageReceipt struct {
@@ -88,6 +89,7 @@ type StudioImageReceipt struct {
 	DeliveredCount int                               `json:"delivered_count,omitempty"`
 	FailedCount    int                               `json:"failed_count,omitempty"`
 	PendingCount   int                               `json:"pending_count,omitempty"`
+	HTTPFailure    *StudioImageHTTPFailure           `json:"http_failure,omitempty"`
 }
 
 // One receipt is both the authoritative task and receipt binding. The permanent
@@ -319,6 +321,9 @@ func (s *StudioImageStore) Receipt(taskID string, owner StudioImageOwner) (*Stud
 
 func studioQuoteHash(q StudioImageQuote) string { q.BindingHash = ""; return studioHash(q) }
 func (s *StudioImageStore) PersistResult(r *StudioImageReceipt, data []byte) error {
+	if r.BillingState == "not_charged" {
+		return ErrStudioImageConflict
+	}
 	if _, err := validateStudioImageReceiptResult(r, data); err != nil {
 		return err
 	}

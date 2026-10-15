@@ -171,6 +171,9 @@ func studioReceiptResponse(c *gin.Context, r *service.StudioImageReceipt) {
 		response["failed_count"] = r.FailedCount
 		response["pending_count"] = r.PendingCount
 	}
+	if code := service.StudioImageFailureCode(r); code != "" {
+		response["failure_code"] = code
+	}
 	if settled, err := service.StudioImageSettledPrice(r); err == nil {
 		response["settled_price"] = settled
 	}

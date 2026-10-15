@@ -12,11 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Transport/server errors do not prove that a supplier rejected execution.
-// Only explicit client rejections terminate a unit; neither case permits replay.
+// Transport errors remain unknown. Explicit HTTP evidence may establish a
+// customer no-charge finality policy without claiming a supplier refund.
 type StudioImageUpstreamError struct {
-	Status    int
-	RequestID string
+	Status      int
+	RequestID   string
+	HTTPFailure *StudioImageHTTPFailure
 }
 
 func (e *StudioImageUpstreamError) Error() string {
@@ -30,15 +31,24 @@ func (e *StudioImageUpstreamError) rejected() bool {
 // One immutable response envelope per claimed unit. Save this before parsing
 // image bytes, so a result-store/fsync failure can recover the original response.
 type studioImageUnitOutcome struct {
-	ID          string `json:"id"`
-	PayloadHash string `json:"payload_hash"`
-	UpstreamID  string `json:"upstream_id"`
-	State       string `json:"state"`
-	Data        []byte `json:"data,omitempty"`
+	ID          string                  `json:"id"`
+	PayloadHash string                  `json:"payload_hash"`
+	UpstreamID  string                  `json:"upstream_id"`
+	State       string                  `json:"state"`
+	Data        []byte                  `json:"data,omitempty"`
+	HTTPFailure *StudioImageHTTPFailure `json:"http_failure,omitempty"`
 }
 
 func (s *StudioImageStore) writeUnitOutcome(u StudioImageUnitReceipt, state string, data []byte, id string) error {
-	b, err := json.Marshal(studioImageUnitOutcome{u.ID, u.PayloadHash, id, state, data})
+	// A finalized unit cannot be replaced by a late response. The original
+	// dispatcher owns the permanent unit claim; recovery never dispatches.
+	var old studioImageUnitOutcome
+	if err := studioRead(s.path("unit-response", u.ID), &old); err == nil && old.State == studioImageNoCharge502 {
+		return ErrStudioImageConflict
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	b, err := json.Marshal(studioImageUnitOutcome{ID: u.ID, PayloadHash: u.PayloadHash, UpstreamID: id, State: state, Data: data, HTTPFailure: u.HTTPFailure})
 	if err != nil {
 		return err
 	}
@@ -123,8 +133,14 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 		if callErr != nil {
 			state = "unknown"
 			var rejected *StudioImageUpstreamError
-			if errors.As(callErr, &rejected) && rejected.rejected() {
-				state = "rejected"
+			if errors.As(callErr, &rejected) {
+				u.HTTPFailure = rejected.HTTPFailure
+				if rejected.rejected() {
+					state = "rejected"
+				}
+			}
+			if proof := studioImageFinalFailure(callErr); proof != nil && len(data) == 0 {
+				state = studioImageNoCharge502
 			}
 		}
 		if err = r.Store.writeUnitOutcome(u, state, data, id); err != nil {
@@ -168,6 +184,9 @@ func (r *StudioImageRuntime) recoverExecution(ctx context.Context, receipt *Stud
 	if receipt.Quote.Execution == nil || studioHash(receipt.Execution) != studioHash(*receipt.Quote.Execution) || len(receipt.Units) != len(receipt.Execution.Units) {
 		return nil, ErrStudioImageConflict
 	}
+	if receipt.Status == "failed" && receipt.BillingState == "not_charged" {
+		return receipt, nil
+	}
 	if receipt.BillingState == "billed" {
 		_, err := r.Store.Result(receipt)
 		return receipt, err
@@ -194,8 +213,15 @@ func (r *StudioImageRuntime) recoverExecution(ctx context.Context, receipt *Stud
 			return receipt, ErrStudioImageUnknown
 		}
 		u.UpstreamID = outcome.UpstreamID
+		u.HTTPFailure = outcome.HTTPFailure
 		u.ActualCount = 0
 		switch outcome.State {
+		case studioImageNoCharge502:
+			if outcome.HTTPFailure == nil || !outcome.HTTPFailure.NoChargeFinal || outcome.HTTPFailure.Status != 502 || len(outcome.Data) != 0 {
+				return receipt, ErrStudioImageConflict
+			}
+			u.Status, u.Error = "failed", studioImageNoCharge502
+			receipt.FailedCount += u.OutputCount
 		case "not_attempted", "rejected":
 			u.Status, u.Error = "failed", outcome.State
 			receipt.FailedCount += u.OutputCount

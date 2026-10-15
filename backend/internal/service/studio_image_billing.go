@@ -173,7 +173,7 @@ func SettleQuotedImage(ctx context.Context, repo UsageBillingRepository, receipt
 }
 
 func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingCommand, error) {
-	if receipt == nil {
+	if receipt == nil || receipt.BillingState == "not_charged" {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
 	q, taskID, payloadHash, subscriptionID := receipt.Quote, receipt.TaskID, receipt.PayloadHash, receipt.Quote.SubscriptionID
@@ -247,6 +247,11 @@ func studioImageReceiptPrices(r *StudioImageReceipt) (mediaworkbench.Price, medi
 	}
 	if r.Quote.Execution == nil || r.ResultHash == "" || r.PendingCount != 0 || r.DeliveredCount < 1 || r.ExpectedCount != r.Quote.Binding.Spec.Count || r.DeliveredCount+r.FailedCount != r.ExpectedCount {
 		return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, mediaworkbench.ErrRuntimeBinding
+	}
+	for _, unit := range r.Units {
+		if unit.HTTPFailure != nil && unit.HTTPFailure.NoChargeFinal && (unit.ActualCount != 0 || unit.ResultHash != "" || unit.Status != "failed") {
+			return mediaworkbench.Price{}, mediaworkbench.Price{}, 0, ErrStudioImageConflict
+		}
 	}
 	return studioImagePricesForQuantity(r.Quote, r.DeliveredCount)
 }

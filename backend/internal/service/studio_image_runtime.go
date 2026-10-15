@@ -215,6 +215,12 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	}
 	data, id, err := r.network(ctx, c, a, persisted.Request, persisted.Endpoint)
 	if err != nil {
+		if proof := studioImageFinalFailure(err); proof != nil && len(data) == 0 {
+			persisted.HTTPFailure = proof
+			persisted.UpstreamID = id
+			persisted.Status, persisted.BillingState = "failed", "not_charged"
+			return persisted, r.Store.Save(persisted)
+		}
 		return persisted, ErrStudioImageUnknown
 	}
 	persisted.UpstreamID = id
@@ -239,6 +245,9 @@ func (r *StudioImageRuntime) Recover(ctx context.Context, taskID string, owner S
 	if err != nil {
 		return nil, err
 	}
+	if receipt.Status == "failed" && receipt.BillingState == "not_charged" {
+		return receipt, nil
+	}
 	if receipt.Version == StudioImageMultiReceiptVersion {
 		return r.recoverExecution(ctx, receipt)
 	}
@@ -261,6 +270,9 @@ func (r *StudioImageRuntime) Recover(ctx context.Context, taskID string, owner S
 	return r.settle(ctx, receipt)
 }
 func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageReceipt) (*StudioImageReceipt, error) {
+	if receipt.BillingState == "not_charged" {
+		return receipt, ErrStudioImageConflict
+	}
 	if receipt.BillingState == "billed" {
 		return receipt, nil
 	}
@@ -329,6 +341,11 @@ func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, outer *gin.Contex
 	defer release()
 	c, capture := newStudioNativeContext(upstreamCtx, http.MethodPost, endpoint, body, 32<<20)
 	defer func() {
+		if value, ok := c.Get(studioImageHTTPFailureKey); ok && callErr != nil {
+			if proof, ok := value.(*StudioImageHTTPFailure); ok {
+				callErr = &StudioImageUpstreamError{Status: proof.Status, RequestID: proof.RequestID, HTTPFailure: proof}
+			}
+		}
 		id := preserveStudioNativeDiagnostics(outer, c)
 		if callErr != nil && upstreamID == "" {
 			upstreamID = id

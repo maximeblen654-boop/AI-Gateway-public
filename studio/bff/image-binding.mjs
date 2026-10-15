@@ -130,6 +130,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
       if(['expected_count','delivered_count','failed_count','pending_count'].some(name=>Object.prototype.hasOwnProperty.call(receipt,name))) throw new Error('Receipt version/count mismatch');
       delivered=(receipt.status==='completed' && receipt.billing_state==='billed' && receipt.result_available)?expected:0;
     } else throw new Error('Receipt version mismatch');
+    task.failure_code = receipt.failure_code === "upstream_http_502_no_delivery" ? receipt.failure_code : undefined;
     const settled = receipt.settled_price === undefined ? undefined : receipt.settled_price;
     if(settled !== undefined && (receipt.billing_state!=='billed' || !settled || typeof settled !== 'object' || typeof settled.amount !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(settled.amount) || settled.currency!=='CNY' || settled.billing_mode!=='per_request')) throw new Error('Receipt settlement mismatch');
     if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && receipt.result_available) {
@@ -162,7 +163,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     return recover(session,task.task_id);
   }
   function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
-    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,billing_state:task.billing_state,settled_price:task.settled_price,execution:q.execution};}
+    offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,billing_state:task.billing_state,settled_price:task.settled_price,failure_code:task.failure_code,execution:q.execution};}
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {
