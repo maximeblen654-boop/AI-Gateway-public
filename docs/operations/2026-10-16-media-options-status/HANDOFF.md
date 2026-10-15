@@ -2,7 +2,7 @@
 
 状态：**DEPLOYMENT_BLOCKED_BEFORE_SWITCH**。2026-10-16生产部署前检查发现既有发布目录依赖不一致，未切换。固定15da候选仍已通过隔离验收。最新现场及停止原因见[DEPLOYMENT.md](DEPLOYMENT.md)。
 
-本轮已完成非生产实现、真实三组件隔离验收与候选准备。未部署、未修改生产商品/价格/mapping/Group/Key/付费开关，未调用真实供应商生成。最后已核实的生产运行仍为4f10，图片开启/视频关闭；本报告不替代下一次部署时的现场核对。
+本轮已完成非生产实现、真实三组件隔离验收与候选准备。未部署、未修改生产商品/价格/mapping/Group/Key/付费开关，未调用真实供应商生成。候选阶段最后核实的生产为4f10、图片开启/视频关闭；本次部署前最新核实为图片requested=true/effective=false、视频关闭，以本页顶部及DEPLOYMENT.md为准。
 
 ## 1. 固定身份与可复核入口
 
@@ -70,7 +70,7 @@ Oil UI 0.22.2已实际读取并应用，三方案保留在[设计比较](DESIGN.
 
 主要文件：`MediaProductEditor.vue`、`MediaTokensField.vue`及测试；`StudioModelPicker.vue`、`StudioMediaPanel.vue`、`studio-workspace.css`、`api/studioMedia.ts`及测试；`studio_passive_status.go`、授权图片/视频catalog接线、Wire依赖；`studio_images.go`原生Ops标记及测试；现有native-media-e2e的比例/状态脚本。细节见[IMPLEMENTATION.md](IMPLEMENTATION.md)。未新增数据库schema，未重写执行/账务/模型映射。
 
-候选具备进入下一次部署审核的条件；**生产部署必须另行授权**。下一次应核对实际4f10或更新的现场身份、保持failed/not_charged历史终态与原生结算保护、保护图片当前状态和视频关闭，按现行受控三组件切换/网络附着及条件恢复流程。不能自动降级到不认识终态的2bd，不恢复整库或覆盖journal。生产监控V2是否启用另由用户决定，本候选不包含自动启用。
+本候选已获本次部署授权，但现场发布依赖阻塞使切换未执行；需先处理DEPLOYMENT.md记录的具体阻塞，不重复构建。下一次应核对实际4f10或更新的现场身份、保持failed/not_charged历史终态与原生结算保护、保护图片当前状态和视频关闭，按现行受控三组件切换/网络附着及条件恢复流程。不能自动降级到不认识终态的2bd，不恢复整库或覆盖journal。生产监控V2是否启用另由用户决定，本候选不包含自动启用。
 
 manifest中的legacy false是既有managed模式启动边界，不是授权本轮修改生产图片有效开关。生产HTTPS、登录、开关和恢复资产须到获授权部署时现场复验；不能用本轮隔离PASS冒充现网验收。GitHub runner已结束，其127.0.0.1地址不再可访问。
 
