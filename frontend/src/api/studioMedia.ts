@@ -3,7 +3,13 @@ import { uploadStudioAsset } from './studioAssets'
 
 export { uploadStudioAsset }
 export type StudioKind = 'image' | 'video'
+export interface StudioPassiveStatus {
+  state: 'unavailable' | 'no_data' | 'insufficient' | 'stale' | 'observed'
+  scope: 'platform_group_requested_model'; window_seconds: number
+  data_through?: string; computed_at?: string; error_rate?: number
+}
 export interface StudioOffer {
+  passive_status?: StudioPassiveStatus
   input_mode?: string; offer_id: string; model: string; display_name: string; upstream_model: string
   spec: { resolution?: string[]; duration_seconds?: number[]; aspect_ratio?: string[]; quality?: string[]; count: { min: number; max: number }; references: { image: {min: number; max: number}; video: {min: number; max: number}; audio: {min: number; max: number}; total_max: number } }
 }

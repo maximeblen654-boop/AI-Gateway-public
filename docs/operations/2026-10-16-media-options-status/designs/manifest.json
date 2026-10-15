@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "project": "AI-Gateway · 模型选择",
+  "brief": "同一组虚构数据，仅比较状态展示。A/B/C 均未连接生产；正式接入共用后端权限与报价合同。",
+  "round": "01",
+  "candidates": [
+    {
+      "id": "a",
+      "name": "简洁标签",
+      "concept": "熟悉的下拉列表，状态安静地靠右",
+      "typography": "Segoe UI / Microsoft YaHei，14px 正文、16px 面板标题",
+      "palette": [
+        "#f6f3ed",
+        "#75513e",
+        "#837c72"
+      ],
+      "traits": [
+        "熟悉的下拉列表，状态安静地靠右",
+        "保留真实范围和中性无数据状态"
+      ],
+      "source": "a.html",
+      "interactive": true
+    },
+    {
+      "id": "b",
+      "name": "细条记录",
+      "concept": "模型与统计分栏，短条只表达已知比例",
+      "typography": "Segoe UI / Microsoft YaHei，14px 正文、16px 面板标题",
+      "palette": [
+        "#f6f3ed",
+        "#75513e",
+        "#837c72"
+      ],
+      "traits": [
+        "模型与统计分栏，短条只表达已知比例",
+        "保留真实范围和中性无数据状态"
+      ],
+      "source": "b.html",
+      "interactive": true
+    },
+    {
+      "id": "c",
+      "name": "轻量卡片",
+      "concept": "模型先被辨认，再查看对应统计",
+      "typography": "Segoe UI / Microsoft YaHei，14px 正文、16px 面板标题",
+      "palette": [
+        "#f6f3ed",
+        "#75513e",
+        "#837c72"
+      ],
+      "traits": [
+        "模型先被辨认，再查看对应统计",
+        "保留真实范围和中性无数据状态"
+      ],
+      "source": "c.html",
+      "interactive": true
+    }
+  ]
+}

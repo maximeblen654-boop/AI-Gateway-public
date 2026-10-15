@@ -13,6 +13,11 @@ const imageOffers = [
   { offer_id: 'image-standard', model: 'studio-image', display_name: 'GPT Image 2', upstream_model: 'configured-image', spec: { resolution: ['1K', '2K', '4K'], aspect_ratio: ['1:1', '3:4', '4:3', '16:9', '9:16'], count: { min: 1, max: 10 }, references } },
   { offer_id: 'image-limited', model: 'studio-image-other', display_name: '轻绘 · 标准', upstream_model: 'configured-image-other', spec: { resolution: ['1K'], aspect_ratio: ['1:1', '3:4'], count: { min: 1, max: 3 }, references: { ...references, image: { min: 0, max: 0 }, total_max: 0 } } },
 ]
+if (scenario === 'statuses') {
+ const observation = {scope:'platform_group_requested_model',window_seconds:5400,data_through:new Date().toISOString(),computed_at:new Date().toISOString()}
+ Object.assign(imageOffers[0]!, {passive_status:{...observation,state:'observed',error_rate:0.12}})
+ Object.assign(imageOffers[1]!, {passive_status:{...observation,state:'insufficient'}})
+}
 const videoOffers = [{ offer_id: 'video-standard', model: 'studio-video', display_name: '映像 · 视频', upstream_model: 'configured-video', spec: { resolution: ['720p', '1080p'], aspect_ratio: ['16:9', '9:16'], duration_seconds: [5, 10], count: { min: 1, max: 1 }, references } }]
 // Stress only the layout; synthetic option labels are not supplier capability claims.
 if (scenario === 'many-options') {
@@ -30,6 +35,7 @@ const persist = () => sessionStorage.setItem(cacheKey, JSON.stringify(db))
 const calls: { method: string; path: string; body?: unknown }[] = []
 Object.assign(window, { studioFixture: { calls, snapshot: () => structuredClone(db) } })
 apiClient.defaults.adapter = async config => {
+  if (config.url === '/keys/studio-access') return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: { ready: true } } }
   if (config.url !== '/auth/me') throw new Error(`Unexpected auth request ${config.url}`)
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: { id: 9001 } } }
 }

@@ -66,7 +66,7 @@
             <div class="studio-floating-model">
               <span v-if="!active" class="studio-lift" aria-hidden="true"><i></i><i></i></span>
               <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon name="chevronDown" /></button>
-              <Transition name="studio-pop"><div v-show="openControl === 'model'" class="studio-popover studio-model-menu" id="studio-model-menu"><label for="studio-offer">选择当前可用模型</label><select :disabled="busy" id="studio-offer" v-model="offerId" data-testid="studio-offer-select" :size="Math.max(2,Math.min(visibleOffers.length,5))" @change="selectOffer(); closeControl()"><option v-for="o in visibleOffers" :key="o.offer_id" :value="o.offer_id">{{ o.display_name || o.upstream_model }}{{ offerSpecs(o) }}</option></select><p v-if="!visibleOffers.length">暂无可用模型</p><button class="studio-text-button" @click="closeControl">收起<Icon name="chevronUp" /></button></div></Transition>
+              <Transition name="studio-pop"><div v-show="openControl === 'model'" class="studio-popover studio-model-menu" id="studio-model-menu"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">收起<Icon name="chevronUp" /></button></div></Transition>
             </div>
             <div class="studio-writing"><label for="studio-prompt" class="studio-sr-only">提示词</label><textarea :disabled="busy" id="studio-prompt" ref="promptInput" v-model="prompt" :placeholder="imageMode === 'edit' && kind === 'image' ? '想怎样改变这张图？描述你的想法…' : '写下你想看到的画面…'" rows="2" data-testid="studio-prompt" /></div>
             <div v-if="showUploader" class="studio-asset-uploader" data-testid="studio-asset-uploader" @paste.stop="paste">
@@ -107,6 +107,7 @@ import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
+import StudioModelPicker from './StudioModelPicker.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import '@/styles/studio-workspace.css'
 const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref('')
@@ -130,7 +131,6 @@ const visibleHistory=computed(()=>historyMode.value?history.value:history.value.
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
-const offerSpecs=(o:StudioOffer)=>{const values=[...(o.spec.resolution||[]),...(o.spec.aspect_ratio||[])];return values.length ? ' · '+values.join(' / ') : ''}
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
 async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus()}

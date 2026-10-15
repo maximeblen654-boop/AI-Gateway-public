@@ -59,7 +59,8 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     const loadedHistory = video && !workspace ? page.waitForResponse(r => r.url().endsWith('/studio-v2/api/video/operations') && r.request().method() === 'GET') : null
     await page.goto(base+'/video-studio')
     const existingTasks = loadedHistory ? await (await loadedHistory).json() : []
-    await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
+    if(workspace) await expect(page.getByTestId('studio-model-toggle')).toBeEnabled()
+    else await expect.poll(() => page.getByTestId('studio-offer-select').locator('option').count()).toBeGreaterThan(0)
     if(workspace){
       await page.getByTestId(video?'studio-mode-video':scenario==='edit'||geometry?.edit?'studio-mode-edit':'studio-mode-text').click()
       await expect(page.getByTestId('studio-model-toggle')).toBeEnabled()
@@ -88,7 +89,8 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     assert(!geometry || geometryProduct, 'saved UI product identity is required')
     const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.product_id === geometryProduct.product_id && o.spec.resolution.includes(geometry.resolution))))
     assert(offer, JSON.stringify(catalog))
-    await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
+    if(workspace) await page.locator(`[data-offer-id="${offer.offer_id}"]`).click()
+    else await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
     if (!video) {if(workspace){await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()}else await page.getByTestId('studio-count').fill(String(count))}
     if (geometry) {
       if(workspace){await page.getByTestId('studio-resolution').click();await page.locator('#studio-resolution-menu [data-value]').filter({hasText:geometry.resolution}).click()}else await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
