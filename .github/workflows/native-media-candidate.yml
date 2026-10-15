@@ -118,6 +118,7 @@ jobs:
           path: |
             ${{ runner.temp }}/native-candidate-output/*.json
             ${{ runner.temp }}/native-candidate-output/*.png
+            ${{ runner.temp }}/native-candidate-output/*.csv
       - name: Save final candidate and non-secret evidence only
         if: always()
         uses: actions/upload-artifact@v4
@@ -151,6 +152,13 @@ jobs:
         with:
           version: 9.15.9
       - uses: docker/setup-buildx-action@v3
+      - name: Read the frozen runtime source for acceptance applicability
+        if: github.event.inputs.acceptance_scenario == 'paid-controls'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.candidate_source_sha }}
+          path: .candidate-runtime
+          persist-credentials: false
       - name: Download the exact existing candidate artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -168,6 +176,7 @@ jobs:
       - name: Accept the existing candidate without rebuilding
         env:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
+          NATIVE_CANDIDATE_SOURCE_DIR: ${{ github.workspace }}/.candidate-runtime
           NATIVE_ACCEPTANCE_SCENARIO: ${{ github.event.inputs.acceptance_scenario }}
         run: |
           if [ "$NATIVE_ACCEPTANCE_SCENARIO" = paid-controls ]; then
@@ -189,6 +198,7 @@ jobs:
             ${{ runner.temp }}/native-existing-acceptance-output/*
             ${{ runner.temp }}/native-candidate-output/*.json
             ${{ runner.temp }}/native-candidate-output/*.png
+            ${{ runner.temp }}/native-candidate-output/*.csv
 
   admin-ui-review:
     if: >-
@@ -252,6 +262,7 @@ jobs:
           path: |
             ${{ runner.temp }}/native-candidate-output/*.json
             ${{ runner.temp }}/native-candidate-output/*.png
+            ${{ runner.temp }}/native-candidate-output/*.csv
 
       - name: Preserve one complete candidate
         if: ${{ !cancelled() && github.event.inputs.mode == 'admin-candidate' && steps.build.outcome == 'success' }}

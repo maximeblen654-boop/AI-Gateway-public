@@ -267,7 +267,7 @@ if (mode === 'load-existing') {
     }
   } finally {
     proxy.kill()
-    for (const name of fs.readdirSync(evidence).filter(n => /^native-.*\.(png|json)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
+    for (const name of fs.readdirSync(evidence).filter(n => /^native-.*\.(png|json|csv)$/.test(n))) fs.copyFileSync(path.join(evidence, name), path.join(out, name))
   }
 } else if (mode === 'export') {
   if (adminCandidate && fs.existsSync(path.join(out, 'acceptance.json'))) run(process.execPath, ['tools/native-media-e2e/check-admin-review.mjs', out])
