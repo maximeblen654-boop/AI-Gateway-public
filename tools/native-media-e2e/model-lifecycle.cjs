@@ -41,10 +41,17 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
  let baseline,postsBefore,catalogChanged=false
  try{
   const source=await api('/admin/accounts/'+id),owner=await api('/auth/me')
-  assert(source.name.startsWith('Synthetic '));assert.equal(source.credentials.base_url,'https://localhost:19090');assert.equal(owner.email,'native-admin@example.invalid');assert(Number.isSafeInteger(owner.id))
+  assert(source.name.startsWith('Synthetic '));assert.equal(source.credentials.api_key,'synthetic-native-only');assert.equal(owner.email,'native-admin@example.invalid');assert(Number.isSafeInteger(owner.id))
+  // The preceding finality fixture uses the provider hostname pinned to this
+  // runner's simulator. Verify that pin before restoring the generic local URL.
+  if(source.credentials.base_url==='https://api.image2pro.top/v1'){
+   assert.equal(compose.services.core.extra_hosts['api.image2pro.top'],'127.0.0.1')
+   assert.equal(compose.services.simulator.environment.NATIVE_IMAGE_FINALITY,'true')
+   assert(/127\.0\.0\.1\s+api\.image2pro\.top/.test(dc('exec','-T','core','cat','/etc/hosts').toString()))
+  }else assert.equal(source.credentials.base_url,'https://localhost:19090')
   // Native API admission uses its own explicit model mapping. This synthetic
   // fixture does not borrow Studio's Published-model context or task headers.
-  await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,model_mapping:{...source.credentials.model_mapping,'native-openai-image':'native-openai-image'}}})
+  await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,base_url:'https://localhost:19090',model_mapping:{...source.credentials.model_mapping,'native-openai-image':'native-openai-image'}},upstream_billing_probe_enabled:false})
   const original=await config(),products=structuredClone(original.draft.products)
   assert.equal(products.length,2);assert(products.every(p=>p.media_type==='image'))
   const [a,b]=products
