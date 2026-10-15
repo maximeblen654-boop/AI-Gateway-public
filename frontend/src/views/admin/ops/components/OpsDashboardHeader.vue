@@ -1392,7 +1392,7 @@ function handleToolbarRefresh() {
               {{ t('admin.ops.requestDetails.details') }}
             </button>
           </div>
-          <div class="mt-2 text-3xl font-black" :class="getThresholdColorClass(getRequestErrorRateThresholdLevel(errorRatePercent))">
+          <div class="mt-2 text-3xl font-black" :class="errorRatePercent == null ? 'text-gray-500 dark:text-gray-400' : getThresholdColorClass(getRequestErrorRateThresholdLevel(errorRatePercent))">
             {{ errorRatePercent == null ? t('admin.ops.noRequestSamples') : `${errorRatePercent.toFixed(2)}%` }}
           </div>
           <div class="mt-3 space-y-1 text-xs">
@@ -1418,7 +1418,7 @@ function handleToolbarRefresh() {
               {{ t('admin.ops.requestDetails.details') }}
             </button>
           </div>
-          <div class="mt-2 text-3xl font-black" :class="getThresholdColorClass(getUpstreamErrorRateThresholdLevel(upstreamErrorRatePercent))">
+          <div class="mt-2 text-3xl font-black" :class="upstreamErrorRatePercent == null ? 'text-gray-500 dark:text-gray-400' : getThresholdColorClass(getUpstreamErrorRateThresholdLevel(upstreamErrorRatePercent))">
             {{ upstreamErrorRatePercent == null ? t('admin.ops.noRequestSamples') : `${upstreamErrorRatePercent.toFixed(2)}%` }}
           </div>
           <div class="mt-3 space-y-1 text-xs">

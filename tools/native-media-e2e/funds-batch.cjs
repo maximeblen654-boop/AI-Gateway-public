@@ -17,6 +17,12 @@ async function core(token,path,method='GET',body){const r=await fetch(base+'/api
 async function login(email,password){return (await core('','/auth/login','POST',{email,password})).access_token}
 async function session(user){const issued=await core(user.token,'/auth/studio-media-ticket','POST',{});const r=await fetch(base+'/studio-v2/api/session/exchange',{method:'POST',headers:{'Content-Type':'application/json',Origin:base,'X-Studio-Request':'session-exchange-v1'},body:JSON.stringify({ticket:issued.ticket})});assert.equal(r.status,200);user.cookie=r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.equal((await r.json()).owner_id,user.id)}
 async function media(user,op,body,signal){const r=await fetch(base+'/studio-v2/api/image/'+op,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',Origin:base,Cookie:user.cookie,'X-Studio-Request':'image-binding-v1'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});return {status:r.status,body:await r.json()}}
+async function quoteAfterNativeCooldown(user,offer_id,spec){
+ const start=Date.now();let waits=0
+ for(;;){const r=await media(user,'quotes',{offer_id,spec});if(r.status===200){if(waits)(report.admission_waits??=[]).push({user_id:user.id,attempts:waits,elapsed_ms:Date.now()-start});return r.body}
+ assert(r.status===409&&r.body.diagnostic_stage==='account_admission',JSON.stringify(r));assert(Date.now()-start<70000,'Native Account did not recover within its 45 second cooldown plus margin');waits++;await sleep(5000)
+ }
+}
 const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
 ;(async()=>{
  const env=compose.services.core.environment,admin=await login(env.ADMIN_EMAIL,env.ADMIN_PASSWORD),users=[]
@@ -28,11 +34,10 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  // Count includes 12 real upstream response-header timeouts, not a fabricated HTTP 504.
  for(const [scenario,n] of [['OK',24],['PARTIAL',12],['REJECT',12],['502',16],['DISCONNECT',12],['TIMEOUT',12],['LATE',8],['DUPLICATE',8]]){
   for(let offset=0;offset<n;offset+=4){
-   await sleep(11000) // existing native Account cooldown, never clear it in a database
    const cohort=[]
    for(let slot=0;slot<4;slot++){
     const user=users[slot],count=scenario==='PARTIAL'?3:1,prompt=`BATCH_FUNDS_${scenario}:${report.tasks.length}`,spec={resolution:'4K',aspect_ratio:'16:9',duration_seconds:0,quality:'',count,images:0,videos:0,audio:0}
-    const quote=ok(await media(user,'quotes',{offer_id:offer.offer_id,spec}));const prepared=ok(await media(user,'prepare',{quote_token:quote.quote_token,client_key:randomUUID(),prompt,asset_refs:[]}))
+    const quote=await quoteAfterNativeCooldown(user,offer.offer_id,spec);const prepared=ok(await media(user,'prepare',{quote_token:quote.quote_token,client_key:randomUUID(),prompt,asset_refs:[]}))
     const record={id:prepared.task_id,user_id:user.id,scenario,prompt,quantity:count,frozen_price:prepared.total_price||prepared.sale_price,before:snapshot(user.id),balance_samples:[],released:'0',hold_contract:'Studio image delivery settlement; no reserve/capture/release hold'}
     assert.equal(money(record.before.frozen_balance),0);assert.equal(ledger(record.id).dedup,0);report.tasks.push(record);cohort.push({user,record})
    }
@@ -54,6 +59,11 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
     for(const snap of [...record.balance_samples,record.after])assert.equal(money(snap.frozen_balance),0)
     const calls=stats().requests.filter(r=>r.method==='POST'&&r.body.prompt===record.prompt);record.upstream_requests=calls.map(r=>({method:r.method,path:r.path,model:r.body.model,n:r.body.n,size:r.body.size}))
     assert.equal(calls.length,scenario==='PARTIAL'?2:1,JSON.stringify(record));assert(calls.every(c=>c.body.model==='gpt-image-2'))
+    const wrongOwner=users[(users.indexOf(user)+1)%users.length]
+    const denied=await media(wrongOwner,'tasks/'+record.id);record.cross_owner_status=denied.status
+    assert([403,404,409].includes(denied.status));assert.notEqual(denied.body.task_id,record.id)
+    if(delivered){const r=await fetch(base+'/studio-v2/api/image/tasks/'+record.id+'/results/0',{headers:{Cookie:user.cookie}});assert.equal(r.status,200);record.original_sha256=createHash('sha256').update(Buffer.from(await r.arrayBuffer())).digest('hex');assert.equal(record.original_sha256,createHash('sha256').update(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64')).digest('hex'))}
+
     record.pass=true
    }))}finally{clearInterval(sampler);save()}
   }

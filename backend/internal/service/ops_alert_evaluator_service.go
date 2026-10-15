@@ -293,9 +293,10 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				firedEvent.Dimensions["request_count_sla"] = overview.RequestCountSLA
 				firedEvent.Dimensions["success_count"] = overview.SuccessCount
 				firedEvent.Dimensions["error_count_sla"] = overview.ErrorCountSLA
+				firedEvent.Dimensions["upstream_error_count_excl_429_529"] = overview.UpstreamErrorCountExcl429529
 				firedEvent.Dimensions["window_start"] = windowStart.Format(time.RFC3339)
 				firedEvent.Dimensions["window_end"] = windowEnd.Format(time.RFC3339)
-				firedEvent.Description += fmt.Sprintf("; trigger sample: %d requests, %d successful, %d SLA errors", overview.RequestCountSLA, overview.SuccessCount, overview.ErrorCountSLA)
+				firedEvent.Description += fmt.Sprintf("; trigger sample: %d requests, %d successful, %d SLA errors, %d upstream errors excluding 429/529", overview.RequestCountSLA, overview.SuccessCount, overview.ErrorCountSLA, overview.UpstreamErrorCountExcl429529)
 			}
 
 			created, err := s.opsRepo.CreateAlertEvent(ctx, firedEvent)
@@ -512,7 +513,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.IsRateLimited
-		})), true
+		})), true, nil
 	case "account_error_count":
 		if s == nil || s.opsService == nil {
 			return 0, false, nil
@@ -523,7 +524,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.HasError && acc.TempUnschedulableUntil == nil
-		})), true
+		})), true, nil
 	case "account_temp_unscheduled_count":
 		if s == nil || s.opsService == nil {
 			return 0, false, nil
@@ -535,7 +536,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		now := time.Now().UTC()
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.TempUnschedulableUntil != nil && now.Before(*acc.TempUnschedulableUntil)
-		})), true
+		})), true, nil
 	case "group_rate_limit_ratio":
 		if groupID == nil || *groupID <= 0 {
 			return 0, false, nil
@@ -577,7 +578,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.IsOverloaded
-		})), true
+		})), true, nil
 	case "proxy_expired_count":
 		if s == nil || s.proxyRepo == nil {
 			return 0, false, nil
