@@ -36,3 +36,27 @@ it('displays a frozen total only when unit price and quantity agree without repr
  expect(()=>studioTaskView('image',{...quoted,quantity:2})).toThrow('studio_contract')
  expect(()=>studioTaskView('image',{...legacy,spec:{count:11}})).toThrow('studio_contract')
 })
+
+it.each(['image','video'] as const)('prepares a private native credential for %s without caller Group or key',async kind=>{
+ client.get.mockResolvedValue({data:{id:2}});client.post.mockResolvedValue({data:{prepared:true}})
+ const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockResolvedValueOnce(new Response(JSON.stringify({offers:[]})));vi.stubGlobal('fetch',fetch)
+ await studioRequest(kind,'catalog')
+ expect(client.post).toHaveBeenCalledWith('/keys/studio-access',{media:kind})
+ expect(fetch.mock.calls[1][0]).toBe(`/studio-v2/api/${kind}/catalog`)
+})
+it('does not allocate credentials when reading or recovering an existing task',async()=>{
+ client.get.mockResolvedValue({data:{id:2}})
+ const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockResolvedValueOnce(new Response(JSON.stringify({tasks:[]})));vi.stubGlobal('fetch',fetch)
+ await studioRequest('image','tasks');expect(client.post).not.toHaveBeenCalled()
+})
+it('credential preparation denial stops the business request',async()=>{
+ client.get.mockResolvedValue({data:{id:2}});client.post.mockRejectedValue(new Error('GROUP_NOT_ALLOWED'))
+ const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({owner_id:2})));vi.stubGlobal('fetch',fetch)
+ await expect(studioRequest('image','catalog')).rejects.toThrow('GROUP_NOT_ALLOWED');expect(fetch).toHaveBeenCalledTimes(1)
+})
+it('identity changes during credential preparation cannot cross into a business request',async()=>{
+ localStorage.setItem('auth_token','first');client.get.mockResolvedValue({data:{id:2}})
+ client.post.mockImplementation(async()=>{localStorage.setItem('auth_token','second');return {data:{prepared:true}}})
+ const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({owner_id:2})));vi.stubGlobal('fetch',fetch)
+ await expect(studioRequest('image','catalog')).rejects.toThrow('studio_session_changed');expect(fetch).toHaveBeenCalledTimes(1)
+})
