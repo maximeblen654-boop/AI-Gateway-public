@@ -48,7 +48,7 @@ func run() error {
 	if e != nil {
 		return fmt.Errorf("database connection setup failed")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	backup := func(b []byte) error {
@@ -56,11 +56,14 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if _, e = f.Write(b); e != nil {
 			return e
 		}
-		return f.Sync()
+		if e = f.Sync(); e != nil {
+			return e
+		}
+		return f.Close()
 	}
 	p, e := repository.RecoverAccount77Published(ctx, db, at, expected, backup)
 	if e != nil {

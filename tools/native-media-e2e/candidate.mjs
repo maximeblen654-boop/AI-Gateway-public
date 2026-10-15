@@ -12,7 +12,7 @@ assert.equal(process.env.RUNNER_OS, 'Linux')
 assert.equal(process.env.GITHUB_REPOSITORY, 'maximeblen654-boop/AI-Gateway-public')
 const paidControls = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'paid-controls'
 const focusedEntry = paidControls && process.env.NATIVE_FOCUSED_ENTRY === 'true'
-const acceptanceScope = focusedEntry ? 'studio-entry-and-image-502-finality' : 'paid-controls'
+let acceptanceScope = focusedEntry ? 'studio-entry-and-image-502-finality' : 'paid-controls'
 const adminReview = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'admin-ui-review'
 assert.equal(process.env.GITHUB_REF, paidControls ? 'refs/heads/codex/media-paid-controls' : adminReview ? 'refs/heads/codex/admin-media-design-review' : 'refs/heads/codex/studio-native-media')
 const adminCandidate = adminReview && process.env.NATIVE_EXPORT_CANDIDATE === 'true'
@@ -23,6 +23,7 @@ const sha = process.env.NATIVE_CANDIDATE_SOURCE_SHA || scriptSha
 assert.match(sha, /^[a-f0-9]{40}$/)
 const source = path.resolve(process.env.NATIVE_CANDIDATE_SOURCE_DIR || process.cwd())
 const catalogRecovery = fs.existsSync(path.join(source, 'backend/internal/mediaworkbench/published_recovery.go'))
+if (catalogRecovery && paidControls) acceptanceScope = 'published-catalog-dependencies-and-media-regression'
 const mediaOptions = focusedEntry && fs.existsSync(path.join(source, 'backend/internal/service/studio_passive_status.go'))
 const workspaceArtifact = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'studio-workspace'
 if (workspaceArtifact) assert.equal(sha, '40310e2961a5e8150e0c9df4cc86bb8087406c06')

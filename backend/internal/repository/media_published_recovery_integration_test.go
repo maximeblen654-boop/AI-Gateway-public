@@ -16,11 +16,11 @@ func TestAccount77PublishedRecoveryPostgres(t *testing.T) {
 	ctx := context.Background()
 	conn, e := integrationDB.Conn(ctx)
 	require.NoError(t, e)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	// Session-local disposable table, independent of all other fixtures and IDs.
 	_, e = conn.ExecContext(ctx, `CREATE TEMP TABLE accounts AS SELECT * FROM public.accounts WITH NO DATA`)
 	require.NoError(t, e)
-	defer conn.ExecContext(ctx, `DROP TABLE pg_temp.accounts`)
+	defer func() { _, _ = conn.ExecContext(ctx, `DROP TABLE pg_temp.accounts`) }()
 	cfg := &mediaworkbench.Config{SchemaVersion: 1, RecordVersion: 32, MediaTypes: []string{"image"}, AdapterBindings: map[string]mediaworkbench.AdapterBinding{}, Sales: mediaworkbench.Sales{Enabled: true}}
 	desc, _ := mediaworkbench.Descriptor("openai_images")
 	cfg.AdapterBindings["image"] = mediaworkbench.AdapterBinding{Kind: desc.Kind, Revision: desc.Revision, Auth: desc.Auth, TaskFlow: desc.TaskFlow}

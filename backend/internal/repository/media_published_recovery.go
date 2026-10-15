@@ -40,7 +40,7 @@ func RecoverAccount77Published(ctx context.Context, db interface {
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, "SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='20s'"); err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func RecoverAccount77Published(ctx context.Context, db interface {
 		return nil, err
 	}
 	if !rows.Next() {
-		rows.Close()
+		_ = rows.Close()
 		return nil, mediaworkbench.ErrNotFound
 	}
 	a, err := scanMediaAccount(rows)

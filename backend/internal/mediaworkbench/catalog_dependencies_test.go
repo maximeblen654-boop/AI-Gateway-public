@@ -173,7 +173,7 @@ func TestCatalogSyncKeepsFrozenQuoteAndVideo(t *testing.T) {
 	must(t, e)
 	d, e = s.SaveDraft(context.Background(), 7, d.Config.RecordVersion, DraftInput{Products: []Product{representativeVideoProduct(&Price{Amount: "2.5", Currency: "CNY", BillingMode: "per_request"})}})
 	must(t, e)
-	d, e = s.Publish(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	_, e = s.Publish(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
 	must(t, e)
 	if !publishedReady(&r.a) {
 		t.Fatal("video not ready")

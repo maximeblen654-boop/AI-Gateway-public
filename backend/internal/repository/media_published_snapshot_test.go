@@ -28,7 +28,7 @@ func TestAccount77SnapshotRecovery(t *testing.T) {
 	require.NoError(t, json.Unmarshal(x["base_url"], &a.BaseURL))
 	db, m, e := sqlmock.New()
 	require.NoError(t, e)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	m.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE id=$1 AND deleted_at IS NULL`)).WithArgs(a.ID).WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(a.ID, a.Name, a.Platform, a.Type, a.Status, a.Schedulable, a.BaseURL, []byte(x["model_catalog"]), []byte(x["media_workbench_v1"]), []byte(x["routing"])))
 	account, e := NewMediaConfigRepository(db).Get(context.Background(), 77)
 	require.NoError(t, e)
