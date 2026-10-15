@@ -1,0 +1,62 @@
+{
+  "status": "PREPARED_NOT_SWITCHED_AWAITING_IMAGE_RESTORE_AUTHORIZATION",
+  "time": "2026-10-15T02:15:47.371876+00:00",
+  "runtime": [
+    {
+      "name": "sub2api",
+      "container_unchanged": true,
+      "image": "sha256:a0f6c2d9ff5ab1fa269d9ff5e8ae4ca9b4f6df988bffaa5020b7be4a95a818c2",
+      "health": "healthy",
+      "rollback_available": true
+    },
+    {
+      "name": "studio-v2-bridge",
+      "container_unchanged": true,
+      "image": "sha256:7c7db67cea0a4ea08425246627b5113c613b8c0468ed8d212231e6f98e755787",
+      "health": "healthy",
+      "rollback_available": true
+    },
+    {
+      "name": "studio-v2-bff",
+      "container_unchanged": true,
+      "image": "sha256:ba87605bc65d9a3547e3bd7e59c612319967c4bc104bfc4acb619512176fbbe6",
+      "health": "healthy",
+      "rollback_available": true
+    }
+  ],
+  "disk_free_gib": 10.32,
+  "candidate_loaded": [
+    {
+      "component": "core",
+      "tag": "native-candidate-core:ac8923ab666a77acc3675024c286ff2effff9546",
+      "manifest_digest": "sha256:e78166bf05b68299c9bd839ab5431ff051d02def730165d9f492ddca1097b7e2",
+      "config_digest": "sha256:24c6fdf42705d35c9736c526b052efd5a9a6af964e8c3868725d86cfae2b7690",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-funds-ops-ac8923-20261015/core-ac8923ab666a77acc3675024c286ff2effff9546.tar.gz",
+      "sha256": "19adcc3908ab51e7796d56dd481a27575d3b7657479d293bb5648cf5ca82e13e",
+      "size": 307527675
+    },
+    {
+      "component": "bridge",
+      "tag": "native-candidate-bridge:ac8923ab666a77acc3675024c286ff2effff9546",
+      "manifest_digest": "sha256:65142a7635c34b2c6675117ed0870e93acbd977363a2fcfac021a3598273b242",
+      "config_digest": "sha256:b3c86c854a915e977496ab78db7ed8bae8380c371aa24c8f2e63803abc07fad4",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-funds-ops-ac8923-20261015/bridge-ac8923ab666a77acc3675024c286ff2effff9546.tar.gz",
+      "sha256": "8ca90d6c31a2f9895fe410b6fae7b5a4d0cb3d58277a9966773cbc6a2b92f800",
+      "size": 95861095
+    },
+    {
+      "component": "bff",
+      "tag": "native-candidate-bff:ac8923ab666a77acc3675024c286ff2effff9546",
+      "manifest_digest": "sha256:fbe06459ecd03646a3bea837ff10ebcdf540c5ff4a5aafb803b29d680b696836",
+      "config_digest": "sha256:85380819444bab8bafac475cb867f6a05ada90ec09c5dca189b8365cde294a6d",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-funds-ops-ac8923-20261015/bff-ac8923ab666a77acc3675024c286ff2effff9546.tar.gz",
+      "sha256": "9a3802a7790dfb93b4c7210be3474fdc7850ae147bff2d72a93642d2622735bc",
+      "size": 617445706
+    }
+  ],
+  "compose": "/home/ubuntu/services/ai-gateway/deploy-funds-ops-ac8923-20261015/compose.override.ac8923ab.json",
+  "compose_sha256": "df5f5dd8ec85ec62463eb026fa0b8bc66e1c74570d945e44d8c5136974432cde"
+}
