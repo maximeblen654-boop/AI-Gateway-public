@@ -23,7 +23,8 @@ const setMapping=(id,mapping)=>{
 const p='/admin/media-workbench/paid-controls/'
 ;(async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true})
- const page=await browser.newPage({locale:'zh-CN',viewport:{width:1440,height:1000}});page.setDefaultTimeout(30000)
+ const context=await browser.newContext({locale:'zh-CN',viewport:{width:1440,height:1000}})
+ const page=await context.newPage();page.setDefaultTimeout(30000)
  page.on('response',async r=>{if(r.url().startsWith(base+'/studio-v2/api/')&&r.status()>=400){const b=await r.json().catch(()=>({}));report.http_errors.push({path:new URL(r.url()).pathname,status:r.status(),error:b.error,stage:b.diagnostic_stage})}})
  await page.addInitScript(()=>{localStorage.setItem('sub2api_locale','zh');localStorage.setItem('admin_guide_1_admin_v4_interactive','true')})
  const raw=async(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{const r=await fetch('/api/v1'+path,{method,headers:{'Content-Type':'application/json','X-Admin-UI-Request':'1',Authorization:'Bearer '+localStorage.getItem('auth_token')},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json()}},{path,method,body})
