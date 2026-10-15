@@ -163,7 +163,7 @@ const report = { cases: [], http: [] }
     await w('wizard-step-5').click()
     await w('return-models').click()
     await w('publish').click()
-    for (const product of report.products) await w(`publish-product-${product.product_id}`).check()
+    for (const checkbox of await w("publish-products").locator("input[type=checkbox]").all()) await checkbox.check()
     await w('confirm-publish').click()
     await expect(w('sales')).toBeEnabled()
     if ((await w('sales').innerText()).includes('开启')) { await w('sales').click(); await w('confirm-sales').click() }
