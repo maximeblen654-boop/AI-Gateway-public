@@ -31,7 +31,7 @@ func (s studioImageLoopbackHTTP) Do(req *http.Request, proxy string, accountID i
 }
 
 func TestStudioImageRealHTTPRecovery(t *testing.T) {
-	for _, mode := range []string{"success", "widescreen", "different_pixels", "different_ratio", "reject", "lost_response", "timeout", "wrong_count", "missing_metadata"} {
+	for _, mode := range []string{"success", "widescreen", "different_pixels", "different_ratio", "reject", "bad_gateway", "lost_response", "timeout", "wrong_count", "missing_metadata"} {
 		t.Run(mode, func(t *testing.T) {
 			var posts atomic.Int32
 			result := studioResult(t, "png")
@@ -52,7 +52,7 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				wireSize = "1536x864"
 				result = studioPixelResult(t, 1536, 864)
 			}
-			transportUnknown := mode == "reject" || mode == "lost_response" || mode == "timeout"
+			transportUnknown := mode == "reject" || mode == "bad_gateway" || mode == "lost_response" || mode == "timeout"
 			supplier := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				posts.Add(1)
 				require.Equal(t, "POST", req.Method)
@@ -70,6 +70,10 @@ func TestStudioImageRealHTTPRecovery(t *testing.T) {
 				case "reject":
 					w.WriteHeader(422)
 					_, _ = w.Write([]byte(`{"error":"synthetic private provider detail"}`))
+				case "bad_gateway":
+					w.Header().Set("x-request-id", "synthetic-failed-request")
+					w.WriteHeader(http.StatusBadGateway)
+					_, _ = w.Write([]byte(`{"error":{"message":"synthetic upstream busy"}}`))
 				case "lost_response":
 					hijacker, ok := w.(http.Hijacker)
 					require.True(t, ok)

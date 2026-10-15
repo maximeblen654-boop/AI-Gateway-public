@@ -316,7 +316,7 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 	}
 	return receipt, r.Store.Save(receipt)
 }
-func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, _ *gin.Context, a *Account, body []byte, endpoint string) ([]byte, string, error) {
+func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, outer *gin.Context, a *Account, body []byte, endpoint string) (data []byte, upstreamID string, callErr error) {
 	plan, err := imageplan.CompileJSON(body, gjson.GetBytes(body, "model").String(), endpoint)
 	if err != nil {
 		return nil, "", err
@@ -328,6 +328,12 @@ func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, _ *gin.Context, a
 	upstreamCtx, release := detachUpstreamContext(ctx)
 	defer release()
 	c, capture := newStudioNativeContext(upstreamCtx, http.MethodPost, endpoint, body, 32<<20)
+	defer func() {
+		id := preserveStudioNativeDiagnostics(outer, c)
+		if callErr != nil && upstreamID == "" {
+			upstreamID = id
+		}
+	}()
 	if a.Platform == PlatformGemini {
 		return r.forwardGeminiImage(c, capture, a, parsed, body)
 	}

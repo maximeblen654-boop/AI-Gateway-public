@@ -100,3 +100,43 @@ func studioNativeResult(w *studioNativeResponse, result *OpenAIForwardResult, er
 	}
 	return w.body.Bytes(), id, nil
 }
+
+// Native forwarding runs with an isolated response writer, but its diagnostics
+// still belong to the original Studio request. Copy only existing Ops fields;
+// never copy authentication, response-committed state or the upstream body to
+// the customer's response. The returned request ID is retained by unit receipts.
+func preserveStudioNativeDiagnostics(outer, native *gin.Context) string {
+	if native == nil || outer == native {
+		return ""
+	}
+	if outer != nil {
+		for _, key := range []string{OpsUpstreamStatusCodeKey, OpsUpstreamErrorMessageKey,
+			OpsUpstreamErrorDetailKey, OpsUpstreamModelKey, OpsUpstreamLatencyMsKey,
+			OpsResponseLatencyMsKey, OpsTimeToFirstTokenMsKey} {
+			if value, ok := native.Get(key); ok {
+				outer.Set(key, value)
+			}
+		}
+	}
+	value, _ := native.Get(OpsUpstreamErrorsKey)
+	events, _ := value.([]*OpsUpstreamErrorEvent)
+	var requestID string
+	var merged []*OpsUpstreamErrorEvent
+	if outer != nil {
+		previous, _ := outer.Get(OpsUpstreamErrorsKey)
+		prior, _ := previous.([]*OpsUpstreamErrorEvent)
+		merged = append(merged, prior...)
+	}
+	for _, event := range events {
+		if event == nil {
+			continue
+		}
+		copyOfEvent := *event
+		merged = append(merged, &copyOfEvent)
+		requestID = event.UpstreamRequestID
+	}
+	if outer != nil && len(events) > 0 {
+		outer.Set(OpsUpstreamErrorsKey, merged)
+	}
+	return requestID
+}
