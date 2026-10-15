@@ -115,6 +115,13 @@ func studioGroupAllows(k *APIKey, model string) bool {
 }
 
 func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, subscriptionID *int64) (string, error) {
+	return r.issueQuote(ctx, owner, key, offerID, spec, subscriptionID, false)
+}
+func (r *StudioImageRuntime) quotePreflight(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, subscriptionID *int64) error {
+	_, err := r.issueQuote(ctx, owner, key, offerID, spec, subscriptionID, true)
+	return err
+}
+func (r *StudioImageRuntime) issueQuote(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, subscriptionID *int64, preflight bool) (string, error) {
 	if r == nil || r.Core == nil || r.Media == nil || key == nil || key.ID != owner.APIKeyID || key.UserID != owner.UserID || key.GroupID == nil || *key.GroupID != owner.GroupID {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
@@ -162,6 +169,9 @@ func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, 
 	} else {
 		release()
 	}
+	if preflight {
+		return "", nil
+	}
 	return r.Store.Issue(q)
 }
 
@@ -200,6 +210,9 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	// key accounting or move a new request between balance/subscription ledgers.
 	if (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
+	}
+	if !r.PaidControl.AllowsOffer(ctx, "image", q.Binding.Offer.AccountID, q.Binding.Offer.OfferID) {
+		return nil, ErrPaidControl
 	}
 	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true, r.Gemini)
 	if err != nil {

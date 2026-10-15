@@ -69,6 +69,8 @@ func (r *memoryRepo) swap(id, expected int64, c *Config) error {
 		return ErrStale
 	}
 	b, _ := json.Marshal(c)
+	// Persisted JSON replaces the record; absent optional fields are not merged.
+	r.a.Config = nil
 	_ = json.Unmarshal(b, &r.a.Config)
 	r.writes++
 	return nil

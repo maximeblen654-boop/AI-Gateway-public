@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic } from '@/api/admin/mediaWorkbench'
+import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget } from '@/api/admin/mediaWorkbench'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 export function useMediaWorkbench() {
@@ -107,6 +107,7 @@ export function useMediaWorkbench() {
     selectedProduct.value = id
   }
   function removalReason(p: Product): string {
+    if (config.value?.product_lifecycle?.[p.product_id]?.state === 'archived') return '已归档商品保留配置，请先恢复后再管理。'
     if (saveState.value === 'unconfirmed') return '保存结果未确认，请重新读取后再管理商品。'
     if (addedProductIds.value.includes(p.product_id)) return ''
     const permission = detail.value?.product_removal?.[p.product_id]
@@ -207,6 +208,23 @@ export function useMediaWorkbench() {
     try { apply(await mediaWorkbenchAPI.sales(detail.value.id, config.value.record_version, enabled), false) }
     catch (e) { failure(e) } finally { pending.value = '' }
   }
+  async function lifecycle(action: LifecycleAction, target: LifecycleTarget): Promise<boolean> {
+    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) return false
+    if (dirty.value) { message.value = '请先保存或放弃未保存修改，再管理上下架与归档。'; return false }
+    pending.value = 'lifecycle'; clearError(); stopPolling()
+    try {
+      const dto = await mediaWorkbenchAPI.lifecycle(detail.value.id, config.value?.record_version ?? 0, action, target)
+      if (disposed) return false
+      apply(dto, true)
+      return true
+    } catch (e) {
+      failure(e)
+      if (![401, 403, 404, 409, 410, 422].includes(errorStatus.value)) {
+        saveState.value = 'unconfirmed'; validationUnavailable.value = true
+      }
+      return false
+    } finally { pending.value = '' }
+  }
   async function sync() {
     if (pending.value || loading.value || deleted.value || conflict.value || !detail.value) return
     pending.value = 'sync'; clearError(); stopPolling()
@@ -227,5 +245,5 @@ export function useMediaWorkbench() {
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
     errorStatus, diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
-    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, discard }
+    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
 }

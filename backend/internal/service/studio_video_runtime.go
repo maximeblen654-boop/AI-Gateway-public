@@ -373,6 +373,9 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	if !time.Now().Before(b.ExpiresAt) || time.Now().Before(b.CreatedAt) || !key.Group.ModelAllowlist.Allows(b.Offer.SiteModel) || (key.Quota > 0) != b.KeyQuotaEnabled || key.HasRateLimits() != b.KeyRateEnabled {
 		return StudioVideoState{}, ErrStudioVideoConflict
 	}
+	if !r.PaidControl.AllowsOffer(ctx, "video", b.Offer.AccountID, b.Offer.OfferID) {
+		return StudioVideoState{}, ErrPaidControl
+	}
 	a, release, e := r.account(ctx, b, true, true)
 	if e != nil {
 		return StudioVideoState{}, e

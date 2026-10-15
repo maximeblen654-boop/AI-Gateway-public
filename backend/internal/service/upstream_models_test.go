@@ -1209,3 +1209,33 @@ func TestMediaCatalogSnapshotKeepsLastSuccessOnSyncFailure(t *testing.T) {
 	require.Nil(t, repo.updates)
 	require.Equal(t, saved, a.Extra["upstream_model_catalog_snapshot"])
 }
+
+func TestMediaCatalogSnapshotRejectsPartialSuccess(t *testing.T) {
+	for _, body := range []string{
+		`{"data":[{"id":"banana"}],"has_more":true}`,
+		`{"models":[{"name":"banana"}],"nextPageToken":"next"}`,
+		`{"data":[{"id":"banana"}],"pagination":{"total":2}}`,
+		`{"data":[{"id":"banana"}],"links":{"next":"/page2"}}`,
+		`{"data":[{"id":"banana"}],"partial":true}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			old := map[string]any{"source": "upstream", "models": []string{"gpt-image-2", "banana"}, "synced_at": "2026-10-01T00:00:00Z"}
+			a := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "fixture", "base_url": "https://provider.example/v1"}, Extra: map[string]any{"upstream_model_catalog_snapshot": old}}
+			repo := &upstreamModelMetadataRepoStub{}
+			svc := &AccountTestService{accountRepo: repo, cfg: upstreamModelSyncTestConfig(), httpUpstream: &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}}}}
+			_, err := svc.SyncUpstreamModelCatalog(context.Background(), a)
+			require.Error(t, err)
+			require.Empty(t, repo.updates)
+			require.Equal(t, old, a.Extra["upstream_model_catalog_snapshot"])
+		})
+	}
+	require.Error(t, requireCompleteModelCatalog([]byte(`{"data":[{"id":"banana"}]}`), `</models?page=2>; rel="next"`))
+}
+func TestMediaCatalogCompleteRemovalPersistsRemainingModel(t *testing.T) {
+	a := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "fixture", "base_url": "https://provider.example/v1"}, Extra: map[string]any{"upstream_model_catalog_snapshot": map[string]any{"models": []string{"gpt-image-2", "gpt-image-new"}}}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, cfg: upstreamModelSyncTestConfig(), httpUpstream: &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"gpt-image-new"}]}`))}}}}
+	_, err := svc.SyncUpstreamModelCatalog(context.Background(), a)
+	require.NoError(t, err)
+	require.Equal(t, []string{"gpt-image-new"}, a.Extra["upstream_model_catalog_snapshot"].(map[string]any)["models"])
+}

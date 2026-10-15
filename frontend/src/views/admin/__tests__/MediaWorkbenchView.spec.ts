@@ -8,7 +8,7 @@ import { supplier, saved } from '@/components/admin/media/__tests__/fixtures'
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
-  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn() }
+  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn() }
 }))
 const api = vi.mocked(mediaWorkbenchAPI)
 let wrapper: VueWrapper
@@ -397,4 +397,132 @@ describe('Media Workbench page flow', () => {
     expect(router.currentRoute.value.path).toBe('/admin/accounts')
     expect(api.saveDraft).toHaveBeenCalledTimes(1)
   })
+})
+
+
+describe('Media Workbench product and model lifecycle', () => {
+  it('confirms only the selected product and never publishes other drafts', async () => {
+    const dto = supplier()
+    const first = dto.media_workbench_v1!.draft.products[0]!
+    const second = structuredClone(first); second.product_id = 'second-product'; second.display_name = '第二份独立商品'
+    dto.media_workbench_v1!.draft.products.push(second)
+    api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="product-select"]').setValue(second.product_id)
+    await wrapper.get('[data-test="product-unlist"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="lifecycle-products"]').text()).toContain('第二份独立商品')
+    expect(wrapper.get('[data-test="lifecycle-products"]').text()).not.toContain(first.display_name)
+    expect(wrapper.get('[data-test="lifecycle-products"]').text()).not.toContain(second.product_id)
+    await wrapper.get('[data-test="confirm-lifecycle"]').trigger('click'); await flushPromises()
+    expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'unlist', { product_id: second.product_id })
+    expect(api.publish).not.toHaveBeenCalled(); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('lists all model products in the bulk confirmation, including archived and published-only entries', async () => {
+    const dto = supplier(); const c = dto.media_workbench_v1!
+    const archived = structuredClone(c.draft.products[0]!); archived.product_id = 'archived'; archived.display_name = '已归档独立商品'
+    const publishedOnly = structuredClone(archived); publishedOnly.product_id = 'published-only'; publishedOnly.display_name = '仅发布商品'
+    c.draft.products.push(archived); c.published!.products!.push(publishedOnly)
+    c.product_lifecycle = { archived: { state: 'archived', revision: 1, updated_at: '' } }
+    api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="model-unlist"]').trigger('click'); await flushPromises()
+    const list = wrapper.get('[data-test="lifecycle-products"]')
+    expect(list.findAll('li')).toHaveLength(3)
+    expect(list.text()).toContain('已归档独立商品'); expect(list.text()).toContain('仅发布商品')
+    await wrapper.get('[data-test="confirm-lifecycle"]').trigger('click'); await flushPromises()
+    expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'unlist', { model_id: 'image-native-1' })
+  })
+
+  it('disables lifecycle actions while edits are unsaved and requires unlisting before archive', async () => {
+    await openEditor()
+    expect(wrapper.get('[data-test="product-archive"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="model-archive"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-test="display-name"]').setValue('未保存的名称')
+    expect(wrapper.get('[data-test="product-unlist"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="model-unlist"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="lifecycle-dirty"]').text()).toContain('先保存或放弃')
+    expect(api.lifecycle).not.toHaveBeenCalled(); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('filters archived products only for display and retains them in a later draft save', async () => {
+    const dto = supplier(); const c = dto.media_workbench_v1!
+    const archived = structuredClone(c.draft.products[0]!); archived.product_id = 'archived'; archived.display_name = '归档保留'
+    c.draft.products.push(archived); c.product_lifecycle = { archived: { state: 'archived', revision: 1, updated_at: '' } }
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    expect(wrapper.find('[data-test="product-select"]').exists()).toBe(false)
+    await wrapper.get('[data-test="show-archived-products"]').setValue(true)
+    await wrapper.get('[data-test="product-select"]').setValue('archived')
+    expect(wrapper.get('[data-test="product-status"]').text()).toContain('已归档')
+    expect(wrapper.get('[data-test="product-restore"]').text()).toContain('已下架')
+    await wrapper.get('[data-test="show-archived-products"]').setValue(false)
+    await wrapper.get('[data-test="display-name"]').setValue('活动商品修改')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft.mock.calls[0]![2]).toHaveLength(2)
+    expect(api.saveDraft.mock.calls[0]![2][1]!.product_id).toBe('archived')
+  })
+
+  it('hides archived models by default and restores hidden unconfigured models without syncing native catalog', async () => {
+    const dto = supplier(); dto.models.find(m => m.model_id === 'new-model')!.state = 'ARCHIVED'
+    dto.media_workbench_v1!.hidden_models = ['new-model']
+    api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
+    await mountWorkbench(); await selectAccount()
+    expect(wrapper.find('[data-test="model-new-model"]').exists()).toBe(false)
+    await wrapper.get('[data-test="show-archived-models"]').setValue(true)
+    expect(wrapper.get('[data-test="model-new-model"]').text()).toContain('已归档')
+    await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="model-hide-restore"]').trigger('click'); await flushPromises()
+    expect(wrapper.find('dialog[open]').text()).toContain('保留上游模型目录')
+    await wrapper.get('[data-test="confirm-lifecycle"]').trigger('click'); await flushPromises()
+    expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'restore', { model_id: 'new-model' })
+    expect(api.sync).not.toHaveBeenCalled()
+  })
+
+  it('offers independent lifecycle management for published-only products', async () => {
+    const dto = supplier(); const p = structuredClone(dto.media_workbench_v1!.published!.products![0]!)
+    p.product_id = 'published-only'; p.display_name = '仅发布商品'
+    dto.media_workbench_v1!.published!.products!.push(p)
+    api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
+    await openEditor()
+    await wrapper.get('[data-test="published-unlist-published-only"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="lifecycle-products"]').findAll('li')).toHaveLength(1)
+    await wrapper.get('[data-test="confirm-lifecycle"]').trigger('click'); await flushPromises()
+    expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'unlist', { product_id: 'published-only' })
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+})
+
+
+it('restores an archived product as unlisted without automatically relisting', async () => {
+  const dto = supplier(); const id = dto.media_workbench_v1!.draft.products[0]!.product_id
+  dto.models[0]!.state = 'ARCHIVED'
+  dto.media_workbench_v1!.product_lifecycle = { [id]: { state: 'archived', revision: 1, updated_at: '' } }
+  const restored = structuredClone(dto)
+  restored.models[0]!.state = 'UNLISTED'; restored.media_workbench_v1!.record_version = 4
+  restored.media_workbench_v1!.product_lifecycle![id]!.state = 'unlisted'
+  api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(restored)
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('[data-test="show-archived-models"]').setValue(true)
+  await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="product-restore"]').trigger('click'); await flushPromises()
+  expect(wrapper.find('dialog[open]').text()).toContain('不会自动重新上架')
+  await wrapper.get('[data-test="confirm-lifecycle"]').trigger('click'); await flushPromises()
+  expect(api.lifecycle).toHaveBeenCalledTimes(1)
+  expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'restore', { product_id: id })
+  expect(wrapper.get('[data-test="product-status"]').text()).toContain('已下架')
+  expect(wrapper.get('[data-test="product-relist"]').exists()).toBe(true)
+  expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+})
+
+it('shows both Draft and Published model identities and blocks ambiguous bulk action', async () => {
+  const dto = supplier(); const c = dto.media_workbench_v1!
+  c.draft.products[0]!.upstream_model = 'new-model'
+  api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="model-unlist"]').trigger('click'); await flushPromises()
+  expect(wrapper.find('dialog[open]').text()).toContain('草稿与已发布商品使用不同模型')
+  expect(wrapper.get('[data-test="confirm-lifecycle"]').attributes('disabled')).toBeDefined()
+  expect(api.lifecycle).not.toHaveBeenCalled()
 })

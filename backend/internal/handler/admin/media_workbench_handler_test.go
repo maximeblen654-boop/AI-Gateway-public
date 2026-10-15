@@ -193,3 +193,31 @@ func TestBlankDraftRemovalHTTPContract(t *testing.T) {
 		})
 	}
 }
+
+func TestMediaLifecycleHTTPUsesExplicitCASAndPreservesDraft(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mediaHandlerRepo{a: mediaworkbench.Account{ID: 7, Type: "apikey", Status: "active", Schedulable: true, Catalog: &mediaworkbench.Catalog{Models: []string{"gpt-image-2"}, SyncedAt: "2026-10-16T00:00:00Z"}}}
+	h := NewMediaWorkbenchHandler(mediaworkbench.NewService(repo))
+	r := gin.New()
+	r.POST("/accounts/:id/lifecycle", h.Lifecycle)
+	for _, tc := range []struct {
+		body   string
+		status int
+	}{
+		{`{"action":"hide","model_id":"gpt-image-2"}`, 400},
+		{`{"expected_version":0,"action":"hide","model_id":"gpt-image-2","product_id":"p"}`, 400},
+		{`{"expected_version":0,"action":"hide","model_id":"gpt-image-2","sales":{"enabled":true}}`, 400},
+		{`{"expected_version":0,"action":"hide","model_id":"gpt-image-2"}`, 200},
+		{`{"expected_version":0,"action":"restore","model_id":"gpt-image-2"}`, 409},
+		{`{"expected_version":1,"action":"restore","model_id":"gpt-image-2"}`, 200},
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest("POST", "/accounts/7/lifecycle", strings.NewReader(tc.body)))
+		if w.Code != tc.status {
+			t.Fatalf("got %d want %d: %s", w.Code, tc.status, w.Body.String())
+		}
+	}
+	if repo.a.Config.Published != nil || repo.a.Config.Sales.Enabled || len(repo.a.Config.Draft.Products) != 0 || len(repo.a.Config.HiddenModels) != 0 {
+		t.Fatal("lifecycle changed publication/sales/draft")
+	}
+}

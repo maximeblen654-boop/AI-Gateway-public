@@ -48,7 +48,7 @@ func PublishedVideoOffers(a *Account) []Offer {
 	}
 	out := []Offer{}
 	for _, o := range a.Config.Published.Offers {
-		if o.MediaType == "video" && validVideoBinding(o.Adapter) && ValidateVideoSalePrice(o.SalePrice) == nil {
+		if o.MediaType == "video" && publishedProductReady(context.Background(), a, o.ProductID) && validVideoBinding(o.Adapter) && ValidateVideoSalePrice(o.SalePrice) == nil {
 			out = append(out, o)
 		}
 	}
@@ -57,7 +57,7 @@ func PublishedVideoOffers(a *Account) []Offer {
 
 func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
 	var r ResolvedVideoOffer
-	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedOfferReady(context.Background(), a, offerID) {
 		return r, ErrRuntimeBinding
 	}
 	return resolvePublishedVideoOffer(a, offerID, spec)
@@ -79,7 +79,8 @@ func resolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (Resolved
 		if e != nil || !n.IsPositive() {
 			return r, ErrRuntimeBinding
 		}
-		return ResolvedVideoOffer{a.Config.Published.Revision, a.Config.Published.Dependencies, o, spec, hash(spec)}, nil
+		revision, deps := offerSnapshot(a, o)
+		return ResolvedVideoOffer{revision, deps, o, spec, hash(spec)}, nil
 	}
 	return r, ErrRuntimeBinding
 }

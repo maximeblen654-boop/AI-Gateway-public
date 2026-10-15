@@ -35,7 +35,12 @@ export interface Validation {
 }
 export interface AdapterBinding { kind: string; revision: string; auth: string; task_flow: string }
 export interface NativeAdapter extends AdapterBinding { media_type: string; max_references: number; parameters: Record<string, { mode: string; wire_field?: string; value_type?: string }> }
+export type LifecycleAction = 'unlist' | 'relist' | 'archive' | 'restore' | 'hide'
+export type LifecycleTarget = { product_id: string; model_id?: never } | { model_id: string; product_id?: never }
+export interface ProductLifecycle { state: 'active' | 'unlisted' | 'archived'; revision: number; updated_at: string }
 export interface MediaConfig {
+  product_lifecycle?: Record<string, ProductLifecycle>
+  hidden_models?: string[]
   adapter_bindings?: Record<string, AdapterBinding>
   record_version: number; media_types: string[]
   sales: { enabled: boolean }
@@ -113,6 +118,11 @@ export const mediaWorkbenchAPI = {
   async sales(id: number, version: number, enabled: boolean): Promise<SupplierDetail> {
     return (await apiClient.put<SupplierDetail>(`${accountPath(id)}/sales`, {
       expected_record_version: version, enabled
+    })).data
+  },
+  async lifecycle(id: number, version: number, action: LifecycleAction, target: LifecycleTarget): Promise<SupplierDetail> {
+    return (await apiClient.post<SupplierDetail>(`${accountPath(id)}/lifecycle`, {
+      expected_version: version, action, ...target
     })).data
   },
   sync: syncUpstreamModels

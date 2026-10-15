@@ -164,3 +164,27 @@ func (h *MediaWorkbenchHandler) SetSales(c *gin.Context) {
 		response.Success(c, v)
 	}
 }
+
+func (h *MediaWorkbenchHandler) Lifecycle(c *gin.Context) {
+	id, ok := mediaAccountID(c)
+	if !ok {
+		return
+	}
+	var in struct {
+		Expected  *int64 `json:"expected_version"`
+		Action    string `json:"action"`
+		ProductID string `json:"product_id,omitempty"`
+		ModelID   string `json:"model_id,omitempty"`
+	}
+	if !decodeMediaInput(c, &in) {
+		return
+	}
+	if in.Expected == nil {
+		response.ErrorFrom(c, mediaworkbench.ErrInvalid)
+		return
+	}
+	v, err := h.service.Lifecycle(c.Request.Context(), id, *in.Expected, mediaworkbench.LifecycleInput{Action: in.Action, ProductID: in.ProductID, ModelID: in.ModelID})
+	if !response.ErrorFrom(c, err) {
+		response.Success(c, v)
+	}
+}

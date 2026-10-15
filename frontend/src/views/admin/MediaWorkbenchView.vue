@@ -78,6 +78,7 @@
           </div>
           <div class="mw-model-filters"><label class="mw-field">搜索模型<input v-model="search" class="input" placeholder="模型名称或精确 ID" type="search" data-test="model-search" /></label>
           <label class="mw-field">模型状态<select v-model="filter" class="input" data-test="model-filter"><option value="">全部状态</option><option v-for="state in modelStates" :key="state" :value="state">{{ modelLabel(state) }}</option></select></label></div>
+          <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-models" /><span>显示已归档模型</span></label>
           <p v-if="!filteredModels.length" class="mw-muted">没有匹配模型。可同步上游模型目录。</p>
           <div class="mw-model-list">
             <button v-for="row in filteredModels" :key="row.model_id" class="mw-model-row" :class="{ 'mw-selected': selectedModel === row.model_id }" :aria-pressed="selectedModel === row.model_id" :disabled="busy" :data-test="`model-${row.model_id}`" @click="navigate(() => openEditor(row.model_id))">
@@ -104,17 +105,54 @@
             <div class="mw-selection-feedback" data-test="selected-model-summary"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span></div>
           </div>
           <template v-if="detail && selectedModel">
+            <section class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
+              <div class="mw-section-heading"><strong>模型管理</strong><span class="mw-badge">{{ modelLabel(selectedRow?.state ?? '') }}</span></div>
+              <p class="mw-muted">模型操作覆盖 {{ selectedModel }} 下的全部 {{ lifecycleModelProducts.length }} 份商品（包含已归档商品）。</p>
+              <div class="mw-product-type-actions">
+                <template v-if="lifecycleModelProducts.length">
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'active')" class="btn btn-secondary" data-test="model-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { model_id: selectedModel })">下架模型全部商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'unlisted')" class="btn btn-secondary" data-test="model-relist" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { model_id: selectedModel })">重新上架模型商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) !== 'archived')" class="btn btn-secondary" data-test="model-archive" :disabled="lifecycleDisabled || modelArchiveBlocked" @click="requestLifecycle('archive', { model_id: selectedModel })">归档模型全部商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'archived')" class="btn btn-secondary" data-test="model-restore" :disabled="lifecycleDisabled" @click="requestLifecycle('restore', { model_id: selectedModel })">恢复模型已归档商品</button>
+                </template>
+                <button v-else class="btn btn-secondary" data-test="model-hide-restore" :disabled="lifecycleDisabled" @click="requestLifecycle(isModelHidden ? 'restore' : 'hide', { model_id: selectedModel })">{{ isModelHidden ? '恢复显示模型' : '隐藏未配置模型' }}</button>
+              </div>
+              <p v-if="modelArchiveBlocked" class="mw-muted">已发布商品需先下架，再归档。</p>
+              <p v-if="dirty" class="mw-muted" data-test="lifecycle-dirty">请先保存或放弃未保存修改，再管理上下架与归档。</p>
+              <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-products" :disabled="busy || dirty" /><span>显示已归档商品</span></label>
+            </section>
             <p v-if="selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING'" class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
-            <div v-if="!product" class="mw-start-product mw-banner">
+            <p v-if="!product && lifecycleModelProducts.length" class="mw-muted">当前没有可编辑的商品。已归档商品可勾选“显示已归档商品”后查看；仅有已发布版本的商品可在下方管理。</p>
+            <div v-if="!product && !lifecycleModelProducts.length" class="mw-start-product mw-banner">
               <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
               <div class="mw-product-type-actions"><button class="btn btn-primary" data-test="add-product-image" :disabled="busy || deleted || conflict" @click="addProduct('image')">开始配置图片</button><button class="btn btn-secondary" data-test="add-product-video" :disabled="busy || deleted || conflict" @click="addProduct('video')">开始配置视频</button></div>
             </div>
+            <section v-if="publishedOnlyProducts.length" class="mw-product-management" aria-label="仅有已发布版本的商品" data-test="published-only-products">
+              <h3>仅有已发布版本的商品</h3>
+              <div v-for="(p, index) in publishedOnlyProducts" :key="p.product_id">
+                <p>{{ productOptionLabel(p, index) }} · {{ lifecycleLabel(p) }}</p>
+                <div class="mw-product-type-actions">
+                  <button v-if="lifecycleState(p) === 'active'" class="btn btn-secondary" :data-test="`published-unlist-${p.product_id}`" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { product_id: p.product_id })">下架此商品</button>
+                  <button v-if="lifecycleState(p) === 'unlisted'" class="btn btn-secondary" :data-test="`published-relist-${p.product_id}`" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { product_id: p.product_id })">重新上架此商品</button>
+                  <button v-if="lifecycleState(p) === 'unlisted'" class="btn btn-secondary" :data-test="`published-archive-${p.product_id}`" :disabled="lifecycleDisabled" @click="requestLifecycle('archive', { product_id: p.product_id })">归档此商品</button>
+                  <button v-if="lifecycleState(p) === 'archived'" class="btn btn-secondary" :data-test="`published-restore-${p.product_id}`" :disabled="lifecycleDisabled" @click="requestLifecycle('restore', { product_id: p.product_id })">恢复为已下架</button>
+                </div>
+              </div>
+            </section>
             <section v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
-              <div class="mw-section-heading"><strong>正在编辑的商品</strong><span class="mw-badge" data-test="product-status">{{ product.enabled ? '草稿：已启用' : '草稿：已停用' }}</span></div>
+              <div class="mw-section-heading"><strong>正在编辑的商品</strong><span class="mw-badge" data-test="product-status">{{ lifecycleLabel(product) }} · {{ product.enabled ? '草稿：已启用' : '草稿：已停用' }}</span></div>
               <label v-if="modelProducts.length > 1" class="mw-field">切换商品（此模型共 {{ modelProducts.length }} 份）<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label>
               <p v-else class="mw-muted">{{ productDisplayTitle(product) }} · {{ product.media_type === 'video' ? '视频' : '图片' }}</p>
               <p v-if="modelProducts.length > 1" class="mw-product-description mw-muted" data-test="selected-product-description">当前：{{ productOptionLabel(product, modelProducts.indexOf(product)) }}</p>
-              <label class="mw-product-toggle"><input type="checkbox" data-test="product-enabled" :checked="product.enabled" :disabled="managementDisabled" @change="updateProduct({ ...product, enabled: ($event.target as HTMLInputElement).checked })" /><span>启用此商品<span class="mw-muted">保存并发布后生效；不会改变 Account 销售开关。</span></span></label>
+              <div class="mw-product-type-actions" data-test="product-lifecycle">
+                <button v-if="lifecycleState(product) === 'active'" class="btn btn-secondary" data-test="product-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { product_id: product.product_id })">下架此商品</button>
+                <button v-if="lifecycleState(product) === 'unlisted'" class="btn btn-secondary" data-test="product-relist" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { product_id: product.product_id })">重新上架此商品</button>
+                <button v-if="lifecycleState(product) !== 'archived'" class="btn btn-secondary" data-test="product-archive" :disabled="lifecycleDisabled || archiveBlocked(product)" @click="requestLifecycle('archive', { product_id: product.product_id })">归档此商品</button>
+                <button v-else class="btn btn-secondary" data-test="product-restore" :disabled="lifecycleDisabled" @click="requestLifecycle('restore', { product_id: product.product_id })">恢复此商品为已下架</button>
+              </div>
+              <p v-if="archiveBlocked(product)" class="mw-muted">此商品已经发布，请先下架再归档。</p>
+              <p v-if="lifecycleState(product) === 'archived'" class="mw-muted">已归档配置保留；恢复后仍为已下架，需要单独重新上架。</p>
+              <label class="mw-product-toggle"><input type="checkbox" data-test="product-enabled" :checked="product.enabled" :disabled="managementDisabled || lifecycleState(product) === 'archived'" @change="updateProduct({ ...product, enabled: ($event.target as HTMLInputElement).checked })" /><span>启用此商品<span class="mw-muted">保存并发布后生效；不会改变 Account 销售开关。</span></span></label>
               <div v-if="addedProductIds.includes(product.product_id)" class="mw-product-local" role="status"><span>本次新增，尚未保存</span><button type="button" class="btn btn-secondary" data-test="undo-add-product" :disabled="managementDisabled" @click="removeProduct(product.product_id)">撤销新增</button></div>
               <details class="mw-product-options" data-test="product-options"><summary>更多商品操作</summary>
                 <p class="mw-muted">同一模型通常只需一份商品：图片的文生图、参考图编辑及多种规格可在这里一起配置。仅在需要独立售价或销售方案时另建商品。</p>
@@ -128,7 +166,7 @@
               <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
               <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveDraft">保存草稿与移除操作</button>
             </section>
-            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict || lifecycleState(product) === 'archived'" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
@@ -150,6 +188,21 @@
       </main>
     </div>
 
+    <MediaDialog :show="!!lifecycleRequest" :title="`${lifecycleActionLabel(lifecycleRequest?.action)}确认`" :busy="pending === 'lifecycle'" @close="lifecycleRequest = null">
+      <template v-if="lifecycleRequest">
+        <p>Account #{{ detail?.id }} · {{ detail?.name }}</p>
+        <p v-if="lifecycleRequest.target.model_id">目标模型：{{ lifecycleRequest.target.model_id }}。以下是此模型的全部商品，操作不受列表筛选影响。</p>
+        <p v-else>仅操作下面这份商品，同模型的其他商品独立管理。</p>
+        <ul class="mw-dialog-list" data-test="lifecycle-products"><li v-for="(p, index) in lifecycleAffectedProducts" :key="`${p.product_id}:${p.upstream_model}`">商品 {{ index + 1 }} · {{ productOptionLabel(p, index) }} · 模型 {{ p.upstream_model }} · {{ lifecycleLabel(p) }}</li></ul>
+        <p v-if="!lifecycleAffectedProducts.length">仅改变此模型在媒体工作台中的显示状态；保留上游模型目录。</p>
+        <p v-else-if="lifecycleRequest.action === 'restore'">仅恢复已归档商品为已下架，其他商品保持原状态；不会自动重新上架。</p>
+        <p v-else-if="lifecycleRequest.action === 'relist'">后台重新检查所有未归档商品的原已发布版本；任一不满足条件则整笔不生效。已归档商品保持归档，仅有草稿的商品仍未发布；Account 销售开关独立生效。</p>
+        <p v-else>下架或归档后停止对应商品的新报价和新提交；已归档商品不会因下架恢复。配置、历史订单与恢复关联会保留。</p>
+        <p v-if="lifecycleModelAmbiguous" role="alert">此模型的草稿与已发布商品使用不同模型，请在具体商品中操作并核对两份配置。</p>
+        <p class="mw-muted">此操作立即保存生命周期状态，不发布整个 Account 的草稿。</p>
+      </template>
+      <template #actions><button class="btn btn-primary" data-test="confirm-lifecycle" :disabled="lifecycleDisabled || lifecycleModelAmbiguous" @click="confirmLifecycle">确认{{ lifecycleActionLabel(lifecycleRequest?.action) }}</button></template>
+    </MediaDialog>
     <MediaDialog :show="!!newProductType" title="另建独立销售商品？" :busy="busy" @close="newProductType = ''">
       <p>当前模型已有 {{ modelProducts.length }} 份商品。已有商品的规格和售价会保留；新商品有独立名称、规格、售价和启用状态。</p>
       <p>文生图与参考图编辑、不同分辨率和比例通常可以放在同一份图片商品中，无需分别新增。</p>
@@ -196,7 +249,7 @@ import MediaDialog from '@/components/admin/media/MediaDialog.vue'
 import MediaProductEditor from '@/components/admin/media/MediaProductEditor.vue'
 import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.vue'
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
-import type { Product, Diagnostic, SupplierDetail } from '@/api/admin/mediaWorkbench'
+import type { Product, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
 import '@/styles/media-workbench.css'
 
 const costOpen = ref(false)
@@ -204,10 +257,12 @@ const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
   diagnostics, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
-  loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, sync, discard } = workbench
+  loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
 const step = ref('suppliers')
 const search = ref('')
 const filter = ref('')
+const showArchived = ref(false)
+const lifecycleRequest = ref<{ action: LifecycleAction; target: LifecycleTarget } | null>(null)
 const editorElement = ref<HTMLElement>()
 const auth = useAuthStore()
 const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
@@ -244,9 +299,41 @@ const filteredGroups = computed(() => sourceGroups.value.map(group => ({ ...grou
 const visibleAccountCount = computed(() => filteredGroups.value.reduce((count, group) => count + group.accounts.length, 0))
 const platforms = computed(() => [...new Set(suppliers.value.map(supplier => supplier.platform).filter(Boolean))].sort())
 const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
-const filteredModels = computed(() => detail.value?.models.filter(m => (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
+const filteredModels = computed(() => detail.value?.models.filter(m => (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id))) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
-const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value))
+const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value && (showArchived.value || lifecycleState(p) !== 'archived')))
+const lifecycleProducts = computed(() => {
+  const byId = new Map((config.value?.published?.products ?? []).map(p => [`${p.product_id}:${p.upstream_model}`, p]))
+  for (const p of config.value?.draft.products ?? []) byId.set(`${p.product_id}:${p.upstream_model}`, p)
+  return [...byId.values()]
+})
+const lifecycleModelProducts = computed(() => lifecycleProducts.value.filter(p => p.upstream_model === selectedModel.value))
+const publishedOnlyProducts = computed(() => lifecycleModelProducts.value.filter(p => !products.value.some(draft => draft.product_id === p.product_id) && (showArchived.value || lifecycleState(p) !== 'archived')))
+const lifecycleAffectedProducts = computed(() => lifecycleProducts.value.filter(p => lifecycleRequest.value?.target.product_id ? p.product_id === lifecycleRequest.value.target.product_id : p.upstream_model === lifecycleRequest.value?.target.model_id))
+const lifecycleModelAmbiguous = computed(() => !!lifecycleRequest.value?.target.model_id && lifecycleAffectedProducts.value.some(p => {
+  const draft = config.value?.draft.products.find(d => d.product_id === p.product_id)
+  const published = config.value?.published?.products?.find(d => d.product_id === p.product_id)
+  return draft && published && draft.upstream_model !== published.upstream_model
+}))
+const lifecycleDisabled = computed(() => managementDisabled.value || dirty.value)
+const isModelHidden = computed(() => config.value?.hidden_models?.includes(selectedModel.value) ?? false)
+const modelArchiveBlocked = computed(() => lifecycleModelProducts.value.some(archiveBlocked))
+function lifecycleState(p: Product) { return config.value?.product_lifecycle?.[p.product_id]?.state ?? 'active' }
+function lifecycleLabel(p: Product) { return ({ active: '未下架', unlisted: '已下架', archived: '已归档' })[lifecycleState(p)] }
+function archiveBlocked(p: Product) { return lifecycleState(p) === 'active' && !!config.value?.published?.products?.some(item => item.product_id === p.product_id) }
+function lifecycleActionLabel(action?: LifecycleAction) { return action ? ({ unlist: '下架', relist: '重新上架', archive: '归档', restore: '恢复', hide: '隐藏模型' })[action] : '' }
+function requestLifecycle(action: LifecycleAction, target: LifecycleTarget) { if (!lifecycleDisabled.value) lifecycleRequest.value = { action, target } }
+async function confirmLifecycle() {
+  if (!lifecycleRequest.value || lifecycleDisabled.value || lifecycleModelAmbiguous.value) return
+  const request = lifecycleRequest.value
+  if (await lifecycle(request.action, request.target)) {
+    lifecycleRequest.value = null
+    if (request.action === 'archive' || request.action === 'hide') showArchived.value = true
+  }
+}
+watch([showArchived, selectedModel], () => {
+  if (!dirty.value && !modelProducts.value.some(p => p.product_id === selectedProduct.value)) selectedProduct.value = modelProducts.value[0]?.product_id ?? ''
+})
 const diagnosticProducts = computed(() => (config.value?.draft.products ?? []).map((p, index) => ({
   product_id: p.product_id,
   label: `${productDisplayTitle(p)} · ${p.media_type === 'video' ? '视频' : '图片'} · 商品 ${index + 1}`
@@ -289,7 +376,7 @@ function matchesAccount(supplier: SupplierDetail, query: string) { const normali
 function clearAccountFilters() { accountSearch.value = ''; accountFilter.value = ''; platformFilter.value = '' }
 function toggleSource(host: string) { if (accountSearch.value || accountFilter.value || platformFilter.value) return; const next = new Set(collapsedSources.value); if (next.has(host)) next.delete(host); else next.add(host); collapsedSources.value = next }
 function sourceOpen(host: string) { return !!accountSearch.value || !!accountFilter.value || !!platformFilter.value || !collapsedSources.value.has(host) }
-function modelLabel(state: string) { return ({ PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
+function modelLabel(state: string) { return ({ ARCHIVED: '已归档', UNLISTED: '已下架', PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
 function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置暂未满足销售条件', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }
@@ -350,7 +437,7 @@ async function openSupplier(id: number) { await selectSupplier(id); if (detail.v
 async function openEditor(modelId: string) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
   modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }
-  selectModel(modelId); step.value = 'editor'
+  selectModel(modelId); selectedProduct.value = modelProducts.value[0]?.product_id ?? ''; step.value = 'editor'
   await nextTick()
   editorElement.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
 }

@@ -67,3 +67,12 @@ describe('strict Media Workbench API boundary', () => {
     expect(client.post).not.toHaveBeenCalled()
   })
 })
+
+
+it('sends the exact lifecycle CAS and one explicit target without draft publication', async () => {
+  await mediaWorkbenchAPI.lifecycle(77, 4, 'unlist', { product_id: 'product-a' })
+  await mediaWorkbenchAPI.lifecycle(77, 5, 'restore', { model_id: 'model-a' })
+  expect(client.post).toHaveBeenNthCalledWith(1, '/admin/media-workbench/accounts/77/lifecycle', { expected_version: 4, action: 'unlist', product_id: 'product-a' })
+  expect(client.post).toHaveBeenNthCalledWith(2, '/admin/media-workbench/accounts/77/lifecycle', { expected_version: 5, action: 'restore', model_id: 'model-a' })
+  expect(client.put).not.toHaveBeenCalled()
+})

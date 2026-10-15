@@ -46,6 +46,7 @@ func TestPublishedCatalogScope(t *testing.T) {
 func TestLegacyCatalogStaysStrictUntilExplicitRecovery(t *testing.T) {
 	a := preflight1870Fixture(t)
 	// Old records omit the scope field. Their revision/quote identity stays intact.
+	a.Config.Published.ProductDependencies = nil
 	a.Config.Published.Dependencies = DependenciesFor(a)
 	a.Config.Published.Revision = publishedRevision(a.Config.Published)
 	before := hash(a.Config.Published)
@@ -75,6 +76,7 @@ func recoveryAccount(t *testing.T) *Account {
 		t.Fatal(v.Diagnostics)
 	}
 	old.Offers = offers
+	old.ProductDependencies = nil
 	old.Dependencies = v.Dependencies
 	old.Revision = publishedRevision(old)
 	a.Catalog.Models = append(a.Catalog.Models, "Nano-banana-2.1")

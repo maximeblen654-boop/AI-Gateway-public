@@ -504,17 +504,30 @@ func PublishedDependenciesFor(a *Account) Dependencies {
 
 func publishedRevision(p *Published) string {
 	return "mwp_" + hash(struct {
-		Source       string
-		Products     []Product
-		Offers       []Offer
-		Dependencies Dependencies
-	}{p.SourceDraftRevision, p.Products, p.Offers, p.Dependencies})
+		Source              string
+		Products            []Product
+		Offers              []Offer
+		Dependencies        Dependencies
+		ProductDependencies map[string]Dependencies `json:",omitempty"`
+	}{p.SourceDraftRevision, p.Products, p.Offers, p.Dependencies, p.ProductDependencies})
 }
 func publishedReady(a *Account) bool {
 	return publishedReadyContext(context.Background(), a)
 }
 
 func publishedReadyContext(ctx context.Context, a *Account) bool {
+	if a != nil && a.Config != nil && a.Config.Published != nil {
+		for _, o := range a.Config.Published.Offers {
+			if publishedProductReady(ctx, a, o.ProductID) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func legacyPublishedReady(ctx context.Context, a *Account) bool {
 	if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady || a.Config == nil {
 		return false
 	}
@@ -524,6 +537,9 @@ func publishedReadyContext(ctx context.Context, a *Account) bool {
 	}
 	// Validate the immutable Published products rather than a newer/incomplete
 	// Draft. An edit failure must not interrupt previously published sales.
-	v, offers := validateContext(ctx, a, Draft{Revision: p.SourceDraftRevision, Products: p.Products}, p.PublishedAt)
+	copyAccount, copyConfig := *a, *a.Config
+	copyConfig.ProductLifecycle = nil // Validate immutable offers; current availability is checked per product.
+	copyAccount.Config = &copyConfig
+	v, offers := validateContext(ctx, &copyAccount, Draft{Revision: p.SourceDraftRevision, Products: p.Products}, p.PublishedAt)
 	return v.PublishReady && hash(offers) == hash(p.Offers)
 }

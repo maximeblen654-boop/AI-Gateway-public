@@ -107,6 +107,9 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 	if !time.Now().Before(q.ExpiresAt) || time.Now().Before(q.CreatedAt) || (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
+	if !r.PaidControl.AllowsOffer(ctx, "image", q.Binding.Offer.AccountID, q.Binding.Offer.OfferID) {
+		return nil, ErrPaidControl
+	}
 	a, release, err := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, true, r.Gemini)
 	if err != nil {
 		return nil, err

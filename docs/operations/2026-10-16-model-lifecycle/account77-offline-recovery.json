@@ -1,0 +1,170 @@
+{
+  "after_dependencies": {
+    "account_id": 77,
+    "routing_sha256": "3d6a9d93d57cf510336670c90af2d773a4626c63fb7353d3b677f78043fb19b0",
+    "catalog_sha256": "published-models-v1:97fcdf67f6bb9b3efecd14d28ce16b3d1ae95125d5f07d14d194001b22cb602b",
+    "mapping_sha256": "86448a3782a9fdaa4732e56a00d73d0f17201a9c8a8f2f504d1c4be9b8edfa5c",
+    "binding_sha256": "dae807945a7b1e6daa7e692c307c037924d7304a5f15b4088ea235ee916ada1e",
+    "registry_revision": "media_registry_v1_r1"
+  },
+  "after_published_revision": "mwp_a2ba7043fbb0b9a9528879ba1f8d0fa32df963102bacdf803eb51e29da30f589",
+  "before_dependencies": {
+    "account_id": 77,
+    "routing_sha256": "3d6a9d93d57cf510336670c90af2d773a4626c63fb7353d3b677f78043fb19b0",
+    "catalog_sha256": "7a23bb397161bfa30e7194dd6675d6de3b1e3c9e71aa9f0cec493369c3c80e38",
+    "mapping_sha256": "86448a3782a9fdaa4732e56a00d73d0f17201a9c8a8f2f504d1c4be9b8edfa5c",
+    "binding_sha256": "dae807945a7b1e6daa7e692c307c037924d7304a5f15b4088ea235ee916ada1e",
+    "registry_revision": "media_registry_v1_r1"
+  },
+  "before_published_revision": "mwp_398091bdc7e4e4e90e1a2c92808fa182c203560023448ece87b910b25bef012e",
+  "draft_products": 2,
+  "draft_revision": "mwd_e7d66dfc6b79c84ec1382c602d1ef9d2e42e992e7765ebff89bca21a8adcba6e",
+  "draft_validation_status": "PASS",
+  "elapsed_ms": 733,
+  "offers_sha256": "4a0088abf5280c688b6c4905fbf6d6f7ddac140c018a74bb8bb9ea372b6c7a45",
+  "original_config_sha256": "50d0b7ba9e00299b98f52bfa1194e2df8768bd1cb0ecb7ee71c2c84f78ff96b6",
+  "production_written": false,
+  "products_offers_draft_validation_unchanged": true,
+  "published_products_sha256": "a487d9b84a3b0ce46af0adbb65c309865d52ec2ae088774c9a62886d4282ffbc",
+  "quotes": [
+    {
+      "count": 1,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 0,
+      "total": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 1,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 1,
+      "total": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 1,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 16,
+      "total": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 3,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 0,
+      "total": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 3,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 1,
+      "total": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 3,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 16,
+      "total": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 10,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 0,
+      "total": {
+        "amount": "0.250",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 10,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 1,
+      "total": {
+        "amount": "0.250",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    },
+    {
+      "count": 10,
+      "offer_id": "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5",
+      "references": 16,
+      "total": {
+        "amount": "0.250",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "unit": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      }
+    }
+  ],
+  "record_version": 32,
+  "replacement_sha256": "2d7fd238326ab6b73a905593d785b0594457eef29080583da24ff09f3ea60033",
+  "specs_checked": 1870,
+  "status": "PASS_OFFLINE_NATIVE_REVALIDATION"
+}

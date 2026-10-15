@@ -117,7 +117,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 		if cancelled() {
 			return v, nil
 		}
-		if !p.Enabled {
+		if !p.Enabled || (a.Config != nil && a.Config.ProductLifecycle[p.ProductID].State == "archived") {
 			continue
 		}
 		enabled++

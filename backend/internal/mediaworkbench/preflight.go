@@ -21,7 +21,7 @@ type PublishedOfferInspection struct {
 	Err       error
 }
 
-// InspectPublishedOffers validates the whole published snapshot once, then
+// InspectPublishedOffers validates each published product once, then
 // checks EVERY allowed spec with the same resolvers/compilers as native quotes.
 // a must be the caller's request-local repository snapshot. Nothing is cached
 // between requests, and mutable Draft never supplies the checked specifications.
@@ -30,7 +30,13 @@ func InspectPublishedOffers(ctx context.Context, a *Account, media string) (out 
 		return
 	}
 	start := time.Now()
-	ready := a != nil && a.Config != nil && a.Config.Sales.Enabled && publishedReadyContext(ctx, a)
+	ready := publishedEnvelopeReady(a) && a.Config.Sales.Enabled
+	valid := map[string]bool{}
+	if ready {
+		for _, p := range a.Config.Published.Products {
+			valid[p.ProductID] = publishedProductReady(ctx, a, p.ProductID)
+		}
+	}
 	out.ValidationTime = time.Since(start)
 	if err = ctx.Err(); err != nil {
 		return
@@ -48,6 +54,11 @@ func InspectPublishedOffers(ctx context.Context, a *Account, media string) (out 
 			continue
 		}
 		checked := PublishedOfferInspection{Offer: o, Selected: map[string]Spec{}}
+		if !valid[o.ProductID] {
+			checked.Err = ErrRuntimeBinding
+			out.Offers = append(out.Offers, checked)
+			continue
+		}
 		cases, e := publishedOfferSpecs(a, o)
 		for _, spec := range cases {
 			if err = ctx.Err(); err != nil {
@@ -91,7 +102,13 @@ func InspectPublishedOffers(ctx context.Context, a *Account, media string) (out 
 	if err = ctx.Err(); err != nil {
 		return
 	}
-	if len(out.Offers) == 0 {
+	validOffers := 0
+	for _, checked := range out.Offers {
+		if checked.Err == nil {
+			validOffers++
+		}
+	}
+	if validOffers == 0 {
 		return out, ErrRuntimeBinding
 	}
 	return out, nil

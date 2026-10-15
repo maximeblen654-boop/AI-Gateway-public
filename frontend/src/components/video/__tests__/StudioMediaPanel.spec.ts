@@ -2,7 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import StudioMediaPanel from '../StudioMediaPanel.vue'
 import StudioSpecPicker from '../StudioSpecPicker.vue'
-import type { StudioTask } from '@/api/studioMedia'
+import { StudioError, type StudioTask } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 
 const api = vi.hoisted(() => ({ session:vi.fn(), catalog:vi.fn(), request:vi.fn(), history:vi.fn(), task:vi.fn(), generate:vi.fn(), upload:vi.fn() }))
@@ -263,4 +263,112 @@ describe('Explicit HTTP failure finality',()=>{
   expect(wrapper.text()).toContain('生成失败，未收费');expect(wrapper.get('[data-testid="studio-http-failure"]').text()).toContain('HTTP 502');expect(wrapper.text()).not.toContain('供应商已退款')
   await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises();expect(api.generate).not.toHaveBeenCalled();expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('未收费')
  })
+})
+
+
+describe('Catalog lifecycle changes preserve customer work',()=>{
+ const other={...offer,offer_id:'other-offer',model:'other-model',display_name:'另一个模型'}
+ async function composer(){api.history.mockResolvedValue([{...prepared,status:'completed',resultCount:1}]);wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('保留我的画面描述');await pick([imageFile('keep.png')])}
+ it('preserves prompt, upload, mode and history when the selected offer disappears without selecting its replacement',async()=>{
+  await composer();api.catalog.mockResolvedValue([other]);api.request.mockClear()
+  await wrapper.get('[data-testid="studio-refresh-models"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-testid="studio-model-unavailable"]').text()).toBe('此模型暂不可用，请选择其他模型')
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','保留我的画面描述')
+  expect(wrapper.get('[data-testid="studio-asset-success"]').text()).toContain('keep.png')
+  expect(wrapper.get('[data-testid="studio-mode-video"]').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.find(`[data-task-id="${prepared.id}"]`).exists()).toBe(true)
+  expect(wrapper.get('[data-testid="studio-model-toggle"]').text()).not.toContain('另一个模型')
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined()
+  expect(api.request).toHaveBeenCalledTimes(1);expect(api.generate).not.toHaveBeenCalled()
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('继续编辑描述')
+  await wrapper.get('[data-testid="studio-assets-clear"]').trigger('click')
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(true)
+  await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click')
+  await wrapper.get('[data-offer-id="other-offer"]').trigger('click');await flushPromises()
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(false)
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
+  expect(api.generate).not.toHaveBeenCalled();expect(api.request).toHaveBeenCalledTimes(1)
+ })
+ it('dismisses the old quote confirmation and blocks that quote even after selecting it from history',async()=>{
+  api.history.mockResolvedValue([]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('保留报价输入')
+  api.request.mockResolvedValueOnce({contract:'account_video_v1',operation_id:prepared.id,model:prepared.model,status:'prepared',created_at:prepared.createdAt,expires_at:prepared.expiresAt,offer_id:prepared.offerId,spec:prepared.spec,sale_price:prepared.price})
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(wrapper.findComponent({name:'BaseDialog'}).props('show')).toBe(true)
+  api.catalog.mockResolvedValue([other])
+  await wrapper.get('[data-testid="studio-refresh-models"]').trigger('click');await flushPromises()
+  expect(wrapper.findComponent({name:'BaseDialog'}).props('show')).toBe(false)
+  expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false)
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','保留报价输入')
+  await wrapper.get(`[data-task-id="${prepared.id}"]`).trigger('click');await flushPromises()
+  expect(wrapper.get('[data-testid="studio-generate"]').attributes('disabled')).toBeDefined()
+  ;(wrapper.get('[data-testid="studio-generate"]').element as HTMLButtonElement).disabled=false
+  await wrapper.get('[data-testid="studio-generate"]').trigger('click');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('refreshes after a quote 409 and requires explicit replacement selection before a new quote',async()=>{
+  await composer();api.catalog.mockResolvedValue([other]);api.request.mockRejectedValueOnce(new StudioError('offer_unavailable',409))
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(true)
+  expect(api.catalog).toHaveBeenCalledTimes(2)
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','保留我的画面描述')
+  expect(wrapper.find('[data-testid="studio-asset-success"]').exists()).toBe(true)
+  await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click');await wrapper.get('[data-offer-id="other-offer"]').trigger('click');await flushPromises()
+  const replacement={...prepared,id:'op_'+'c'.repeat(64),offerId:other.offer_id,model:other.model}
+  api.request.mockResolvedValueOnce({contract:'account_video_v1',operation_id:replacement.id,model:replacement.model,status:'prepared',created_at:replacement.createdAt,expires_at:replacement.expiresAt,offer_id:replacement.offerId,spec:replacement.spec,sale_price:replacement.price})
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenLastCalledWith('video','quotes',expect.objectContaining({offer_id:other.offer_id,prompt:'保留我的画面描述'}))
+  expect(wrapper.findComponent({name:'BaseDialog'}).props('show')).toBe(true)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('does not label the selected model unavailable when the shared gate closes with an empty catalog',async()=>{
+  wrapper=mount(StudioMediaPanel);await flushPromises();api.catalog.mockResolvedValue([]);api.request.mockResolvedValue({paid_enabled:false})
+  await wrapper.get('[data-testid="studio-refresh-models"]').trigger('click');await flushPromises()
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid="studio-gate"]').exists()).toBe(true)
+  expect(wrapper.get('[data-testid="studio-generate"]').attributes('disabled')).toBeDefined()
+  expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(true);expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('keeps existing input and selection on a failed catalog refresh',async()=>{
+  await composer();api.catalog.mockRejectedValueOnce(new Error('offline'))
+  await wrapper.get('[data-testid="studio-refresh-models"]').trigger('click');await flushPromises()
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(false)
+  expect(wrapper.get('[data-testid="studio-model-toggle"]').text()).toContain(offer.display_name)
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','保留我的画面描述')
+  expect(wrapper.find('[data-testid="studio-asset-success"]').exists()).toBe(true);expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('does not restore a removed historical prepared quote as generatable after remount',async()=>{
+  api.catalog.mockResolvedValue([other]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(true)
+  expect(wrapper.find('[data-testid="studio-generate"]').exists()).toBe(false)
+  expect(wrapper.find(`[data-task-id="${prepared.id}"]`).exists()).toBe(true);expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
+
+it('retains image edit references and discards an old quote token after prepare is rejected',async()=>{
+ sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',imageMode:'edit'}));api.history.mockResolvedValue([])
+ const first={...offer,model:'image-one'},second={...offer,offer_id:'image-two',model:'image-two',display_name:'第二图片模型'}
+ api.catalog.mockResolvedValue([first]);wrapper=mount(StudioMediaPanel);await flushPromises()
+ await wrapper.get('[data-testid="studio-prompt"]').setValue('保留图生图提示词');await pick([imageFile('original.png')])
+ api.catalog.mockResolvedValue([second]);api.request.mockResolvedValueOnce({quote_token:'old-quote'}).mockRejectedValueOnce(new StudioError('image_offer_unavailable',409))
+ await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+ expect(wrapper.get('[data-testid="studio-mode-edit"]').attributes('aria-pressed')).toBe('true')
+ expect(wrapper.get('[data-testid="studio-asset-success"]').text()).toContain('original.png')
+ expect(wrapper.find('[data-testid="studio-model-unavailable"]').exists()).toBe(true)
+ await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click');await wrapper.get('[data-offer-id="image-two"]').trigger('click');await flushPromises()
+ api.request.mockClear();api.request.mockResolvedValueOnce({quote_token:'new-quote'}).mockRejectedValueOnce(new Error('stop after inspecting prepare'))
+ await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+ expect(api.request).toHaveBeenNthCalledWith(1,'image','quotes',expect.objectContaining({offer_id:'image-two'}))
+ expect(api.request).toHaveBeenNthCalledWith(2,'image','prepare',expect.objectContaining({quote_token:'new-quote',prompt:'保留图生图提示词',asset_refs:['asset_aaaaaaaa-0000-0000-0000-000000000000']}))
+ expect(api.generate).not.toHaveBeenCalled()
+})
+
+
+it('preserves submitted uncertain task recovery when its original offer disappears',async()=>{
+ sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video',id:prepared.id,attempted:[prepared.id]}));api.catalog.mockResolvedValue([{...offer,offer_id:'replacement'}])
+ wrapper=mount(StudioMediaPanel);await flushPromises()
+ expect(wrapper.get('[data-testid="studio-task-id"]').text()).toContain(prepared.id)
+ expect(wrapper.get('[data-testid="studio-status"]').text()).toContain('结果待确认')
+ expect(wrapper.find('[data-testid="studio-generate"]').exists()).toBe(false)
+ expect(api.task).toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
 })

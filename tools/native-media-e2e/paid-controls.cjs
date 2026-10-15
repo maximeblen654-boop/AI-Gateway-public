@@ -106,10 +106,11 @@ const p='/admin/media-workbench/paid-controls/'
    assert.equal((await current('video')).effective_enabled,false)
    assert.deepEqual(stats(),before,'all 1870 checks and enable recheck must make zero supplier calls')
    if(process.env.NATIVE_CATALOG_RECOVERY==='true') report.catalog_dependencies=await require('./catalog-dependencies.cjs')({fixture,dc,api,current,check,change,media,page,base,accountPath,p,stats,before})
+   if(process.env.NATIVE_MODEL_LIFECYCLE==='true') report.model_lifecycle=await require('./model-lifecycle.cjs')({root,fixture,dc,api,raw,current,check,change,media,page,base,accountPath,stats})
    assert.equal((await change('image',false)).status,200)
    assert.equal((await current('image')).effective_enabled,false)
    report.assets=await proof()
-   report.checks.push('All 1870 specs checked; three real admin UI preflights and enable recheck under 15s; video stayed closed; zero supplier requests; final both closed')
+   report.checks.push('All 1870 specs checked; three real admin UI preflights and enable recheck under 15s with zero supplier requests; optional lifecycle delivery reported separately; video stayed closed; final both closed')
   }else if(phase==='close'){
    for(const kind of ['image','video']){assert.equal((await change(kind,false)).status,200);assert.equal((await current(kind)).effective_enabled,false)}
    report.checks.push('Both synthetic paid gates closed after simulated task acceptance')

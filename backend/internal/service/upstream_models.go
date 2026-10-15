@@ -781,6 +781,10 @@ func (s *AccountTestService) fetchUpstreamModelList(ctx context.Context, account
 		}
 	}
 
+	if err := requireCompleteModelCatalog(body, resp.Header.Get("Link")); err != nil {
+		return nil, nil, newUpstreamModelSyncUpstreamError("Upstream model list is incomplete; previous catalog retained", err)
+	}
+
 	extractModels := extractUpstreamModelIDs
 	if account.IsGrok() {
 		extractModels = extractGrokUpstreamModelIDs
@@ -1446,6 +1450,59 @@ func normalizeCodexInputModalities(modalities []string) []string {
 		normalized = append(normalized, modality)
 	}
 	return normalized
+}
+
+// A partial successful page is not evidence that previously published models
+// disappeared. Keep the last complete snapshot until a complete list is received.
+func requireCompleteModelCatalog(body []byte, link string) error {
+	if strings.Contains(strings.ToLower(link), `rel="next"`) || strings.Contains(strings.ToLower(link), "rel=next") {
+		return fmt.Errorf("model list has another page")
+	}
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil
+	} // Existing parser validates arrays/JSON.
+	var count int
+	for _, key := range []string{"data", "models"} {
+		var entries []json.RawMessage
+		if json.Unmarshal(root[key], &entries) == nil {
+			count += len(entries)
+		}
+	}
+	var inspect func(map[string]json.RawMessage) error
+	inspect = func(fields map[string]json.RawMessage) error {
+		for _, key := range []string{"has_more", "hasMore", "incomplete", "partial"} {
+			var flag bool
+			if json.Unmarshal(fields[key], &flag) == nil && flag {
+				return fmt.Errorf("model list signals %s", key)
+			}
+		}
+		for _, key := range []string{"next", "next_page", "next_page_token", "nextPageToken", "next_cursor"} {
+			value := strings.TrimSpace(string(fields[key]))
+			if value != "" && value != "null" && value != `""` && value != "false" {
+				return fmt.Errorf("model list has another page")
+			}
+		}
+		for _, key := range []string{"total", "total_count", "totalCount"} {
+			var total int
+			if json.Unmarshal(fields[key], &total) == nil && total > count {
+				return fmt.Errorf("model list omits entries")
+			}
+		}
+		return nil
+	}
+	if err := inspect(root); err != nil {
+		return err
+	}
+	for _, key := range []string{"pagination", "meta", "links"} {
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(root[key], &fields) == nil {
+			if err := inspect(fields); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func extractUpstreamModelIDsWithSelector(body []byte, selectID func(upstreamModelEntry) string) ([]string, error) {

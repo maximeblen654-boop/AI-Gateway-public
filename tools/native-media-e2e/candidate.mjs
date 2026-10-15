@@ -24,6 +24,8 @@ assert.match(sha, /^[a-f0-9]{40}$/)
 const source = path.resolve(process.env.NATIVE_CANDIDATE_SOURCE_DIR || process.cwd())
 const catalogRecovery = fs.existsSync(path.join(source, 'backend/internal/mediaworkbench/published_recovery.go'))
 if (catalogRecovery && paidControls) acceptanceScope = 'published-catalog-dependencies-and-media-regression'
+const modelLifecycle = fs.existsSync(path.join(source, 'backend/internal/mediaworkbench/lifecycle.go'))
+if (modelLifecycle && paidControls) acceptanceScope = 'model-lifecycle-isolation-and-media-regression'
 const mediaOptions = focusedEntry && fs.existsSync(path.join(source, 'backend/internal/service/studio_passive_status.go'))
 const workspaceArtifact = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'studio-workspace'
 if (workspaceArtifact) assert.equal(sha, '40310e2961a5e8150e0c9df4cc86bb8087406c06')
@@ -203,7 +205,7 @@ if (mode === 'load-existing') {
       if(focusedEntry) run(process.execPath,['tools/native-media-e2e/image-finality.cjs',root])
       if (mediaOptions) run(process.execPath,['tools/native-media-e2e/passive-status.cjs',root])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
-      if (!focusedEntry || catalogRecovery) run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'], {env:{...process.env,NATIVE_CATALOG_RECOVERY:catalogRecovery?'true':'false'}})
+      if (!focusedEntry || catalogRecovery) run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'], {env:{...process.env,NATIVE_CATALOG_RECOVERY:catalogRecovery?'true':'false',NATIVE_MODEL_LIFECYCLE:modelLifecycle?'true':'false'}})
       // The old d893 baseline has no sample-evidence UI; require it for repaired sources.
       if(!focusedEntry && fs.readFileSync(path.join(source,'frontend/src/views/admin/ops/components/OpsDashboardHeader.vue'),'utf8').includes('ops-sla-samples')) run(process.execPath,['tools/native-media-e2e/ops-evidence.cjs',root])
     } else if (adminReview) {

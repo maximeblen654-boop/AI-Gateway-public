@@ -39,6 +39,7 @@ func RevalidatePublishedCatalog(ctx context.Context, a *Account, now time.Time) 
 	}
 	next := *old
 	next.Dependencies = dependenciesForProducts(a, old.Products)
+	next.ProductDependencies = snapshotProductDependencies(a, old.Products)
 	next.PublishedAt = now
 	next.Revision = publishedRevision(&next)
 	candidate := *a

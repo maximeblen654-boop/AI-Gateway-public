@@ -102,7 +102,7 @@ func NormalizeImageSpec(s Spec) (Spec, string, error) {
 
 func ResolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedImageOffer, error) {
 	var r ResolvedImageOffer
-	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedOfferReady(context.Background(), a, offerID) {
 		return r, ErrRuntimeBinding
 	}
 	return resolvePublishedImageOffer(a, offerID, s)
@@ -128,7 +128,8 @@ func resolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 		if !ok || execErr != nil || exec.Mode == ImageExecutionProviderAsync || d.MediaType != "image" || o.AccountID != a.ID || o.MediaType != "image" || d.Transport != "https_json" || d.TaskFlow != "sync" || o.Adapter != (AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}) || s.Images > d.MaxReferences || !o.Matches(s) || ValidateMediaSalePrice(o.SalePrice) != nil {
 			return r, ErrRuntimeBinding
 		}
-		r = ResolvedImageOffer{ImageBindingVersion, a.Config.Published.Revision, a.Config.Published.Dependencies, o, s, h}
+		revision, deps := offerSnapshot(a, o)
+		r = ResolvedImageOffer{ImageBindingVersion, revision, deps, o, s, h}
 		return r, nil
 	}
 	return r, ErrRuntimeBinding
@@ -138,7 +139,7 @@ func resolvePublishedImageOffer(a *Account, offerID string, s Spec) (ResolvedIma
 // Enumerate the owning published product's allowed specs using the validator's
 // existing bounded enumerator, including its combination exclusions.
 func PublishedImageOfferQuoteable(a *Account, offerID string) bool {
-	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedOfferReady(context.Background(), a, offerID) {
 		return false
 	}
 	p := a.Config.Published
@@ -254,7 +255,7 @@ func PublishedImageExecution(r ResolvedImageOffer) (ImageExecutionPlan, error) {
 // PublishedOfferSpecs enumerates the actual published contract, never the UI's
 // capped previews. Used by non-paid admission checks; it does not mutate Draft.
 func PublishedOfferSpecs(a *Account, o Offer) ([]Spec, error) {
-	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
+	if a == nil || a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled || !publishedProductReady(context.Background(), a, o.ProductID) {
 		return nil, ErrRuntimeBinding
 	}
 	return publishedOfferSpecs(a, o)

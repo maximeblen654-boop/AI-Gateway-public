@@ -7,7 +7,7 @@ import { supplier, saved, copy, draftManagementSupplier } from '@/components/adm
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
-  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn() }
+  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn() }
 }))
 const api = vi.mocked(mediaWorkbenchAPI)
 let state: ReturnType<typeof useMediaWorkbench>
@@ -215,4 +215,31 @@ it('allows an untouched blank price placeholder but protects a specified price m
   expect(state.removalReason(p)).toBe('')
   p.pricing_rules[0]!.match.resolution = ['1K']
   expect(state.removalReason(p)).not.toBe('')
+})
+
+
+describe('explicit lifecycle mutations', () => {
+  it('blocks dirty drafts even when called directly and does not autosave', async () => {
+    await start(); state.products.value[0]!.display_name = '未保存'
+    expect(await state.lifecycle('unlist', { product_id: state.products.value[0]!.product_id })).toBe(false)
+    expect(api.lifecycle).not.toHaveBeenCalled(); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+  it('uses current CAS and blocks ambiguous retries until reload', async () => {
+    await start(); api.lifecycle.mockRejectedValue({ status: 503 })
+    await state.lifecycle('unlist', { model_id: 'image-native-1' })
+    await state.lifecycle('unlist', { model_id: 'image-native-1' })
+    expect(api.lifecycle).toHaveBeenCalledTimes(1)
+    expect(api.lifecycle).toHaveBeenCalledWith(77, 3, 'unlist', { model_id: 'image-native-1' })
+    expect(state.saveState.value).toBe('unconfirmed')
+  })
+  it('adopts returned lifecycle and version without publishing or dropping archived products', async () => {
+    await start(); const dto = supplier(); const id = dto.media_workbench_v1!.draft.products[0]!.product_id
+    dto.media_workbench_v1!.record_version = 4
+    dto.media_workbench_v1!.product_lifecycle = { [id]: { state: 'archived', revision: 1, updated_at: '' } }
+    api.lifecycle.mockResolvedValue(dto)
+    expect(await state.lifecycle('archive', { product_id: id })).toBe(true)
+    expect(state.config.value!.record_version).toBe(4)
+    expect(state.products.value).toHaveLength(1); expect(state.dirty.value).toBe(false)
+    expect(api.publish).not.toHaveBeenCalled(); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
 })

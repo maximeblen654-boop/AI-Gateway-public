@@ -41,7 +41,9 @@ type Config struct {
 	Published       *Published                `json:"published"`
 	Procurement     Procurement               `json:"procurement"`
 	// Retain removed blank drafts; removing an editor entry is not a hard delete.
-	RemovedDraftProducts []Product `json:"removed_draft_products,omitempty"`
+	RemovedDraftProducts []Product                   `json:"removed_draft_products,omitempty"`
+	ProductLifecycle     map[string]ProductLifecycle `json:"product_lifecycle,omitempty"`
+	HiddenModels         []string                    `json:"hidden_models,omitempty"`
 }
 type Sales struct {
 	Enabled bool `json:"enabled"`
@@ -156,12 +158,13 @@ type Validation struct {
 }
 
 type Published struct {
-	Revision            string       `json:"revision"`
-	SourceDraftRevision string       `json:"source_draft_revision"`
-	PublishedAt         time.Time    `json:"published_at"`
-	Products            []Product    `json:"products"`
-	Offers              []Offer      `json:"offers"`
-	Dependencies        Dependencies `json:"dependencies"`
+	Revision            string                  `json:"revision"`
+	SourceDraftRevision string                  `json:"source_draft_revision"`
+	PublishedAt         time.Time               `json:"published_at"`
+	Products            []Product               `json:"products"`
+	Offers              []Offer                 `json:"offers"`
+	Dependencies        Dependencies            `json:"dependencies"`
+	ProductDependencies map[string]Dependencies `json:"product_dependencies,omitempty"`
 }
 type Offer struct {
 	OfferID        string         `json:"offer_id"`
@@ -335,6 +338,37 @@ func describe(a *Account) *Detail {
 	}
 	if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady {
 		d.EffectiveSales = false
+	}
+	if c := a.Config; c != nil {
+		for _, model := range c.HiddenModels {
+			states[model] = "ARCHIVED"
+		}
+		all := map[string]Product{}
+		for _, p := range c.Draft.Products {
+			all[p.ProductID] = p
+		}
+		if c.Published != nil {
+			for _, p := range c.Published.Products {
+				all[p.ProductID] = p
+			}
+		}
+		total, archived, unlisted := map[string]int{}, map[string]int{}, map[string]int{}
+		for id, p := range all {
+			total[p.UpstreamModel]++
+			switch c.ProductLifecycle[id].State {
+			case "archived":
+				archived[p.UpstreamModel]++
+			case "unlisted":
+				unlisted[p.UpstreamModel]++
+			}
+		}
+		for model, n := range total {
+			if archived[model] == n {
+				states[model] = "ARCHIVED"
+			} else if archived[model]+unlisted[model] == n {
+				states[model] = "UNLISTED"
+			}
+		}
 	}
 	for m, state := range states {
 		d.Models = append(d.Models, ModelState{m, state})
@@ -554,11 +588,12 @@ func (s *Service) Publish(ctx context.Context, id, expected int64, revision stri
 	if v.PublishReady {
 		products := []Product{}
 		for _, product := range a.Config.Draft.Products {
-			if product.Enabled {
+			if product.Enabled && a.Config.ProductLifecycle[product.ProductID].State != "archived" {
 				products = append(products, product)
 			}
 		}
 		p := &Published{SourceDraftRevision: revision, PublishedAt: now, Products: products, Offers: offers, Dependencies: dependenciesForProducts(a, products)}
+		p.ProductDependencies = snapshotProductDependencies(a, products)
 		p.Revision = publishedRevision(p)
 		a.Config.Published = p
 	}

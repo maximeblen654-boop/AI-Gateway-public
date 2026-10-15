@@ -14,6 +14,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -31,11 +32,14 @@ type paidSidecar struct {
 	AssetStorage string `json:"asset_storage"`
 }
 type paidSnapshot struct {
-	accounts    []mediaworkbench.Account
-	key         *APIKey
-	group       int64
-	fingerprint string
-	assets      bool
+	accounts     []mediaworkbench.Account
+	key          *APIKey
+	subscription *UserSubscription
+	group        int64
+	fingerprint  string
+	grants       map[string]string
+	checks       []PaidCheck
+	assets       bool
 }
 type studioPaidPreflight struct {
 	image *StudioImageRuntime
@@ -47,9 +51,9 @@ func NewStudioPaidControl(settings SettingRepository, image *StudioImageRuntime,
 	p := &studioPaidPreflight{image, video, keys}
 	c := &StudioPaidControl{Settings: settings, Managed: StudioManagedPaidMode()}
 	c.Check = p.check
-	c.Fingerprint = func(ctx context.Context, m string, actor int64) (string, error) {
+	c.Snapshot = func(ctx context.Context, m string, actor int64) (paidDependencies, error) {
 		v, e := p.snapshot(ctx, m, actor)
-		return v.fingerprint, e
+		return paidDependencies{Shared: v.fingerprint, Offers: v.grants}, e
 	}
 	return c
 }
@@ -81,7 +85,7 @@ func paidSidecarStatus(ctx context.Context, raw string) (paidSidecar, error) {
 	return out, nil
 }
 func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int64) (paidSnapshot, error) {
-	var out paidSnapshot
+	out := paidSnapshot{grants: map[string]string{}}
 	if !validPaidMedia(m) || actor <= 0 || p.image == nil || p.video == nil || p.keys == nil || p.keys.apiKeyRepo == nil || p.image.Core == nil || p.image.Core.accountRepo == nil || p.image.Media == nil || p.image.Store == nil || p.video.Store == nil {
 		return out, ErrPaidControl
 	}
@@ -109,7 +113,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		return out, QuoteFailure("customer_key", ErrPaidControl)
 	}
 	key, e := p.keys.GetByID(ctx, keys[0].ID)
-	if e != nil || key.User == nil || key.Group == nil || key.GroupID == nil || *key.GroupID != out.group || key.UserID != actor || !key.IsActive() || key.IsExpired() || !key.User.IsActive() || !key.Group.IsActive() {
+	if e != nil || key == nil || key.User == nil || key.Group == nil || key.GroupID == nil || *key.GroupID != out.group || key.UserID != actor || !key.IsActive() || key.IsExpired() || !key.User.IsActive() || !key.Group.IsActive() {
 		return out, QuoteFailure("customer_key", ErrPaidControl)
 	}
 	if !key.Group.IsSubscriptionType() && !key.User.CanBindGroup(key.Group.ID, key.Group.IsExclusive) {
@@ -135,6 +139,27 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		Rates       [3]float64
 		Allow, Deny []string
 	}{key.ID, key.UserID, key.User.Status, key.Group, key.Status, key.Quota, key.ExpiresAt, [3]float64{key.RateLimit5h, key.RateLimit1d, key.RateLimit7d}, key.IPWhitelist, key.IPBlacklist}}
+	var costChannel *Channel
+	if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {
+		cid, e := ch.repo.GetChannelIDByGroupID(ctx, out.group)
+		if e != nil {
+			return out, e
+		}
+		if cid > 0 {
+			c, e := ch.repo.GetByID(ctx, cid)
+			if e != nil {
+				return out, e
+			}
+			if c == nil {
+				return out, ErrPaidControl
+			}
+			costChannel = c
+			sharedChannel := *c
+			sharedChannel.AccountStatsPricingRules = nil
+			sharedChannel.UpdatedAt = time.Time{}
+			parts = append(parts, sharedChannel)
+		}
+	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 	for _, a := range rows {
 		if a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled {
@@ -150,43 +175,116 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			continue
 		}
 		native, e := p.image.Core.accountRepo.GetByID(ctx, a.ID)
-		if e != nil {
-			return out, e
+		// A missing/unusable Account excludes only its offers. Media.List and shared
+		// services remain fail-closed; per-request native admission is still required.
+		if e != nil || native == nil || !native.IsSchedulable() {
+			out.checks = append(out.checks, PaidCheck{Code: "native_account", AccountID: a.ID})
+			continue
 		}
 		if !slices.Contains(native.GroupIDs, out.group) {
 			continue
 		}
-		// Exclude unpublished Draft and live usage counters. Every frozen Published,
-		// mapping, routing, auth, Account-cost and permission dependency participates.
-		parts = append(parts, []any{a.ID, a.Status, a.Schedulable, a.RuntimeReady, mediaworkbench.PublishedDependenciesFor(&a), a.Config.Sales, a.Config.Published, studioCredentialFingerprint(native), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
+		for _, offer := range a.Config.Published.Offers {
+			if offer.MediaType != m || !key.Group.ModelAllowlist.Allows(offer.SiteModel) {
+				continue
+			}
+			identity, ok := mediaworkbench.PublishedOfferIdentity(&a, offer.OfferID)
+			if !ok {
+				continue
+			}
+			credentials := make(map[string]any, len(native.Credentials))
+			for k, v := range native.Credentials {
+				// Mapping for another product cannot invalidate this product's grant.
+				if k != "model_mapping" && k != "compact_model_mapping" {
+					credentials[k] = v
+				}
+			}
+			proxy := ""
+			if native.Proxy != nil {
+				proxy = native.Proxy.URL()
+			}
+			out.grants[paidOfferKey(a.ID, offer.OfferID)] = studioHash([]any{paidOfferCostIdentity(costChannel, native, offer), identity, native.ID, native.Type, native.Platform, native.ParentAccountID, credentials, native.ProxyID, proxy, studioMediaBaseURL(native), native.GetMappedModel(offer.SiteModel), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
+		}
 		out.accounts = append(out.accounts, a)
 	}
-	if len(out.accounts) == 0 {
-		return out, QuoteFailure("published_offer", ErrPaidControl)
-	}
-	if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {
-		cid, e := ch.repo.GetChannelIDByGroupID(ctx, out.group)
-		if e != nil {
-			return out, e
-		}
-		if cid > 0 {
-			c, e := ch.repo.GetByID(ctx, cid)
-			if e != nil {
-				return out, e
-			}
-			parts = append(parts, c)
-		}
+	out.subscription, e = p.sharedEligibility(ctx, m, key)
+	if e != nil {
+		return out, e
 	}
 	out.fingerprint = studioHash(parts)
 	return out, nil
 }
+
+// Resolve the same first Account/model cost rule as native quote accounting.
+// Keep an exact decimal explicitly: its API JSON field is intentionally hidden.
+func paidOfferCostIdentity(channel *Channel, account *Account, offer mediaworkbench.Offer) any {
+	if channel == nil || !channel.IsActive() {
+		return nil
+	}
+	for _, rule := range channel.AccountStatsPricingRules {
+		if !slices.Contains(rule.AccountIDs, account.ID) {
+			continue
+		}
+		price := findPricingForModel(rule.Pricing, firstNonEmptyString(account.Platform, PlatformOpenAI), strings.ToLower(offer.UpstreamModel))
+		if price != nil {
+			return []any{rule.ID, rule.ChannelID, price, price.AccountStatsPerRequestExact}
+		}
+	}
+	return nil
+}
+
+func (p *studioPaidPreflight) sharedEligibility(ctx context.Context, m string, key *APIKey) (*UserSubscription, error) {
+	var sub *UserSubscription
+	if key.Group.IsSubscriptionType() {
+		if p.keys.userSubRepo == nil {
+			return nil, QuoteFailure("subscription", ErrPaidControl)
+		}
+		var err error
+		sub, err = p.keys.userSubRepo.GetActiveByUserIDAndGroupID(ctx, key.UserID, *key.GroupID)
+		if err != nil || sub == nil {
+			return nil, QuoteFailure("subscription", ErrPaidControl)
+		}
+	}
+	if key.IsQuotaExhausted() {
+		return nil, QuoteFailure("customer_quota", ErrPaidControl)
+	}
+	if allowed, _ := ip.CheckIPRestriction("127.0.0.1", key.IPWhitelist, key.IPBlacklist); !allowed {
+		return nil, QuoteFailure("customer_key_network_restricted", ErrPaidControl)
+	}
+	if p.image.Core.billingCacheService == nil {
+		return nil, QuoteFailure("billing_eligibility", ErrPaidControl)
+	}
+	if err := p.image.Core.billingCacheService.checkBillingEligibility(ctx, key.User, key, key.Group, sub, QuotaPlatform(ctx, key), false); err != nil {
+		return nil, QuoteFailure("billing_eligibility", err)
+	}
+	var err error
+	root := p.image.Store.Root
+	if m == "image" {
+		err = p.image.Store.init()
+	} else {
+		root = p.video.Store.Root
+		err = p.video.Store.init()
+		if p.video.Orders == nil {
+			err = ErrPaidControl
+		}
+	}
+	if err == nil {
+		err = probeStudioPrivateRoot(root)
+	}
+	if err != nil {
+		return nil, QuoteFailure("private_result_storage", err)
+	}
+	return sub, nil
+}
+
 func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) (report PaidReport) {
 	started := time.Now()
 	report = PaidReport{Metrics: &PaidCheckMetrics{TimingsMS: map[string]int64{}}, Media: m, Pass: true, Checks: []PaidCheck{}, CheckedAt: time.Now().UTC()}
 	add := func(code string, account int64, product, path string, err error) {
 		report.Checks = append(report.Checks, PaidCheck{code, account, product, path, err == nil})
-		if err != nil {
+		if err != nil && account == 0 {
 			report.Pass = false
+			report.sharedFailure = true
 		}
 	}
 	defer func() {
@@ -214,59 +312,17 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 		add(code, 0, "", "", e)
 		return report
 	}
-	report.Fingerprint = snap.fingerprint
+	report.Checks = append(report.Checks, snap.checks...)
+	report.dependencies = paidDependencies{Shared: snap.fingerprint, Offers: map[string]string{}}
 	key := snap.key
 	owner := StudioImageOwner{key.UserID, key.ID, *key.GroupID}
-	var sub *UserSubscription
-	if key.Group.IsSubscriptionType() {
-		sub, e = p.keys.userSubRepo.GetActiveByUserIDAndGroupID(ctx, key.UserID, *key.GroupID)
-		if e != nil {
-			add("subscription", 0, "", "", e)
-			return report
-		}
-	}
-	if key.IsQuotaExhausted() {
-		add("customer_quota", 0, "", "", ErrPaidControl)
-		return report
-	}
-	// The managed Bridge handshake verifies its Core transport is IPv4 loopback,
-	// with no forwarded client headers. Reuse the native API-key ACL at that ingress.
-	if allowed, _ := ip.CheckIPRestriction("127.0.0.1", key.IPWhitelist, key.IPBlacklist); !allowed {
-		add("customer_key_network_restricted", 0, "", "", ErrPaidControl)
-		return report
-	}
-	if p.image.Core.billingCacheService == nil {
-		add("billing_eligibility", 0, "", "", ErrPaidControl)
-		return report
-	}
-	e = p.image.Core.billingCacheService.CheckBillingEligibility(ctx, key.User, key, key.Group, sub, QuotaPlatform(ctx, key))
-	add("billing_eligibility", 0, "", "", e)
-	if e != nil {
-		return report
-	}
+	sub := snap.subscription
 	var sid *int64
 	if sub != nil {
 		sid = &sub.ID
 	}
-	if m == "image" {
-		e = p.image.Store.init()
-	} else {
-		e = p.video.Store.init()
-		if p.video.Orders == nil {
-			e = ErrPaidControl
-		}
-	}
-	if e == nil {
-		root := p.image.Store.Root
-		if m == "video" {
-			root = p.video.Store.Root
-		}
-		e = probeStudioPrivateRoot(root)
-	}
-	add("private_result_storage", 0, "", "", e)
-	if e != nil {
-		return report
-	}
+	add("billing_eligibility", 0, "", "", nil)
+	add("private_result_storage", 0, "", "", nil)
 	report.Metrics.TimingsMS["eligibility_and_storage"] = time.Since(started).Milliseconds() - report.Metrics.TimingsMS["initial_dependencies"]
 	for i := range snap.accounts {
 		if ctx.Err() != nil {
@@ -295,6 +351,7 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 			if err != nil {
 				continue
 			}
+			offerPass := len(selected) > 0
 			for _, path := range []string{"text", "edit"} {
 				spec, ok := selected[path]
 				if !ok {
@@ -305,7 +362,7 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 				}
 				quoteStarted := time.Now()
 				if m == "image" {
-					_, err = p.image.Issue(ctx, owner, key, o.OfferID, spec, sid)
+					err = p.image.quotePreflight(ctx, owner, key, o.OfferID, spec, sid)
 				} else {
 
 					// Reuse the native preview constructor for each actual wire profile.
@@ -333,6 +390,12 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 					code = "quote_" + QuoteFailureStage(err)
 				}
 				add(code, a.ID, o.ProductID, path, err)
+				if err != nil {
+					offerPass = false
+				}
+			}
+			if identity := snap.grants[paidOfferKey(a.ID, o.OfferID)]; offerPass && identity != "" {
+				report.dependencies.Offers[paidOfferKey(a.ID, o.OfferID)] = identity
 			}
 		}
 	}
@@ -342,9 +405,22 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 	stage = time.Now()
 	latest, e := p.snapshot(ctx, m, actor)
 	report.Metrics.TimingsMS["final_dependencies"] = time.Since(stage).Milliseconds()
-	if e != nil || latest.fingerprint != report.Fingerprint {
+	if e != nil || latest.fingerprint != snap.fingerprint {
 		add("dependencies_changed", 0, "", "", ErrPaidControl)
+	} else {
+		// Do not authorize a changed offer or latch unrelated offers closed when one
+		// product disappears during the scan.
+		for id, identity := range report.dependencies.Offers {
+			if latest.grants[id] != identity {
+				delete(report.dependencies.Offers, id)
+			}
+		}
 	}
+	if len(report.dependencies.Offers) == 0 {
+		report.Pass = false
+		report.Checks = append(report.Checks, PaidCheck{Code: "published_offer"})
+	}
+	report.Fingerprint = studioHash(report.dependencies)
 	return report
 }
 
