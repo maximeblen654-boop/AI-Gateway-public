@@ -100,7 +100,7 @@ export async function studioRequest<T = unknown>(kind: StudioKind, operation: st
   const token = localStorage.getItem('auth_token')
   await ensureStudioSession()
   sameWebsiteSession(token)
-  if (operation === 'catalog' || operation === 'prepare') {
+  if (operation === 'catalog' || operation === 'readiness' || operation === 'prepare') {
     // Provision only on creation entry, never while reading/recovering old tasks.
     // Server chooses the Group and retains existing credential restrictions.
     await apiClient.post('/keys/studio-access', { media: kind })

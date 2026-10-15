@@ -60,3 +60,19 @@ it('identity changes during credential preparation cannot cross into a business 
  const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({owner_id:2})));vi.stubGlobal('fetch',fetch)
  await expect(studioRequest('image','catalog')).rejects.toThrow('studio_session_changed');expect(fetch).toHaveBeenCalledTimes(1)
 })
+
+it('parallel catalog and readiness both wait for first-login credential preparation',async()=>{
+ client.get.mockResolvedValue({data:{id:2}})
+ let ready=false
+ const finish:Array<()=>void>=[]
+ client.post.mockImplementation(()=>new Promise(resolve=>finish.push(()=>{ready=true;resolve({data:{prepared:true}})})))
+ const fetch=vi.fn().mockImplementation(async(url:string)=>{
+  if(url.endsWith('/session'))return new Response(JSON.stringify({owner_id:2}))
+  expect(ready).toBe(true)
+  return new Response(JSON.stringify(url.endsWith('/readiness')?{paid_enabled:true}:{offers:[]}))
+ });vi.stubGlobal('fetch',fetch)
+ const catalog=studioRequest('image','catalog'),readiness=studioRequest('image','readiness')
+ await vi.waitFor(()=>expect(finish).toHaveLength(2));expect(fetch).toHaveBeenCalledTimes(1)
+ finish.forEach(done=>done())
+ expect(await readiness).toEqual({paid_enabled:true});expect(await catalog).toEqual({offers:[]})
+})

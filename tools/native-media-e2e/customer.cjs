@@ -114,7 +114,7 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     if (drift) restoreDrift = await require('./quote-drift.cjs')(root, drift, report)
     const submitted = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/tasks`) && r.request().method() === 'POST')
-    await page.getByTestId(workspace?'studio-confirm-generate':'studio-generate').click(); const submit = await submitted
+    const [submit] = await Promise.all([submitted, page.getByTestId(workspace?'studio-confirm-generate':'studio-generate').click()])
     report.submit = { status: submit.status(), body: await submit.json() }
     if (drift && drift !== 'draft') {
       assert(submit.status() >= 400 || ['failed','unknown'].includes(report.submit.body?.status), JSON.stringify(report.submit))
