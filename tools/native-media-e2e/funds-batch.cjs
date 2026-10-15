@@ -13,10 +13,10 @@ const snapshot=uid=>{assert(Number.isSafeInteger(uid));return JSON.parse(sql(`SE
 const ledger=id=>{assert(/^img_[a-f0-9]{32}$/.test(id));const k=createHash('sha256').update('studio-image:'+id).digest('hex');return JSON.parse(sql(`SELECT json_build_object('request_id','${k}','usage',(SELECT count(*) FROM usage_logs WHERE request_id='${k}'),'dedup',(SELECT count(*) FROM usage_billing_dedup WHERE request_id='${k}'),'cost',(SELECT COALESCE(sum(actual_cost),0)::text FROM usage_logs WHERE request_id='${k}'),'user_id',(SELECT user_id FROM usage_logs WHERE request_id='${k}' LIMIT 1),'image_count',(SELECT image_count FROM usage_logs WHERE request_id='${k}' LIMIT 1))`))}
 const report={production:false,api_mocking:false,scope:'104 original tasks; real BFF/Bridge/Core and native PostgreSQL transactions',tasks:[],checks:[],source_sha:process.env.NATIVE_CANDIDATE_SOURCE_SHA}
 const save=()=>fs.writeFileSync(root+'/evidence/native-funds-batch.json',JSON.stringify(report,null,2))
-async function core(token,path,method='GET',body){const r=await fetch(base+'/api/v1'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'X-Admin-UI-Request':'1'},...(body?{body:JSON.stringify(body)}:{})});const b=await r.json();assert.equal(r.status,200,`${path}: ${r.status} ${JSON.stringify(b)}`);assert.equal(b.code,0);return b.data}
+async function core(token,path,method='GET',body){const r=await fetch(base+'/api/v1'+path,{method,headers:{Connection:'close','Content-Type':'application/json',Authorization:'Bearer '+token,'X-Admin-UI-Request':'1'},...(body?{body:JSON.stringify(body)}:{})});const b=await r.json();assert.equal(r.status,200,`${path}: ${r.status} ${JSON.stringify(b)}`);assert.equal(b.code,0);return b.data}
 async function login(email,password){return (await core('','/auth/login','POST',{email,password})).access_token}
-async function session(user){const issued=await core(user.token,'/auth/studio-media-ticket','POST',{});const r=await fetch(base+'/studio-v2/api/session/exchange',{method:'POST',headers:{'Content-Type':'application/json',Origin:base,'X-Studio-Request':'session-exchange-v1'},body:JSON.stringify({ticket:issued.ticket})});assert.equal(r.status,200);user.cookie=r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.equal((await r.json()).owner_id,user.id)}
-async function media(user,op,body,signal){const r=await fetch(base+'/studio-v2/api/image/'+op,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',Origin:base,Cookie:user.cookie,'X-Studio-Request':'image-binding-v1'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});return {status:r.status,body:await r.json()}}
+async function session(user){const issued=await core(user.token,'/auth/studio-media-ticket','POST',{});const r=await fetch(base+'/studio-v2/api/session/exchange',{method:'POST',headers:{Connection:'close','Content-Type':'application/json',Origin:base,'X-Studio-Request':'session-exchange-v1'},body:JSON.stringify({ticket:issued.ticket})});assert.equal(r.status,200);user.cookie=r.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.equal((await r.json()).owner_id,user.id)}
+async function media(user,op,body,signal){const r=await fetch(base+'/studio-v2/api/image/'+op,{method:body===undefined?'GET':'POST',headers:{Connection:'close','Content-Type':'application/json',Origin:base,Cookie:user.cookie,'X-Studio-Request':'image-binding-v1'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal});return {status:r.status,body:await r.json()}}
 async function quoteAfterNativeCooldown(user,offer_id,spec){
  const start=Date.now();let waits=0
  for(;;){const r=await media(user,'quotes',{offer_id,spec});if(r.status===200){if(waits)(report.admission_waits??=[]).push({user_id:user.id,attempts:waits,elapsed_ms:Date.now()-start});return r.body}
@@ -72,11 +72,17 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  }
  assert.equal(report.tasks.length,104);assert(report.tasks.every(t=>t.pass))
  // Persisted original identities survive a real Core restart and namespace reattachment.
+ report.phase='restart';save()
  const beforeRestart=stats().image_posts
  dc('restart','core');dc('up','-d','--wait','--wait-timeout','90','core')
  const pid=execFileSync('docker',['inspect','--format','{{.State.Pid}}','ai-gateway-native-core-20261012'],{encoding:'utf8'}).trim();assert(/^[1-9][0-9]*$/.test(pid))
  execFileSync('sudo',['nsenter','-t',pid,'-n','ip','addr','replace','203.0.113.10/32','dev','lo'])
  dc('up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','90','bridge','bff','simulator')
+ // Synchronous Docker calls block Node's event loop while idle sockets close.
+ // Let close events drain and verify each new listener before auth/readonly recovery.
+ await sleep(250)
+ for(const port of [28180,28182,28183]){const r=await fetch(`http://127.0.0.1:${port}/health`,{headers:{Connection:'close'}});assert.equal(r.status,200);await r.text()}
+ report.phase='recovery';save()
  for(const u of users)await session(u)
  for(const t of report.tasks){const user=users.find(u=>u.id===t.user_id);t.restarted_query=await media(user,'tasks/'+t.id);assert([200,409].includes(t.restarted_query.status));assert.deepEqual(ledger(t.id),t.ledger);assert.equal(t.restarted_query.body.status,t.latest.body.status)}
  assert.equal(stats().image_posts,beforeRestart);report.after=users.map(u=>({user_id:u.id,...snapshot(u.id)}));
@@ -86,5 +92,5 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  const columns=['id','user_id','scenario','status','before_balance','quoted','charged','after_balance','hold','released','usage','dedup','supplier_posts']
  const rows=report.tasks.map(t=>[t.id,t.user_id,t.scenario,t.latest.body.status,t.before.balance,t.frozen_price.amount,t.ledger.cost,t.after.balance,t.after.frozen_balance,t.released,t.ledger.usage,t.ledger.dedup,t.upstream_requests.length])
  fs.writeFileSync(root+'/evidence/native-funds-batch.csv',[columns,...rows].map(row=>row.join(',')).join('\n')+'\n')
- report.pass=true;save();console.log(JSON.stringify({pass:true,tasks:report.tasks.length,counts:report.counts}))
-})().catch(e=>{report.error=e.stack;save();console.error(e);process.exitCode=1})
+ report.phase='complete';report.pass=true;save();console.log(JSON.stringify({pass:true,tasks:report.tasks.length,counts:report.counts}))
+})().catch(e=>{report.error=e.stack;report.error_code=e.cause?.code;save();console.error(e);process.exitCode=1})
