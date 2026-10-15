@@ -50,7 +50,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    await w('custom-ratio-input').fill(' 3 : 5 ');await w('custom-ratio-add').click();await w('custom-ratio-input').fill('3:5');await w('custom-ratio-add').click();await expect(admin.getByRole('status').filter({hasText:'无需重复添加'})).toBeVisible()
    await w('custom-ratio-input').fill('5:7');await w('custom-ratio-add').click();await admin.getByRole('button',{name:'移除比例 5:7',exact:true}).click()
    await expect(admin.getByRole('button',{name:'移除比例 5:7',exact:true})).toHaveCount(0);await expect(admin.getByRole('button',{name:'移除比例 3:5',exact:true})).toHaveCount(1)
-   await shot(admin,'native-aspect-options-desktop.png');await admin.setViewportSize({width:390,height:844});assert(await admin.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile horizontal overflow');await shot(admin,'native-aspect-options-mobile.png')
+   await shot(admin,'native-aspect-options-desktop.png');await admin.setViewportSize({width:390,height:844});await expect.poll(()=>admin.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),{message:'Mobile horizontal overflow after responsive layout settles',timeout:5000}).toBe(true);await shot(admin,'native-aspect-options-mobile.png')
    await w('wizard-step-5').click()
    const saving=admin.waitForResponse(r=>r.request().method()==='PUT'&&r.url().endsWith(`/accounts/${account}/draft`))
    await w('save').click();const saved=await saving;assert.equal(saved.status(),200);report.save_request=saved.request().postDataJSON()
@@ -105,7 +105,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    report.checks.push('Custom ratio reaches real simulated text/edit POST unchanged; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle')
   }
   report.assets??={};report.assets[phase]={admin:phase==='configure'?await proof():undefined,customer:await customerProof()}
- }catch(error){report.error=error.message;await shot(phase==='configure'?admin:customer,'native-aspect-options-failure.png');throw error}
+ }catch(error){report.error=error.message;report.overflow=await admin.evaluate(()=>[...document.querySelectorAll('body *')].map(e=>({tag:e.tagName,cls:e.className,left:e.getBoundingClientRect().left,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e=>e.right>innerWidth+1&&e.width>0).slice(0,25));await shot(phase==='configure'?admin:customer,'native-aspect-options-failure.png');throw error}
  finally{fs.writeFileSync(reportPath,JSON.stringify(report,null,2));await browser.close()}
  console.log(JSON.stringify({phase,configuration_pass:report.configuration_pass,execution_pass:report.execution_pass}))
 })().catch(error=>{console.error(error.message);process.exitCode=1})
