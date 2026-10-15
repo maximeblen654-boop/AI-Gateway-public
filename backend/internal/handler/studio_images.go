@@ -169,8 +169,15 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 // and task GETs have no new upstream attempt and must not add failure samples.
 func markStudioImageTerminalOpsFailure(c *gin.Context, r *service.StudioImageReceipt) {
 	if c == nil || c.Request == nil || c.Request.Method != http.MethodPost || r == nil ||
-		r.Status != "failed" || r.BillingState != "not_charged" || r.DeliveredCount != 0 || r.ResultHash != "" || r.PendingCount != 0 ||
-		c.GetInt(service.OpsUpstreamStatusCodeKey) != http.StatusBadGateway {
+		r.Status != "failed" || r.BillingState != "not_charged" || r.DeliveredCount != 0 || r.ResultHash != "" || r.PendingCount != 0 {
+		return
+	}
+	// ForwardImages failover can record only an attempt event. Use the same
+	// latest-attempt resolution as native Ops persistence, including auth and
+	// transport exclusions, rather than assuming the legacy scalar is present.
+	native := &service.OpsInsertErrorLogInput{}
+	applyOpsUpstreamFieldsFromContext(c, native)
+	if native.UpstreamStatusCode == nil || *native.UpstreamStatusCode != http.StatusBadGateway {
 		return
 	}
 	code := service.StudioImageFailureCode(r)

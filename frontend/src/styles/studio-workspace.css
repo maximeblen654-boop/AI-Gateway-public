@@ -31,3 +31,6 @@
 .studio-task-actions{flex-wrap:wrap}.studio-task-actions button{min-height:40px}
 @media(max-width:600px){.studio-waiting{padding:12px}.studio-task-actions button{flex:1 1 140px}}
 @media(prefers-reduced-motion:reduce){.studio-workspace .spinning{animation:none}}
+
+/* Keep expanded model observations clear of mobile navigation and in view. */
+@media(max-width:700px){.studio-floating-model.model-open{z-index:31}.studio-model-menu{position:fixed;top:110px;bottom:auto;left:18px;right:18px;width:auto;max-width:none;max-height:calc(100dvh - 130px);overflow-y:auto;overscroll-behavior:contain}}

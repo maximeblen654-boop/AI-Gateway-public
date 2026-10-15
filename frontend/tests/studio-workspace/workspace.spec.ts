@@ -44,6 +44,7 @@ for (const width of [1440, 390]) for (const theme of ['light', 'dark']) test(`pa
  await expect(page.getByRole('button',{name:/GPT Image 2：错误 12%/})).toBeVisible()
  await page.getByRole('button',{name:/GPT Image 2：错误 12%/}).click()
  await expect(page.locator('#studio-model-observation')).toContainText('不代表某个具体渠道')
+ if(width===390){const box=await page.locator('#studio-model-menu').boundingBox();expect(box!.y).toBeGreaterThanOrEqual(100);expect(box!.y+box!.height).toBeLessThanOrEqual(900)}
  expect(await posts(page)).toHaveLength(0)
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
  await page.screenshot({path:`test-results/studio-workspace/models-${width}-${theme}.png`,fullPage:true})

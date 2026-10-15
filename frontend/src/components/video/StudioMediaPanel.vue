@@ -63,7 +63,7 @@
         <div class="studio-composer" ref="composerRoot" @keydown.esc="closeControl" @dragover.prevent @drop.prevent="drop">
           <fieldset :disabled="!!active">
             <legend class="studio-sr-only">{{ modeLabel }}创作设置</legend>
-            <div class="studio-floating-model">
+            <div class="studio-floating-model" :class="{ 'model-open': openControl === 'model' }">
               <span v-if="!active" class="studio-lift" aria-hidden="true"><i></i><i></i></span>
               <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon name="chevronDown" /></button>
               <Transition name="studio-pop"><div v-show="openControl === 'model'" class="studio-popover studio-model-menu" id="studio-model-menu"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">收起<Icon name="chevronUp" /></button></div></Transition>

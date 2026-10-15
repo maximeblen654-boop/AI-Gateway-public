@@ -38,7 +38,7 @@ func TestStudioImageTerminalOpsFailureCountsNative502Once(t *testing.T) {
 				setOpsRequestContext(c, "site-image", false)
 				setOpsSelectedAccount(c, 77)
 				c.Set(service.OpsUpstreamModelKey, "upstream-image")
-				service.SetOpsUpstreamError(c, 502, "capacity unavailable", "")
+				// Actual ForwardImages failover supplies events without a scalar status.
 				c.Set(service.OpsUpstreamErrorsKey, []*service.OpsUpstreamErrorEvent{{AccountID: 77, UpstreamStatusCode: 502, Message: "capacity unavailable"}})
 				receipt := studioOpsFailedReceipt()
 				if mark {
@@ -132,4 +132,27 @@ func TestStudioImageTerminalOpsFailureAcceptsMultiUnitTerminalProof(t *testing.T
 	require.True(t, marks[0].NonStream)
 	require.True(t, marks[0].CountTowardsSLA)
 	require.Equal(t, 502, marks[0].IntendedStatus)
+}
+
+// Native ForwardImages failover records the attempt event without setting the
+// legacy single-value status. A stale earlier HTTP status must not override the
+// last attempt (e.g. a disconnect or account-auth failure).
+func TestStudioImageTerminalOpsFailureUsesLatestNativeAttempt(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		events []*service.OpsUpstreamErrorEvent
+		want   bool
+	}{
+		{"event-only 502", []*service.OpsUpstreamErrorEvent{{AccountID: 77, UpstreamStatusCode: 502}}, true},
+		{"earlier 502 then disconnect", []*service.OpsUpstreamErrorEvent{{UpstreamStatusCode: 502}, {Kind: "request_error"}}, false},
+		{"earlier 502 then auth failure", []*service.OpsUpstreamErrorEvent{{UpstreamStatusCode: 502}, {Stage: string(service.GatewayFailureStageAccountAuth), UpstreamStatusCode: 502}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/studio/images/tasks", nil)
+			c.Set(service.OpsUpstreamErrorsKey, tc.events)
+			markStudioImageTerminalOpsFailure(c, studioOpsFailedReceipt())
+			require.Equal(t, tc.want, len(service.GetOpsStreamErrors(c)) == 1)
+		})
+	}
 }
