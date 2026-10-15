@@ -158,8 +158,32 @@ func (h *OpenAIGatewayHandler) StudioImageSubmit(c *gin.Context) {
 		studioError(c, err)
 		return
 	}
+	markStudioImageTerminalOpsFailure(c, receipt)
 	studioReceiptResponse(c, receipt)
 }
+
+// A terminal failed receipt is an application-level failure inside a successful
+// task-API response. Reuse native in-band error telemetry so the 200 envelope
+// is not mistaken for a recovered upstream attempt by Ops / Monitor V2.
+// Only this submission's real native error context can mark it: replayed POSTs
+// and task GETs have no new upstream attempt and must not add failure samples.
+func markStudioImageTerminalOpsFailure(c *gin.Context, r *service.StudioImageReceipt) {
+	if c == nil || c.Request == nil || c.Request.Method != http.MethodPost || r == nil ||
+		r.Status != "failed" || r.BillingState != "not_charged" || r.DeliveredCount != 0 || r.ResultHash != "" || r.PendingCount != 0 ||
+		c.GetInt(service.OpsUpstreamStatusCodeKey) != http.StatusBadGateway {
+		return
+	}
+	code := service.StudioImageFailureCode(r)
+	if code == "" {
+		return
+	}
+	service.MarkOpsStreamErrorValue(c, service.OpsStreamError{
+		ErrType: "upstream_error", Code: code,
+		Message:        "Image generation failed with upstream HTTP 502; no image delivered",
+		IntendedStatus: http.StatusBadGateway, CountTowardsSLA: true, NonStream: true,
+	})
+}
+
 func studioReceiptResponse(c *gin.Context, r *service.StudioImageReceipt) {
 	response := gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "receipt_version": r.Version, "result_available": r.ResultHash != "", "execution": r.Execution}
 	// v2 receipts predate per-unit accounting.  Do not serialize zero-valued
