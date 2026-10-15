@@ -261,7 +261,11 @@ func TestStudioPaidSnapshotScopesCostAndMapping(t *testing.T) {
 	}
 	// A closed paid control must still allow ordinary non-paid quote previews.
 	p.image.PaidControl = &StudioPaidControl{Managed: true, Settings: &paidSettingsFake{values: map[string]string{}}}
-	if _, err = p.image.Issue(ctx, StudioImageOwner{1, 2, 3}, p.keys.apiKeyRepo.(paidPreflightKeys).key, repo.a.Config.Published.Offers[0].OfferID, mediaworkbench.Spec{Resolution: "1K", AspectRatio: "1:1", Count: 1}, nil); err != nil {
+	keyRepo, ok := p.keys.apiKeyRepo.(paidPreflightKeys)
+	if !ok {
+		t.Fatal("invalid key fixture")
+	}
+	if _, err = p.image.Issue(ctx, StudioImageOwner{1, 2, 3}, keyRepo.key, repo.a.Config.Published.Offers[0].OfferID, mediaworkbench.Spec{Resolution: "1K", AspectRatio: "1:1", Count: 1}, nil); err != nil {
 		t.Fatal("paid control blocked non-paid quote", err)
 	}
 }

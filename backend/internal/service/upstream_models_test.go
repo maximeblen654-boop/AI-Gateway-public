@@ -1237,5 +1237,7 @@ func TestMediaCatalogCompleteRemovalPersistsRemainingModel(t *testing.T) {
 	svc := &AccountTestService{accountRepo: repo, cfg: upstreamModelSyncTestConfig(), httpUpstream: &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"gpt-image-new"}]}`))}}}}
 	_, err := svc.SyncUpstreamModelCatalog(context.Background(), a)
 	require.NoError(t, err)
-	require.Equal(t, []string{"gpt-image-new"}, a.Extra["upstream_model_catalog_snapshot"].(map[string]any)["models"])
+	snapshot, ok := a.Extra["upstream_model_catalog_snapshot"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, []string{"gpt-image-new"}, snapshot["models"])
 }
