@@ -35,5 +35,15 @@
     "credentials and user files"
   ],
   "local_build_note": "Later narrow Go recompile failed with Windows VirtualAlloc errno 1455; no retry, tests verified by GitHub CI. No remaining go-tmp subdirectories.",
-  "artifacts": "Only small reports/screenshots downloaded; complete three-image artifact retained on GitHub, no duplicate local TAR or extraction."
+  "artifacts": "Only small reports/screenshots downloaded; complete three-image artifact retained on GitHub, no duplicate local TAR or extraction.",
+  "post_archive_cleanup": {
+    "paths": [
+      "D:/AI-Gateway/.codex-tmp/image-502-finality-evidence/build",
+      "D:/AI-Gateway/.codex-tmp/image-502-finality-evidence/final"
+    ],
+    "archive_hashes_verified": true,
+    "actual_delta_bytes": 21463040,
+    "C_remaining_bytes": 5071458304,
+    "D_remaining_bytes": 10910109696
+  }
 }

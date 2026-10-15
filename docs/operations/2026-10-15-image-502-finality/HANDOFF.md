@@ -77,7 +77,7 @@ Separate authorization is needed to finalize these specific historical customer 
 
 ## 资源处理
 
-[定向清理记录](RESOURCE_USAGE.json)：删除项目 go-tmp 下12个无进程使用的失败编译目录，实际释放2,004,983,808 bytes（约1.87GiB）。清理后D约10.17GiB、C约4.70GiB。有效共享缓存、正式候选、回退资产、源码和持久数据保留。最终本地仅保留小报告/截图，完整候选一份在GitHub；不是永久备份，到期时间见上方。没有本地Docker构建。
+[定向清理记录](RESOURCE_USAGE.json)：删除项目 go-tmp 下12个无进程使用的失败编译目录，实际释放2,004,983,808 bytes（约1.87GiB）。归档后又删除本轮两份重复临时下载，释放21,463,040 bytes；最终D约10.16GiB、C约4.72GiB。有效共享缓存、正式候选、回退资产、源码和持久数据保留。最终本地仅保留小报告/截图，完整候选一份在GitHub；不是永久备份，到期时间见上方。没有本地Docker构建。
 
 本地最终Go补编遇Windows内存不足，未继续挤占本地资源；最终完整Go/前端/安全依据为上述GitHub CI。Constraints保持原文，SHA-256 `88f1088b2f7c99d3461b93749211ca02ec624adb74c14b9ff6628cf32a5bafea`。
 
