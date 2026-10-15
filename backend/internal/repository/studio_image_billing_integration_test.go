@@ -6,7 +6,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sync"
 	"testing"
 	"time"
 )
@@ -45,6 +47,28 @@ func TestStudioQuotedBillingPostgresSeparationAndReplay(t *testing.T) {
 	second, e := service.SettleQuotedImage(ctx, repo, receipt)
 	require.NoError(t, e)
 	require.False(t, second.Applied)
+	// Concurrent late callbacks and restored workers all use the original native key.
+	// A completed financial transaction must not be applied again.
+	var replayWG sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		replayWG.Add(1)
+		go func() {
+			defer replayWG.Done()
+			replayed, replayErr := service.SettleQuotedImage(ctx, repo, receipt)
+			if assert.NoError(t, replayErr) {
+				assert.False(t, replayed.Applied)
+			}
+		}()
+	}
+	replayWG.Wait()
+	var usageCount, dedupCount int
+	var frozen string
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT count(*) FROM usage_logs WHERE api_key_id=$1", key.ID).Scan(&usageCount))
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT count(*) FROM usage_billing_dedup WHERE api_key_id=$1", key.ID).Scan(&dedupCount))
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT frozen_balance::text FROM users WHERE id=$1", user.ID).Scan(&frozen))
+	require.Equal(t, 1, usageCount)
+	require.Equal(t, 1, dedupCount)
+	require.Equal(t, "0.00000000", frozen)
 	var balance, keyCost, accountCost, customer, stats, rate string
 	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT balance::text FROM users WHERE id=$1", user.ID).Scan(&balance))
 	require.Equal(t, "9.20000000", balance)

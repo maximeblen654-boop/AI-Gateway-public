@@ -187,7 +187,7 @@ function formatDurationLabel(event: AlertEvent): string {
 
   const now = Date.now()
   const ms = now - firedAt.getTime()
-  return `${t('admin.ops.alertEvents.status.firing')} ${formatDurationMs(ms)}`
+  return `${t('admin.ops.alertEvents.unconfirmedRecovery')} ${formatDurationMs(ms)}`
 }
 
 function formatDimensionsSummary(event: AlertEvent): string {

@@ -397,13 +397,13 @@ const slaPercent = computed(() => {
 
 const errorRatePercent = computed(() => {
   const v = overview.value?.error_rate
-  if (typeof v !== 'number') return null
+  if (typeof v !== 'number' || (overview.value?.request_count_sla ?? 0) <= 0) return null
   return v * 100
 })
 
 const upstreamErrorRatePercent = computed(() => {
   const v = overview.value?.upstream_error_rate
-  if (typeof v !== 'number') return null
+  if (typeof v !== 'number' || (overview.value?.request_count_sla ?? 0) <= 0) return null
   return v * 100
 })
 
@@ -1244,6 +1244,10 @@ function handleToolbarRefresh() {
           </div>
         </div>
 
+        <p class="text-xs text-gray-500 dark:text-gray-400" style="grid-column: 1 / -1; order: 1;" data-testid="ops-sla-samples">
+          {{ t('admin.ops.requestSampleSummary', { total: overview.request_count_sla ?? 0, success: overview.success_count ?? 0, errors: overview.error_count_sla ?? 0 }) }}
+          {{ t('admin.ops.requestSampleCaution') }}
+        </p>
         <!-- Card 2: SLA -->
         <div class="rounded-2xl bg-gray-50 p-4 dark:bg-dark-900" style="order: 2;">
           <div class="flex items-center justify-between">
@@ -1262,7 +1266,7 @@ function handleToolbarRefresh() {
             </button>
           </div>
           <div class="mt-2 text-3xl font-black" :class="getThresholdColorClass(getSLAThresholdLevel(slaPercent))">
-            {{ slaPercent == null ? '-' : `${slaPercent.toFixed(3)}%` }}
+            {{ slaPercent == null ? t('admin.ops.noRequestSamples') : `${slaPercent.toFixed(3)}%` }}
           </div>
           <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-700">
             <div class="h-full transition-all" :class="getSLAThresholdLevel(slaPercent) === 'critical' ? 'bg-red-500' : getSLAThresholdLevel(slaPercent) === 'warning' ? 'bg-yellow-500' : 'bg-green-500'" :style="{ width: `${Math.max((slaPercent ?? 0) - 90, 0) * 10}%` }"></div>
@@ -1389,7 +1393,7 @@ function handleToolbarRefresh() {
             </button>
           </div>
           <div class="mt-2 text-3xl font-black" :class="getThresholdColorClass(getRequestErrorRateThresholdLevel(errorRatePercent))">
-            {{ errorRatePercent == null ? '-' : `${errorRatePercent.toFixed(2)}%` }}
+            {{ errorRatePercent == null ? t('admin.ops.noRequestSamples') : `${errorRatePercent.toFixed(2)}%` }}
           </div>
           <div class="mt-3 space-y-1 text-xs">
             <div class="flex justify-between">
@@ -1415,7 +1419,7 @@ function handleToolbarRefresh() {
             </button>
           </div>
           <div class="mt-2 text-3xl font-black" :class="getThresholdColorClass(getUpstreamErrorRateThresholdLevel(upstreamErrorRatePercent))">
-            {{ upstreamErrorRatePercent == null ? '-' : `${upstreamErrorRatePercent.toFixed(2)}%` }}
+            {{ upstreamErrorRatePercent == null ? t('admin.ops.noRequestSamples') : `${upstreamErrorRatePercent.toFixed(2)}%` }}
           </div>
           <div class="mt-3 space-y-1 text-xs">
             <div class="flex justify-between">

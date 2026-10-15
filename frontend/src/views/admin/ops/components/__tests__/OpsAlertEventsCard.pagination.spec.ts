@@ -70,3 +70,14 @@ describe('alert events filtered pagination', () => {
     expect(vm.hasMore).toBe(false)
   })
 })
+
+
+describe('alert evidence semantics', () => {
+  it('labels unresolved elapsed time as unconfirmed recovery rather than continuous outage', async () => {
+    listAlertEvents.mockResolvedValueOnce([{ ...rows(1, 1)[0], description: 'trigger sample: 1 requests, 0 successful, 1 SLA errors' }])
+    const { wrapper } = mountCard()
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.ops.alertEvents.unconfirmedRecovery')
+    expect(wrapper.text()).toContain('trigger sample: 1 requests, 0 successful, 1 SLA errors')
+  })
+})

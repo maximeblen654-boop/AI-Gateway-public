@@ -226,7 +226,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		windowStart := safeEnd.Add(-time.Duration(windowMinutes) * time.Minute)
 		windowEnd := safeEnd
 
-		metricValue, ok := s.computeRuleMetric(ctx, rule, systemMetrics, windowStart, windowEnd, scopePlatform, scopeGroupID)
+		metricValue, ok, overview := s.computeRuleMetric(ctx, rule, systemMetrics, windowStart, windowEnd, scopePlatform, scopeGroupID)
 		if !ok {
 			s.resetRuleState(rule.ID, now)
 			continue
@@ -284,6 +284,20 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				CreatedAt:      now,
 			}
 
+			// The same raw window that produced the percentage supplies its denominator.
+			// Preserve a trigger snapshot, not a claim about current traffic.
+			if overview != nil {
+				if firedEvent.Dimensions == nil {
+					firedEvent.Dimensions = map[string]any{}
+				}
+				firedEvent.Dimensions["request_count_sla"] = overview.RequestCountSLA
+				firedEvent.Dimensions["success_count"] = overview.SuccessCount
+				firedEvent.Dimensions["error_count_sla"] = overview.ErrorCountSLA
+				firedEvent.Dimensions["window_start"] = windowStart.Format(time.RFC3339)
+				firedEvent.Dimensions["window_end"] = windowEnd.Format(time.RFC3339)
+				firedEvent.Description += fmt.Sprintf("; trigger sample: %d requests, %d successful, %d SLA errors", overview.RequestCountSLA, overview.SuccessCount, overview.ErrorCountSLA)
+			}
+
 			created, err := s.opsRepo.CreateAlertEvent(ctx, firedEvent)
 			if err != nil {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] create event failed (rule=%d): %v", rule.ID, err)
@@ -299,8 +313,9 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 			continue
 		}
 
-		// Not breached: resolve active event if present.
-		if activeEvent != nil {
+		// Sustained counts only gate new alerts. A reset/restart must not resolve
+		// an existing incident while the current valid sample still breaches.
+		if !breachedNow && activeEvent != nil {
 			resolvedAt := now
 			if err := s.opsRepo.UpdateAlertEventStatus(ctx, activeEvent.ID, OpsAlertStatusResolved, &resolvedAt); err != nil {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] resolve event failed (event=%d): %v", activeEvent.ID, err)
@@ -440,82 +455,82 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 	end time.Time,
 	platform string,
 	groupID *int64,
-) (float64, bool) {
+) (float64, bool, *OpsDashboardOverview) {
 	if rule == nil {
-		return 0, false
+		return 0, false, nil
 	}
 	switch strings.TrimSpace(rule.MetricType) {
 	case "cpu_usage_percent":
 		if systemMetrics != nil && systemMetrics.CPUUsagePercent != nil {
-			return *systemMetrics.CPUUsagePercent, true
+			return *systemMetrics.CPUUsagePercent, true, nil
 		}
-		return 0, false
+		return 0, false, nil
 	case "memory_usage_percent":
 		if systemMetrics != nil && systemMetrics.MemoryUsagePercent != nil {
-			return *systemMetrics.MemoryUsagePercent, true
+			return *systemMetrics.MemoryUsagePercent, true, nil
 		}
-		return 0, false
+		return 0, false, nil
 	case "concurrency_queue_depth":
 		if systemMetrics != nil && systemMetrics.ConcurrencyQueueDepth != nil {
-			return float64(*systemMetrics.ConcurrencyQueueDepth), true
+			return float64(*systemMetrics.ConcurrencyQueueDepth), true, nil
 		}
-		return 0, false
+		return 0, false, nil
 	case "group_available_accounts":
 		if groupID == nil || *groupID <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		if availability.Group == nil {
-			return 0, true
+			return 0, true, nil
 		}
-		return float64(availability.Group.AvailableCount), true
+		return float64(availability.Group.AvailableCount), true, nil
 	case "group_available_ratio":
 		if groupID == nil || *groupID <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
-		return computeGroupAvailableRatio(availability.Group), true
+		return computeGroupAvailableRatio(availability.Group), true, nil
 	case "account_rate_limited_count":
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.IsRateLimited
 		})), true
 	case "account_error_count":
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.HasError && acc.TempUnschedulableUntil == nil
 		})), true
 	case "account_temp_unscheduled_count":
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		now := time.Now().UTC()
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
@@ -523,64 +538,64 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		})), true
 	case "group_rate_limit_ratio":
 		if groupID == nil || *groupID <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		if availability.Group == nil || availability.Group.TotalAccounts <= 0 {
-			return 0, true
+			return 0, true, nil
 		}
-		return (float64(availability.Group.RateLimitCount) / float64(availability.Group.TotalAccounts)) * 100, true
+		return (float64(availability.Group.RateLimitCount) / float64(availability.Group.TotalAccounts)) * 100, true, nil
 	case "account_error_ratio":
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		total := int64(len(availability.Accounts))
 		if total <= 0 {
-			return 0, true
+			return 0, true, nil
 		}
 		errorCount := countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.HasError && acc.TempUnschedulableUntil == nil
 		})
-		return (float64(errorCount) / float64(total)) * 100, true
+		return (float64(errorCount) / float64(total)) * 100, true, nil
 	case "overload_account_count":
 		if s == nil || s.opsService == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		availability, err := s.opsService.GetAccountAvailability(ctx, platform, groupID)
 		if err != nil || availability == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		return float64(countAccountsByCondition(availability.Accounts, func(acc *AccountAvailability) bool {
 			return acc.IsOverloaded
 		})), true
 	case "proxy_expired_count":
 		if s == nil || s.proxyRepo == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		n, err := s.proxyRepo.CountExpired(ctx)
 		if err != nil {
-			return 0, false
+			return 0, false, nil
 		}
-		return float64(n), true
+		return float64(n), true, nil
 	case "proxy_expiring_soon_count":
 		if s == nil || s.proxyRepo == nil {
-			return 0, false
+			return 0, false, nil
 		}
 		n, err := s.proxyRepo.CountExpiringSoon(ctx, time.Now())
 		if err != nil {
-			return 0, false
+			return 0, false, nil
 		}
-		return float64(n), true
+		return float64(n), true, nil
 	}
 
 	overview, err := s.opsRepo.GetDashboardOverview(ctx, &OpsDashboardFilter{
@@ -591,30 +606,30 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		QueryMode: OpsQueryModeRaw,
 	})
 	if err != nil {
-		return 0, false
+		return 0, false, nil
 	}
 	if overview == nil {
-		return 0, false
+		return 0, false, nil
 	}
 
 	switch strings.TrimSpace(rule.MetricType) {
 	case "success_rate":
 		if overview.RequestCountSLA <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
-		return overview.SLA * 100, true
+		return overview.SLA * 100, true, overview
 	case "error_rate":
 		if overview.RequestCountSLA <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
-		return overview.ErrorRate * 100, true
+		return overview.ErrorRate * 100, true, overview
 	case "upstream_error_rate":
 		if overview.RequestCountSLA <= 0 {
-			return 0, false
+			return 0, false, nil
 		}
-		return overview.UpstreamErrorRate * 100, true
+		return overview.UpstreamErrorRate * 100, true, overview
 	default:
-		return 0, false
+		return 0, false, nil
 	}
 }
 

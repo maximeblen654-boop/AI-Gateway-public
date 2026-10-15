@@ -5,6 +5,8 @@ FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/client.spec.ts \
 	src/api/__tests__/tokenRefresh.spec.ts \
 	src/api/__tests__/studioMedia.spec.ts \
+	src/views/admin/ops/components/__tests__/OpsDashboardHeader.samples.spec.ts \
+	src/views/admin/ops/components/__tests__/OpsAlertEventsCard.pagination.spec.ts \
 	src/components/video/__tests__/StudioMediaPanel.spec.ts \
 	src/api/admin/__tests__/mediaWorkbench.spec.ts \
 	src/components/admin/media/__tests__ \

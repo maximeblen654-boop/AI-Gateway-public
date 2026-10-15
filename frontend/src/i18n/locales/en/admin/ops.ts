@@ -434,7 +434,11 @@ export default {
           actions: 'Actions'
         }
       },
+      noRequestSamples: 'No request samples',
+      requestSampleSummary: 'SLA window: {total} requests, {success} successful, {errors} errors.',
+      requestSampleCaution: 'Small-sample percentages do not establish a widespread outage; no samples do not confirm recovery.',
       alertEvents: {
+        unconfirmedRecovery: 'Recovery unconfirmed · since trigger',
         title: 'Alert Events',
         description: 'Recent alert firing/resolution records (email-only)',
         loading: 'Loading...',

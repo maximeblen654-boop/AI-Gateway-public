@@ -434,7 +434,11 @@ export default {
           actions: '操作'
         }
       },
+      noRequestSamples: '无请求样本',
+      requestSampleSummary: '本窗口 SLA 样本 {total} 笔：成功 {success}，失败 {errors}。',
+      requestSampleCaution: '小样本百分比不代表大范围故障；无样本不代表已恢复。',
       alertEvents: {
+        unconfirmedRecovery: '尚未确认恢复 · 距触发',
         title: '告警事件',
         description: '最近的告警触发/恢复记录（仅邮件通知）',
         loading: '加载中...',
