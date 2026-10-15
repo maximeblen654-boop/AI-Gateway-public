@@ -1,0 +1,52 @@
+{
+  "checked_at": "2026-10-14T23:34:23.250379+00:00",
+  "task_id": "img_246553331bf3e4639ab4adbe94fcccc2",
+  "site_native_charge_cny": "0",
+  "native_dedup": 0,
+  "native_archive_dedup": 0,
+  "native_usage": 0,
+  "frozen_balance": 0.0,
+  "inflight": {
+    "zcard": "0",
+    "hcount": "0",
+    "ttl": "-2",
+    "exact_requests": {
+      "02fd937070787c2776784c00f9363cb8f66e4ea67614deb89d7eab970cec9249": "",
+      "bdfccad4-adb0-4c1c-a67d-f89c19fc9935": "",
+      "img_246553331bf3e4639ab4adbe94fcccc2": ""
+    }
+  },
+  "video_holds": [
+    {
+      "rows": 0,
+      "held_amount": 0,
+      "active_holds": 0
+    }
+  ],
+  "pg_transactions": [
+    {
+      "prepared_count": 0,
+      "long_running_transactions": 0
+    }
+  ],
+  "receipt": {
+    "sha256": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46",
+    "status": "unknown",
+    "billing_state": "pending",
+    "delivered_count": null,
+    "pending_count": 3,
+    "result_hash": null
+  },
+  "units": [
+    {
+      "id": "8d16eedf1d4366c9f54a0add706a3f10f7de7f570d18e9f10b066ccb616de92a",
+      "state": "unknown",
+      "response_present": false,
+      "upstream_id_present": false,
+      "sha256": "b50460361f52464ffa08433145cfc38f15e6a1e8918e51f29cb2226214fcd439"
+    }
+  ],
+  "provider_host": "api.image2pro.top",
+  "historical_balance_snapshot_available": false,
+  "scope": "Charge conclusion binds this task to the unique native transaction path; not a reconstruction of all historical balance changes."
+}

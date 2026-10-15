@@ -1,0 +1,173 @@
+{
+  "checked_at": "2026-10-14T23:34:23.250379+00:00",
+  "rules": [
+    {
+      "id": 1,
+      "enabled": true,
+      "severity": "P1",
+      "metric_type": "error_rate",
+      "operator": ">",
+      "threshold": 5,
+      "window_minutes": 5,
+      "sustained_minutes": 5,
+      "filters": null,
+      "last_triggered_at": null
+    },
+    {
+      "id": 2,
+      "enabled": true,
+      "severity": "P0",
+      "metric_type": "success_rate",
+      "operator": "<",
+      "threshold": 95,
+      "window_minutes": 5,
+      "sustained_minutes": 5,
+      "filters": null,
+      "last_triggered_at": null
+    },
+    {
+      "id": 8,
+      "enabled": true,
+      "severity": "P0",
+      "metric_type": "error_rate",
+      "operator": ">",
+      "threshold": 20,
+      "window_minutes": 1,
+      "sustained_minutes": 1,
+      "filters": null,
+      "last_triggered_at": null
+    }
+  ],
+  "events": [
+    {
+      "id": 15,
+      "rule_id": 1,
+      "severity": "P1",
+      "status": "firing",
+      "metric_value": 100,
+      "threshold_value": 5,
+      "dimensions": null,
+      "fired_at": "2026-10-15T04:52:50.732981+08:00",
+      "resolved_at": null
+    },
+    {
+      "id": 14,
+      "rule_id": 2,
+      "severity": "P0",
+      "status": "firing",
+      "metric_value": 0,
+      "threshold_value": 95,
+      "dimensions": null,
+      "fired_at": "2026-10-15T04:52:50.732981+08:00",
+      "resolved_at": null
+    }
+  ],
+  "active_events": [
+    {
+      "id": 14,
+      "rule_id": 2,
+      "status": "firing",
+      "fired_at": "2026-10-15T04:52:50.732981+08:00",
+      "metric_value": 0,
+      "resolved_at": null
+    },
+    {
+      "id": 15,
+      "rule_id": 1,
+      "status": "firing",
+      "fired_at": "2026-10-15T04:52:50.732981+08:00",
+      "metric_value": 100,
+      "resolved_at": null
+    },
+    {
+      "id": 7,
+      "rule_id": 8,
+      "status": "firing",
+      "fired_at": "2026-10-09T05:33:09.26808+08:00",
+      "metric_value": 100,
+      "resolved_at": null
+    }
+  ],
+  "windows": [
+    {
+      "label": "alert5",
+      "start": "2026-10-14T20:47:00Z",
+      "end": "2026-10-14T20:52:00Z",
+      "counts": [
+        {
+          "errors": 1,
+          "success": 0,
+          "sla_errors": 1
+        }
+      ],
+      "errors": [
+        {
+          "user_id": 2,
+          "group_id": 31,
+          "platform": "openai",
+          "account_id": null,
+          "created_at": "2026-10-15T04:47:47.463002+08:00",
+          "request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+          "error_owner": "platform",
+          "error_phase": "internal",
+          "status_code": 409,
+          "request_path": "/v1/studio/images/tasks",
+          "is_business_limited": false,
+          "upstream_status_code": null
+        }
+      ]
+    },
+    {
+      "label": "alert15",
+      "start": "2026-10-14T20:37:00Z",
+      "end": "2026-10-14T20:52:00Z",
+      "counts": [
+        {
+          "errors": 1,
+          "success": 0,
+          "sla_errors": 1
+        }
+      ],
+      "errors": [
+        {
+          "user_id": 2,
+          "group_id": 31,
+          "platform": "openai",
+          "account_id": null,
+          "created_at": "2026-10-15T04:47:47.463002+08:00",
+          "request_id": "bdfccad4-adb0-4c1c-a67d-f89c19fc9935",
+          "error_owner": "platform",
+          "error_phase": "internal",
+          "status_code": 409,
+          "request_path": "/v1/studio/images/tasks",
+          "is_business_limited": false,
+          "upstream_status_code": null
+        }
+      ]
+    },
+    {
+      "label": "current15",
+      "start": null,
+      "end": null,
+      "counts": [
+        {
+          "errors": 0,
+          "success": 0,
+          "sla_errors": 0
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "descriptions": [
+    {
+      "id": 14,
+      "description": "success_rate < 95.00 (current 0.00) over last 5m (overall)"
+    },
+    {
+      "id": 15,
+      "description": "error_rate > 5.00 (current 100.00) over last 5m (overall)"
+    }
+  ],
+  "observation": "No new samples in current 15m; zero-sample metric returns unavailable and leaves active event unresolved. Single historical failure does not prove ongoing platform-wide outage."
+}

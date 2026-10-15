@@ -1,0 +1,22 @@
+{
+  "time": "2026-10-15T00:01:49.519Z",
+  "states": {
+    "image": {
+      "media": "image",
+      "mode": "managed-v1",
+      "requested_enabled": true,
+      "effective_enabled": true,
+      "revision": "f0a84d3e6155a2e7195148aba6cc00fb89275cb02987b141e2774bb81261f185",
+      "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+      "reason": "open"
+    },
+    "video": {
+      "media": "video",
+      "mode": "managed-v1",
+      "requested_enabled": false,
+      "effective_enabled": false,
+      "revision": "",
+      "reason": "closed"
+    }
+  }
+}

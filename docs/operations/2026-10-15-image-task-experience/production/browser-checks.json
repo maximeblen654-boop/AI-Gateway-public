@@ -1,0 +1,210 @@
+{
+  "source_sha": "d893690abe47f891aacde8876837ccc0c8b653ac",
+  "time": "2026-10-14T23:59:46.468Z",
+  "image_preflight_pass": true,
+  "image_preflight": {
+    "metrics": {
+      "accounts_validated": 1,
+      "specs_checked": 1870,
+      "timings_ms": {
+        "eligibility_and_storage": 3,
+        "final_dependencies": 21,
+        "initial_dependencies": 25,
+        "native_quotes": 635,
+        "published_validation": 95,
+        "spec_compilation": 274,
+        "total": 1055
+      }
+    },
+    "media": "image",
+    "pass": true,
+    "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "path": "edit",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-14T23:59:47.015521122Z"
+  },
+  "precheck_wall_ms": 1306,
+  "restoration_report": null,
+  "image_effective_enabled": true,
+  "video_effective_enabled": false,
+  "screenshots": [
+    "production-text-1440.png",
+    "production-edit-1440.png",
+    "production-video-1440.png",
+    "production-text-390.png",
+    "production-edit-390.png",
+    "production-video-390.png",
+    "production-paid-panel-1440.png",
+    "production-paid-panel-390.png"
+  ],
+  "blocked": [],
+  "mutations": [
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/media-workbench/paid-controls/image/check"
+    },
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/image/quotes"
+    },
+    {
+      "method": "POST",
+      "path": "/studio-v2/api/image/quotes"
+    }
+  ],
+  "assets": [
+    "/assets/vendor-vue-DeI_Ip_v.js",
+    "/assets/vendor-i18n-Sz9OaMvZ.js",
+    "/assets/index-DMdrJ7Ef.js",
+    "/assets/vendor-misc-DB0Q8XAf.css",
+    "/assets/index-BiOI67aw.css",
+    "/assets/vendor-misc-CeAxBZ0e.js",
+    "/assets/index-DDfo002m.js",
+    "/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-BwGHlnQ4.js",
+    "/assets/MediaWorkbenchView-DgA6S2Mh.js",
+    "/assets/useClipboard-B_R5Ggxv.js",
+    "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CnS9HPXe.js",
+    "/assets/LocaleSwitcher-CPV73PcG.js",
+    "/assets/AppHeader-C7aWrA1h.css",
+    "/assets/LocaleSwitcher-CjvPxOhx.css",
+    "/assets/MediaWorkbenchView-BwzGhhIj.css",
+    "/assets/VideoStudioView-B9nrdUzf.css",
+    "/assets/VideoStudioView-DfyUczpO.js"
+  ],
+  "page_errors": [],
+  "browser_identity": {
+    "id": 1,
+    "role": "admin"
+  },
+  "modes": [
+    {
+      "width": 1440,
+      "mode": "text",
+      "composer_visible": true,
+      "paid_enabled": true
+    },
+    {
+      "width": 1440,
+      "mode": "edit",
+      "composer_visible": true,
+      "paid_enabled": true
+    },
+    {
+      "width": 1440,
+      "mode": "video",
+      "composer_visible": true,
+      "paid_enabled": false
+    },
+    {
+      "width": 390,
+      "mode": "text",
+      "composer_visible": true,
+      "paid_enabled": true
+    },
+    {
+      "width": 390,
+      "mode": "edit",
+      "composer_visible": true,
+      "paid_enabled": true
+    },
+    {
+      "width": 390,
+      "mode": "video",
+      "composer_visible": true,
+      "paid_enabled": false
+    }
+  ],
+  "customer": {
+    "catalog_status": 200,
+    "offers": [
+      {
+        "upstream_model": "gpt-image-2"
+      }
+    ],
+    "quotes": [
+      {
+        "path": "text",
+        "status": 200,
+        "spec": {
+          "resolution": "4K",
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "duration_seconds": 0,
+          "count": 3,
+          "images": 0,
+          "videos": 0,
+          "audio": 0
+        },
+        "unit_price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "total_price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "issued": true
+      },
+      {
+        "path": "edit",
+        "status": 200,
+        "spec": {
+          "resolution": "4K",
+          "aspect_ratio": "16:9",
+          "quality": "",
+          "duration_seconds": 0,
+          "count": 3,
+          "images": 1,
+          "videos": 0,
+          "audio": 0
+        },
+        "unit_price": {
+          "amount": "0.025",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "total_price": {
+          "amount": "0.075",
+          "currency": "CNY",
+          "billing_mode": "per_request"
+        },
+        "issued": true
+      }
+    ]
+  },
+  "task_interaction_scope": "Authenticated admin is not assumed to own user #2 task. No production recovery GET or generation POST sent. Waiting/query feedback and two independent tasks reuse exact candidate isolated acceptance.",
+  "result": "PASS",
+  "restoration_note": "First authenticated run restored image at 07:57:39.920+08 after full preflight. Final browser retry reused already-open state; no repeat PUT. See activation-log.json."
+}

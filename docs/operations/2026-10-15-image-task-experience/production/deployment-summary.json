@@ -1,0 +1,271 @@
+{
+  "status": "DEPLOYED_IMAGE_STATE_PRESERVED_VIDEO_DISABLED",
+  "runtime_source_sha": "d893690abe47f891aacde8876837ccc0c8b653ac",
+  "test_sha": "465d05f35ad2e6d0a3c3fe6e12ec884b927caa0c",
+  "manifest_sha256": "97e63251df6c17ebc401a1cc94330eac0f4518ba225e7393b5ba950cd6d2222e",
+  "artifact_id": 11933596314,
+  "build_run_id": 38647616053,
+  "before_source_sha": "1ab3838a0dc40a32973ae06cc440b210f0a9d842",
+  "first_preflight_time": "2026-10-14T23:31:18.857042+00:00",
+  "switch_start": "2026-10-14T23:56:42.484159+00:00",
+  "service_ready": "2026-10-14T23:57:19.949120+00:00",
+  "switch_completed": "2026-10-15T00:00:32.277255+00:00",
+  "final_checked_at": "2026-10-15T00:03:05.198131+00:00",
+  "image_restored_at": "2026-10-15T07:57:39.920+0800",
+  "image_restore_put_count": 1,
+  "components": [
+    {
+      "component": "core",
+      "tag": "native-candidate-core:d893690abe47f891aacde8876837ccc0c8b653ac",
+      "manifest_digest": "sha256:a0f6c2d9ff5ab1fa269d9ff5e8ae4ca9b4f6df988bffaa5020b7be4a95a818c2",
+      "config_digest": "sha256:46380c683487c313de1f988a2879fe6106768333cf2c7ecd35dc05156b319d7b",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-image-task-d893-20261015/core-d893690abe47f891aacde8876837ccc0c8b653ac.tar.gz",
+      "sha256": "d58626ef4b6e22c6aad6f51e0d7170f34eb42cf336ad33330754b789c910c3a7",
+      "size": 307527669
+    },
+    {
+      "component": "bridge",
+      "tag": "native-candidate-bridge:d893690abe47f891aacde8876837ccc0c8b653ac",
+      "manifest_digest": "sha256:7c7db67cea0a4ea08425246627b5113c613b8c0468ed8d212231e6f98e755787",
+      "config_digest": "sha256:af9114c9d2b6e835f1ea890e421f43bbdb14c1cbffa312e00bc2cd85082d86fa",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-image-task-d893-20261015/bridge-d893690abe47f891aacde8876837ccc0c8b653ac.tar.gz",
+      "sha256": "3676629682930051d185cef4ca4c11d5e29f2ae2e5ca7412df46c73e134771c3",
+      "size": 95861092
+    },
+    {
+      "component": "bff",
+      "tag": "native-candidate-bff:d893690abe47f891aacde8876837ccc0c8b653ac",
+      "manifest_digest": "sha256:ba87605bc65d9a3547e3bd7e59c612319967c4bc104bfc4acb619512176fbbe6",
+      "config_digest": "sha256:5fee96b658de52b4b58c2b2476c58b307c6b610ec6a7276b1e6b6cd5b2caf719",
+      "platform": "linux/amd64",
+      "tar": "/home/ubuntu/services/ai-gateway/deploy-image-task-d893-20261015/bff-d893690abe47f891aacde8876837ccc0c8b653ac.tar.gz",
+      "sha256": "71a323403507e0ed515c8b13e70352f5cdffaa4dd7b57d6f39ef430f259f0135",
+      "size": 617445709
+    }
+  ],
+  "runtime": {
+    "sub2api": {
+      "id": "36023e8f6443723b0b810a0776e86e0801136fee45259f89a7176c8964fc6f12",
+      "image": "sha256:a0f6c2d9ff5ab1fa269d9ff5e8ae4ca9b4f6df988bffaa5020b7be4a95a818c2",
+      "health": "healthy",
+      "network": "deploy_sub2api-network"
+    },
+    "studio-v2-bridge": {
+      "id": "1e0087fc496d6ded2afd7e4ce9ddeee36751db3bae27fadb9f86ab4ad5754da8",
+      "image": "sha256:7c7db67cea0a4ea08425246627b5113c613b8c0468ed8d212231e6f98e755787",
+      "health": "healthy",
+      "network": "container:36023e8f6443723b0b810a0776e86e0801136fee45259f89a7176c8964fc6f12"
+    },
+    "studio-v2-bff": {
+      "id": "dbbee46f531ee4a6f29c430a1103ea9c70d64dd5e40685bb6c2783201cd2897c",
+      "image": "sha256:ba87605bc65d9a3547e3bd7e59c612319967c4bc104bfc4acb619512176fbbe6",
+      "health": "healthy",
+      "network": "container:36023e8f6443723b0b810a0776e86e0801136fee45259f89a7176c8964fc6f12"
+    }
+  },
+  "dependencies": {
+    "sub2api-postgres": {
+      "unchanged": true,
+      "health": "healthy"
+    },
+    "sub2api-redis": {
+      "unchanged": true,
+      "health": "healthy"
+    },
+    "caddy": "active"
+  },
+  "compose": "/home/ubuntu/services/ai-gateway/deploy-image-task-d893-20261015/compose.override.d893690a.json",
+  "compose_sha256": "9d274eb34289c2e57ce323601a61cb0a851c2183ad1f76e12219ef92b2ad0542",
+  "environment_changes": {
+    "sub2api": {},
+    "studio-bridge": {},
+    "studio-bff": {}
+  },
+  "paid_state": {
+    "image": {
+      "media": "image",
+      "mode": "managed-v1",
+      "requested_enabled": true,
+      "effective_enabled": true,
+      "revision": "f0a84d3e6155a2e7195148aba6cc00fb89275cb02987b141e2774bb81261f185",
+      "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+      "reason": "open"
+    },
+    "video": {
+      "media": "video",
+      "mode": "managed-v1",
+      "requested_enabled": false,
+      "effective_enabled": false,
+      "revision": "",
+      "reason": "closed"
+    }
+  },
+  "protection": {
+    "account77_product_count": 1,
+    "all_accounts_unchanged": true,
+    "product_credentials_mapping_sales_unchanged": true,
+    "user_balance_usage_video_orders_unchanged": true,
+    "original_task_receipt_sha256": "6ec8c567030fcc504978a734114a26504e55fe44b3840a62d6ef652e892e6d46",
+    "original_task_unchanged": true,
+    "migration_ledger_before": {
+      "count": 293,
+      "sha256": "d6a8f75d4ae22b8a460a31de549f4865b710699f18a233d62408491b61f5631f"
+    },
+    "migration_ledger_after": {
+      "count": 293,
+      "sha256": "d6a8f75d4ae22b8a460a31de549f4865b710699f18a233d62408491b61f5631f"
+    },
+    "video_setting_record_unchanged": true
+  },
+  "preflight": {
+    "metrics": {
+      "accounts_validated": 1,
+      "specs_checked": 1870,
+      "timings_ms": {
+        "eligibility_and_storage": 3,
+        "final_dependencies": 21,
+        "initial_dependencies": 25,
+        "native_quotes": 635,
+        "published_validation": 95,
+        "spec_compilation": 274,
+        "total": 1055
+      }
+    },
+    "media": "image",
+    "pass": true,
+    "fingerprint": "88f9a727fceeeb53f19eea95934c90993ec1004df428b382bfe5b04ccc6caff4",
+    "checks": [
+      {
+        "code": "billing_eligibility",
+        "pass": true
+      },
+      {
+        "code": "private_result_storage",
+        "pass": true
+      },
+      {
+        "code": "published_specs",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "spec_compilation_and_assets",
+        "account_id": 77,
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "path": "text",
+        "pass": true
+      },
+      {
+        "code": "native_quote",
+        "account_id": 77,
+        "path": "edit",
+        "pass": true
+      }
+    ],
+    "checked_at": "2026-10-14T23:59:47.015521122Z"
+  },
+  "preflight_wall_ms": 1306,
+  "quotes": [
+    {
+      "path": "text",
+      "status": 200,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 3,
+        "images": 0,
+        "videos": 0,
+        "audio": 0
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "issued": true
+    },
+    {
+      "path": "edit",
+      "status": 200,
+      "spec": {
+        "resolution": "4K",
+        "aspect_ratio": "16:9",
+        "quality": "",
+        "duration_seconds": 0,
+        "count": 3,
+        "images": 1,
+        "videos": 0,
+        "audio": 0
+      },
+      "unit_price": {
+        "amount": "0.025",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "total_price": {
+        "amount": "0.075",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "issued": true
+    }
+  ],
+  "runtime_file_hashes": {
+    "result": "PASS",
+    "time": "2026-10-15T00:00:03.597137+00:00",
+    "checks": [
+      {
+        "container": "sub2api",
+        "path": "/app/sub2api",
+        "sha256": "41e206983b6ec5db2dc7ca942896c0e4d4e6b5bef3778a39d3ef8d78302d113b",
+        "bytes": 135983264
+      },
+      {
+        "container": "studio-v2-bridge",
+        "path": "/app/studio-bridge",
+        "sha256": "a4ad1b2dc1682fbcb473d9f9a36aeb75593dcf3e1678dc34bbf2623dfc499602",
+        "bytes": 37388448
+      },
+      {
+        "container": "studio-v2-bff",
+        "path": "/app/studio/bff/image-server.mjs",
+        "sha256": "7a42aef466f3ddaa8767920d6e8616a8f05b130c8de28d3539d1447da1fc3123",
+        "bytes": 11901
+      }
+    ]
+  },
+  "rollback": {
+    "performed": false
+  },
+  "rollback_assets": "/home/ubuntu/services/ai-gateway/deploy-image-task-d893-20261015/before",
+  "rollback_images": {
+    "sub2api": {
+      "id": "sha256:422c068739614090c6417223076d9dc8728490d8b8145a26475cba7b53b3cc5e",
+      "available": true
+    },
+    "studio-v2-bridge": {
+      "id": "sha256:597b99e4867fed388bfcce9b09f4ca41bbd0d17de25a65f81c791589656c2c2c",
+      "available": true
+    },
+    "studio-v2-bff": {
+      "id": "sha256:ad938ae7b8997241b84c60cc316774342e64dc23f7386ca94005d3ccbb43257a",
+      "available": true
+    }
+  },
+  "supplier_generation_calls": 0,
+  "original_task_recovery_calls": 0,
+  "scope_limit": "Admin #1 session does not impersonate user #2. Production waiting/recovery not triggered; exact d893 isolated evidence reused."
+}
