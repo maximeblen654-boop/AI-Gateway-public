@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 )
 
 // Preserve the configured supplier identity; transport is loopback-only.
@@ -47,7 +48,9 @@ func TestStudioImage502CustomerFinalityRealHTTP(t *testing.T) {
 					}
 					return
 				case "disconnect":
-					conn, _, err := w.(http.Hijacker).Hijack()
+					hijacker, ok := w.(http.Hijacker)
+					require.True(t, ok)
+					conn, _, err := hijacker.Hijack()
 					require.NoError(t, err)
 					_ = conn.Close()
 					return
@@ -166,7 +169,9 @@ func TestStudioImage502EvidenceScope(t *testing.T) {
 				require.False(t, ok)
 				return
 			}
-			require.Equal(t, tc.want, value.(*StudioImageHTTPFailure).NoChargeFinal)
+			proof, valid := value.(*StudioImageHTTPFailure)
+			require.True(t, valid)
+			require.Equal(t, tc.want, proof.NoChargeFinal)
 		})
 	}
 	require.Nil(t, studioImageFinalFailure(&StudioImageUpstreamError{Status: 502}))
@@ -193,7 +198,9 @@ func TestStudioImageHTTPFailureRedactsCredential(t *testing.T) {
 	a := &Account{Type: AccountTypeAPIKey, Platform: PlatformOpenAI, Credentials: map[string]any{"base_url": "https://api.image2pro.top/v1", "api_key": "synthetic-secret"}}
 	recordStudioImageHTTPFailure(c, a, 502, "id", []byte(`{"error":"token synthetic-secret https://example.invalid/?key=private"}`))
 	proof, _ := c.Get(studioImageHTTPFailureKey)
-	message := proof.(*StudioImageHTTPFailure).Message
+	failure, ok := proof.(*StudioImageHTTPFailure)
+	require.True(t, ok)
+	message := failure.Message
 	require.NotContains(t, message, "synthetic-secret")
 	require.NotContains(t, message, "key=private")
 }
