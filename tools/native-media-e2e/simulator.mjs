@@ -48,7 +48,7 @@ https.createServer({ key: fs.readFileSync(path.join(root, 'simulator-key.pem')),
         const attempts = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt).length
         if (scenario === 'BATCH_FUNDS_PARTIAL' && attempts === 2) return reply(422, { error: 'synthetic_second_unit_rejected' })
       }
-      if (body.prompt.startsWith('SYNTHETIC_UNKNOWN_502')) return reply(502, { error: 'synthetic_upstream_outcome_unknown' })
+      if (body.prompt.startsWith('SYNTHETIC_UNKNOWN_502')) { res.setHeader('x-request-id', 'synthetic-studio-unknown-502'); return reply(502, { error: 'synthetic_upstream_outcome_unknown' }) }
       if (body.prompt.startsWith('SYNTHETIC_WAIT')) await new Promise(resolve => setTimeout(resolve, 15000))
       const calls = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt)
       if (body.prompt.startsWith('SYNTHETIC_PARTIAL') && calls.length === 2) return reply(422, { error: 'synthetic_second_batch_rejected' })
