@@ -51,7 +51,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   }else assert.equal(source.credentials.base_url,'https://localhost:19090')
   // Native API admission uses its own explicit model mapping. This synthetic
   // fixture does not borrow Studio's Published-model context or task headers.
-  await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,base_url:'https://localhost:19090',model_mapping:{...source.credentials.model_mapping,'native-openai-image':'native-openai-image'}},upstream_billing_probe_enabled:false})
+  await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,base_url:'https://localhost:19090',model_mapping:{...source.credentials.model_mapping,'gpt-image-1':'gpt-image-1'}},upstream_billing_probe_enabled:false})
   const original=await config(),products=structuredClone(original.draft.products)
   assert.equal(products.length,2);assert(products.every(p=>p.media_type==='image'))
   const [a,b]=products
@@ -59,7 +59,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
    capabilities:{resolutions:['1024x1024'],aspect_ratios:['1:1'],qualities:[],durations_seconds:[],count:{min:1,max:1},references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},total_max:0},combination_rules:[]},
    pricing_rules:[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}],adapter_config:{version:1,model_family:'openai_json',size_mappings:[],execution:{mode:'single',max_output_images:1}}})
   configure(a,'gpt-image-2','Synthetic lifecycle target')
-  configure(b,'native-openai-image','Synthetic lifecycle healthy sibling')
+  configure(b,'gpt-image-1','Synthetic lifecycle healthy sibling')
   let c=await saveDraft(accountPath,products);assert.equal(c.validation.publish_ready,true,JSON.stringify(c.validation));await publish(accountPath,c);await salesOn(accountPath)
   // A separate Account in the same real Group proves isolation is not merely
   // a different customer or a different Group. Credentials target only localhost.
@@ -72,7 +72,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const costChannel=channels.items.find(channel=>channel.name==='Synthetic openai cost'&&channel.group_ids.includes(gid))
   assert(costChannel,'existing synthetic Group cost channel is required')
   const sourceCosts=costChannel.account_stats_pricing_rules.find(rule=>rule.account_ids.includes(id)&&rule.pricing.some(price=>price.platform==='openai'&&price.models.includes('*')&&price.billing_mode==='per_request'&&Number(price.per_request_price)>0))
-  assert(sourceCosts,'native-openai-image must be covered by original Account wildcard cost')
+  assert(sourceCosts,'gpt-image-1 must be covered by original Account wildcard cost')
   const costRules=structuredClone(costChannel.account_stats_pricing_rules)
   costRules.push({name:'Synthetic exact lifecycle peer Account cost',group_ids:[],account_ids:[peer.id],pricing:[{platform:'openai',models:['*'],billing_mode:'per_request',per_request_price:0.35}]})
   await api('/admin/channels/'+costChannel.id,'PUT',{account_stats_pricing_rules:costRules})
@@ -154,7 +154,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   await expect(page.locator('[data-test="model-gpt-image-2"]')).toHaveCount(0)
   await page.locator('[data-test="show-archived-models"]').check()
   await expect(page.locator('[data-test="model-gpt-image-2"]')).toContainText('已归档')
-  await expect(page.locator('[data-test="model-native-openai-image"]')).toBeVisible()
+  await expect(page.locator('[data-test="model-gpt-image-1"]')).toBeVisible()
   await shot(page,'native-model-lifecycle-admin-archived-list.png')
   await page.setViewportSize({width:390,height:844})
   await shot(page,'native-model-lifecycle-admin-archived-list-390.png')
@@ -180,7 +180,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const duplicate=await media('image','tasks','POST',{task_id:prepared.task_id});assert([200,202,409].includes(duplicate.status),JSON.stringify(duplicate))
   assert.deepEqual(ledger(prepared.task_id),settled);assert.deepEqual(snapshot(owner.id),afterBalance)
   const supplierCalls=stats().requests.filter(r=>r.method==='POST'&&r.body?.prompt===prompt)
-  assert.equal(supplierCalls.length,1);assert.equal(supplierCalls[0].body.model,'native-openai-image');assert.equal(supplierCalls[0].body.n,1);assert.equal(stats().image_posts,postsBefore+1)
+  assert.equal(supplierCalls.length,1);assert.equal(supplierCalls[0].body.model,'gpt-image-1');assert.equal(supplierCalls[0].body.n,1);assert.equal(stats().image_posts,postsBefore+1)
   report.healthy_delivery={task_id:prepared.task_id,quote:healthyQuote,balance_before:beforeBalance,balance_after:afterBalance,ledger:settled,original_sha256:digest(Buffer.from(result.bytes)),supplier_requests:supplierCalls,duplicate_status:duplicate.status}
   await customer.getByTestId('studio-model-toggle').click();await customer.locator(`[data-offer-id="${offerB.offer_id}"]`).click()
   await expect(customer.getByTestId('studio-model-unavailable')).toHaveCount(0)
@@ -255,21 +255,21 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const proveNative=async(label,expectedCalls)=>{
    assert.equal((await quote(offerB)).status,409,'Studio product must be unavailable during native request')
    assert.equal((await current('image')).effective_enabled,true)
-   const result=await nativeRequest('native-openai-image')
-   assert.equal(result.status,200,`${label}: native endpoint returned ${result.status}`)
+   const result=await nativeRequest('gpt-image-1')
+   assert.equal(result.status,200,`${label}: native endpoint returned ${result.status}: ${JSON.stringify(result.body)}`)
    assert.equal(result.body.data?.length,1);assert.equal(digest(Buffer.from(result.body.data[0].b64_json,'base64')),digest(expectedPNG))
    await expect.poll(()=>nativeLedger().usage,{timeout:30000}).toBe(expectedCalls)
    const usage=nativeLedger();assert.deepEqual(usage.accounts,[id],'native route must use the same Account as the Studio product')
    const calls=stats().requests.filter(r=>r.method==='POST'&&r.body?.prompt===result.prompt)
-   assert.equal(calls.length,1);assert.equal(calls[0].path,'/v1/images/generations');assert.equal(calls[0].body.model,'native-openai-image');assert.equal(calls[0].auth,'bearer')
+   assert.equal(calls.length,1);assert.equal(calls[0].path,'/v1/images/generations');assert.equal(calls[0].body.model,'gpt-image-1');assert.equal(calls[0].auth,'bearer')
    assert.equal(stats().image_posts,nativeBaseline.posts+expectedCalls)
    assert.deepEqual(snapshot(owner.id),nativeBaseline.studio_owner);assert.deepEqual(ledger(prepared.task_id),nativeBaseline.studio_ledger)
-   nativeProof.push({state:label,status:result.status,api_key_id:nativeKey.id,user_id:fixture.customer,account_id:id,model:'native-openai-image',original_sha256:digest(expectedPNG),native_usage:usage.usage,supplier_calls:1,studio_quote_status:409,studio_ledger_unchanged:true})
+   nativeProof.push({state:label,status:result.status,api_key_id:nativeKey.id,user_id:fixture.customer,account_id:id,model:'gpt-image-1',original_sha256:digest(expectedPNG),native_usage:usage.usage,supplier_calls:1,studio_quote_status:409,studio_ledger_unchanged:true})
   }
   await lifecycle('unlist',b.product_id)
   await proveNative('Studio Published product unlisted',1)
   await lifecycle('relist',b.product_id)
-  setCatalog({...nativeCatalog,models:nativeCatalog.models.filter(model=>model!=='native-openai-image')});catalogChanged=true
+  setCatalog({...nativeCatalog,models:nativeCatalog.models.filter(model=>model!=='gpt-image-1')});catalogChanged=true
   await proveNative('Studio Published product not ready after catalog model removal',2)
   setCatalog(nativeCatalog);catalogChanged=false
   assert.equal((await quote(offerB)).status,200)
@@ -320,7 +320,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const selectedOffers=ok(await catalog()).offers;assert(!selectedOffers.some(offer=>offer.product_id===unfinished.product_id))
   report.selected_publication={catalog_count:53,catalog_source:'isolated synthetic snapshot injection',published_before:2,draft_products:3,selected_product_ids:[a.product_id],publish_status:selectedResponse.status(),published_after:2,unfinished_remained_draft:true,unselected_published_unchanged:true,unselected_draft_unchanged:true,supplier_posts:0}
   setCatalog(nativeCatalog);catalogChanged=false
-  report.checks.push('Independent native customer API Key executes native-openai-image through original native endpoint on the same Account while its Studio product is unlisted or not ready; protected Image2Pro canvas-image-01 still requires Studio task flow','Actual admin publication selects one product from a 53-model catalog with two Published products and an unfinished third Draft; the unfinished and unselected products are not published')
+  report.checks.push('Independent native customer API Key executes gpt-image-1 through original native endpoint on the same Account while its Studio product is unlisted or not ready; protected Image2Pro canvas-image-01 still requires Studio task flow','Actual admin publication selects one product from a 53-model catalog with two Published products and an unfinished third Draft; the unfinished and unselected products are not published')
 
   report.checks.push('Single product unlist/archive/restore/relist preserves saved Draft, Published snapshot, Account sales and shared paid gate','Frozen old quote rejected while unlisted; independent never-attempted old quote first submitted after relist also rejects with no supplier call, usage, dedup or balance change; archive restore stays unlisted','Healthy sibling completes through actual BFF/Bridge/Core, downloads original bytes and settles once; duplicate and reads do not regenerate; unlisting that delivered product preserves original task/result bytes and ledger','Missing native catalog model isolates only the affected product; same Account model and same Group peer Account remain quotable','Final embedded admin confirmation and customer unavailable prompt exercised without API mocks or Vite')
   report.admin_writes=observedWrites;report.assets=await proof();report.supplier_posts_after=stats().image_posts;report.pass=true;save();return report
