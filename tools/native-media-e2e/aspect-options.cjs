@@ -29,7 +29,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
  const accountPath='/admin/media-workbench/accounts/'+account,w=id=>admin.locator(`[data-test="${id}"]`)
  const openEditor=async id=>{await admin.goto(base+'/admin/media');await w('source-localhost').locator('summary').click();await w(`supplier-${account}`).click();await w('model-gpt-image-2').click();if(await w('product-select').count())await w('product-select').selectOption(id);await w('wizard-step-1').click()}
  const customerPage=async()=>{await customer.goto(base+'/video-studio');await expect.poll(async()=>(await media('catalog')).status).toBe(200)}
- const shot=async(page,name)=>{await page.screenshot({path:root+'/evidence/'+name,fullPage:true,animations:'disabled'});report.screenshots.push(name)}
+ const shot=async(page,name)=>{await page.evaluate(async()=>{await document.fonts.ready;window.scrollTo({top:0,behavior:'instant'})});await page.screenshot({path:root+'/evidence/'+name,fullPage:true,animations:'disabled'});report.screenshots.push(name)}
  try{
   await login(admin,compose.services.core.environment.ADMIN_EMAIL,compose.services.core.environment.ADMIN_PASSWORD)
   await login(customer,'native-customer@example.invalid','Native-Customer-Only-20261012')
