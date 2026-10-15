@@ -1,0 +1,167 @@
+{
+  "native-customer-image-geometry-1k.json": {
+    "pass": true,
+    "scenario": "image-geometry-1k",
+    "id": "img_748df6d2bef6585a71b3a13d8117f901",
+    "actual_submits": [
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k bce3acc5-eef7-4967-a103-98664ccaaa3c",
+          "resolution": "1K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k bce3acc5-eef7-4967-a103-98664ccaaa3c",
+          "resolution": "1K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/generations",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "1:1",
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native image-geometry-1k bce3acc5-eef7-4967-a103-98664ccaaa3c",
+          "resolution": "1K"
+        }
+      }
+    ],
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+  },
+  "native-customer-edit-geometry-2k.json": {
+    "pass": true,
+    "scenario": "edit-geometry-2k",
+    "id": "img_bd5cac7708bf195fdf91a029d1ba81a4",
+    "actual_submits": [
+      {
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native edit-geometry-2k 32cf7580-248c-4eca-9391-89c6b63db662",
+          "resolution": "2K"
+        }
+      },
+      {
+        "method": "POST",
+        "path": "/v1/images/edits",
+        "auth": "bearer",
+        "body": {
+          "aspect_ratio": "3:2",
+          "images": [
+            {
+              "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+            }
+          ],
+          "model": "gpt-image-2",
+          "n": 1,
+          "prompt": "SYNTHETIC native edit-geometry-2k 32cf7580-248c-4eca-9391-89c6b63db662",
+          "resolution": "2K"
+        }
+      }
+    ],
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "repeat_download_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460"
+  },
+  "native-customer-video-compatible.json": {
+    "pass": true,
+    "scenario": "video-compatible",
+    "id": "op_f71bae0222049022e1c5883e9fb3ec48367574383fddf816de08e35176862bff",
+    "actual_submit": {
+      "method": "POST",
+      "path": "/v1/videos",
+      "auth": "bearer",
+      "body": {
+        "model": "synthetic-compatible-video",
+        "prompt": "SYNTHETIC native video-compatible 3c5c3438-bcc8-43a2-8b2d-eb2f3fd6594e",
+        "duration": 5,
+        "resolution": "720p",
+        "ratio": "16:9",
+        "face_direct": false
+      }
+    },
+    "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "repeat_download_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+    "playback_verified": true
+  },
+  "native-task-experience.json": {
+    "pass": true,
+    "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+    "checks": [
+      "502 retains unknown receipt, zero charge; text/edit/video navigation and refresh stay usable; query has loading, timestamp and persistent offline failure",
+      "Two explicit independent image tasks and frozen prices; edit outputs delivered and original hash verified; exactly one native settlement per completed task; no replay on query/download/relogin; video submissions unchanged"
+    ]
+  },
+  "native-studio-entry.json": {
+    "pass": true,
+    "checks": [
+      "Zero pre-created customer keys; actual Vue login/catalog prepares one native key per configured Group",
+      "Text/edit/single-video delivery and download use real Core/Bridge/BFF and native settlement",
+      "Account switch, refresh and query preserve identities; upstream 502 remains unknown with zero settlement",
+      "Native error status, Account, message, request ID and timing retained by real Ops middleware",
+      "104-request funds suite and 1870 scale suite reused, not rerun"
+    ],
+    "keys_before": [],
+    "keys_after": [
+      {
+        "id": 3,
+        "user_id": 2,
+        "group_id": 4,
+        "status": "active"
+      },
+      {
+        "id": 4,
+        "user_id": 2,
+        "group_id": 3,
+        "status": "active"
+      }
+    ]
+  },
+  "test_and_security": {
+    "runtime_sha": "4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+    "test_script_sha": "98a8e190bdbaefdfaa6381ee0665e6456b35bbdb",
+    "ci": 38710997846,
+    "ci_status": "PASS",
+    "security": 38710997965,
+    "security_status": "PASS",
+    "targeted_bff_tests": 21,
+    "targeted_vue_tests": 51,
+    "typecheck": "PASS",
+    "targeted_lint": "PASS",
+    "go": "CI service tests PASS; earlier local focused tests PASS; final local recompile hit Windows memory limit, cloud is final evidence"
+  },
+  "visual_review": {
+    "reviewed": true,
+    "viewports": [
+      1440,
+      390
+    ],
+    "source": "Final Core image; screenshots after real restart and readonly task query",
+    "findings": "No overlapping or clipped status/action controls. No-charge terminal, safe 502 reason, query timestamp and continue-creation visible. Service-closed banner is intentional managed-v1 invalidation after isolated Core restart. Black thumbnails are the synthetic 1px PNG, not real supplier artwork.",
+    "resource_boundary": "Captured response bytes match direct Core. One vendor-chart body was unavailable after navigation and explicitly excluded; no claim of verification for that body."
+  }
+}

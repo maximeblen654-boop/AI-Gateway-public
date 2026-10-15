@@ -1,0 +1,5369 @@
+{
+  "production": false,
+  "api_mocking": false,
+  "scope": "20 focused image-finality tasks; real BFF/Bridge/Core and native PostgreSQL transactions",
+  "tasks": [
+    {
+      "id": "img_466e025a05b1c16de7f32a3544a8c63f",
+      "user_id": 3,
+      "scenario": "OK",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_OK:0",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "100.00000000",
+        "frozen_balance": "0.00000000",
+        "usage": 0
+      },
+      "balance_samples": [
+        {
+          "balance": "100.00000000",
+          "frozen_balance": "0.00000000",
+          "usage": 0
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "completed"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_466e025a05b1c16de7f32a3544a8c63f",
+          "created_at": "2026-10-15T09:17:56.001Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_466e025a05b1c16de7f32a3544a8c63f/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:55.971259668Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4658,
+      "after": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "ledger": {
+        "request_id": "a6c6aab81e7bc2a03ce099382b7f080f99e54496e3da1300a2d76b22d34b86d9",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 3,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_466e025a05b1c16de7f32a3544a8c63f",
+          "created_at": "2026-10-15T09:17:56.001Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_466e025a05b1c16de7f32a3544a8c63f/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:55.971259668Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_a54046a7a6b41dba8346ca5de1220bb5",
+      "user_id": 4,
+      "scenario": "OK",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_OK:1",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "100.00000000",
+        "frozen_balance": "0.00000000",
+        "usage": 0
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "completed"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_a54046a7a6b41dba8346ca5de1220bb5",
+          "created_at": "2026-10-15T09:17:56.338Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_a54046a7a6b41dba8346ca5de1220bb5/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.279303195Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 2950,
+      "after": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "ledger": {
+        "request_id": "62ba917e0dcf746d60e10e81f5ed0fbc7d23b57245d8d6326f5af1017aaa489a",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 4,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_a54046a7a6b41dba8346ca5de1220bb5",
+          "created_at": "2026-10-15T09:17:56.338Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_a54046a7a6b41dba8346ca5de1220bb5/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.279303195Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_9ae427a4c7dccae0ec23af261e2b848a",
+      "user_id": 5,
+      "scenario": "OK",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_OK:2",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "100.00000000",
+        "frozen_balance": "0.00000000",
+        "usage": 0
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "completed"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_9ae427a4c7dccae0ec23af261e2b848a",
+          "created_at": "2026-10-15T09:17:56.644Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_9ae427a4c7dccae0ec23af261e2b848a/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.619221705Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 3414,
+      "after": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "ledger": {
+        "request_id": "a89a54591c90170041cdef5e9210e549e9002729c80119155ed57d91fdbed55c",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 5,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_9ae427a4c7dccae0ec23af261e2b848a",
+          "created_at": "2026-10-15T09:17:56.644Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_9ae427a4c7dccae0ec23af261e2b848a/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.619221705Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_d140fae6a176efb851119d03bb253092",
+      "user_id": 6,
+      "scenario": "OK",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_OK:3",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "100.00000000",
+        "frozen_balance": "0.00000000",
+        "usage": 0
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "completed"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_d140fae6a176efb851119d03bb253092",
+          "created_at": "2026-10-15T09:17:56.961Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_d140fae6a176efb851119d03bb253092/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.900149971Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 3188,
+      "after": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "ledger": {
+        "request_id": "9197546d8c22583f0f21821e2770abee323164f704e8bf9d513db93642ca45c9",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 6,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_d140fae6a176efb851119d03bb253092",
+          "created_at": "2026-10-15T09:17:56.961Z",
+          "status": "completed",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_d140fae6a176efb851119d03bb253092/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:19:56.900149971Z",
+          "expected_count": 1,
+          "delivered_count": 1,
+          "failed_count": 0,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_12702f46e5d8ebbbe19cadecb294b843",
+      "user_id": 3,
+      "scenario": "PARTIAL502",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_PARTIAL502:4",
+      "quantity": 3,
+      "frozen_price": {
+        "amount": "3.30",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "partial"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_12702f46e5d8ebbbe19cadecb294b843",
+          "created_at": "2026-10-15T09:18:02.593Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_12702f46e5d8ebbbe19cadecb294b843/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:02.568874419Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4211,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "f1f5ac785dac31591c324cbb39d680adf7dad4ebafe5a6f8a0c33241f9c156c8",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 3,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_12702f46e5d8ebbbe19cadecb294b843",
+          "created_at": "2026-10-15T09:18:02.593Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_12702f46e5d8ebbbe19cadecb294b843/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:02.568874419Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_4f3e19c5dd5f4b8331d9f9ae9210cefe",
+      "user_id": 4,
+      "scenario": "PARTIAL502",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_PARTIAL502:5",
+      "quantity": 3,
+      "frozen_price": {
+        "amount": "3.30",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "partial"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_4f3e19c5dd5f4b8331d9f9ae9210cefe",
+          "created_at": "2026-10-15T09:18:02.912Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_4f3e19c5dd5f4b8331d9f9ae9210cefe/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:02.852880413Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4432,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "35396b7aa6111803211a33a6ac36039088b638a913176baba7ed744072bb31ce",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 4,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_4f3e19c5dd5f4b8331d9f9ae9210cefe",
+          "created_at": "2026-10-15T09:18:02.912Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_4f3e19c5dd5f4b8331d9f9ae9210cefe/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:02.852880413Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_b4b64065140bf6237e800caf59cea42c",
+      "user_id": 5,
+      "scenario": "PARTIAL502",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_PARTIAL502:6",
+      "quantity": 3,
+      "frozen_price": {
+        "amount": "3.30",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "partial"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_b4b64065140bf6237e800caf59cea42c",
+          "created_at": "2026-10-15T09:18:03.199Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_b4b64065140bf6237e800caf59cea42c/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:03.174060125Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 3973,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "39ec3f71491ceffd879a23ee6fd1c03cd8af321498ef824b6b53ab4bbdf6ddee",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 5,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_b4b64065140bf6237e800caf59cea42c",
+          "created_at": "2026-10-15T09:18:03.199Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_b4b64065140bf6237e800caf59cea42c/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:03.174060125Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_539a37747347c8435e263f8b0b2d9883",
+      "user_id": 6,
+      "scenario": "PARTIAL502",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_PARTIAL502:7",
+      "quantity": 3,
+      "frozen_price": {
+        "amount": "3.30",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "98.90000000",
+        "frozen_balance": "0.00000000",
+        "usage": 1
+      },
+      "balance_samples": [
+        {
+          "balance": "98.90000000",
+          "frozen_balance": "0.00000000",
+          "usage": 1
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "partial"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_539a37747347c8435e263f8b0b2d9883",
+          "created_at": "2026-10-15T09:18:03.515Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_539a37747347c8435e263f8b0b2d9883/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:03.456143126Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 5101,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "c5451e8a2774d07dce9bf302e0de4d7766e0b3f536a7542a6ff28b203e204a88",
+        "usage": 1,
+        "dedup": 1,
+        "cost": "1.1000000000",
+        "user_id": 6,
+        "image_count": 1
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        },
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_539a37747347c8435e263f8b0b2d9883",
+          "created_at": "2026-10-15T09:18:03.515Z",
+          "status": "partial",
+          "results": [
+            {
+              "url": "/studio-v2/api/image/tasks/img_539a37747347c8435e263f8b0b2d9883/results/0",
+              "mime_type": "image/png",
+              "output_format": "png",
+              "extension": "png"
+            }
+          ],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "3.30",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 3,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 3,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:03.456143126Z",
+          "expected_count": 3,
+          "delivered_count": 1,
+          "failed_count": 2,
+          "pending_count": 0,
+          "billing_state": "billed",
+          "settled_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 1,
+                "output_offset": 1,
+                "output_count": 1,
+                "mode": "single"
+              },
+              {
+                "index": 2,
+                "output_offset": 2,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_1134da2624c9fd97dd9ef420d0c994db",
+      "user_id": 3,
+      "scenario": "502",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_502:8",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "failed"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_1134da2624c9fd97dd9ef420d0c994db",
+          "created_at": "2026-10-15T09:18:50.005Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:49.979105709Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 2951,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "c2bc6685324de377652a7646468f2dee9ce25d39edacd3259b11bf49a6d34ec6",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_1134da2624c9fd97dd9ef420d0c994db",
+          "created_at": "2026-10-15T09:18:50.005Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:49.979105709Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_589434f882c5c8ae9cbbe737637d98b0",
+      "user_id": 4,
+      "scenario": "502",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_502:9",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "failed"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_589434f882c5c8ae9cbbe737637d98b0",
+          "created_at": "2026-10-15T09:18:50.333Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.273670486Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4124,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "718582c62bae456bf30363919c194a0b5c701a15c9337f10ee7f74e626357138",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_589434f882c5c8ae9cbbe737637d98b0",
+          "created_at": "2026-10-15T09:18:50.333Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.273670486Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_ce46b9928878a540cc90893737a2e5b0",
+      "user_id": 5,
+      "scenario": "502",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_502:10",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "failed"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_ce46b9928878a540cc90893737a2e5b0",
+          "created_at": "2026-10-15T09:18:50.631Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.602049639Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4588,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "4b4deb93d1f75477a79dc85df377f7080ddcc6308e954b56481f56c144ec33a9",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_ce46b9928878a540cc90893737a2e5b0",
+          "created_at": "2026-10-15T09:18:50.631Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.602049639Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_c224210043f35faaaed818aae62a40aa",
+      "user_id": 6,
+      "scenario": "502",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_502:11",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 200,
+        "task_status": "failed"
+      },
+      "duplicate_submit": {
+        "status": 200
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_c224210043f35faaaed818aae62a40aa",
+          "created_at": "2026-10-15T09:18:50.951Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.891710501Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 4348,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "a7cea3039ef6819ce1ff69c9ee247428ae67ab5dc9bee16753e703bc3adb7f74",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_c224210043f35faaaed818aae62a40aa",
+          "created_at": "2026-10-15T09:18:50.951Z",
+          "status": "failed",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:20:50.891710501Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 1,
+          "pending_count": 0,
+          "billing_state": "not_charged",
+          "failure_code": "upstream_http_502_no_delivery",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_79ec9e18a13d651edaafb39b97e5b130",
+      "user_id": 3,
+      "scenario": "DISCONNECT",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_DISCONNECT:12",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_79ec9e18a13d651edaafb39b97e5b130",
+          "created_at": "2026-10-15T09:19:36.957Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:36.932086474Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 3133,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "c712e33fcf17dab011440aa77b30869ab5a907aad7813b2216935225b1ae8a23",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_79ec9e18a13d651edaafb39b97e5b130",
+          "created_at": "2026-10-15T09:19:36.957Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:36.932086474Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_93f9616722e7620864177be623d7f2d2",
+      "user_id": 4,
+      "scenario": "DISCONNECT",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_DISCONNECT:13",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_93f9616722e7620864177be623d7f2d2",
+          "created_at": "2026-10-15T09:19:37.272Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.212354023Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 2676,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "9cfaf925dffb5bb520cd40015fd53aa1c1f6dc577083041ba1b6f1c569ec2276",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_93f9616722e7620864177be623d7f2d2",
+          "created_at": "2026-10-15T09:19:37.272Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.212354023Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_72c3ba79af79bddee5842d74f2d26e7d",
+      "user_id": 5,
+      "scenario": "DISCONNECT",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_DISCONNECT:14",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_72c3ba79af79bddee5842d74f2d26e7d",
+          "created_at": "2026-10-15T09:19:37.561Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.531309055Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 2905,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "412eb89f4c40d08afb3f0dd3c7d315333729abb9ae544aa07c592ffbcc8df381",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_72c3ba79af79bddee5842d74f2d26e7d",
+          "created_at": "2026-10-15T09:19:37.561Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.531309055Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_3883ccfe236b317bde3df97bb279e64e",
+      "user_id": 6,
+      "scenario": "DISCONNECT",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_DISCONNECT:15",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_3883ccfe236b317bde3df97bb279e64e",
+          "created_at": "2026-10-15T09:19:37.873Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.814514971Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 2450,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "824395f1ba108059a856764e40735ab9449add855f56d7818298ce1522700ba1",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_3883ccfe236b317bde3df97bb279e64e",
+          "created_at": "2026-10-15T09:19:37.873Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:37.814514971Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_2dafc66da5e53b997a3a39e5d82864a8",
+      "user_id": 3,
+      "scenario": "TIMEOUT",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_TIMEOUT:16",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_2dafc66da5e53b997a3a39e5d82864a8",
+          "created_at": "2026-10-15T09:19:42.009Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:41.982482719Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 23149,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "a85f5ad697882ff5cadc3bd84669cf3e442d9d18cd0624c7eea292f21c14582c",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_2dafc66da5e53b997a3a39e5d82864a8",
+          "created_at": "2026-10-15T09:19:42.009Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:41.982482719Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_d301877f53075f0f20d10737e714472d",
+      "user_id": 4,
+      "scenario": "TIMEOUT",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_TIMEOUT:17",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_d301877f53075f0f20d10737e714472d",
+          "created_at": "2026-10-15T09:19:42.335Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.277754067Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 22680,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "b03c924a9f0f9d985d2e0d368913d5e586b14c860c22c602d311d6a35dd6bc4a",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_d301877f53075f0f20d10737e714472d",
+          "created_at": "2026-10-15T09:19:42.335Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.277754067Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_c762680f3944e296bc9b134df8da9721",
+      "user_id": 5,
+      "scenario": "TIMEOUT",
+      "edit": false,
+      "prompt": "BATCH_FUNDS_TIMEOUT:18",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_c762680f3944e296bc9b134df8da9721",
+          "created_at": "2026-10-15T09:19:42.613Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.58950674Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 22454,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "d90d483c22abd0427b83800882d4d766245830fc3947d0bb10dd051d53976ea0",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/generations",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_c762680f3944e296bc9b134df8da9721",
+          "created_at": "2026-10-15T09:19:42.613Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 0,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.58950674Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "img_99f59f907250f324e01f69e39a69b07b",
+      "user_id": 6,
+      "scenario": "TIMEOUT",
+      "edit": true,
+      "prompt": "BATCH_FUNDS_TIMEOUT:19",
+      "quantity": 1,
+      "frozen_price": {
+        "amount": "1.10",
+        "currency": "CNY",
+        "billing_mode": "per_request"
+      },
+      "before": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "balance_samples": [
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        },
+        {
+          "balance": "97.80000000",
+          "frozen_balance": "0.00000000",
+          "usage": 2
+        }
+      ],
+      "released": "0",
+      "hold_contract": "Studio image delivery settlement; no reserve/capture/release hold",
+      "submit": {
+        "status": 409,
+        "error": "image_binding_unavailable"
+      },
+      "latest": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_99f59f907250f324e01f69e39a69b07b",
+          "created_at": "2026-10-15T09:19:42.940Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.868402436Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      },
+      "elapsed_ms": 22902,
+      "after": {
+        "balance": "97.80000000",
+        "frozen_balance": "0.00000000",
+        "usage": 2
+      },
+      "ledger": {
+        "request_id": "90f1c9f3cf77e1ee6f60427077a4d9c61c9e92f49d5eeef114a163b0f58f46dd",
+        "usage": 0,
+        "dedup": 0,
+        "cost": "0",
+        "user_id": null,
+        "image_count": null
+      },
+      "upstream_requests": [
+        {
+          "method": "POST",
+          "path": "/v1/images/edits",
+          "model": "gpt-image-2",
+          "n": 1
+        }
+      ],
+      "cross_owner_status": 409,
+      "pass": true,
+      "restarted_query": {
+        "status": 200,
+        "body": {
+          "contract": "published_image_binding_v1",
+          "task_id": "img_99f59f907250f324e01f69e39a69b07b",
+          "created_at": "2026-10-15T09:19:42.940Z",
+          "status": "unknown",
+          "results": [],
+          "offer_id": "mw_offer_281803f4f1ddbd377b4af68768843e4587b237d7972c017c39e6bbd9216f6e0c",
+          "sale_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "unit_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "total_price": {
+            "amount": "1.10",
+            "currency": "CNY",
+            "billing_mode": "per_request"
+          },
+          "quantity": 1,
+          "spec": {
+            "resolution": "4K",
+            "duration_seconds": 0,
+            "aspect_ratio": "16:9",
+            "quality": "",
+            "count": 1,
+            "images": 1,
+            "videos": 0,
+            "audio": 0
+          },
+          "expires_at": "2026-10-15T09:21:42.868402436Z",
+          "expected_count": 1,
+          "delivered_count": 0,
+          "failed_count": 0,
+          "pending_count": 1,
+          "billing_state": "pending",
+          "execution": {
+            "mode": "single",
+            "max_output_images": 1,
+            "units": [
+              {
+                "index": 0,
+                "output_offset": 0,
+                "output_count": 1,
+                "mode": "single"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "checks": [
+    "Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks",
+    "Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity",
+    "transport-unknown remains unknown; explicit scoped 502 ends without charge, not declared supplier-refunded",
+    "No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint"
+  ],
+  "source_sha": "4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+  "before": [
+    {
+      "user_id": 3,
+      "balance": "100.00000000",
+      "frozen_balance": "0.00000000",
+      "usage": 0
+    },
+    {
+      "user_id": 4,
+      "balance": "100.00000000",
+      "frozen_balance": "0.00000000",
+      "usage": 0
+    },
+    {
+      "user_id": 5,
+      "balance": "100.00000000",
+      "frozen_balance": "0.00000000",
+      "usage": 0
+    },
+    {
+      "user_id": 6,
+      "balance": "100.00000000",
+      "frozen_balance": "0.00000000",
+      "usage": 0
+    }
+  ],
+  "posts_before": 9,
+  "admission_waits": [
+    {
+      "user_id": 3,
+      "attempts": 8,
+      "elapsed_ms": 40467
+    },
+    {
+      "user_id": 3,
+      "attempts": 8,
+      "elapsed_ms": 40492
+    }
+  ],
+  "phase": "complete",
+  "after": [
+    {
+      "user_id": 3,
+      "balance": "97.80000000",
+      "frozen_balance": "0.00000000",
+      "usage": 2
+    },
+    {
+      "user_id": 4,
+      "balance": "97.80000000",
+      "frozen_balance": "0.00000000",
+      "usage": 2
+    },
+    {
+      "user_id": 5,
+      "balance": "97.80000000",
+      "frozen_balance": "0.00000000",
+      "usage": 2
+    },
+    {
+      "user_id": 6,
+      "balance": "97.80000000",
+      "frozen_balance": "0.00000000",
+      "usage": 2
+    }
+  ],
+  "modes": {
+    "text": 10,
+    "edit": 10
+  },
+  "counts": {
+    "502": 4,
+    "OK": 4,
+    "PARTIAL502": 4,
+    "DISCONNECT": 4,
+    "TIMEOUT": 4
+  },
+  "assets": {
+    "frontend_origin": "final Core image",
+    "vite": false,
+    "browser_api_mocking": false,
+    "resources": [
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "bytes": 3938,
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+        "bytes": 63323,
+        "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-vue-DeI_Ip_v.js",
+        "bytes": 113799,
+        "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-CmpEUn2X.js",
+        "bytes": 194144,
+        "sha256": "e86ae0d185a0eb45aabd96fd322d0c614b294bc17d3de2b994706e4acde835d8",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/vendor-misc-CeAxBZ0e.js",
+        "bytes": 279017,
+        "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "bytes": 293040,
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/index-Y0bcKx5T.js",
+        "bytes": 414176,
+        "sha256": "e5deddc8af71e400e4dfb4bc1818b49e1f4786f8411baad54b32b893b0b23b2a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-B6ZiYKjM.css",
+        "bytes": 523,
+        "sha256": "fd702f466c23c7eaec04f358d8631d348075d1563df805687a1b0a5ca796b782",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-DhEkaHwn.css",
+        "bytes": 508,
+        "sha256": "e1a547e6e2a48ac77b7e78648aba36e1cff355613de73f332c9c35b5139445af",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge-BmkiKxf7.css",
+        "bytes": 1401,
+        "sha256": "7ad582c21fe51460913dfdb03ca27b6c1e34e0c151b89d7f6aa62c7121183b8f",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-mYEDiWCN.css",
+        "bytes": 200,
+        "sha256": "96de8eb2802f0665e11e1cfd66ac0fcebd9d351c19c8051dd3913876ebc8af38",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppHeader-C7aWrA1h.css",
+        "bytes": 13615,
+        "sha256": "119f13136fdfa3758a5fb1461dfdc29e8e0a794dc89cb2249b3cd8040dc61312",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-CjvPxOhx.css",
+        "bytes": 228,
+        "sha256": "4f4d9bbbf1a10bc86ad2bd7ff56b3b3428b1115bb5aef6ffea490abae992700d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginView-DG5NpNVD.js",
+        "bytes": 17928,
+        "sha256": "fc1b216f9408ca9cb6e343c368e62e06cc7253cba43b7b714124d676e43237a7",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AuthLayout-BXoSCdAe.js",
+        "bytes": 2420,
+        "sha256": "9519ed9a19ab39b6d4167207573e1e99e378136ec66210cf0353821bc910bb45",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/useClipboard-f-9zyzP0.js",
+        "bytes": 917,
+        "sha256": "3a8e39869aee3a0f924612c45a8367ebb575f083e2c2ee4ebc00af4a90c4514a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-C46qPadz.js",
+        "bytes": 10787,
+        "sha256": "9da72c3ca49b69992508c02faf47babdffbc60dc7278668b6b764666aae0d0e1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/oauthAffiliate-CrlUwkd1.js",
+        "bytes": 1197,
+        "sha256": "1ba453f05da3a376c7fed82fc6850b45a6f8c0d4a600bff7938917804806af89",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/apiError-zX02PgX9.js",
+        "bytes": 1212,
+        "sha256": "2b13e47dc6627eb34e647e3d20bf06c6817dc8831c6e0f1aed9c5823bd7eded3",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoginAgreementPrompt-B8y3Eq-C.js",
+        "bytes": 16271,
+        "sha256": "a07044822efd29ce5ab2e9fc001deb271e7bc143fe24ebde9ded1af012c9bc3a",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/usage-C-goCWFw.js",
+        "bytes": 1882,
+        "sha256": "cca746081195c7399e9f8a71f8b13ea07086cb02e07d90c550f360961d01496d",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LocaleSwitcher-Cd_vkNN4.js",
+        "bytes": 2345,
+        "sha256": "4c527a59f8a1fbdfde23cc429bc741a285251a8f25519161c64e750fbe385c60",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DSkMNq6b.js",
+        "bytes": 828,
+        "sha256": "575cc61055b9503e047778ba8b43d8f74f13f0ec3a9b9edebf3251251608e2bb",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/DashboardView-BkNyvx9j.js",
+        "bytes": 27006,
+        "sha256": "b4f9552d340092236a429f9e323a8d278529f507adf92ebae7b62b6ffb974d81",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend-Ci85YOuO.css",
+        "bytes": 9161,
+        "sha256": "f566e2ca595ffb156f0135b7b0864c1432f4170d015bbae4bc5b50e8cfa7d4a1",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-vfjFHKfA.css",
+        "bytes": 9840,
+        "sha256": "f7d4a7bc7d47b6a2fe4ca6b91b25d7dd239b6f92f8df8377a5577c4d926d4ac4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/LoadingSpinner-DT-rtrW_.css",
+        "bytes": 267,
+        "sha256": "d65d063476e8e82f9b0fc783eb879d9c067a4416f877de4b80162013ddf326ce",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/AppLayout.vue_vue_type_script_setup_true_lang-CCLzLHlM.js",
+        "bytes": 104141,
+        "sha256": "14a841bdc86cbae7f6d352485e5474957edf1c65e9fb85925e7f7157ba53edf4",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-C3F2H9ug.js",
+        "bytes": 8018,
+        "sha256": "7ea43dd784d8e5241d7ddabebe9e2289756050952b798739fc36bfec6d95042b",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/Select-BDxoiTNC.js",
+        "bytes": 8032,
+        "sha256": "a22a4195fad48d4bd2afd2baab544a944dea18bd17fdefce9f34860ebafcf00b",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/EmptyState.vue_vue_type_script_setup_true_lang-WHxDDduN.js",
+        "bytes": 1709,
+        "sha256": "967e2eedbc998a1f89179ed34d33505cf61d1d8a357d691fae6839c98e0cefb9",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/user-CuxxW0_2.js",
+        "bytes": 2057,
+        "sha256": "e6d4f2f2f0fdc5b35ffac75cba2a11857cf7374fb6a0a2f5f0ee08435d48f5ab",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-B9nrdUzf.css",
+        "bytes": 22628,
+        "sha256": "453a197243a1e1db9fd2649e9892b9165d72c81a21bda2783a4adb36b5aacda0",
+        "direct_core_equal": true
+      },
+      {
+        "path": "/assets/VideoStudioView-BDVrcoOX.js",
+        "bytes": 48385,
+        "sha256": "2336f32357fe8667ccb252167ac8f91152ac573e3abdc1d5c883b783b8574bd8",
+        "direct_core_equal": true
+      }
+    ],
+    "unavailable_bodies": [
+      {
+        "path": "/assets/vendor-chart-BykZcwza.js",
+        "reason": "Chromium body unavailable after navigation; excluded from byte verification"
+      }
+    ]
+  },
+  "pass": true
+}

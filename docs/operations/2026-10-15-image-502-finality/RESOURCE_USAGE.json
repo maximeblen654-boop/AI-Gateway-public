@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-15",
+  "production_action": false,
+  "cleanup_root": "D:/AI-Gateway-public-readiness-private/20261009-security/go-tmp",
+  "deleted_idle_go_build_directories": [
+    "go-build1142694390",
+    "go-build1190056593",
+    "go-build1553576078",
+    "go-build1914875187",
+    "go-build2229389868",
+    "go-build2321185593",
+    "go-build2563109798",
+    "go-build2854725625",
+    "go-build3334645075",
+    "go-build3537293975",
+    "go-build368320535",
+    "go-build651057089"
+  ],
+  "checks": [
+    "No active go/compile/link process",
+    "Each resolved absolute path within exact cleanup root",
+    "No reparse points in any target tree",
+    "Each target verified absent after removal"
+  ],
+  "D_before_bytes": 8912064512,
+  "D_after_bytes": 10917048320,
+  "D_actual_delta_bytes": 2004983808,
+  "C_before_bytes": 5051764736,
+  "C_after_bytes": 5051731968,
+  "preserved": [
+    "source and dirty worktrees",
+    "shared Go build/module cache",
+    "formal candidates and rollback assets",
+    "Docker images/volumes and persistent media",
+    "credentials and user files"
+  ],
+  "local_build_note": "Later narrow Go recompile failed with Windows VirtualAlloc errno 1455; no retry, tests verified by GitHub CI. No remaining go-tmp subdirectories.",
+  "artifacts": "Only small reports/screenshots downloaded; complete three-image artifact retained on GitHub, no duplicate local TAR or extraction."
+}
