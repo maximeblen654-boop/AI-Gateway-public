@@ -1,0 +1,125 @@
+{
+  "status": "DEPLOYMENT_BLOCKED_BEFORE_SWITCH",
+  "observed_at": "2026-10-15T19:11:46.920778+00:00",
+  "candidate_source_sha": "15da7cbbaefe4a3ea11fda6dfd983e030db44b4a",
+  "candidate_artifact": 11997437376,
+  "candidate_manifest_sha256": "bd499f3dc9e7311c240e0e04539579711b9d02dbeeb2272b4fa790d2cf7c29a6",
+  "actual_production_source_sha": "4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+  "images": {
+    "sub2api": {
+      "ref": "native-candidate-core:4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+      "image": "sha256:fb7b46046f8abf255ad7013c4296de24cc956b6b18e44313b7d9af38aeeae1c0",
+      "config_digest": "sha256:34242d4051dd842e48ef5ba60af853da810410cf5c6cffe0dda1d054c5d4c918",
+      "health": "healthy"
+    },
+    "studio-v2-bridge": {
+      "ref": "native-candidate-bridge:4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+      "image": "sha256:3d3c0a4c07ca4fc92fe5af0865d50b47f2c9783a3acb70bdc209cb5b423aded6",
+      "config_digest": "sha256:c687e5dd1d5d6832b20a2a544a7bf0d55900c6fe45659fe5e619755b1349e493",
+      "health": "healthy"
+    },
+    "studio-v2-bff": {
+      "ref": "native-candidate-bff:4f10be20ef06bc0a7670822e88eefd60c53d09c9",
+      "image": "sha256:c0496b56b01c7f87886e53e5d010380e3f7b73b93355f1042bbf9877da02c686",
+      "config_digest": "sha256:5f557e082f1bf8004396b1ac10f345cce4b75cf97cf098990b7d2dd5cae2d744",
+      "health": "healthy"
+    }
+  },
+  "paid_states": {
+    "image": {
+      "requested_enabled": true,
+      "effective_enabled": false,
+      "reason": "apply_failed"
+    },
+    "video": {
+      "requested_enabled": false,
+      "effective_enabled": false,
+      "reason": "closed"
+    }
+  },
+  "precheck": {
+    "http": 200,
+    "wall_ms": 334,
+    "body": {
+      "code": 0,
+      "message": "success",
+      "data": {
+        "metrics": {
+          "accounts_validated": 0,
+          "specs_checked": 0,
+          "timings_ms": {
+            "eligibility_and_storage": 6,
+            "final_dependencies": 21,
+            "initial_dependencies": 33,
+            "published_validation": 0,
+            "spec_compilation": 0,
+            "total": 61
+          }
+        },
+        "media": "image",
+        "pass": false,
+        "fingerprint": "5c90cfd517fe423db85d0f401da3cf7a7a25dac08e6259c1f841eff7eae8f651",
+        "checks": [
+          {
+            "code": "billing_eligibility",
+            "pass": true
+          },
+          {
+            "code": "private_result_storage",
+            "pass": true
+          },
+          {
+            "code": "published_specs",
+            "account_id": 77,
+            "pass": false
+          }
+        ],
+        "checked_at": "2026-10-15T19:08:14.015917149Z"
+      }
+    }
+  },
+  "catalog_dependency": {
+    "current_catalog_sha256": "d351a78377633b97bf27bda5694c4b672032dd5115c6a22884de33f257937a81",
+    "published_catalog_sha256": "7a23bb397161bfa30e7194dd6675d6de3b1e3c9e71aa9f0cec493369c3c80e38",
+    "validation_catalog_sha256": "d351a78377633b97bf27bda5694c4b672032dd5115c6a22884de33f257937a81",
+    "matches_published": false,
+    "matches_saved_validation": true,
+    "catalog_synced_at": "2026-10-15T15:47:27Z",
+    "model_count": 53
+  },
+  "account77": {
+    "draft_revision": "mwd_e7d66dfc6b79c84ec1382c602d1ef9d2e42e992e7765ebff89bca21a8adcba6e",
+    "draft_updated_at": "2026-10-15T16:39:27.558307584Z",
+    "draft_product_count": 2,
+    "draft_models": [
+      "gpt-image-2",
+      "Nano-banana-2.1"
+    ],
+    "validation_status": "PASS",
+    "validation_matches_draft": true,
+    "validation_cases": 3570,
+    "diagnostics": [],
+    "published_models": [
+      "gpt-image-2"
+    ],
+    "sales_enabled": true,
+    "effective_sales": false,
+    "effective_state": "PUBLISHED_NOT_READY"
+  },
+  "unchanged": {
+    "fingerprints": true,
+    "historical_receipts": true,
+    "account77_draft": true,
+    "monitor": true,
+    "paid_records": true
+  },
+  "monitor": "v1",
+  "migration_pending": [],
+  "migration_checksum_mismatch": [],
+  "switch_performed": false,
+  "rollback_performed": false,
+  "supplier_generation_performed": false,
+  "protected_data_modified": false,
+  "maintenance_seconds": 0,
+  "archive_verification_scope": "Existing PASS manifest hash and GitHub artifact metadata verified. No TAR download, docker load, build or switch performed because production precheck failed."
+}
