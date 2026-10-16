@@ -50,3 +50,26 @@
 候选完整包仍只保留 GitHub 一份；本地未下载完整镜像。
 
 - 最终 manifest SHA-256：247bb9a3445028ae0243d8de60d757e0ac313f0b6fb2159056321946cb52eaa5。
+
+## 自动历史清理补丁候选
+
+- 新运行源码：`a8f5f0f21c3fe092c815400c27b9fc19d789861d`
+- Candidate Run：`38859091998`，Acceptance `PASS`，状态 `CANDIDATE_READY_NOT_DEPLOYED`
+- CI：`38857828665` PASS；Security：`38857828630` PASS
+- 完整 Artifact：`12029375171`，小证据 Artifact：`12029256517`，均预计 2026-10-30 到期
+- Manifest SHA-256：`a4b873c32489c0b65cf6a284cee360dcf274424176f3c2793a498a24df5d9180`
+- Core config/image `sha256:821100b48b83468b0ee7fff361d352675eaef5bc3b6d27bcc28db59d46ad8bb5`，OCI `sha256:10a764873e12edb0c0689c4c7511e0926b2422a3ccdd09940c90cf83a8ba1432`，TAR SHA-256 `1847a07b52d05f6d0a01a77cf14bdb739f6ad0b291d8045a9290fa2a04683e6a`
+- Bridge config/image `sha256:fb2b01a2bec9c537113fb2531a4de14aafa78f125ebd8d40cd9e095760e29acf`，OCI `sha256:64d1fefdfc73838d6cd926446fb94ebcff84986bafa1fc897e2f8e18d6c228be`，TAR SHA-256 `073f3dbcb200bf813e9e6b10f8a76b128caf8a432e92f1d6420bffe553511b76`
+- BFF config/image `sha256:8850f2ee3756dcc0b44169c30b8d21558377d566e77c96c767a837e7f6f88c02`，OCI `sha256:4e8e52c5f238b345e214e63d4b96d37604d7ee907149c2dcc7d3b73173f0f40e`，TAR SHA-256 `2ad4bac64ae4d84c621f0b61b6cd5735cb37d086a8d8fa09db4defa4d7bc6af5`
+
+### 本轮实际修复
+
+- 历史接口隐藏超过 72 小时的已结算/已明确未收费终态；unknown、pending、billing_unknown 和恢复中的任务继续返回。
+- 首次读取某 owner 历史时自动触发有限批次清理，并为该 owner 建立 6 小时重复维护；每次删除前重新 GET 权威 receipt，绝不使用恒真 confirm。
+- 删除仅限已过期、receipt 终态匹配、无仍在保留期原片的 task/identity 展示记录；quote、dispatch claim、receipt、usage/dedup 和财务证据保留。
+- 清理结果记录 deleted/failed/bytes；重复执行安全，删除失败不阻塞历史读取。
+- 视频页面不显示图片 72 小时文案。
+
+### 受控部署方案
+
+部署前以当前生产三组件和开关为基线，校验新 manifest/TAR/config digest；先灰度或维护窗口切换三组件，再做只读健康、历史接口和原片下载检查。确认图片/视频开关、商品、余额、usage/dedup、receipt 与历史任务指纹不变后，才允许恢复原图片状态。生产执行 owner-scoped 清理只会由客户历史读取触发，首次运行按批次处理并记录统计；不做全库扫描、不删除未决任务、不改视频策略。
