@@ -37,3 +37,14 @@
 - 390px 显示失败：[failed-shown-390.png](failed-shown-390.png)
 
 截图来自本地隔离 Vite fixture `scenario=failed`，不含生产数据，也未连接真实上游。
+
+## 候选结果
+
+- 固定源码：`875eeef7644993f08de04b0ccdcf2179627848be`
+- Candidate Run：`38851646539`，Acceptance `PASS`，状态 `CANDIDATE_READY_NOT_DEPLOYED`
+- CI：`38850505697` PASS；Security：`38850505696` PASS
+- 完整候选 Artifact：`12025273779`（约242.5 MiB）；小证据 Artifact：`12025243949`
+- manifest 记录的组件身份：Core config/image `sha256:eff74c4a2c0f9db928dd656e5c08c0a2326c0127f34150c0b6dde7b97918dc9b`，OCI manifest `sha256:ddebbdcaaa11ad9d5c0de456560d3055af5e1edacd75b296539c17fe5b177d98`，TAR `core-875eeef7644993f08de04b0ccdcf2179627848be.tar.gz` SHA-256 `f76f535d004c51d287736e12d905ce87f4b13e0fa1026b01cfea842f0f9e4d79`；Bridge config/image `sha256:e2d0ba88f9094f31816baf9f557ba3ea8869cffc9b1854cf8117d51ba76c10f7`，OCI manifest `sha256:b6b0439b5829db1df733d08e8a860fbe520f11fae7d3e96e55b2c3e1a4234ceb`，TAR `bridge-875eeef7644993f08de04b0ccdcf2179627848be.tar.gz` SHA-256 `5c8e0a9ff7a76a3f578e2b51900b22fd76e2968bfbe4ea694ec78e935303419a`；BFF config/image `sha256:6fbab1d8126bd1c0de17ca3d14a2cd609989487271865e122b1984c91b7dba9d`，OCI manifest `sha256:f053577130e22fb42a80be3c9147474d9e2220fc60249d11bf1ce0a420a8f727`，TAR `bff-875eeef7644993f08de04b0ccdcf2179627848be.tar.gz` SHA-256 `039ee6bd2297f0204d5963ccc48fa527af6cc30cda6fae18ce8d4338edfb11fd`。
+- 组合验收来自最终 Core 镜像，三组件 healthy，Bridge/BFF 使用 Core network namespace；无生产动作、无真实供应商请求。
+
+候选完整包仍只保留 GitHub 一份；本地未下载完整镜像。
