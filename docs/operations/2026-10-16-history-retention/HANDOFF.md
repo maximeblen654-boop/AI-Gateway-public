@@ -73,3 +73,16 @@
 ### 受控部署方案
 
 部署前以当前生产三组件和开关为基线，校验新 manifest/TAR/config digest；先灰度或维护窗口切换三组件，再做只读健康、历史接口和原片下载检查。确认图片/视频开关、商品、余额、usage/dedup、receipt 与历史任务指纹不变后，才允许恢复原图片状态。生产执行 owner-scoped 清理只会由客户历史读取触发，首次运行按批次处理并记录统计；不做全库扫描、不删除未决任务、不改视频策略。
+
+## 最终公平清理候选
+
+- 最新运行源码：`d1b87b3f80c0a42e7b7905c153e5532f38182a23`
+- Candidate Run：`38883814258`，Candidate/Acceptance `PASS`，状态 `CANDIDATE_READY_NOT_DEPLOYED`
+- CI：`38881494843` PASS；Security：`38881494777` PASS
+- 完整 Artifact：`12039074579`；小证据 Artifact：`12039573346`；预计 2026-10-30 到期
+- Manifest SHA-256：`e1774699fbee677f9b6df8bf99c84bc5ba6b47263ffd31424571602f575a86f4`
+- Core config/image `sha256:e0c546c87ac43656bef14341176ffabf4870cff95d1c3c8110f64ab8108b4174`，OCI `sha256:285924aa048bde1b9d25a456a873640cd6570fc4b27deac82bcfc9fde0197387`，TAR SHA-256 `a3be77732ca6c32d4b966aaf8bda6acad084148f99f00b0a136929f6b80e77cb`
+- Bridge config/image `sha256:4a00c84a893aac260178d013f9641dc3e8d28e73f90d98354defacf19690f05e`，OCI `sha256:0f8cd5efdd7955a599c92e6588ed8fe0e42f5fa0fe717a4f357ca28e9fb8b0f9`，TAR SHA-256 `34709d490ce8d87fff70d4f3133059256acd88d61c3ca6543c36aa19c71abf96`
+- BFF config/image `sha256:564d2207099d8c2d3c21882b8c91342f49313a350e357e1e3f5591dd185e27eb`，OCI `sha256:489debb67b625d69b6043f6eabb28f7d09db944a694c92fe91b9cac8179cac78`，TAR SHA-256 `110c95c954b501c34f9feb066ef4e6f0b16871047aaf0c476f9a458ad5d151db`
+
+公平批次采用 owner-scoped 持久 cursor，每轮最多检查 batchSize 条，前面的未到期/未决任务不会永久挡住后续任务。历史 GET 是唯一自动触发点；请求期间复用 in-flight promise，下一次请求重新认证，不保存 15 分钟 TTL 之外的 sessionProof。没有跨用户后台定时器；不活跃 owner 的展示 journal 可能在下一次合法访问前保留。图片原片的全局 6 小时清理不变。
