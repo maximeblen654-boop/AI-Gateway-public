@@ -111,6 +111,11 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
   async function recover(session,taskID) {
     const {task,identity}=get(session,taskID);
     if(task.status==='prepared'&&!fs.existsSync(`${location('task',identity)}.sync-dispatch`))return view(task);
+    const storedCount=Array.isArray(task.results) ? task.results.length : 0;
+    const storedFinal=task.billing_state==='billed' && ['completed','partial'].includes(task.status) && storedCount>0 && storedCount===(task.delivered_count??storedCount) && Array.from({length:storedCount},(_,index)=>results.hasResult(task.owner,taskID,index)).every(Boolean);
+    // Final local state is sufficient for history viewing. Fall through only
+    // when a saved result is missing and recovery can still repair it.
+    if(storedFinal)return view(task);
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
     if(!['unknown','persisted','completed','partial','failed'].includes(receipt.status) || !['pending','billing_unknown','billed','not_charged'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');

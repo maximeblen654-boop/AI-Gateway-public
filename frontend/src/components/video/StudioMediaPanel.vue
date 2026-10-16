@@ -35,7 +35,7 @@
       <p v-if="selectionUnavailable || activeQuoteUnavailable" role="status" class="studio-notice" data-testid="studio-model-unavailable">此模型暂不可用，请选择其他模型</p>
       <p v-if="notice" role="status" class="studio-notice">{{ notice }}</p>
       <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
-      <p v-if="!enabled" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
+      <p v-if="readinessState === 'disabled'" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
       <section v-if="active" ref="taskDetail" class="studio-task-detail" data-testid="studio-task" aria-label="当前任务">
         <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</span></div>
         <div class="studio-price-line"><p data-testid="studio-price">冻结报价 <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
@@ -52,7 +52,8 @@
         <div v-if="hasResults(active)" class="studio-results" data-testid="studio-results">
           <figure v-for="i in active.resultCount" :key="`${active.id}-${i}`">
             <div class="studio-result-stage" :class="{ 'is-image': active.kind === 'image' }">
-              <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="unavailableResults[`${active.id}-${i}`] = false" @error="unavailableResults[`${active.id}-${i}`] = true" />
+              <span v-if="loadingResults[`${active.id}-${i}`]" class="studio-result-loading" role="status">正在加载已保存原片…</span>
+              <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
               <video :key="`video-${resultRead}-${i}`" v-else :src="studioResultUrl(active,i-1)" controls preload="metadata" data-testid="studio-result-video" @loadedmetadata="unavailableResults[`${active.id}-${i}`] = false" @error="unavailableResults[`${active.id}-${i}`] = true" />
             </div>
             <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download"><Icon name="download" /><span>下载原片</span></a></figcaption>
@@ -118,13 +119,14 @@ type UploadState = 'pending' | 'success' | 'failure'
 type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
 const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
-const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
+const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
 const activeQuoteUnavailable=computed(()=>!!active.value && active.value.status==='prepared' && (invalidatedQuotes.value.has(active.value.id)||unavailableOffers.value.has(`${active.value.kind}:${active.value.offerId}`)))
 const unavailableResults=ref<Record<string,boolean>>({})
+const loadingResults=ref<Record<string,boolean>>({})
 const quoteConfirm=ref(false), fileInput=ref<HTMLInputElement|null>(null)
 const taskDetail=ref<HTMLElement|null>(null)
 function revealTask(){void nextTick(()=>taskDetail.value?.scrollIntoView?.({block:'nearest',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}))}
@@ -139,6 +141,7 @@ const filteredHistory=computed(()=>showFailed.value ? history.value : history.va
 const displayHistory=computed(()=>historyMode.value?filteredHistory.value:filteredHistory.value.slice(0,3))
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
+const needsRecovery=(task:StudioTask)=>['unknown','queued','processing','billing_pending','reserve_pending','recovery_blocked'].includes(task.status)
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
@@ -189,20 +192,22 @@ const statusText=(status:string)=>statuses[status]||'结果待确认'
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||(!/^media[-_]/.test(task.model)?task.model:'')||'已保存的创作'
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
 function remember(){try{if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,view:active.value?'task':'compose',attempted:[...attempted]}))}catch{/* Durable server history remains available when browser storage is unavailable. */}}
+function resultLoaded(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=false}
+function resultUnavailable(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=true}
 function accepted(task:StudioTask,select=true){
  if(!mounted)return
  if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'}
- if(select || active.value?.id===task.id && active.value.kind===task.kind){active.value=task;resultRead.value++}
+ if(select || active.value?.id===task.id && active.value.kind===task.kind){active.value=task;resultRead.value++;if(hasResults(task))for(let i=1;i<=task.resultCount;i++)loadingResults.value[`${task.id}-${i}`]=true}
  if(select || task.kind===kind.value)history.value=[task,...history.value.filter(t=>t.id!==task.id)]
  remember()
 }
 function selectOffer(){if(offer.value)unavailableOffers.value.delete(`${kind.value}:${offerId.value}`);const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=kind.value==='image' ? countOptions.value[0]??1 : 1;intent=undefined}
 function newTask(){if(busy.value || !active.value)return;quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;remember();focusPrompt()}
-async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;offers.value=[];history.value=[];try{
+async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;readinessState.value='unknown';offers.value=[];history.value=[];try{
  const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
  if(epoch!==generation)return;
  if(catalog.status==='fulfilled')offers.value=catalog.value;
- if(readiness.status==='fulfilled')enabled.value=readiness.value.paid_enabled===true;
+ if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
  if(tasks.status==='rejected')throw tasks.reason;
  history.value=tasks.value;
  if(catalog.status==='rejected'||readiness.status==='rejected')notice.value='目录或生成服务暂不可用，仍可查询原任务和已保存结果。';
@@ -214,7 +219,7 @@ async function load(selectedId?:unknown,restorePending=true){const epoch=++gener
   }
  }remember()
  }catch(e){error.value=studioErrorMessage(e)}finally{if(epoch===generation)busy.value=false}
- if(active.value)await refresh()
+ if(active.value&&needsRecovery(active.value))await refresh()
 }
 // Refresh only catalog/readiness. Never rebuild the composer or replace history.
 async function refreshCatalog(){
@@ -224,8 +229,8 @@ async function refreshCatalog(){
  try{
   const [catalog,readiness]=await Promise.allSettled([studioCatalog(originalKind),studioRequest<{paid_enabled:boolean}>(originalKind,'readiness')])
   if(!mounted||epoch!==generation||originalKind!==kind.value)return
-  if(readiness.status==='fulfilled')enabled.value=readiness.value.paid_enabled===true
-  else enabled.value=false
+   if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
+   else {enabled.value=false;readinessState.value='unknown'}
   if(catalog.status==='rejected'){notice.value='模型目录暂时无法刷新，保留当前输入与已有结果。';return}
   // A closed shared gate may intentionally return an empty catalog. It is not
   // evidence that this particular model was removed; retain the last catalog.
@@ -240,7 +245,7 @@ async function refreshCatalog(){
  }finally{catalogLoading.value=false}
 }
 async function reloadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
-async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();await refresh()}
+async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();if(needsRecovery(task))await refresh()}
 async function refresh(automatic=false){
  if(!active.value||querying.value||submitting.value[active.value.id])return
  const original=active.value;querying.value=true

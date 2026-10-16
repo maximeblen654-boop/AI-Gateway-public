@@ -315,6 +315,14 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     return files;
   }
   function hasTaskData(ownerId, taskId) { return taskFiles(ownerId, taskId).length > 0; }
+  function hasResult(ownerId, taskId, index) {
+    try {
+      const file = locate(ownerId, taskId, index);
+      const stat = statIfExists(file);
+      const meta = loadMeta(file) || (stat ? legacyMeta(file, stat) : null);
+      return !!stat && !!meta && now() < meta.expiresAt;
+    } catch { return false; }
+  }
   function removeTask(ownerId, taskId) {
     return locked(() => {
       const files = taskFiles(ownerId, taskId);
@@ -378,7 +386,7 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     const meta = loadMeta(file) || (stat ? legacyMeta(file, stat) : null);
     if (!meta) { const error = new Error('Image result missing'); error.code = 'ENOENT'; throw error; }
     return { ...(meta.version === 1 ? IMAGE_FORMATS.png : IMAGE_FORMATS[meta.output_format]),
-      bytes: meta.bytes, expires_at: new Date(meta.expiresAt).toISOString(), expired: now() >= meta.expiresAt, missing: !stat };
+      bytes: meta.bytes, etag: `"${meta.sha256}"`, expires_at: new Date(meta.expiresAt).toISOString(), expired: now() >= meta.expiresAt, missing: !stat };
   }
   function read(ownerId, taskId, index) {
     const info = metadata(ownerId, taskId, index);
@@ -391,5 +399,5 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     if (meta && (meta.bytes !== data.length || meta.sha256 !== hash(data))) throw new Error('Invalid image result');
     return data;
   }
-  return Object.freeze({ saveBase64, saveResult, read, metadata, cleanup, hasTaskData, removeTask });
+  return Object.freeze({ saveBase64, saveResult, read, metadata, cleanup, hasTaskData, hasResult, removeTask });
 }

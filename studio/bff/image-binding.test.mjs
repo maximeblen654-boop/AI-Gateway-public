@@ -87,6 +87,12 @@ test('Published quote, durable journal/claim, full original result delivery',asy
   const history=f.tasks.history(owner);assert.equal(history.tasks.length,1);assert.equal(history.tasks[0].task_id,task.task_id);
   assert.equal(f.tasks.history({ownerId:2}).tasks.length,0);assert.ok(!JSON.stringify(history).includes('quote_token'));assert.ok(!JSON.stringify(history).includes('keyRef'));
 });
+test('saved completed results recover locally without another Core receipt or result read',async t=>{
+  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
+  const task=await f.tasks.dispatch(owner,f.input);const gets=f.stats().gets;
+  const reopened=await f.tasks.recover(owner,task.task_id);
+  assert.equal(reopened.status,'completed');assert.equal(reopened.resultCount ?? reopened.results?.length,1);assert.equal(f.stats().gets,gets);
+});
 test('claim/response loss uses frozen original key and GET only after restart',async t=>{
   const f=fixture(t,{lost:true});await f.tasks.quote(owner,{offer_id:'published-offer',spec:{count:1,images:0}});
   await assert.rejects(f.tasks.dispatch(owner,f.input),/lost response/);
@@ -174,7 +180,8 @@ test('explicit server permission dispatches an owner-resolved prepared request o
   const resultPath=`/studio-v2/api/image/tasks/${task.task_id}/results/0`;
   assert.equal(task.results[0].url,resultPath);
   const stored=f.results.metadata(1,task.task_id,0);
-  const download=await fetch(base+resultPath);assert.equal(download.status,200);
+  const download=await fetch(base+resultPath);assert.equal(download.status,200);assert.equal(download.headers.get('cache-control'),'private, max-age=60, must-revalidate');assert.equal(download.headers.get('etag'),stored.etag);
+  const cached=await fetch(base+resultPath,{headers:{'If-None-Match':stored.etag}});assert.equal(cached.status,304);
   assert.deepEqual(Buffer.from(await download.arrayBuffer()),Buffer.from(png,'base64'));
   assert.equal((await fetch(base+resultPath.replace('/studio-v2/','/studio/'))).status,404);
   currentOwner={ownerId:2};assert.equal((await fetch(base+resultPath)).status,409);

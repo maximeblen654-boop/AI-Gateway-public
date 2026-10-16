@@ -103,7 +103,9 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
       if(req.method==='GET' && match) {
         if(match[2]===undefined) {reply(200,await tasks.recover(session,match[1]));return;}
         const result=tasks.result(session,match[1],Number(match[2]));
-        res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
+        const etag=result.info.etag;
+        if (etag && req.headers['if-none-match'] === etag) { res.writeHead(304,{'Cache-Control':'private, max-age=60, must-revalidate','ETag':etag,'Vary':'If-None-Match'}); res.end(); return; }
+        res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':'private, max-age=60, must-revalidate','ETag':etag,'Vary':'If-None-Match','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
       }
       reply(404,{error:'image_route_not_found'});
     } catch(error) {if(!res.headersSent)reply(409,{error:error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',...(error?.stage ? {diagnostic_stage:error.stage} : {}),recovery:'GET original task only'});else res.end();}
