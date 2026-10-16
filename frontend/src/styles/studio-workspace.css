@@ -35,3 +35,20 @@
 /* Keep expanded model observations clear of mobile navigation and in view. */
 @media(max-width:700px){.studio-floating-model.model-open{z-index:31}.studio-model-menu{position:fixed;top:110px;bottom:auto;left:18px;right:18px;width:auto;max-width:none;max-height:calc(100dvh - 130px);overflow-y:auto;overscroll-behavior:contain}}
 .studio-failed-toggle{min-height:34px;padding:7px 11px;border:1px solid var(--sw-line);border-radius:11px;background:var(--sw-paper);color:var(--sw-muted);font-size:12px;font-weight:600;white-space:nowrap}.studio-failed-toggle:hover,.studio-failed-toggle[aria-pressed="true"]{background:var(--sw-soft);color:var(--sw-ink);border-color:var(--sw-accent)}.studio-failed-toggle:focus-visible{outline:3px solid color-mix(in srgb,var(--sw-accent) 45%,transparent);outline-offset:2px}.studio-history-tools{flex-wrap:wrap}
+
+/* Result presentation polish: make the existing original-download route easy to find and give image side gutters a calm editorial backdrop. */
+.studio-result-stage{position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden;min-height:280px;border:1px solid color-mix(in srgb,var(--sw-line) 78%,transparent);border-radius:15px;background:var(--sw-bg)}
+.studio-result-stage::before,.studio-result-stage::after{position:absolute;inset:-18%;z-index:-1;content:"";pointer-events:none;filter:blur(8px)}
+.studio-result-stage::before{background:radial-gradient(circle at 19% 26%,#eac9ad 0 15%,transparent 39%),radial-gradient(circle at 84% 76%,#c5ddd5 0 14%,transparent 41%);opacity:.68}
+.studio-result-stage::after{background:radial-gradient(circle at 73% 17%,#f5e8ce 0 11%,transparent 32%),radial-gradient(circle at 27% 83%,#d9d0e7 0 9%,transparent 31%);opacity:.42}
+.studio-result-stage img,.studio-result-stage video{display:block;width:100%;height:280px;object-fit:contain;border-radius:12px}
+.studio-result-stage video{background:#171614}
+.dark .studio-result-stage{border-color:color-mix(in srgb,var(--sw-line) 82%,transparent);background:var(--sw-bg)}
+.dark .studio-result-stage::before{background:radial-gradient(circle at 19% 26%,#745744 0 15%,transparent 39%),radial-gradient(circle at 84% 76%,#3e665e 0 14%,transparent 41%);opacity:.5}
+.dark .studio-result-stage::after{background:radial-gradient(circle at 73% 17%,#776342 0 11%,transparent 32%),radial-gradient(circle at 27% 83%,#594b6e 0 9%,transparent 31%);opacity:.35}
+.studio-result-label{color:var(--sw-muted)}
+.studio-download{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:7px 12px;border:1px solid color-mix(in srgb,var(--sw-accent) 68%,var(--sw-line));border-radius:10px;background:var(--sw-accent);color:var(--sw-paper)!important;font-weight:650;text-decoration:none;box-shadow:0 4px 12px color-mix(in srgb,var(--sw-accent) 18%,transparent);transition:background .18s,color .18s,transform .18s,box-shadow .18s}
+.studio-download:hover{background:color-mix(in srgb,var(--sw-accent) 86%,#000);box-shadow:0 6px 16px color-mix(in srgb,var(--sw-accent) 26%,transparent);transform:translateY(-1px)}
+.studio-download:active{transform:translateY(0)}
+.studio-download svg{width:16px;height:16px;stroke-width:2}
+@media(max-width:700px){.studio-result-stage{min-height:270px;border-radius:14px}.studio-result-stage img,.studio-result-stage video{height:270px}.studio-results figcaption{padding-top:8px}.studio-download{min-height:34px;padding:6px 10px;font-size:12px}}
