@@ -48,3 +48,5 @@
 - 组合验收来自最终 Core 镜像，三组件 healthy，Bridge/BFF 使用 Core network namespace；无生产动作、无真实供应商请求。
 
 候选完整包仍只保留 GitHub 一份；本地未下载完整镜像。
+
+- 最终 manifest SHA-256：247bb9a3445028ae0243d8de60d757e0ac313f0b6fb2159056321946cb52eaa5。
