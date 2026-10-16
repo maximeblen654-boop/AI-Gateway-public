@@ -190,15 +190,20 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     const id=owner(session);
     if(!Number.isFinite(before))throw new TypeError('Invalid cleanup deadline');
     if(!Number.isSafeInteger(batchSize)||batchSize<1||batchSize>100)throw new TypeError('Invalid cleanup batch size');
-    const lock=path.join(rootDir,`.cleanup-${id}.lock`),fd=fs.openSync(lock,'wx',0o600);
+    const lock=path.join(rootDir,`.cleanup-${id}.lock`),cursorFile=location('cleanup-cursor',[id]),fd=fs.openSync(lock,'wx',0o600);
     const result={scanned:0,deleted:0,skipped:0,failed:0,bytes:0};
     try {
-      for(const file of fs.readdirSync(rootDir)) {
-        if(!/^task-[a-f0-9]{64}\.json$/.test(file))continue;
+      const files=fs.readdirSync(rootDir).filter(file=>/^task-[a-f0-9]{64}\.json$/.test(file)).sort();
+      if(!files.length) { if(fs.existsSync(cursorFile))fs.unlinkSync(cursorFile); return result; }
+      let last;
+      try { last=JSON.parse(fs.readFileSync(cursorFile,'utf8')).last; } catch { last=undefined; }
+      const start=Math.max(0,files.indexOf(last)+1)%files.length;
+      for(let offset=0;offset<Math.min(batchSize,files.length);offset++) {
+        const file=files[(start+offset)%files.length];
+        last=file;
         const task=JSON.parse(fs.readFileSync(path.join(rootDir,file),'utf8'));
         if(task.owner!==id)continue;
         result.scanned++;
-        if(result.scanned>batchSize)break;
         const created=Date.parse(task.created_at||'');
         const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
         const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
@@ -216,6 +221,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
         if(fs.existsSync(identityFile))fs.unlinkSync(identityFile);
         result.deleted++;
       }
+      if(last)write(cursorFile,{last});
       syncDir(rootDir);
       try { onCleanup({...result}); } catch { /* metrics must never affect cleanup */ }
       return result;

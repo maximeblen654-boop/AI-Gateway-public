@@ -265,10 +265,38 @@ test('old unresolved history remains visible and is never cleaned',async t=>{
 });
 
 test('history request automatically starts one bounded owner cleanup loop',async t=>{
- let cleanups=0;const sessions={authenticate:async()=>owner,sameOrigin:()=>true};
+ let cleanups=0,authentications=0;const sessions={authenticate:async()=>{authentications++;return {...owner,sessionProof:`proof-${authentications}`}},sameOrigin:()=>true};
  const tasks={history:()=>({contract:IMAGE_BINDING_CONTRACT,tasks:[]}),cleanupExpired:async()=>{cleanups++;return {deleted:0,failed:0,bytes:0}}};
  const server=http.createServer(createImageHandler({sessions,tasks}));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
  const base=`http://127.0.0.1:${server.address().port}`;
  const get=()=>fetch(base+'/studio-v2/api/image/tasks');
- assert.equal((await get()).status,200);assert.equal((await get()).status,200);assert.equal(cleanups,1);
+ assert.equal((await get()).status,200);assert.equal((await get()).status,200);assert.equal(cleanups,2);assert.equal(authentications,2);
+});
+
+test('mixed owners and ages are covered fairly across bounded cleanup rounds',async t=>{
+ const f=fixture(t);await f.tasks.quote(owner,{offer_id:'batch',spec:{count:1,images:0}});
+ const journal=path.join(f.root,'journal'),prepared=[];
+ for(let i=0;i<100;i++)prepared.push(f.tasks.prepare(owner,{...f.input,client_key:`client-${i.toString().padStart(3,'0')}`,prompt:`prompt-${i}`}).task);
+ const receipts=new Map();
+ for(let i=0;i<100;i++){
+  // Resolve by task identity rather than relying on random journal filenames.
+  const task=prepared[i];
+  const taskPath=path.join(journal,fs.readdirSync(journal).find(name=>/^task-.*\.json$/.test(name)&&JSON.parse(fs.readFileSync(path.join(journal,name),'utf8')).task_id===task.task_id));
+  const value=JSON.parse(fs.readFileSync(taskPath,'utf8'));const old=i<80;
+  value.created_at=new Date(Date.now()-(old?73:1)*3600000).toISOString();
+  if(i<40){value.status='failed';value.billing_state='not_charged';receipts.set(task.task_id,{status:'failed',billing_state:'not_charged'});}
+  else if(i<60){value.status='unknown';value.billing_state='billing_unknown';receipts.set(task.task_id,{status:'unknown',billing_state:'billing_unknown'});}
+  else if(i<80){value.status='completed';value.billing_state='billed';receipts.set(task.task_id,{status:'completed',billing_state:'billed'});}
+  else {value.status='failed';value.billing_state='not_charged';receipts.set(task.task_id,{status:'failed',billing_state:'not_charged'});}
+  fs.writeFileSync(taskPath,JSON.stringify(value));
+ }
+ const runtime=createImageTaskRuntime({
+  rootDir:journal,
+  results:f.results,
+  call:async(_s,method,operation)=>({payload:{contract:IMAGE_BINDING_CONTRACT,task_id:operation.slice('tasks/'.length),...(receipts.get(operation.slice('tasks/'.length))||{status:'unknown',billing_state:'billing_unknown'})}})
+ });
+ let deleted=0,rounds=0;
+ while(rounds++<30&&deleted<60){const stats=await runtime.cleanupExpired(owner,{before:Date.now()-72*3600000,batchSize:10});assert(stats.scanned<=10);deleted+=stats.deleted;if(!stats.deleted&&stats.skipped===0)break;}
+ assert.equal(deleted,60);assert(rounds>1);
+ assert.equal(runtime.history(owner).tasks.length,40);
 });
