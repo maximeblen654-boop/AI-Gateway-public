@@ -39,3 +39,17 @@
 
 本轮仅提交源码、隔离测试和候选准备。尚未构建、部署或改变生产数据、开关、商品、账务、任务及原片。候选构建和完整镜像身份待 GitHub Actions 完成后补录.
 
+
+## 候选验收结果
+
+- 运行源码：`75f8bdc2b545c5edde552e9b896aef4f9e18028e`
+- Candidate Run：`38938645575`，PASS；CI/Security 沿既有工作流完成。
+- 完整候选 Artifact：`12063196736`，归档 ZIP SHA-256：`39d005c5d8af921d4ca7ba1c8e9dc5463d314970ccaf87d44c3ffeb8b66d2b87`。
+- 小证据 Artifact：`12063650738`，归档 ZIP SHA-256：`457413df61249df1d3e0743df51fb550e8c410aae04691b61a01a98d8d738ee4`。
+- Core manifest/config：`aa9fdbfc510b4756149b100461b5288ba5d6484104054cb45ae3efb4069ea729` / `ad3a229242e274dd02f48c6659f73a4cd03ac524998a35ea433af9094cc69302`。
+- Bridge manifest/config：`088f0181295715dbc794bdadf1f03944ae6fb8dcf2206a5dff59a23f335e81b1` / `38b11e836ee2960071e7c62b27724741ddc737356904f50c57cb464bd4b5903b`。
+- BFF manifest/config：`d61df4f3f7c45439947b578d20c68886eb10a341cd1495698204eea67d44f710` / `d1093e3c997e2f7ca7a591aec14027bc5dc907028aac17085ae58f3fc05c6ea0`。
+- 三组件运行源码来源均为本次 `75f8bdc2` 候选；本轮没有复用旧组件身份。
+- 隔离验收：图片文生图、参考图编辑、单视频均通过；104 笔资金/幂等场景通过（502 16、成功24、部分12、拒绝12、断线12、超时12、迟到8、重复8）。
+
+候选未部署，生产仍为 `784d12c3257d7ce40d106ad7991abe6d40c74555`。生产部署需另行授权。
