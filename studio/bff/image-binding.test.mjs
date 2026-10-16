@@ -235,7 +235,7 @@ test('authorized historical finality keeps BFF identity and dispatch claim, no P
  await assert.rejects(runtime.recover({ownerId:2},task.task_id));assert.equal(f.stats().posts,1);
 });
 
-test('expired finalized history can be archived without removing quote or dispatch evidence',async t=>{
+test('expired finalized history is removed only after authoritative receipt confirmation',async t=>{
  const f=fixture(t);await f.tasks.quote(owner,{offer_id:'old',spec:{count:1,images:0}});
  const prepared=f.tasks.prepare(owner,f.input).task;
  const journal=path.join(f.root,'journal');
@@ -243,10 +243,32 @@ test('expired finalized history can be archived without removing quote or dispat
  const file=path.join(journal,taskFile);const task=JSON.parse(fs.readFileSync(file,'utf8'));
  task.created_at=new Date(Date.now()-73*3600000).toISOString();task.status='failed';task.billing_state='not_charged';task.failure_code='upstream_http_502_no_delivery';
  fs.writeFileSync(file,JSON.stringify(task));
- const summary=f.tasks.cleanupExpired(owner,{before:Date.now()-72*3600000,confirm:value=>value.task_id===prepared.task_id});
- assert.deepEqual(summary,{scanned:1,deleted:1,skipped:0});
+ const runtime=createImageTaskRuntime({rootDir:journal,results:f.results,call:async(_s,method,operation)=>{
+  if(method==='GET'&&operation.startsWith('tasks/'))return {payload:{contract:IMAGE_BINDING_CONTRACT,task_id:prepared.task_id,status:'failed',billing_state:'not_charged'}};
+  return f.call(_s,method,operation);
+ }});
+ const summary=await runtime.cleanupExpired(owner,{before:Date.now()-72*3600000});
+ assert.deepEqual(summary,{scanned:1,deleted:1,skipped:0,failed:0,bytes:0});
  assert.equal(f.tasks.history(owner).tasks.length,0);
  assert.equal(fs.readdirSync(journal).some(name=>name.endsWith('.sync-dispatch')),false);
- assert.equal(fs.readdirSync(journal).some(name=>/^archive-.*\.json$/.test(name)),true);
  assert.equal(fs.readdirSync(journal).some(name=>/^quote-.*\.json$/.test(name)),true);
+});
+
+test('old unresolved history remains visible and is never cleaned',async t=>{
+ const f=fixture(t);await f.tasks.quote(owner,{offer_id:'old',spec:{count:1,images:0}});
+ const task=f.tasks.prepare(owner,f.input).task,journal=path.join(f.root,'journal');
+ const file=path.join(journal,fs.readdirSync(journal).find(name=>/^task-.*\.json$/.test(name)));
+ const value=JSON.parse(fs.readFileSync(file,'utf8'));value.created_at=new Date(Date.now()-73*3600000).toISOString();value.status='unknown';value.billing_state='billing_unknown';fs.writeFileSync(file,JSON.stringify(value));
+ const summary=await f.tasks.cleanupExpired(owner,{before:Date.now()-72*3600000});
+ assert.deepEqual(summary,{scanned:1,deleted:0,skipped:1,failed:0,bytes:0});
+ assert.equal(f.tasks.history(owner).tasks[0].task_id,task.task_id);
+});
+
+test('history request automatically starts one bounded owner cleanup loop',async t=>{
+ let cleanups=0;const sessions={authenticate:async()=>owner,sameOrigin:()=>true};
+ const tasks={history:()=>({contract:IMAGE_BINDING_CONTRACT,tasks:[]}),cleanupExpired:async()=>{cleanups++;return {deleted:0,failed:0,bytes:0}}};
+ const server=http.createServer(createImageHandler({sessions,tasks}));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
+ const base=`http://127.0.0.1:${server.address().port}`;
+ const get=()=>fetch(base+'/studio-v2/api/image/tasks');
+ assert.equal((await get()).status,200);assert.equal((await get()).status,200);assert.equal(cleanups,1);
 });

@@ -64,7 +64,7 @@ export function createPublishedImageClient({ baseUrl, serviceToken, fetchImpl = 
 
 // Owner-scoped durable journal and permanent .sync-dispatch marker. Browser
 // inputs never supply account identity, customer key identity or sale amounts.
-export function createImageTaskRuntime({ rootDir, call, results, assetResolver, now = Date.now, retentionMs = 72 * 3600000 }) {
+export function createImageTaskRuntime({ rootDir, call, results, assetResolver, now = Date.now, retentionMs = 72 * 3600000, onCleanup = () => {} }) {
   privateDirectory(rootDir);
   const location = (kind,identity) => path.join(rootDir,`${kind}-${hash(identity)}.json`);
   function read(kind,identity) { const file=location(kind,identity);if(!fs.lstatSync(file).isFile())throw new Error('Unsafe journal entry');return JSON.parse(fs.readFileSync(file,'utf8')); }
@@ -171,6 +171,12 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
       const entry=path.join(rootDir,file);if(!fs.lstatSync(entry).isFile())throw new Error('Unsafe journal entry');
       const task=JSON.parse(fs.readFileSync(entry,'utf8'));
       if(task.owner!==id)continue;
+      const created=Date.parse(task.created_at||'');
+      const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
+      const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
+      // The UI history is a 72-hour view for finalized tasks. Unknown,
+      // pending and billing-uncertain tasks stay visible for recovery.
+      if(Number.isFinite(created) && now()-created>=retentionMs && (settled||failed))continue;
       const verified=get(session,task.task_id).task;
       items.push(view(verified));
     }
@@ -180,32 +186,38 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
   // carries the immutable request/quote identity, so only a caller that has
   // checked the authoritative receipt can authorize removal of the display
   // journal. Quotes and dispatch claims remain available for audit/recovery.
-  function cleanupExpired(session,{before=now()-retentionMs,confirm}={}) {
+  async function cleanupExpired(session,{before=now()-retentionMs,batchSize=25}={}) {
     const id=owner(session);
-    if(typeof confirm!=='function')throw new TypeError('Finality confirmation required');
     if(!Number.isFinite(before))throw new TypeError('Invalid cleanup deadline');
+    if(!Number.isSafeInteger(batchSize)||batchSize<1||batchSize>100)throw new TypeError('Invalid cleanup batch size');
     const lock=path.join(rootDir,`.cleanup-${id}.lock`),fd=fs.openSync(lock,'wx',0o600);
-    const result={scanned:0,deleted:0,skipped:0};
+    const result={scanned:0,deleted:0,skipped:0,failed:0,bytes:0};
     try {
       for(const file of fs.readdirSync(rootDir)) {
         if(!/^task-[a-f0-9]{64}\.json$/.test(file))continue;
         const task=JSON.parse(fs.readFileSync(path.join(rootDir,file),'utf8'));
         if(task.owner!==id)continue;
         result.scanned++;
+        if(result.scanned>batchSize)break;
         const created=Date.parse(task.created_at||'');
         const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
         const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
         if(!Number.isFinite(created)||created>before||(!settled&&!failed)||results?.hasTaskData?.(id,task.task_id)) { result.skipped++; continue; }
-        const summary=view(task);
-        if(!confirm(summary)) { result.skipped++; continue; }
-        const archiveFile=location('archive',[id,task.task_id]);
-        if(!fs.existsSync(archiveFile))write(archiveFile,{contract:IMAGE_BINDING_CONTRACT,owner:id,task_id:task.task_id,created_at:task.created_at,status:task.status,billing_state:task.billing_state,offer_id:task.quote?.offer_id||''},true);
+        // Re-read the authoritative receipt before removal. A stale local
+        // journal must never make a late settlement or recovery disappear.
+        let receipt;
+        try { receipt=(await call(session,'GET',`tasks/${task.task_id}`,undefined,task.keyRef)).payload; }
+        catch { result.failed++; continue; }
+        if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==task.task_id ||
+          !((receipt.status==='completed'||receipt.status==='partial')&&receipt.billing_state==='billed' ||
+            (receipt.status==='failed'||receipt.status==='released')&&receipt.billing_state==='not_charged')) { result.skipped++; continue; }
         fs.unlinkSync(path.join(rootDir,file));
         const identityFile=location('identity',[id,task.task_id]);
         if(fs.existsSync(identityFile))fs.unlinkSync(identityFile);
         result.deleted++;
       }
       syncDir(rootDir);
+      try { onCleanup({...result}); } catch { /* metrics must never affect cleanup */ }
       return result;
     } finally { fs.closeSync(fd); if(fs.existsSync(lock))fs.unlinkSync(lock); }
   }

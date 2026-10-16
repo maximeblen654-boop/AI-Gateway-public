@@ -19,6 +19,20 @@ async function jsonBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=IMAGE_PAID_ENABLED, managedPaid=false }) {
+  const ownerCleanupTimers=new Map();
+  async function ensureOwnerCleanup(session) {
+    if(typeof tasks.cleanupExpired!=='function')return;
+    const ownerId=session.ownerId;
+    if(ownerCleanupTimers.has(ownerId))return;
+    const run=async()=>{
+      try {
+        const stats=await tasks.cleanupExpired(session,{batchSize:25});
+        if(stats.deleted||stats.failed)console.info('studio image history cleanup',JSON.stringify({owner_id:ownerId,deleted:stats.deleted,failed:stats.failed,bytes:stats.bytes}));
+      } catch { /* A history read must remain available when maintenance is busy. */ }
+    };
+    await run();
+    const timer=setInterval(run,6*3600000);timer.unref?.();ownerCleanupTimers.set(ownerId,timer);
+  }
   return async (req,res) => {
     function reply(status,body) {res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));}
     try {
@@ -70,7 +84,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         reply(200,{contract:IMAGE_BINDING_CONTRACT,paid_enabled:enabled});return;
       }
       if(req.method==='GET' && url.pathname==='/studio-v2/api/image/catalog') {reply(200,await tasks.catalog(session));return;}
-      if(req.method==='GET' && url.pathname==='/studio-v2/api/image/tasks') {reply(200,tasks.history(session));return;}
+      if(req.method==='GET' && url.pathname==='/studio-v2/api/image/tasks') {await ensureOwnerCleanup(session);reply(200,tasks.history(session));return;}
       if(req.method==='POST' && url.pathname==='/studio-v2/api/image/quotes') {reply(200,await tasks.quote(session,await jsonBody(req)));return;}
       if(req.method==='POST' && url.pathname==='/studio-v2/api/image/prepare') {
         const input=await jsonBody(req);
