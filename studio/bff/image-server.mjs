@@ -106,7 +106,15 @@ export function buildImageServer(env=process.env, {legacyVideo}={}) {
   if(assetRoot && !path.isAbsolute(assetRoot))throw new Error('Private asset root required');
   const assetIntake=assetRoot?createAssetIntake({rootDir:assetRoot,ffprobePath:env.STUDIO_FFPROBE_PATH||'ffprobe'}):undefined;
   const imageAssetResolver=assetIntake?(session,refs)=>refs.map(ref=>{const a=assetIntake.uploadPayload(session.ownerId,ref);if(a.kind!=='image')throw Error('image_reference_required');return `data:${a.mimeType};base64,${Buffer.from(a.bytes).toString('base64')}`}):undefined;
-  const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call:createPublishedImageClient(common),results:createImageResultStore({rootDir:path.join(root,'results')}),assetResolver:imageAssetResolver});
+  const resultStore=createImageResultStore({rootDir:path.join(root,'results')});
+  // Reuse the result store's locked, metadata-aware cleanup. This only removes
+  // expired image bytes (legacy PNG deadlines remain seven days); task journals
+  // and financial evidence are intentionally handled by the owner-scoped
+  // maintenance API instead of a broad startup sweep.
+  const cleanupImageResults=()=>{try{return resultStore.cleanup();}catch{return undefined;}};
+  cleanupImageResults();
+  const cleanupTimer=setInterval(cleanupImageResults,6*3600000);cleanupTimer.unref?.();
+  const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call:createPublishedImageClient(common),results:resultStore,assetResolver:imageAssetResolver});
   const imageHandler=createImageHandler({sessions,tasks,assetIntake,paidEnabled:env.STUDIO_IMAGE_PUBLISHED_SUBMISSION==='true',managedPaid:env.STUDIO_PAID_CONTROL_MODE==='managed-v1'});
   if(!env.STUDIO_VIDEO_DATA_ROOT)return http.createServer((req,res)=>new URL(req.url,'http://localhost').pathname==='/internal/studio/paid-control'?paidControlHandler(env)(req,res):imageHandler(req,res));
   if(!path.isAbsolute(env.STUDIO_VIDEO_DATA_ROOT))throw new Error('Private video root required');

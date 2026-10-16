@@ -234,3 +234,19 @@ test('authorized historical finality keeps BFF identity and dispatch claim, no P
  const after=JSON.parse(fs.readFileSync(file));for(const k of ['owner','keyRef','task_id','request','requestHash','quote'])assert.deepEqual(after[k],before[k]);
  await assert.rejects(runtime.recover({ownerId:2},task.task_id));assert.equal(f.stats().posts,1);
 });
+
+test('expired finalized history can be archived without removing quote or dispatch evidence',async t=>{
+ const f=fixture(t);await f.tasks.quote(owner,{offer_id:'old',spec:{count:1,images:0}});
+ const prepared=f.tasks.prepare(owner,f.input).task;
+ const journal=path.join(f.root,'journal');
+ const taskFile=fs.readdirSync(journal).find(name=>/^task-.*\.json$/.test(name));
+ const file=path.join(journal,taskFile);const task=JSON.parse(fs.readFileSync(file,'utf8'));
+ task.created_at=new Date(Date.now()-73*3600000).toISOString();task.status='failed';task.billing_state='not_charged';task.failure_code='upstream_http_502_no_delivery';
+ fs.writeFileSync(file,JSON.stringify(task));
+ const summary=f.tasks.cleanupExpired(owner,{before:Date.now()-72*3600000,confirm:value=>value.task_id===prepared.task_id});
+ assert.deepEqual(summary,{scanned:1,deleted:1,skipped:0});
+ assert.equal(f.tasks.history(owner).tasks.length,0);
+ assert.equal(fs.readdirSync(journal).some(name=>name.endsWith('.sync-dispatch')),false);
+ assert.equal(fs.readdirSync(journal).some(name=>/^archive-.*\.json$/.test(name)),true);
+ assert.equal(fs.readdirSync(journal).some(name=>/^quote-.*\.json$/.test(name)),true);
+});

@@ -34,3 +34,4 @@
 
 /* Keep expanded model observations clear of mobile navigation and in view. */
 @media(max-width:700px){.studio-floating-model.model-open{z-index:31}.studio-model-menu{position:fixed;top:110px;bottom:auto;left:18px;right:18px;width:auto;max-width:none;max-height:calc(100dvh - 130px);overflow-y:auto;overscroll-behavior:contain}}
+.studio-failed-toggle{min-height:34px;padding:7px 11px;border:1px solid var(--sw-line);border-radius:11px;background:var(--sw-paper);color:var(--sw-muted);font-size:12px;font-weight:600;white-space:nowrap}.studio-failed-toggle:hover,.studio-failed-toggle[aria-pressed="true"]{background:var(--sw-soft);color:var(--sw-ink);border-color:var(--sw-accent)}.studio-failed-toggle:focus-visible{outline:3px solid color-mix(in srgb,var(--sw-accent) 45%,transparent);outline-offset:2px}.studio-history-tools{flex-wrap:wrap}

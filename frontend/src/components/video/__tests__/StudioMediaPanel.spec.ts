@@ -89,6 +89,20 @@ describe('Reference asset input',()=>{
  })
 })
 describe('Published customer task confirmation and recovery',()=>{
+ it('hides only finalized failed history until the administrator explicitly shows it',async()=>{
+  const failed={...prepared,id:'op_'+'f'.repeat(64),status:'failed',billingState:'not_charged'}
+  const processing={...prepared,id:'op_'+'p'.repeat(64),status:'processing',billingState:'pending'}
+  const completed={...prepared,id:'op_'+'c'.repeat(64),status:'completed',resultCount:1,billingState:'billed'}
+  api.history.mockResolvedValue([failed,processing,completed]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-testid="studio-failed-toggle"]').text()).toContain('显示失败任务（1）')
+  expect(wrapper.find(`[data-task-id="${failed.id}"]`).exists()).toBe(false)
+  expect(wrapper.find(`[data-task-id="${processing.id}"]`).exists()).toBe(true)
+  await wrapper.get('[data-testid="studio-failed-toggle"]').trigger('click')
+  expect(wrapper.get('[data-testid="studio-failed-toggle"]').text()).toContain('隐藏失败任务（1）')
+  expect(wrapper.find(`[data-task-id="${failed.id}"]`).exists()).toBe(true)
+ })
+
  it.each(['unknown','billing_pending'])('keeps %s pending and never infers a paid amount from the quote',async status=>{
   const task={...prepared,kind:'image' as const,status,spec:{count:5},quantity:5,price:{amount:'3.50',currency:'CNY',billing_mode:'per_request'},billingState:'billing_unknown'};
   api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises();

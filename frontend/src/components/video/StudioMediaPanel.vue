@@ -15,12 +15,12 @@
         <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
       <div class="studio-section-heading">
-        <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="history.length">{{ history.length }}</span></h2>
-        <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="historyMode = true">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter">类型<select :disabled="busy" v-model="kind" data-testid="studio-kind" @change="imageMode = 'text'; load()"><option value="image">图片</option><option value="video">视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
+        <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="displayHistory.length">{{ displayHistory.length }}</span></h2>
+        <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="failedHistoryCount" class="studio-failed-toggle" :aria-pressed="showFailed" data-testid="studio-failed-toggle" @click="showFailed = !showFailed">{{ showFailed ? '隐藏失败任务' : '显示失败任务' }}（{{ failedHistoryCount }}）</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="historyMode = true">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter">类型<select :disabled="busy" v-model="kind" data-testid="studio-kind" @change="imageMode = 'text'; load()"><option value="image">图片</option><option value="video">视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
       </div>
-      <p v-if="historyMode" class="studio-retention-note">{{ kind === 'image' ? '图片原片有保留期限，请及时下载；历史记录仍在不代表原片仍可用。' : '这里显示服务端返回的最近任务，请及时下载需要保留的原片。' }}</p>
-      <div v-if="history.length" class="studio-gallery" data-testid="studio-history">
-        <button v-for="task in visibleHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
+      <p v-if="historyMode || kind === 'image'" class="studio-retention-note">{{ kind === 'image' ? '图片和任务记录保留72小时，请及时下载；仍在结算或恢复中的任务会继续保留。' : '任务记录保留72小时，请及时下载需要保留的原片。' }}</p>
+      <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
+        <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
           <span class="studio-work-preview">
             <img v-if="task.kind === 'image' && hasResults(task)" :src="studioResultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
             <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
@@ -31,7 +31,7 @@
           <span class="studio-work-state">{{ statusText(task.status) }}</span>
         </button>
       </div>
-      <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
+      <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
       <p v-if="selectionUnavailable || activeQuoteUnavailable" role="status" class="studio-notice" data-testid="studio-model-unavailable">此模型暂不可用，请选择其他模型</p>
       <p v-if="notice" role="status" class="studio-notice">{{ notice }}</p>
       <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
@@ -117,7 +117,7 @@ type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']
 const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
-const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
+const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
@@ -131,7 +131,10 @@ const modeLabel=computed(()=>kind.value==='video' ? '视频创作' : imageMode.v
 const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || (imageMode.value==='edit' ? o.spec.references.image.max>0 && o.spec.references.total_max>0 : o.spec.references.image.min===0)))
 const offer=computed(()=>visibleOffers.value.find(o=>o.offer_id===offerId.value))
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
-const visibleHistory=computed(()=>historyMode.value?history.value:history.value.slice(0,3))
+const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
+const failedHistoryCount=computed(()=>history.value.filter(isFailedTask).length)
+const filteredHistory=computed(()=>showFailed.value ? history.value : history.value.filter(task=>!isFailedTask(task)))
+const displayHistory=computed(()=>historyMode.value?filteredHistory.value:filteredHistory.value.slice(0,3))
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'

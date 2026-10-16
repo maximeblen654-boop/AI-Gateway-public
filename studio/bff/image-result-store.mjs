@@ -288,7 +288,12 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     for (const entry of entries) if (entry.migrate) persistMeta(entry.file, entry.meta);
     let bytes = 0, deleted = 0, deletedBytes = 0;
     for (const { file, stat, meta } of entries) {
-      if (now() >= meta.expiresAt) { fs.unlinkSync(file); syncDirectory(path.dirname(file)); deleted++; deletedBytes += stat.size; }
+      if (now() >= meta.expiresAt) {
+        fs.unlinkSync(file); syncDirectory(path.dirname(file));
+        const metaFile = metaPath(file);
+        if (statIfExists(metaFile)) { fs.unlinkSync(metaFile); syncDirectory(path.dirname(metaFile)); }
+        deleted++; deletedBytes += stat.size;
+      }
       else bytes += stat.size;
     }
     return { bytes, deleted, deletedBytes };
@@ -298,6 +303,30 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     try { return fn(); } finally { fs.rmdirSync(lock); }
   }
   function cleanup() { return locked(inventory); }
+  function taskFiles(ownerId, taskId) {
+    const files = [];
+    for (const format of Object.values(IMAGE_FORMATS)) {
+      for (let index = 0; index < 10; index++) {
+        const candidate = target(dataRoot(format.extension), ownerId, taskId, index, format.extension);
+        const meta = metaPath(candidate);
+        if (statIfExists(candidate) || statIfExists(meta)) files.push(candidate);
+      }
+    }
+    return files;
+  }
+  function hasTaskData(ownerId, taskId) { return taskFiles(ownerId, taskId).length > 0; }
+  function removeTask(ownerId, taskId) {
+    return locked(() => {
+      const files = taskFiles(ownerId, taskId);
+      let deletedBytes = 0;
+      for (const file of files) {
+        const stat = statIfExists(file), meta = metaPath(file), metaStat = statIfExists(meta);
+        if (stat?.isFile()) { deletedBytes += stat.size; fs.unlinkSync(file); syncDirectory(path.dirname(file)); }
+        if (metaStat?.isFile()) { fs.unlinkSync(meta); syncDirectory(path.dirname(meta)); }
+      }
+      return { deleted: files.length, deletedBytes };
+    });
+  }
   function saveBase64(ownerId, taskId, index, b64, options = {}) {
     target(rootDir, ownerId, taskId, index); // Validate identity before decoding.
     // Only the trusted Core receipt may supply this option, never image data.
@@ -362,5 +391,5 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     if (meta && (meta.bytes !== data.length || meta.sha256 !== hash(data))) throw new Error('Invalid image result');
     return data;
   }
-  return Object.freeze({ saveBase64, saveResult, read, metadata, cleanup });
+  return Object.freeze({ saveBase64, saveResult, read, metadata, cleanup, hasTaskData, removeTask });
 }

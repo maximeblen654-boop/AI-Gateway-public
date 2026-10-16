@@ -64,7 +64,7 @@ export function createPublishedImageClient({ baseUrl, serviceToken, fetchImpl = 
 
 // Owner-scoped durable journal and permanent .sync-dispatch marker. Browser
 // inputs never supply account identity, customer key identity or sale amounts.
-export function createImageTaskRuntime({ rootDir, call, results, assetResolver, now = Date.now }) {
+export function createImageTaskRuntime({ rootDir, call, results, assetResolver, now = Date.now, retentionMs = 72 * 3600000 }) {
   privateDirectory(rootDir);
   const location = (kind,identity) => path.join(rootDir,`${kind}-${hash(identity)}.json`);
   function read(kind,identity) { const file=location(kind,identity);if(!fs.lstatSync(file).isFile())throw new Error('Unsafe journal entry');return JSON.parse(fs.readFileSync(file,'utf8')); }
@@ -176,6 +176,39 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return {contract:IMAGE_BINDING_CONTRACT,tasks:items.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')||a.task_id.localeCompare(b.task_id))};
   }
+  // Finalized history cleanup is deliberately explicit. The task journal also
+  // carries the immutable request/quote identity, so only a caller that has
+  // checked the authoritative receipt can authorize removal of the display
+  // journal. Quotes and dispatch claims remain available for audit/recovery.
+  function cleanupExpired(session,{before=now()-retentionMs,confirm}={}) {
+    const id=owner(session);
+    if(typeof confirm!=='function')throw new TypeError('Finality confirmation required');
+    if(!Number.isFinite(before))throw new TypeError('Invalid cleanup deadline');
+    const lock=path.join(rootDir,`.cleanup-${id}.lock`),fd=fs.openSync(lock,'wx',0o600);
+    const result={scanned:0,deleted:0,skipped:0};
+    try {
+      for(const file of fs.readdirSync(rootDir)) {
+        if(!/^task-[a-f0-9]{64}\.json$/.test(file))continue;
+        const task=JSON.parse(fs.readFileSync(path.join(rootDir,file),'utf8'));
+        if(task.owner!==id)continue;
+        result.scanned++;
+        const created=Date.parse(task.created_at||'');
+        const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
+        const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
+        if(!Number.isFinite(created)||created>before||(!settled&&!failed)||results?.hasTaskData?.(id,task.task_id)) { result.skipped++; continue; }
+        const summary=view(task);
+        if(!confirm(summary)) { result.skipped++; continue; }
+        const archiveFile=location('archive',[id,task.task_id]);
+        if(!fs.existsSync(archiveFile))write(archiveFile,{contract:IMAGE_BINDING_CONTRACT,owner:id,task_id:task.task_id,created_at:task.created_at,status:task.status,billing_state:task.billing_state,offer_id:task.quote?.offer_id||''},true);
+        fs.unlinkSync(path.join(rootDir,file));
+        const identityFile=location('identity',[id,task.task_id]);
+        if(fs.existsSync(identityFile))fs.unlinkSync(identityFile);
+        result.deleted++;
+      }
+      syncDir(rootDir);
+      return result;
+    } finally { fs.closeSync(fd); if(fs.existsSync(lock))fs.unlinkSync(lock); }
+  }
   function result(session,taskID,index) {const {task}=get(session,taskID);if(!['completed','partial'].includes(task.status)||!Number.isInteger(index)||index<0||index>= (task.results?.length||task.delivered_count||0))throw new Error('Image result unavailable');return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
-  return {catalog,readiness,quote,prepare,dispatch,recover,result,history,view};
+  return {catalog,readiness,quote,prepare,dispatch,recover,result,history,cleanupExpired,view};
 }

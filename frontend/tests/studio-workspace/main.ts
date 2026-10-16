@@ -29,6 +29,7 @@ function task(kind: string, index: number, status = 'completed'): Raw { return {
 const initial: Record<string, Raw[]> = { image: scenario === 'empty' ? [] : [task('image', 1), task('image', 2), task('image', 3)], video: [] }
 if (scenario === 'partial') { initial.image = [{ ...task('image', 1, 'partial'), spec: { resolution: '2K', aspect_ratio: '3:4', count: 5 }, quantity: 5, sale_price: price('3.50'), expected_count: 5, delivered_count: 2, failed_count: 3, pending_count: 0, billing_state: 'billed', settled_price: price('1.40') }] }
 if (scenario === 'unknown') initial.image = [task('image', 1, 'unknown')]
+if (scenario === 'failed') initial.image = [task('image', 1), { ...task('image', 2, 'failed'), billing_state: 'not_charged', failure_code: 'upstream_http_502_no_delivery' }]
 const cacheKey = `studio-visual-fixture-${scenario}`
 const db: Record<string, Raw[]> = JSON.parse(sessionStorage.getItem(cacheKey) || 'null') || initial
 const persist = () => sessionStorage.setItem(cacheKey, JSON.stringify(db))
