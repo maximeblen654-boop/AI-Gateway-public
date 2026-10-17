@@ -22,7 +22,8 @@
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
           <span class="studio-work-preview">
-            <img v-if="task.kind === 'image' && hasResults(task)" :src="studioResultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
+            <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-backdrop" :src="studioResultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
+            <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-image" :src="studioResultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
             <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
             <span class="studio-work-badge">{{ hasResults(task) ? `${task.resultCount} ${task.kind === 'image' ? '张原图' : '条视频'}` : statusText(task.status) }}</span>
           </span>
@@ -68,7 +69,6 @@
           <fieldset :disabled="!!active">
             <legend class="studio-sr-only">{{ modeLabel }}创作设置</legend>
             <div class="studio-floating-model" :class="{ 'model-open': openControl === 'model' }">
-              <span v-if="!active" class="studio-lift" aria-hidden="true"><i></i><i></i></span>
               <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon name="chevronDown" /></button>
               <Transition name="studio-pop"><div v-show="openControl === 'model'" class="studio-popover studio-model-menu" id="studio-model-menu"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">收起<Icon name="chevronUp" /></button></div></Transition>
             </div>
@@ -147,6 +147,7 @@ const needsRecovery=(task:StudioTask)=>['unknown','queued','processing','billing
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
+function hidePreviewBackdrop(event:Event){(event.target as HTMLImageElement).style.display='none'}
 async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus()}
 function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:previous==='ratio'?ratioTrigger:null)?.value?.focus()})}
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}

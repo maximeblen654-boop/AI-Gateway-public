@@ -65,7 +65,10 @@ function navigate(event: KeyboardEvent) {
 .studio-offer-picker { color:var(--sw-ink); font-size:13px; outline-offset:2px }
 .picker-heading { display:flex; justify-content:space-between; gap:12px; margin:2px 4px 10px; font-weight:650 }
 .picker-heading span { color:var(--sw-muted); font-weight:400 }
-.picker-list { list-style:none; padding:0; margin:0; max-height:240px; overflow-y:auto; overscroll-behavior:contain }
+.picker-list { list-style:none; padding:0 4px 0 0; margin:0; max-height:240px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--sw-line) transparent; -webkit-overflow-scrolling:touch }
+.picker-list::-webkit-scrollbar { width:8px }
+.picker-list::-webkit-scrollbar-thumb { background:var(--sw-line); border-radius:999px }
+.picker-list::-webkit-scrollbar-track { background:transparent }
 .picker-list li { display:flex; align-items:center; gap:8px; border:1px solid transparent; border-radius:10px; padding:5px; margin:3px 0 }
 .picker-list li.selected { background:var(--sw-soft); border-color:var(--sw-line) }
 .picker-choice { background:transparent; border:0; padding:7px; min-width:0; flex:1; text-align:left; color:inherit; min-height:48px }
