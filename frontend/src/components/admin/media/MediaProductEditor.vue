@@ -231,6 +231,10 @@ function toggleCreationModePricing(event: Event) {
   }
   const merged = mergeCreationModePricing(props.product)
   if (!merged) return
+  if (merged.some(rule => rule.sale_price == null) && typeof window !== 'undefined' && !window.confirm('关闭分别定价会合并不同售价，冲突价格将变为“待填写”。确认继续？')) {
+    (event.target as HTMLInputElement).checked = true
+    return
+  }
   edit(next => { next.pricing_rules = merged })
 }
 function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
