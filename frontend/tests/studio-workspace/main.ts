@@ -2,8 +2,8 @@
 import { createApp } from 'vue'
 import VideoStudioView from '@/views/user/VideoStudioView.vue'
 import { apiClient } from '@/api/client'
-import '@/style.css'
 import '@/styles/site-theme.css'
+import './workspace-test.css'
 const q = new URLSearchParams(location.search)
 const scenario = q.get('scenario') || 'gallery'
 document.documentElement.classList.toggle('dark', q.get('theme') === 'dark')
@@ -27,6 +27,7 @@ if (scenario === 'many-options') {
 type Raw = Record<string, any> // Fixture deliberately emits the HTTP contract, not StudioTask.
 function task(kind: string, index: number, status = 'completed'): Raw { return { contract: kind === 'image' ? 'published_image_binding_v1' : 'account_video_v1', [kind === 'image' ? 'task_id' : 'operation_id']: (kind === 'image' ? 'img_' : 'op_') + index.toString(16).padStart(kind === 'image' ? 32 : 64, '0'), status, created_at: `2026-10-${14-index%3}T04:00:00Z`, expires_at: '2099-01-01T00:00:00Z', offer_id: kind === 'image' ? 'image-standard' : 'video-standard', model: kind === 'image' ? 'GPT Image 2' : '映像 · 视频', spec: { resolution: kind === 'image' ? '2K' : '720p', aspect_ratio: kind === 'image' ? '3:4' : '16:9', count: kind === 'image' ? 4 : 1, ...(kind === 'video' ? { duration_seconds: 5 } : {}) }, quantity: kind === 'image' ? 4 : 1, sale_price: price(kind === 'image' ? '2.80' : '2.00'), unit_price: price(kind === 'image' ? '0.70' : '2.00'), delivered_count: status === 'completed' ? (kind === 'image' ? 4 : 1) : 0, billing_state: status === 'completed' ? 'billed' : 'pending', ...(status === 'completed' ? { settled_price: price(kind === 'image' ? '2.80' : '2.00') } : {}) } }
 const initial: Record<string, Raw[]> = { image: scenario === 'empty' ? [] : [task('image', 1), task('image', 2), task('image', 3)], video: [] }
+if (scenario === 'mixed') initial.video = [task('video', 4)]
 if (scenario === 'partial') { initial.image = [{ ...task('image', 1, 'partial'), spec: { resolution: '2K', aspect_ratio: '3:4', count: 5 }, quantity: 5, sale_price: price('3.50'), expected_count: 5, delivered_count: 2, failed_count: 3, pending_count: 0, billing_state: 'billed', settled_price: price('1.40') }] }
 if (scenario === 'unknown') initial.image = [task('image', 1, 'unknown')]
 if (scenario === 'failed') initial.image = [task('image', 1), { ...task('image', 2, 'failed'), billing_state: 'not_charged', failure_code: 'upstream_http_502_no_delivery' }]
