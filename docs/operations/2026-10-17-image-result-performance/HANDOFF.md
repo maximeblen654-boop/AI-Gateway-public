@@ -53,3 +53,17 @@
 - 隔离验收：图片文生图、参考图编辑、单视频均通过；104 笔资金/幂等场景通过（502 16、成功24、部分12、拒绝12、断线12、超时12、迟到8、重复8）。
 
 候选未部署，生产仍为 `784d12c3257d7ce40d106ad7991abe6d40c74555`。生产部署需另行授权。
+
+## 生产部署记录（2026-10-17）
+
+状态：`DEPLOYED`
+
+- 用户授权已执行固定候选 `75f8bdc2b545c5edde552e9b896aef4f9e18028e`；未重建镜像。完整 Artifact `12063196736` ZIP SHA-256 为 `39d005c5d8af921d4ca7ba1c8e9dc5463d314970ccaf87d44c3ffeb8b66d2b87`。生产主机上的 manifest SHA-256 为 `e413ecbb222f7c8ab671f77183cc9b756b3df05ce2ba838b2f142ca4e140ef77`。
+- 受控切换时间：北京时间约 `2026-10-17 16:14:21` 至 `16:14:49`，约 28 秒。Core 先重建并 healthy，再重建 Bridge/BFF；未重启 PostgreSQL/Redis，未迁移数据库。
+- 实际运行镜像：Core `native-candidate-core:75f8bdc2b545c5edde552e9b896aef4f9e18028e`，OCI manifest `sha256:17f8f06b1083595ac892b850b77528df9a01b928b5c7b666cd2b986c544950c7`，config `sha256:ad3a229242e274dd02f48c6659f73a4cd03ac524998a35ea433af9094cc69302`；Bridge OCI `sha256:f53d61987a98c2fa79d22cebceb7b487104e30bbe8a124c0667e30569f7b200d`，config `sha256:38b11e836ee2960071e7c62b27724741ddc737356904f50c57cb464bd4b5903b`；BFF OCI `sha256:3c7f6ba4448e824a22e12cf0b97f6600bbdb35f6360b17ef4e9f76b8f3a8a354`，config `sha256:d1093e3c997e2f7ca7a591aec14027bc5dc907028aac17085ae58f3fc05c6ea0`。三组件 OCI/config 与 manifest/TAR 逐项一致。
+- 三组件均 healthy。Bridge/BFF 通过 `container:9af2de99af73571e1d3a5030a9b3c1a268858f90f35581d01e2bbdccabd5faf0` 附着新 Core network namespace；原 Compose base、PostgreSQL、Redis、持久化挂载及 Caddy 未改动。BFF 仍挂载 `/var/lib/ai-gateway/studio-v2/{assets,images,videos}`。
+- `https://laifufu.top/health`、`/studio/`、`/video-studio` 均 HTTP 200。未带会话的两个 readiness 路由均按合同返回 401（`image_session_required` / `video_session_required`），没有把未认证 401 当作关闭状态。生产数据库只读设置 `studio_paid_control_image_v1.enabled=true`；`STUDIO_PAID_CONTROL_MODE=managed-v1`、legacy 图片提交开关 false、视频提交开关 false，视频保持关闭。
+- 启动日志未出现迁移或启动错误；商品、价格、mapping、余额、usage/dedup、历史任务和原片未写入或改动。没有发送真实供应商请求。
+- 发布守卫基线与回退证据：`/home/ubuntu/services/ai-gateway/deploy-history-performance-75f8-20261017/`，含 `release-baseline.json`、`compose.override.before.json`、`compose.override.75f8.json`、固定 manifest、三份 TAR、候选清单及切换脚本。未发生回退。
+- 本次使用的已验收隔离证据继续有效：完成图片短路、缺失结果恢复、私有 ETag/304、过期拒绝、权限隔离和 unknown/billing_pending 保护由候选测试覆盖；本轮生产未触发任何任务恢复或付费请求。浏览器 CUA 连接在本次执行中返回 `helper_unknown_error`，因此无法取得新的已登录桌面/手机截图，也未声称已完成需管理员会话的交互式 readiness 与 任务卡片回归；公网页面和服务身份已完成只读核验。
+- 部署前临时 Artifact 下载、解压和脚本已清理；生产部署目录中的唯一候选 TAR、manifest 和回退材料保留。

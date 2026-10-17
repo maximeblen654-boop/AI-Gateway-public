@@ -165,3 +165,7 @@
 候选满足进入生产部署前置审核条件，但本轮没有部署授权。下一轮部署前仍需重新核对 readiness、保护指纹、回退资产和公网登录后页面；不得把未认证 401、旧报告或 Candidate PASS 当作部署后证明。
 
 当前停止状态：`CANDIDATE_READY_NOT_DEPLOYED`。
+
+## 最新部署状态（2026-10-17）
+
+固定候选 `75f8bdc2b545c5edde552e9b896aef4f9e18028e` 已按授权部署，当前实际运行身份、健康、开关、回退证据及认证限制详见 [`image-result-performance/HANDOFF.md`](../2026-10-17-image-result-performance/HANDOFF.md)。
