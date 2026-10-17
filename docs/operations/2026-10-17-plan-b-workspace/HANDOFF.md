@@ -77,9 +77,11 @@ CI：`39036689973`（PASS）；Security：`39036689972`（PASS）。
 
 `fa9cb1868` 在不改变业务合同的前提下完成三项前端精修：创作页移除重复的右上“开始创作”，历史页继续保留“新建创作”；1366×650 下主作品改为横向缩略图+信息卡，避免展示区把主体压扁或裁切；Playwright 改为真实 viewport 截图并对文生图、图生图、视频的提示词、规格和主按钮做首屏边界断言。
 
-受影响的真实 viewport 证据在 `frontend/test-results/workspace-Plan-B-creation-and-archive-surfaces-*/*-viewport-*.png`。Plan B 视口用例 4/4、工作台 Playwright 24/24、StudioMediaPanel 62/62、受影响 ESLint 均 PASS。TypeScript 仍命中仓库原有 `frontend/src/components/admin/media/mediaDialogFocus.ts` 的 `HTMLElement[].at`/`lib` 兼容错误，本次不扩展修复范围。
+`5b074af10ad3290fc29ff7326ecdb52b49d08d84` 将 `focusable.at(-1)` 改为 ES2020 兼容的索引访问。项目正式 `vue-tsc --noEmit` 使用 TypeScript 5.6.3/vue-tsc 2.2.12 已 PASS；此前直接 `tsc --noEmit -p tsconfig.json` 的失败是因为该命令按 ES2020 lib 检查 `Array.prototype.at`，不是运行代码回归。Plan B 视口用例 4/4、工作台 Playwright 24/24、StudioMediaPanel 62/62、受影响 ESLint 均 PASS。
 
-本精修尚未进入候选镜像；用户确认后，必须以 `fa9cb1868` 为运行源码重新构建新候选，不能复用旧 `fe1c6137...` 候选。
+GitHub CI Run `39045377219` 的 `plan-b-viewport-evidence` job PASS，Artifact `12105318583`：[`plan-b-viewport-evidence-5b074af10ad3290fc29ff7326ecdb52b49d08d84`](https://github.com/maximeblen654-boop/AI-Gateway-public/actions/runs/39045377219/artifacts/12105318583)。其中包含 1440×900、1366×768、1366×650 的文生图、图生图、视频真实 viewport 截图及元数据，截图对应源码 `5b074af10ad3290fc29ff7326ecdb52b49d08d84`，不是原型或旧候选。
+
+本精修尚未进入候选镜像；用户确认后，必须以包含本次 TypeScript 修复的 `5b074af10ad3290fc29ff7326ecdb52b49d08d84` 为运行源码重新构建新候选，不能复用旧 `fe1c6137...` 候选。
 
 ## 后续唯一动作
 
