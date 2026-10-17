@@ -99,6 +99,47 @@ jobs:
           fi
           node --test studio/bff/plan-a-isolation.test.mjs studio/bff/asset-intake.test.mjs studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
 
+  plan-b-viewport-evidence:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/media-paid-controls'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: 5b074af10ad3290fc29ff7326ecdb52b49d08d84
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.9
+      - name: Install browser test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend exec playwright install --with-deps chromium
+      - name: Render final Plan B viewport screenshots
+        run: |
+          pnpm --dir frontend exec playwright test tests/studio-workspace/workspace.spec.ts \
+            --config=tests/studio-workspace/playwright.config.ts \
+            --grep "Plan B creation and archive surfaces" \
+            --reporter=line
+          node -e 'const fs=require("fs");fs.writeFileSync("frontend/test-results/plan-b-viewport-evidence.json",JSON.stringify({source_sha:process.env.SOURCE_SHA,viewport_screenshots:true,test_command:"playwright test tests/studio-workspace/workspace.spec.ts --grep Plan B creation and archive surfaces",generated_at:new Date().toISOString()},null,2))'
+      - name: Upload final viewport evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-b-viewport-evidence-${{ env.SOURCE_SHA }}
+          retention-days: 14
+          compression-level: 6
+          path: |
+            frontend/test-results/workspace-Plan-B-creation-and-archive-surfaces-*/*-viewport-*.png
+            frontend/test-results/plan-b-viewport-evidence.json
+
   golangci-lint:
     runs-on: ubuntu-latest
     steps:
