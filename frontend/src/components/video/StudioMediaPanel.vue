@@ -5,20 +5,21 @@
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'text' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'text'" :disabled="busy" data-testid="studio-mode-text" @click="changeMode('text')"><Icon name="grid" /><span>文生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'edit' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'edit'" :disabled="busy" data-testid="studio-mode-edit" @click="changeMode('edit')"><Icon name="edit" /><span>图生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'video' }" :aria-pressed="!historyMode && kind === 'video'" :disabled="busy" data-testid="studio-mode-video" @click="changeMode('video')"><Icon name="play" /><span>视频</span></button>
-      <button class="studio-history-nav" :class="{ selected: historyMode }" :aria-pressed="historyMode" :disabled="busy" data-testid="studio-mode-history" @click="historyMode = true; openControl = null"><Icon name="clock" /><span>任务历史</span></button>
+      <button class="studio-history-nav" :class="{ selected: historyMode }" :aria-pressed="historyMode" :disabled="busy" data-testid="studio-mode-history" @click="openHistory"><Icon name="clock" /><span>任务历史</span></button>
       <a href="/dashboard" class="studio-dashboard"><Icon name="arrowLeft" /><span>控制台</span></a>
     </aside>
     <div class="studio-main">
       <header class="studio-header">
         <div><h1><a href="/dashboard" aria-label="AI Gateway，返回控制台">AI Gateway</a> <span>{{ historyMode ? '任务历史' : modeLabel }}</span></h1><p class="studio-mobile-tagline">让想法有画面。</p></div>
-        <button v-if="!active" class="studio-button studio-header-new" :disabled="busy" @click="focusPrompt"><Icon name="plus" />开始创作</button>
+        <div v-if="!active && historyMode" class="studio-new-menu-wrap"><button class="studio-button studio-header-new" :disabled="busy" :aria-expanded="createMenuOpen" data-testid="studio-header-new" @click="createMenuOpen = !createMenuOpen"><Icon name="plus" />新建创作</button><div v-if="createMenuOpen" class="studio-new-menu" role="menu"><button role="menuitem" @click="startNew('text')"><Icon name="grid" />文生图</button><button role="menuitem" @click="startNew('edit')"><Icon name="edit" />图生图</button><button role="menuitem" @click="startNew('video')"><Icon name="play" />视频</button></div></div>
+        <button v-else-if="!active" class="studio-button studio-header-new" :disabled="busy" data-testid="studio-header-new" @click="focusPrompt"><Icon name="plus" />开始创作</button>
         <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
       <div class="studio-section-heading">
         <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="displayHistory.length">{{ displayHistory.length }}</span></h2>
-        <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="failedHistoryCount" class="studio-failed-toggle" :aria-pressed="showFailed" data-testid="studio-failed-toggle" @click="showFailed = !showFailed">{{ showFailed ? '隐藏失败任务' : '显示失败任务' }}（{{ failedHistoryCount }}）</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="historyMode = true">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter">类型<select :disabled="busy" v-model="kind" data-testid="studio-kind" @change="imageMode = 'text'; load()"><option value="image">图片</option><option value="video">视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
+        <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="failedHistoryCount" class="studio-failed-toggle" :aria-pressed="showFailed" data-testid="studio-failed-toggle" @click="showFailed = !showFailed">{{ showFailed ? '隐藏失败任务' : '显示失败任务' }}（{{ failedHistoryCount }}）</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="openHistory">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter"><span>历史类型</span><select :disabled="busy || historyLoading" v-model="historyFilter" data-testid="studio-kind" @change="loadHistory"><option value="all">全部（图片 + 视频）</option><option value="image">仅图片</option><option value="video">仅视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
       </div>
-      <p v-if="kind === 'image'" class="studio-retention-note">图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。</p>
+      <p v-if="historyMode ? historyFilter !== 'video' : kind === 'image'" class="studio-retention-note">图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
           <span class="studio-work-preview">
@@ -120,7 +121,8 @@ type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']
 const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
-const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
+type HistoryFilter = 'all'|'image'|'video'
+const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
@@ -136,8 +138,9 @@ const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || 
 const offer=computed(()=>visibleOffers.value.find(o=>o.offer_id===offerId.value))
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
-const failedHistoryCount=computed(()=>history.value.filter(isFailedTask).length)
-const filteredHistory=computed(()=>showFailed.value ? history.value : history.value.filter(task=>!isFailedTask(task)))
+const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
+const failedHistoryCount=computed(()=>historyScope.value.filter(isFailedTask).length)
+const filteredHistory=computed(()=>showFailed.value ? historyScope.value : historyScope.value.filter(task=>!isFailedTask(task)))
 const displayHistory=computed(()=>historyMode.value?filteredHistory.value:filteredHistory.value.slice(0,3))
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
@@ -148,7 +151,9 @@ function imageUnavailable(event:Event){const image=event.target as HTMLImageElem
 async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus()}
 function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:previous==='ratio'?ratioTrigger:null)?.value?.focus()})}
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}
-function focusPrompt(){historyMode.value=false;void nextTick(()=>promptInput.value?.focus())}
+function focusPrompt(){historyMode.value=false;createMenuOpen.value=false;void nextTick(()=>promptInput.value?.focus())}
+async function openHistory(){if(busy.value)return;historyMode.value=true;historyFilter.value='all';createMenuOpen.value=false;openControl.value=null;await loadHistory()}
+async function startNew(mode:'text'|'edit'|'video'){createMenuOpen.value=false;await changeMode(mode)}
 async function changeMode(mode:'text'|'edit'|'video'){
  if(busy.value)return
  historyMode.value=false;openControl.value=null
@@ -202,7 +207,15 @@ function accepted(task:StudioTask,select=true){
  remember()
 }
 function selectOffer(){if(offer.value)unavailableOffers.value.delete(`${kind.value}:${offerId.value}`);const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=kind.value==='image' ? countOptions.value[0]??1 : 1;intent=undefined}
-function newTask(){if(busy.value || !active.value)return;quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;remember();focusPrompt()}
+function newTask(){if(busy.value || !active.value)return;const nextKind=active.value.kind;kind.value=nextKind;if(nextKind==='image')imageMode.value='text';quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;createMenuOpen.value=false;remember();focusPrompt()}
+async function loadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation;historyLoading.value=true;try{
+ const kinds:StudioKind[]=historyFilter.value==='all'?['image','video']:[historyFilter.value]
+ const settled=await Promise.allSettled(kinds.map(value=>studioHistory(value)))
+ if(epoch!==generation)return
+ const tasks=settled.flatMap(result=>result.status==='fulfilled'?result.value:[])
+ if(settled.some(result=>result.status==='rejected')&&tasks.length===0)throw settled.find(result=>result.status==='rejected')?.reason
+ const seen=new Set<string>();history.value=tasks.filter(task=>!seen.has(task.id)&&seen.add(task.id)).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))
+ }catch(e){error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
 async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;readinessState.value='unknown';offers.value=[];history.value=[];try{
  const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
  if(epoch!==generation)return;
@@ -244,7 +257,10 @@ async function refreshCatalog(){
   if(activeQuoteUnavailable.value){if(active.value){offerId.value=active.value.offerId;unavailableOffers.value.add(`${originalKind}:${active.value.offerId}`)}quoteConfirm.value=false;active.value=null;intent=undefined;remember()}
  }finally{catalogLoading.value=false}
 }
-async function reloadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
+async function reloadHistory(){
+ if(!historyMode.value){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false};return}
+ await loadHistory()
+}
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();if(needsRecovery(task))await refresh()}
 async function refresh(automatic=false){
  if(!active.value||querying.value||submitting.value[active.value.id])return

@@ -359,6 +359,19 @@ describe('Catalog lifecycle changes preserve customer work',()=>{
  })
 })
 
+describe('Archive history navigation',()=>{
+ it('loads mixed image and video history, filters it, and keeps creation choices explicit',async()=>{
+  const image={...prepared,kind:'image' as const,id:'img_'+'h'.repeat(32),status:'completed' as const,resultCount:1}
+  const video={...prepared,kind:'video' as const,id:'op_'+'h'.repeat(64),status:'completed' as const,resultCount:1}
+  api.history.mockImplementation(async(kind:'image'|'video')=>kind==='image'?[image]:[video])
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises()
+  expect(wrapper.findAll('[data-task-id]')).toHaveLength(2)
+  await wrapper.get('[data-testid="studio-kind"]').setValue('image');await flushPromises();expect(wrapper.findAll('[data-task-id]')).toHaveLength(1);expect(wrapper.find(`[data-task-id="${image.id}"]`).exists()).toBe(true)
+  await wrapper.get('[data-testid="studio-kind"]').setValue('all');await flushPromises();await wrapper.get('[data-testid="studio-header-new"]').trigger('click');expect(wrapper.find('.studio-new-menu').exists()).toBe(true);expect(wrapper.findAll('.studio-new-menu [role="menuitem"]')).toHaveLength(3)
+  const editChoice=wrapper.findAll('.studio-new-menu [role="menuitem"]').find(b=>b.text().includes('图生图'))!;await editChoice.trigger('click');await flushPromises();expect(wrapper.find('[data-testid="studio-prompt"]').exists()).toBe(true);expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(true);expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
 
 it('retains image edit references and discards an old quote token after prepare is rejected',async()=>{
  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',imageMode:'edit'}));api.history.mockResolvedValue([])
