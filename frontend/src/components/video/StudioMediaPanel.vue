@@ -12,7 +12,6 @@
       <header class="studio-header">
         <div><h1><a href="/dashboard" aria-label="AI Gateway，返回控制台">AI Gateway</a> <span>{{ historyMode ? '任务历史' : modeLabel }}</span></h1><p class="studio-mobile-tagline">让想法有画面。</p></div>
         <div v-if="!active && historyMode" class="studio-new-menu-wrap"><button class="studio-button studio-header-new" :disabled="busy" :aria-expanded="createMenuOpen" data-testid="studio-header-new" @click="createMenuOpen = !createMenuOpen"><Icon name="plus" />新建创作</button><div v-if="createMenuOpen" class="studio-new-menu" role="menu"><button role="menuitem" @click="startNew('text')"><Icon name="grid" />文生图</button><button role="menuitem" @click="startNew('edit')"><Icon name="edit" />图生图</button><button role="menuitem" @click="startNew('video')"><Icon name="play" />视频</button></div></div>
-        <button v-else-if="!active" class="studio-button studio-header-new" :disabled="busy" data-testid="studio-header-new" @click="focusPrompt"><Icon name="plus" />开始创作</button>
         <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
       <div class="studio-section-heading">

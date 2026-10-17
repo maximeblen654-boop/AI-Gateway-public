@@ -25,25 +25,31 @@ for (const width of [1440,390]) test(`failed history toggle ${width}px`,async({p
  await page.getByTestId('studio-mode-video').click();await expect(page.getByText('图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。')).toHaveCount(0)
 })
 
+async function expectInViewport(page: Page, selector: string, height: number){const box=await page.locator(selector).boundingBox();expect(box).not.toBeNull();expect(box!.y).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(height+1)}
 for (const viewport of [{width:1440,height:900},{width:1366,height:768},{width:1366,height:650},{width:390,height:844}]) test(`Plan B creation and archive surfaces ${viewport.width}x${viewport.height}`, async ({page}, info) => {
  await page.setViewportSize(viewport)
  await page.goto(`${route}?scenario=gallery`)
+ await expect(page.getByTestId('studio-header-new')).toHaveCount(0)
  await expect(page.getByTestId('studio-prompt')).toBeVisible()
  await expect(page.getByTestId('studio-quote')).toBeVisible()
+ if(viewport.width>700){await expectInViewport(page,'[data-testid="studio-prompt"]',viewport.height);await expectInViewport(page,'.studio-specs',viewport.height);await expectInViewport(page,'[data-testid="studio-quote"]',viewport.height)}
  const gallery=await page.locator('.studio-workspace:not(.is-history) .studio-gallery').boundingBox();const composer=await page.locator('.studio-workspace:not(.is-history) .studio-composer-wrap').boundingBox()
  if(viewport.width>700){expect(composer!.y).toBeGreaterThan(gallery!.y+gallery!.height-2);expect(Math.abs(composer!.x-gallery!.x)).toBeLessThanOrEqual(2);expect(Math.abs(composer!.width-gallery!.width)).toBeLessThanOrEqual(2)}
- if(viewport.height===650){const prompt=await page.getByTestId('studio-prompt').boundingBox();const quote=await page.getByTestId('studio-quote').boundingBox();expect(prompt!.y+prompt!.height).toBeLessThanOrEqual(viewport.height);expect(quote!.y+quote!.height).toBeLessThanOrEqual(viewport.height)}
- await page.screenshot({path:info.outputPath(`plan-b-text-${viewport.width}.png`),fullPage:true})
+ if(viewport.height===650){const prompt=await page.getByTestId('studio-prompt').boundingBox();const quote=await page.getByTestId('studio-quote').boundingBox();const primaryPreview=await page.locator('.studio-workspace:not(.is-history) .studio-work .studio-work-preview').first().boundingBox();expect(prompt!.y+prompt!.height).toBeLessThanOrEqual(viewport.height);expect(quote!.y+quote!.height).toBeLessThanOrEqual(viewport.height);expect(primaryPreview!.height).toBeGreaterThanOrEqual(120)}
+ await page.screenshot({path:info.outputPath(`plan-b-text-viewport-${viewport.width}.png`)})
  await page.getByTestId('studio-mode-edit').click()
  await expect(page.getByTestId('studio-attachment')).toBeVisible()
- await page.screenshot({path:info.outputPath(`plan-b-edit-${viewport.width}.png`),fullPage:true})
+ if(viewport.width>700){await expectInViewport(page,'[data-testid="studio-prompt"]',viewport.height);await expectInViewport(page,'.studio-specs',viewport.height);await expectInViewport(page,'[data-testid="studio-quote"]',viewport.height)}
+ await page.screenshot({path:info.outputPath(`plan-b-edit-viewport-${viewport.width}.png`)})
  await page.getByTestId('studio-mode-video').click()
  await expect(page.getByTestId('studio-duration')).toBeVisible()
- await page.screenshot({path:info.outputPath(`plan-b-video-${viewport.width}.png`),fullPage:true})
+ if(viewport.width>700){await expectInViewport(page,'[data-testid="studio-prompt"]',viewport.height);await expectInViewport(page,'.studio-specs',viewport.height);await expectInViewport(page,'[data-testid="studio-quote"]',viewport.height)}
+ await page.screenshot({path:info.outputPath(`plan-b-video-viewport-${viewport.width}.png`)})
  await page.goto(`${route}?scenario=mixed`)
  await page.getByTestId('studio-mode-history').click()
  await expect(page.getByRole('heading',{name:'我的任务'})).toBeVisible()
  await expect(page.getByTestId('studio-kind')).toBeVisible()
+ await expect(page.getByTestId('studio-header-new')).toBeVisible()
  await page.screenshot({path:info.outputPath(`plan-b-history-${viewport.width}.png`),fullPage:true})
 })
 test('video allows supported attachments but never exposes image quantity',async({page})=>{await open(page,'empty');await page.getByTestId('studio-mode-video').click();await expect(page.getByTestId('studio-duration')).toBeVisible();await expect(page.getByTestId('studio-count')).toHaveCount(0);await expect(page.getByTestId('studio-attachment')).toBeVisible();await page.getByTestId('studio-prompt').fill('slow camera');await page.getByTestId('studio-quote').click();await expect(page.getByRole('dialog')).toContainText('1条');expect(await posts(page)).toHaveLength(0)})
