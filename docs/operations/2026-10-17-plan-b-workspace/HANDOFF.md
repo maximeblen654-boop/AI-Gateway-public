@@ -2,10 +2,11 @@
 
 ## 阶段状态
 
-当前阶段：`CANDIDATE_READY_NOT_DEPLOYED`
+当前阶段：`IMPLEMENTATION_READY_FOR_REVIEW_NOT_DEPLOYED`
 
 本阶段基线：`0e68d4410a02b0c7dfb970c6e4072c3d2529186b`
-实施提交：`fe1c6137d74d5fa2ff55bd0840d4d3f4937aced6`
+实施基线提交：`fe1c6137d74d5fa2ff55bd0840d4d3f4937aced6`
+桌面布局修正提交：`e0cfe38c9`
 分支：`codex/media-paid-controls`
 
 用户已选择 Plan B「作品档案馆」方向。本阶段只做正式 Vue 实现、隔离前后端联调、浏览器验收和候选准备；不部署生产、不执行真实供应商付费请求、不改商品、价格、mapping、资金、权限或开关。
@@ -65,6 +66,12 @@ CI：`39036689973`（PASS）；Security：`39036689972`（PASS）。
 - BFF source SHA `fe1c6137...`，image/config digest `sha256:4ee8d2f0e94ae84e307e2e8c2033997c2ab6420a83cedecb138402d321b4e656`，OCI manifest `sha256:ca8e50daf7548a928ba572352680633d157e9239ecd55d8d102db5f17346ceca`，TAR SHA-256 `974d6a0d6d29d56b4408d94f5157cf026332ee637d79aea06e7cb34dcac88f6b`。
 
 候选 manifest 文件 SHA-256：`3dade8305a66f4a8d8d56afcd253f031dd021fc4891643f70bb9799ffc28f080`；小证据 ZIP SHA-256：`000515479d04822bdde971f52c54e34b39c27298b98ea8f9f2871f1c0f1184ff`。runtime-files 校验与完整 manifest 均已归档；本地不重复下载完整 254 MB 包。候选状态为 `CANDIDATE_READY_NOT_DEPLOYED`，`production_action=false`，候选验收环境的 paid flags 均为 false。候选不等同于生产部署。
+
+## 方案 B 桌面布局修正（待用户复核）
+
+上一候选的桌面 composer 曾被排到作品右侧。本次 `e0cfe38c9` 已按设计包改为：作品展示在上方，整宽对话式 composer 在下方；主作品+两张辅助作品保留，1366×650 仍保留提示词、规格和主按钮。手机、历史页、模型状态和业务 API 合同未改动。
+
+本次修正尚未进入候选镜像。用户确认截图后，必须以 `e0cfe38c9` 为运行源码重新构建并验收新的候选；旧 `fe1c6137...` 候选不能冒充本次布局修正版。
 
 ## 后续唯一动作
 
