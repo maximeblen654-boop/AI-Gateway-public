@@ -60,11 +60,11 @@ CI：`39036689973`（PASS）；Security：`39036689972`（PASS）。
 
 三组件均为本次候选实际构建（`paid-controls` 运行方式未复用旧 sidecar）：
 
-- Core source SHA `fe1c6137...`，image/config digest `sha256:283a77ee3dd0837dff22fa2e534fb5d0d7c8e07d984becf949f2ab180e24fc62`，OCI manifest `sha256:4fc478f2b4c2edf6f7399d874703e7d900796c527b69a49ef286a19d366e975e`。
-- Bridge source SHA `fe1c6137...`，image/config digest `sha256:a048b161c927be8be7f50006de670386ff02ed2b485527672d04de6b9458b747`，OCI manifest `sha256:c410d7931bc1fe8cb0f893c134d845adb5ae86bc47e51f37cd47a32aaf9577f3`。
-- BFF source SHA `fe1c6137...`，image/config digest `sha256:4ee8d2f0e94ae84e307e2e8c2033997c2ab6420a83cedecb138402d321b4e656`，OCI manifest `sha256:c310aa73825398df1a86bfe24259d89c07fc2f2ff3388589313f8a03678275f5`。
+- Core source SHA `fe1c6137...`，image/config digest `sha256:283a77ee3dd0837dff22fa2e534fb5d0d7c8e07d984becf949f2ab180e24fc62`，OCI manifest `sha256:2719e1803ab8ba589f9ba0a26d8db86f8f529ce7c8e1ae3cba6a65a01146ddfa`，TAR SHA-256 `5083b8a857a55682a2f3eed45ecce9450fe538908b4feba1f9a390551de6c68f`。
+- Bridge source SHA `fe1c6137...`，image/config digest `sha256:a048b161c927be8be7f50006de670386ff02ed2b485527672d04de6b9458b747`，OCI manifest `sha256:484337feebe359080a8f68555038c31782c7fe4e9bb5e3d041fa0f7f73a99544`，TAR SHA-256 `7fd4bbecdbf257e5cde778520132e2d2b0673a6f58186676835c6bb45de84031`。
+- BFF source SHA `fe1c6137...`，image/config digest `sha256:4ee8d2f0e94ae84e307e2e8c2033997c2ab6420a83cedecb138402d321b4e656`，OCI manifest `sha256:ca8e50daf7548a928ba572352680633d157e9239ecd55d8d102db5f17346ceca`，TAR SHA-256 `974d6a0d6d29d56b4408d94f5157cf026332ee637d79aea06e7cb34dcac88f6b`。
 
-候选 manifest、三组件 TAR SHA-256、archive identity 和 runtime-files 校验均在完整 Artifact 中；本地不重复下载完整 254 MB 包。候选状态为 `CANDIDATE_READY_NOT_DEPLOYED`，`production_action=false`，候选验收环境的 paid flags 均为 false。候选不等同于生产部署。
+候选 manifest 文件 SHA-256：`3dade8305a66f4a8d8d56afcd253f031dd021fc4891643f70bb9799ffc28f080`；小证据 ZIP SHA-256：`000515479d04822bdde971f52c54e34b39c27298b98ea8f9f2871f1c0f1184ff`。runtime-files 校验与完整 manifest 均已归档；本地不重复下载完整 254 MB 包。候选状态为 `CANDIDATE_READY_NOT_DEPLOYED`，`production_action=false`，候选验收环境的 paid flags 均为 false。候选不等同于生产部署。
 
 ## 后续唯一动作
 
