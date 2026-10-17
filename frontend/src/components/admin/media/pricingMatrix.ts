@@ -64,6 +64,9 @@ function modeOnlyReferences(refs: NonNullable<Match['references']>, product: Pro
   const edit = JSON.stringify(refs) === JSON.stringify(modeReferences(product))
   return text ? 'text' : edit ? 'edit' : undefined
 }
+export function creationModeForRule(rule: Product['pricing_rules'][number], product: Product): 'text' | 'edit' | undefined {
+  return rule.match.references ? modeOnlyReferences(rule.match.references, product) : undefined
+}
 export function hasDetailedReferencePricingRules(product: Product): boolean {
   return product.pricing_rules.some(rule => !!rule.match.references && !modeOnlyReferences(rule.match.references, product))
 }

@@ -80,6 +80,7 @@
       <div class="mw-price-preview" data-test="pricing-preview">
         <strong>客户报价预览</strong>
         <div class="mw-field-grid">
+          <label v-if="creationModePricing" class="mw-field">创作方式<select class="input" v-model="previewCreationMode" data-test="preview-creation-mode"><option value="text">文生图</option><option value="edit">图生图</option></select></label>
           <label v-for="dimension in previewDimensions" :key="dimension.key" class="mw-field">{{ dimension.label }}<select class="input" :value="previewValue(dimension.key)" :data-test="`preview-${dimension.key}`" @change="previewSelection[dimension.key] = text($event)"><option v-for="value in dimensionValues(dimension.key)" :key="value" :value="value">{{ value }}</option></select></label>
           <label class="mw-field">数量（{{ unitLabel }}）<input v-model.number="previewQuantity" class="input" data-test="preview-quantity" type="number" :min="product.capabilities.count.min" :max="product.capabilities.count.max" :disabled="product.media_type === 'video'" /></label>
         </div>
@@ -102,7 +103,7 @@ import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import MediaCostCalculator from './MediaCostCalculator.vue'
 import { multiplyDecimalText } from './decimalText'
-import { allowedSpecs, buildPricingRules, dimensionsFor, hasDetailedReferencePricingRules, mergeCreationModePricing, matchesSpec, pricingDimensions, splitCreationModePricing, supportsCreationModePricing, type MatrixSpec, type PricingDimension } from './pricingMatrix'
+import { allowedSpecs, buildPricingRules, creationModeForRule, dimensionsFor, hasDetailedReferencePricingRules, mergeCreationModePricing, matchesSpec, pricingDimensions, splitCreationModePricing, supportsCreationModePricing, type MatrixSpec, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [open: boolean] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
@@ -148,7 +149,10 @@ const availablePricingDimensions = computed(() => pricingDimensionDefinitions.fi
 const hiddenPricingDimensions = computed(() => activePricingDimensions.value.filter(key => !availablePricingDimensions.value.some(item => item.key === key)))
 const expectedPriceCount = computed(() => {
   const specs = allowedSpecs(props.product.capabilities)
-  return specs ? buildPricingRules(props.product, activePricingDimensions.value, specs).length : undefined
+  if (!specs) return undefined
+  return creationModePricing.value
+    ? splitCreationModePricing(props.product, activePricingDimensions.value, specs).length
+    : buildPricingRules(props.product, activePricingDimensions.value, specs).length
 })
 
 function valuesFor(product: Product, key: PricingDimension): (string | number)[] {
@@ -238,10 +242,13 @@ function toggleCreationModePricing(event: Event) {
   edit(next => { next.pricing_rules = merged })
 }
 function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
+  const mode = creationModeForRule(rule, props.product)
   const labels = pricingDimensionDefinitions.flatMap(({ key, label }) => {
     const values = matchValues(rule.match, key)
     return values.length ? [`${label} ${values.join(' / ')}`] : []
   })
+  const modeLabel = mode === 'text' ? '文生图' : mode === 'edit' ? '图生图' : ''
+  if (modeLabel) return [modeLabel, ...labels].join(' · ')
   return labels.length ? labels.join(' · ') : '统一售价（所有未按维度区分的规格）'
 }
 const filledPricingRows = computed(() => (props.product.pricing_rules ?? []).filter(rule => !!rule.sale_price?.amount).length)
@@ -249,6 +256,7 @@ const priceRows = computed<Product['pricing_rules']>(() => props.product.pricing
 const unitLabel = computed(() => props.product.media_type === 'video' ? '条' : '张')
 const previewSelection = reactive<Partial<Record<PricingDimension, string>>>({})
 const previewQuantity = ref(1)
+const previewCreationMode = ref<'text' | 'edit'>('text')
 const previewDimensions = computed(() => pricingDimensionDefinitions.filter(({ key }) => dimensionValues(key).length))
 const samePriceText = computed(() => {
   const active = activePricingDimensions.value.map(key => pricingDimensionDefinitions.find(item => item.key === key)?.label).filter(Boolean)
@@ -264,6 +272,7 @@ function syncPreview(product: Product) {
   const min = product.media_type === 'video' ? 1 : Math.max(1, product.capabilities.count.min || 1)
   const max = product.media_type === 'video' ? 1 : Math.max(min, product.capabilities.count.max || min)
   if (!Number.isInteger(previewQuantity.value) || previewQuantity.value < min || previewQuantity.value > max) previewQuantity.value = min
+  if (!supportsCreationModePricing(product)) previewCreationMode.value = 'text'
 }
 watch(() => props.product, syncPreview, { immediate: true })
 function previewValue(key: PricingDimension): string { return previewSelection[key] ?? dimensionValues(key)[0] ?? '' }
@@ -290,7 +299,12 @@ const pricingPreview = computed(() => {
   const specs = sellableSpecs(props.product)
   const quantity = props.product.media_type === 'image' ? previewQuantity.value : 1
   if (!specs || !specs.some(spec => spec.count === quantity && pricingDimensions.every(key => !selected[key] || String(spec[key]) === selected[key]))) return undefined
-  const matching = priceRows.value.filter(item => activePricingDimensions.value.every(key => { const values = matchValues(item.match, key); return !values.length || values.includes(selected[key] ?? '') }))
+  const matching = priceRows.value.filter(item => {
+    if (!activePricingDimensions.value.every(key => { const values = matchValues(item.match, key); return !values.length || values.includes(selected[key] ?? '') })) return false
+    const mode = creationModeForRule(item, props.product)
+    if (!mode) return true
+    return mode === previewCreationMode.value
+  })
   const rule = matching.length === 1 ? matching[0] : undefined
   if (!rule?.sale_price || priceError(rule) || rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return undefined
   if (!Number.isInteger(quantity) || quantity < props.product.capabilities.count.min || quantity > props.product.capabilities.count.max) return undefined

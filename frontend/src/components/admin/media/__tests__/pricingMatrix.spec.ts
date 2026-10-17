@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedSpecs, buildPricingRules, mergeCreationModePricing, splitCreationModePricing } from '../pricingMatrix'
+import { allowedSpecs, buildPricingRules, creationModeForRule, mergeCreationModePricing, splitCreationModePricing } from '../pricingMatrix'
 import { copy, imageProduct } from './fixtures'
 
 describe('pricing matrix follows sellable combinations', () => {
@@ -57,5 +57,21 @@ describe('pricing matrix follows sellable combinations', () => {
     expect(split.filter(rule => (rule.match.references?.image.min ?? 0) > 0).map(rule => rule.sale_price?.amount)).toEqual(['0.05', '0.05'])
     expect(split.every(rule => !rule.match.references || rule.match.references.total_max <= product.capabilities.references.total_max)).toBe(true)
     expect(mergeCreationModePricing({ ...product, pricing_rules: split })).toEqual(buildPricingRules(product, ['resolution'], specs))
+  })
+
+  it('keeps separate mode rows addressable for labels and expected counts', () => {
+    const product = copy(imageProduct)
+    product.capabilities.resolutions = ['2K', '4K']
+    product.pricing_rules = [{ match: {}, sale_price: { amount: '0.05', currency: 'CNY', billing_mode: 'per_request' } }]
+    const specs = allowedSpecs(product.capabilities)!
+    const split = splitCreationModePricing(product, ['resolution'], specs)
+    expect(split).toHaveLength(4)
+    expect(split.map(rule => creationModeForRule(rule, product))).toEqual(['text', 'edit', 'text', 'edit'])
+    const textPrices = split.filter(rule => creationModeForRule(rule, product) === 'text')
+    const editPrices = split.filter(rule => creationModeForRule(rule, product) === 'edit')
+    textPrices.forEach(rule => { rule.sale_price = { amount: '0.03', currency: 'CNY', billing_mode: 'per_request' } })
+    editPrices.forEach(rule => { rule.sale_price = { amount: '0.08', currency: 'CNY', billing_mode: 'per_request' } })
+    expect(textPrices.every(rule => rule.sale_price?.amount === '0.03')).toBe(true)
+    expect(editPrices.every(rule => rule.sale_price?.amount === '0.08')).toBe(true)
   })
 })
