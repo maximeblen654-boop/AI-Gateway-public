@@ -50,6 +50,52 @@ export function allowedSpecs(c: Product['capabilities']): MatrixSpec[] | undefin
 export function dimensionsFor(product: Product): PricingDimension[] {
   return pricingDimensions.filter(key => product.pricing_rules.some(rule => rule.match[key]?.length))
 }
+
+const zeroReferences = (): NonNullable<Match['references']> => ({ image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 })
+const modeReferences = (product: Product): NonNullable<Match['references']> => ({ image: { min: 1, max: product.capabilities.references.image.max }, video: { ...product.capabilities.references.video }, audio: { ...product.capabilities.references.audio }, total_max: product.capabilities.references.total_max })
+export function supportsCreationModePricing(product: Product): boolean {
+  return product.media_type === 'image' && product.capabilities.references.image.min === 0 && product.capabilities.references.image.max > 0
+}
+export function hasReferencePricingRules(product: Product): boolean {
+  return product.pricing_rules.some(rule => !!rule.match.references)
+}
+function modeOnlyReferences(refs: NonNullable<Match['references']>, product: Product): 'text' | 'edit' | undefined {
+  const text = JSON.stringify(refs) === JSON.stringify(zeroReferences())
+  const edit = JSON.stringify(refs) === JSON.stringify(modeReferences(product))
+  return text ? 'text' : edit ? 'edit' : undefined
+}
+export function hasDetailedReferencePricingRules(product: Product): boolean {
+  return product.pricing_rules.some(rule => !!rule.match.references && !modeOnlyReferences(rule.match.references, product))
+}
+export function splitCreationModePricing(product: Product, dimensions: PricingDimension[], specs: MatrixSpec[]): Product['pricing_rules'] {
+  const base = buildPricingRules(product, dimensions, specs)
+  return base.flatMap(rule => {
+    const matching = specs.filter(spec => matchesSpec(rule.match, spec))
+    const priceFor = (mode: 'text' | 'edit') => {
+      const modeSpecs = matching.filter(spec => mode === 'text' ? spec.images === 0 : spec.images > 0)
+      const prices = modeSpecs.map(spec => product.pricing_rules.filter(old => matchesSpec(old.match, spec)).map(old => old.sale_price)[0] ?? null)
+      return prices.length && prices.every(price => samePrice(price, prices[0]!)) ? prices[0]! : null
+    }
+    return [
+      { match: { ...rule.match, references: zeroReferences() }, sale_price: priceFor('text') },
+      { match: { ...rule.match, references: modeReferences(product) }, sale_price: priceFor('edit') }
+    ]
+  })
+}
+export function mergeCreationModePricing(product: Product): Product['pricing_rules'] | undefined {
+  const modeRules = product.pricing_rules.filter(rule => rule.match.references).map(rule => ({ rule, mode: modeOnlyReferences(rule.match.references!, product) }))
+  if (modeRules.some(item => !item.mode)) return undefined
+  const grouped = new Map<string, Product['pricing_rules'][number]>()
+  for (const { rule } of modeRules) {
+    const match = { ...rule.match }
+    delete match.references
+    const key = JSON.stringify(match)
+    const current = grouped.get(key)
+    if (!current) grouped.set(key, { match, sale_price: rule.sale_price })
+    else if (!samePrice(current.sale_price, rule.sale_price)) current.sale_price = null
+  }
+  return [...grouped.values()]
+}
 function samePrice(left: Product['pricing_rules'][number]['sale_price'], right: Product['pricing_rules'][number]['sale_price']) {
   return left === right || !!left && !!right && left.amount === right.amount && left.currency === right.currency && left.billing_mode === right.billing_mode
 }

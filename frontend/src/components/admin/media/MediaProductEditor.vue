@@ -38,6 +38,10 @@
 
       <p class="mw-muted">只为勾选的选项组合填写单{{ unitLabel }}价格。数量按单价 × 数量计算；视频时长只决定单条价格，不再乘秒数。</p>
       <div class="mw-pricing-dimensions" role="group" aria-label="会改变单价的规格">
+        <label v-if="creationModePricingVisible" class="mw-check-card" :class="{ 'mw-check-card-selected': creationModePricing }" data-test="creation-mode-pricing">
+          <input type="checkbox" :checked="creationModePricing" :disabled="disabled || creationModePricingLocked" @change="toggleCreationModePricing" />
+          <span class="mw-check-content"><strong>文生图 / 图生图分别定价</strong><span class="mw-option-values">文生图 0 张参考图 · 图生图 1～{{ product.capabilities.references.image.max }} 张参考图</span><span class="mw-check-state">{{ creationModePricing ? '已选择 · 分别定价' : '不区分 · 共享单价' }}</span><small>{{ creationModePricingLocked ? '当前草稿已有更细的参考素材价格规则，继续保留原规则。' : creationModePricing ? '每个分辨率等规格会生成两行价格。' : '客户仍可选择两种创作方式，售价保持相同。' }}</small></span>
+        </label>
         <label v-for="dimension in availablePricingDimensions" :key="dimension.key" class="mw-check-card" :class="{ 'mw-check-card-selected': activePricingDimensions.includes(dimension.key) }">
           <input type="checkbox" :checked="activePricingDimensions.includes(dimension.key)" :disabled="disabled || !dimensionValues(dimension.key).length && !activePricingDimensions.includes(dimension.key)" :data-test="`pricing-dimension-${dimension.key}`" @change="togglePricingDimension(dimension.key, $event)" />
           <span class="mw-check-content"><strong>{{ dimension.label }}不同，价格不同</strong><span class="mw-option-values">{{ dimensionValues(dimension.key).join(' · ') }}</span><span class="mw-check-state">{{ activePricingDimensions.includes(dimension.key) ? '已选择 · 分别定价' : '不区分 · 共享单价' }}</span><small>{{ activePricingDimensions.includes(dimension.key) ? '每个有效选项组合填写一个单价。' : '客户仍可选择这些规格，售价保持相同。' }}</small></span>
@@ -98,7 +102,7 @@ import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import MediaCostCalculator from './MediaCostCalculator.vue'
 import { multiplyDecimalText } from './decimalText'
-import { allowedSpecs, buildPricingRules, dimensionsFor, matchesSpec, pricingDimensions, type MatrixSpec, type PricingDimension } from './pricingMatrix'
+import { allowedSpecs, buildPricingRules, dimensionsFor, hasDetailedReferencePricingRules, mergeCreationModePricing, matchesSpec, pricingDimensions, splitCreationModePricing, supportsCreationModePricing, type MatrixSpec, type PricingDimension } from './pricingMatrix'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number }>()
 const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [open: boolean] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
@@ -177,6 +181,9 @@ function sellableSpecs(product: Product) {
   return allowedSpecs(capabilities)
 }
 const activePricingDimensions = computed<PricingDimension[]>(() => dimensionsFor(props.product))
+const creationModePricingVisible = computed(() => supportsCreationModePricing(props.product))
+const creationModePricingLocked = computed(() => creationModePricingVisible.value && hasDetailedReferencePricingRules(props.product))
+const creationModePricing = computed(() => creationModePricingVisible.value && props.product.pricing_rules.some(rule => rule.match.references))
 function losesPrices(previous: Product, nextRules: Product['pricing_rules'], specs: MatrixSpec[]): boolean {
   const previousSpecs = sellableSpecs(previous)
   if (!previousSpecs) return previous.pricing_rules.some(rule => rule.sale_price != null)
@@ -212,6 +219,19 @@ function togglePricingDimension(key: PricingDimension, event: Event) {
     return
   }
   if (!editPricing(() => {}, current.filter(item => item !== key))) (event.target as HTMLInputElement).checked = true
+}
+function toggleCreationModePricing(event: Event) {
+  if (!creationModePricingVisible.value || creationModePricingLocked.value) return
+  const checked = (event.target as HTMLInputElement).checked
+  const specs = sellableSpecs(props.product)
+  if (!specs) return
+  if (checked) {
+    edit(next => { next.pricing_rules = splitCreationModePricing(next, activePricingDimensions.value, specs) })
+    return
+  }
+  const merged = mergeCreationModePricing(props.product)
+  if (!merged) return
+  edit(next => { next.pricing_rules = merged })
 }
 function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
   const labels = pricingDimensionDefinitions.flatMap(({ key, label }) => {

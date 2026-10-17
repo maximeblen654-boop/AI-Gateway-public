@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedSpecs, buildPricingRules } from '../pricingMatrix'
+import { allowedSpecs, buildPricingRules, mergeCreationModePricing, splitCreationModePricing } from '../pricingMatrix'
 import { copy, imageProduct } from './fixtures'
 
 describe('pricing matrix follows sellable combinations', () => {
@@ -45,5 +45,17 @@ describe('pricing matrix follows sellable combinations', () => {
     const rows = buildPricingRules(product, ['resolution'], allowedSpecs(product.capabilities)!)
     expect(rows.map(row => row.match)).toEqual([{ resolution: ['1K'] }, { resolution: ['4K'] }])
     expect(rows.every(row => row.sale_price?.amount === '0.18')).toBe(true)
+  })
+
+  it('splits one image product into text and edit prices without multiplying by reference count', () => {
+    const product = copy(imageProduct)
+    product.pricing_rules = [{ match: {}, sale_price: { amount: '0.05', currency: 'CNY', billing_mode: 'per_request' } }]
+    const specs = allowedSpecs(product.capabilities)!
+    const split = splitCreationModePricing(product, ['resolution'], specs)
+    expect(split).toHaveLength(4)
+    expect(split.filter(rule => rule.match.references?.total_max === 0).map(rule => rule.sale_price?.amount)).toEqual(['0.05', '0.05'])
+    expect(split.filter(rule => (rule.match.references?.image.min ?? 0) > 0).map(rule => rule.sale_price?.amount)).toEqual(['0.05', '0.05'])
+    expect(split.every(rule => !rule.match.references || rule.match.references.total_max <= product.capabilities.references.total_max)).toBe(true)
+    expect(mergeCreationModePricing({ ...product, pricing_rules: split })).toEqual(buildPricingRules(product, ['resolution'], specs))
   })
 })

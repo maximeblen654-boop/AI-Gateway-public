@@ -25,11 +25,10 @@
             <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-backdrop" :src="studioResultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
             <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-image" :src="studioResultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
             <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
-            <span class="studio-work-badge">{{ hasResults(task) ? `${task.resultCount} ${task.kind === 'image' ? '张原图' : '条视频'}` : statusText(task.status) }}</span>
           </span>
           <span class="studio-work-title"><strong>{{ taskModel(task) }}</strong><time>{{ taskDate(task) }}</time></span>
           <span class="studio-work-meta">{{ specText(task) }}</span>
-          <span class="studio-work-state">{{ statusText(task.status) }}</span>
+          <span class="studio-work-state">{{ statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template></span>
         </button>
       </div>
       <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
