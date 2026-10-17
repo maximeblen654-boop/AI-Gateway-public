@@ -73,6 +73,14 @@ CI：`39036689973`（PASS）；Security：`39036689972`（PASS）。
 
 本次修正尚未进入候选镜像。用户确认截图后，必须以 `e0cfe38c9` 为运行源码重新构建并验收新的候选；旧 `fe1c6137...` 候选不能冒充本次布局修正版。
 
+## 方案 B 视口精修（待用户复核）
+
+`fa9cb1868` 在不改变业务合同的前提下完成三项前端精修：创作页移除重复的右上“开始创作”，历史页继续保留“新建创作”；1366×650 下主作品改为横向缩略图+信息卡，避免展示区把主体压扁或裁切；Playwright 改为真实 viewport 截图并对文生图、图生图、视频的提示词、规格和主按钮做首屏边界断言。
+
+受影响的真实 viewport 证据在 `frontend/test-results/workspace-Plan-B-creation-and-archive-surfaces-*/*-viewport-*.png`。Plan B 视口用例 4/4、工作台 Playwright 24/24、StudioMediaPanel 62/62、受影响 ESLint 均 PASS。TypeScript 仍命中仓库原有 `frontend/src/components/admin/media/mediaDialogFocus.ts` 的 `HTMLElement[].at`/`lib` 兼容错误，本次不扩展修复范围。
+
+本精修尚未进入候选镜像；用户确认后，必须以 `fa9cb1868` 为运行源码重新构建新候选，不能复用旧 `fe1c6137...` 候选。
+
 ## 后续唯一动作
 
 候选 PASS 后，交给用户审核并等待单独生产部署授权。生产部署前重新核对现网版本、业务保护指纹、回退资产和 managed-v1；未获新授权不得切换生产。
