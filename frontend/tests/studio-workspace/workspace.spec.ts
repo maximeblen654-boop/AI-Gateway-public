@@ -30,6 +30,8 @@ for (const viewport of [{width:1440,height:900},{width:1366,height:768},{width:1
  await page.goto(`${route}?scenario=gallery`)
  await expect(page.getByTestId('studio-prompt')).toBeVisible()
  await expect(page.getByTestId('studio-quote')).toBeVisible()
+ const gallery=await page.locator('.studio-workspace:not(.is-history) .studio-gallery').boundingBox();const composer=await page.locator('.studio-workspace:not(.is-history) .studio-composer-wrap').boundingBox()
+ if(viewport.width>700){expect(composer!.y).toBeGreaterThan(gallery!.y+gallery!.height-2);expect(Math.abs(composer!.x-gallery!.x)).toBeLessThanOrEqual(2);expect(Math.abs(composer!.width-gallery!.width)).toBeLessThanOrEqual(2)}
  if(viewport.height===650){const prompt=await page.getByTestId('studio-prompt').boundingBox();const quote=await page.getByTestId('studio-quote').boundingBox();expect(prompt!.y+prompt!.height).toBeLessThanOrEqual(viewport.height);expect(quote!.y+quote!.height).toBeLessThanOrEqual(viewport.height)}
  await page.screenshot({path:info.outputPath(`plan-b-text-${viewport.width}.png`),fullPage:true})
  await page.getByTestId('studio-mode-edit').click()
