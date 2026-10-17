@@ -59,3 +59,29 @@
 
 /* Keep the creation controls inside short desktop viewports such as 1366x768. */
 @media (min-width:701px) and (max-height:820px){.studio-workspace{padding-top:18px;padding-bottom:12px}.studio-header{margin-bottom:24px}.studio-composer-wrap{padding-top:30px}.studio-composer-caption{margin-bottom:16px}.studio-composer{padding-top:18px;padding-bottom:14px}.studio-writing textarea{min-height:64px}}
+
+/* Plan B creation surface: a primary work area beside the real composer. */
+@media (min-width:1051px){
+ .studio-workspace:not(.is-history) .studio-main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;column-gap:22px;align-content:stretch}
+ .studio-workspace:not(.is-history) .studio-header,.studio-workspace:not(.is-history) .studio-section-heading,.studio-workspace:not(.is-history) .studio-retention-note{grid-column:1/-1}
+ .studio-workspace:not(.is-history) .studio-gallery{grid-column:1;grid-row:3;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(160px,.75fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:14px;margin:0;min-height:0;align-content:stretch}
+ .studio-workspace:not(.is-history) .studio-gallery .studio-work{min-height:0}.studio-workspace:not(.is-history) .studio-gallery .studio-work:first-child{grid-row:span 2}
+ .studio-workspace:not(.is-history) .studio-gallery .studio-work-preview{height:100%;aspect-ratio:auto}.studio-workspace:not(.is-history) .studio-gallery .studio-work:nth-child(n+2) .studio-work-preview{aspect-ratio:1.45}
+ .studio-workspace:not(.is-history) .studio-empty{grid-column:1;grid-row:3;margin:0;min-height:100%;border-radius:16px;background:var(--sw-soft)}
+ .studio-workspace:not(.is-history) .studio-composer-wrap{grid-column:2;grid-row:3;margin:0;padding-top:0;min-height:0;display:flex;flex-direction:column}
+ .studio-workspace:not(.is-history) .studio-composer{flex:1;display:flex;flex-direction:column}.studio-workspace:not(.is-history) .studio-composer fieldset{flex:1;display:flex;flex-direction:column}
+ .studio-workspace:not(.is-history) .studio-writing{flex:1;display:flex;flex-direction:column}.studio-workspace:not(.is-history) .studio-writing textarea{flex:1;min-height:150px}
+ .studio-workspace:not(.is-history) .studio-composer-bottom{margin-top:auto}.studio-workspace:not(.is-history) .studio-task-detail{grid-column:1/-1;grid-row:4;margin-top:18px}
+ .studio-workspace:not(.is-history) .studio-notice,.studio-workspace:not(.is-history) .studio-error,.studio-workspace:not(.is-history) .studio-gate{grid-column:2}
+ /* In the Plan B side composer, let the picker grow downward.  The previous
+    bottom anchor made the menu reflow upward when passive details appeared,
+    which could cover the status trigger and make it impossible to click. */
+ .studio-workspace:not(.is-history) .studio-model-menu{top:calc(100% + 12px);bottom:auto;max-height:min(560px,calc(100dvh - 150px));overflow-y:auto;overscroll-behavior:contain}
+}
+@media (min-width:1051px) and (max-height:820px){.studio-workspace:not(.is-history) .studio-writing textarea{min-height:95px}.studio-workspace:not(.is-history) .studio-composer{padding-top:16px;padding-bottom:13px}.studio-workspace:not(.is-history) .studio-composer-caption{margin-bottom:12px}.studio-workspace:not(.is-history) .studio-gallery{gap:10px}}
+@media (min-width:1051px) and (max-height:700px){
+ .studio-workspace:not(.is-history) .studio-composer-wrap{align-self:start;height:auto}
+ .studio-workspace:not(.is-history) .studio-composer{flex:none}
+ .studio-workspace:not(.is-history) .studio-writing textarea{min-height:86px;max-height:120px}
+}
+@media (max-width:1050px){.studio-workspace:not(.is-history) .studio-gallery .studio-work:first-child .studio-work-preview{aspect-ratio:1.28}}

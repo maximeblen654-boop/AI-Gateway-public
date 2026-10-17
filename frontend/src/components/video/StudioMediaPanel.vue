@@ -63,7 +63,7 @@
         <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '继续创作' }}</button></div>
         <details class="studio-task-id"><summary>任务详情</summary><p data-testid="studio-task-id">任务：{{ active.id }}</p></details>
       </section>
-      <section v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
+      <section v-if="!historyMode" v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
         <p v-if="history.length || active" class="studio-composer-caption"><StudioMark /><span>{{ active ? '本次输入已冻结，调整输入请新建任务。' : '让想法有画面。' }}</span></p>
         <div class="studio-composer" ref="composerRoot" @keydown.esc="closeControl" @dragover.prevent @drop.prevent="drop">
           <fieldset :disabled="!!active">
@@ -258,7 +258,7 @@ async function refreshCatalog(){
  }finally{catalogLoading.value=false}
 }
 async function reloadHistory(){
- if(!historyMode.value){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false};return}
+ if(!historyMode.value){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}return}
  await loadHistory()
 }
 async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();if(needsRecovery(task))await refresh()}
