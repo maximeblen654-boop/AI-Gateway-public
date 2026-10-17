@@ -140,3 +140,28 @@
 
 本交接没有授权生产部署、真实供应商付费生成、商品发布、启售或生产历史删除。
 
+
+## 2026-10-17 性能候选复核结果
+
+- 实时生产只读核对确认仍为 `784d12c3257d7ce40d106ad7991abe6d40c74555`。
+- Core image config label：`sha256:1d6e581e5959efb71ccf7e2c983e7a0977e40d02afdd9be8f822e312f3bac718`。
+- Bridge image config label：`sha256:380eb805c15526fbe7bad191b84276792d77edf3b47ff657f6d3f2034786c405`。
+- BFF image config label：`sha256:abb6bb06ff37934683799c6d406605cf92488291fffba2927cd30817bad5da9c`。
+- 三组件均 healthy；Bridge/BFF 使用 `container:<Core>` network namespace；Core 使用生产持久卷，BFF 使用图片/视频/素材绑定挂载。
+- Compose 实际配置文件仍指向 `phase5-launch-20261010-final-3bb336b/compose.json` 与 `deploy-model-lifecycle-6f02-20261016/compose.override.6f02fdc1.json`。
+- 公网 `/health` 和 `/studio/` 返回 200。未带工作台会话访问 image/video readiness 返回 401 `image_session_required` / `video_session_required`，因此本轮没有把未认证响应冒充为有效 paid readiness；legacy 环境提交开关仍为 false，`managed-v1` 仍生效。未修改开关。
+
+### 候选与测试关系
+
+- `62374582ab346e29deebdaf48a38fd0e52f5c110` 是性能运行代码提交。
+- `75f8bdc2b545c5edde552e9b896aef4f9e18028e` 只在其上增加候选交接文档，没有运行代码差异。
+- Candidate Run `38938645575`、完整 Artifact `12063196736`、既有 104 笔隔离证据继续有效。
+- 普通 CI 旧断言已在测试提交 `5eb47faa54ad3057177827dff4ee7399b366aa05` 修正：catalog 仍准备一次工作台凭据，readiness 只读不再调用 `/keys/studio-access`。
+- 本地 readiness/API 与工作台定向测试：73 tests PASS + 61 tests PASS；CI `39014079350` PASS；Security `39014079348` PASS。
+- 这是测试代码修正，不改变候选运行代码，不需要重建或替换 `75f8bdc2` 候选。
+
+### 可部署性判断
+
+候选满足进入生产部署前置审核条件，但本轮没有部署授权。下一轮部署前仍需重新核对 readiness、保护指纹、回退资产和公网登录后页面；不得把未认证 401、旧报告或 Candidate PASS 当作部署后证明。
+
+当前停止状态：`CANDIDATE_READY_NOT_DEPLOYED`。
