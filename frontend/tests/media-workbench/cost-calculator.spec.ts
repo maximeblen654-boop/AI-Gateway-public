@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
-  test(`cost estimate ${width} ${mode}: optional, local only, price preserved`, async ({ page }, info) => {
+  test(`cost estimate ${width} ${mode}: explicit adoption, local until saved, price preserved`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 1000 })
     await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
     await page.goto(`/tests/media-workbench/index.html?scenario=WIZARD&mode=${mode}&theme=blue`)
@@ -12,21 +12,30 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.getByTestId('cost-purchase').fill('100')
     await page.getByTestId('cost-credits').fill('1000')
     await page.getByTestId('cost-consumption-0').fill('8')
-    await expect(page.getByTestId('cost-row-0')).toContainText('−0.1 CNY')
-    await expect(page.getByTestId('cost-row-0')).toContainText('低于估算上游成本')
+    await expect(page.getByTestId('cost-rate')).toContainText('0.1 CNY')
+    await expect(page.getByTestId('cost-row-0').locator('.mw-cost-results dd').first()).toHaveText('0.8 CNY')
+    await expect(page.getByTestId('cost-row-0')).toContainText('客户售价按独立售价表配置')
     if (width >= 1280) {
       const editor = await page.getByTestId('editor-page').boundingBox()
       const drawer = await page.getByTestId('cost-calculator').boundingBox()
       expect(editor!.x + editor!.width).toBeLessThanOrEqual(drawer!.x - 8)
       await page.getByTestId('price-0').fill('0.90')
-      await expect(page.getByTestId('cost-row-0')).toContainText('现有售价：0.90')
-      await expect(page.getByTestId('cost-row-0')).not.toContainText('低于估算上游成本')
+      await expect(page.getByTestId('price-0')).toHaveValue('0.90')
+      await expect(page.getByTestId('cost-row-0').locator('.mw-cost-results dd').first()).toHaveText('0.8 CNY')
+      await expect(page.getByTestId('cost-row-0')).toContainText('客户售价按独立售价表配置')
       await page.getByTestId('price-0').fill('0.70')
     } else {
       await page.getByTestId('cost-close').focus()
       await page.keyboard.press('Shift+Tab')
       expect(await page.getByTestId('cost-calculator').evaluate(el => el.contains(document.activeElement))).toBe(true)
     }
+    const pricesBeforeAdoption = await page.locator('input[data-test^="price-"]').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))
+    const savedBeforeAdoption = await page.evaluate(() => (window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot())
+    await page.getByTestId('cost-apply-0').click()
+    await expect(page.getByTestId('calculator-applied')).toContainText('尚未保存')
+    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.8')
+    expect(await page.locator('input[data-test^="price-"]').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toEqual(pricesBeforeAdoption)
+    expect(await page.evaluate(() => (window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot())).toEqual(savedBeforeAdoption)
     await page.keyboard.press('Escape'); await expect(page.getByTestId('open-cost-0')).toBeFocused();
     await page.getByTestId('wizard-step-3').click(); await page.getByTestId('wizard-step-4').click()
     await expect(page.getByTestId('price-0')).toHaveValue('0.70')
@@ -42,7 +51,9 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     page.once('dialog', dialog => dialog.accept())
     await page.reload()
     await page.getByTestId('account-search').fill('#77'); await page.getByTestId('supplier-77').click(); await page.getByTestId('model-image-native-1').click()
-    await page.getByTestId('wizard-step-4').click(); await page.getByTestId('open-cost-0').click()
+    await page.getByTestId('wizard-step-4').click()
+    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('')
+    await page.getByTestId('open-cost-0').click()
     await expect(page.getByTestId('cost-purchase')).toHaveValue('100'); await expect(page.getByTestId('cost-consumption-0')).toHaveValue('8')
     await page.getByTestId('cost-consumption-0').fill('0')
     await expect(page.getByTestId('cost-row-0')).toContainText('0 CNY')
