@@ -9,6 +9,7 @@ export interface Match {
 }
 export interface Price { amount: string; currency: string; billing_mode: string }
 export interface PricingRule { match: Match; sale_price: Price | null }
+export interface CostRule { match: Match; cost: Price | null; source?: 'manual' | 'calculator' }
 export interface SizeMapping { resolution: string; aspect_ratio: string; wire_size: string }
 export type ImageExecutionMode = 'single' | 'native_multi' | 'provider_async'
 export interface ImageExecutionConfig { mode?: ImageExecutionMode; max_output_images?: number; provider?: string }
@@ -21,6 +22,9 @@ export interface Product {
     count: Range; references: References; combination_rules: { deny: Match }[]
   }
   pricing_rules: PricingRule[]
+  cost_rules?: CostRule[]
+  /** Server-owned contract marker; draft writes cannot opt back into legacy. */
+  cost_version?: number
   adapter_config: AdapterConfig
 }
 export interface Diagnostic {
@@ -96,6 +100,11 @@ export function draftInput(products: Product[]): { products: Product[] } {
       count: range(p.capabilities.count), references: references(p.capabilities.references),
       combination_rules: (p.capabilities.combination_rules ?? []).map(rule => ({ deny: match(rule.deny) }))
     },
+    ...(p.cost_rules !== undefined ? { cost_rules: p.cost_rules.map(rule => ({
+      match: match(rule.match), cost: rule.cost == null ? null : {
+        amount: rule.cost.amount, currency: rule.cost.currency, billing_mode: rule.cost.billing_mode
+      }, ...(rule.source ? { source: rule.source } : {})
+    })) } : {}),
     pricing_rules: (p.pricing_rules ?? []).map(rule => ({ match: match(rule.match), sale_price: rule.sale_price == null ? null : {
       amount: rule.sale_price.amount, currency: rule.sale_price.currency, billing_mode: rule.sale_price.billing_mode
     } }))
