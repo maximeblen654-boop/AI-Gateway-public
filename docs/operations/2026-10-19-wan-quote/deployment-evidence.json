@@ -1,0 +1,620 @@
+{
+  "status": "DEPLOYED_ACCEPTANCE_PARTIAL",
+  "observed_utc": "2026-10-18T23:34:37.076667+00:00",
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "old_source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+  "candidate": {
+    "artifact": 12149012613,
+    "final_evidence_artifact": 12149958347,
+    "manifest_sha256": "485c4a8fcc54b31bb415304366f9244d33ed95a9fb63a6c43f0779451a7d0dca",
+    "original_tar_plus_final_pass_manifest": true,
+    "rebuilt": false
+  },
+  "components": [
+    {
+      "component": "core",
+      "container": "sub2api",
+      "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+      "image_id": "sha256:02246764463d28040bd4917ca4c6d0a9903d9977f377648ddb528e46b2e71d48",
+      "oci_manifest": "sha256:02246764463d28040bd4917ca4c6d0a9903d9977f377648ddb528e46b2e71d48",
+      "config_digest": "sha256:76a084ae2d253dfaf1d48fa5af2c8dfa8775a230c6e95822686fc25d5a0e965c",
+      "tar_sha256": "4b7340643da2095e32af304b59b62946709dad888932cb1570fa2134d392ef41",
+      "container_id": "9c71a2da77eb1cd5ddc0200958c1630c736c2bb2874e7b967238e155f7d59fd1",
+      "started_at": "2026-10-18T23:09:39.455469721Z",
+      "health": "healthy",
+      "network": "deploy_sub2api-network"
+    },
+    {
+      "component": "bridge",
+      "container": "studio-v2-bridge",
+      "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+      "image_id": "sha256:b3f8836b60b2baad304bb78747fea1e70298f865a1fba9fbf122f8409bc6b11b",
+      "oci_manifest": "sha256:b3f8836b60b2baad304bb78747fea1e70298f865a1fba9fbf122f8409bc6b11b",
+      "config_digest": "sha256:5845bd670349d4c363c2732c248744a1de03b6329b7a34d9f1296c8150189bc0",
+      "tar_sha256": "e4c91eec68ee3fd9eeee62450accdf387610db0df4d04720cc92dd5034aa90c3",
+      "container_id": "4efe4e6eeb3f39689b3de95122320e5f43607ea768ba3565f89d37e40f30b6b9",
+      "started_at": "2026-10-18T23:09:47.485073111Z",
+      "health": "healthy",
+      "network": "container:9c71a2da77eb1cd5ddc0200958c1630c736c2bb2874e7b967238e155f7d59fd1"
+    },
+    {
+      "component": "bff",
+      "container": "studio-v2-bff",
+      "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+      "image_id": "sha256:a15a5581e39eca3cd1dbe7d6faeb379cff23cc416a3b3539d39750ebd3e7b4cf",
+      "oci_manifest": "sha256:a15a5581e39eca3cd1dbe7d6faeb379cff23cc416a3b3539d39750ebd3e7b4cf",
+      "config_digest": "sha256:88ad43ec7b56f4f47ef653f26d3eed6187c8dcd9f00a433bedc2c9698cde39c8",
+      "tar_sha256": "726eaababccb16855fc1013c103b59c49029868f7b80dac8b0a622aa157da413",
+      "container_id": "9d934a127f244f56e69b17614b37a6dff5a6bafe21a3962696f7a23492fd516b",
+      "started_at": "2026-10-18T23:10:08.745481448Z",
+      "health": "healthy",
+      "network": "container:9c71a2da77eb1cd5ddc0200958c1630c736c2bb2874e7b967238e155f7d59fd1"
+    }
+  ],
+  "maintenance": {
+    "started_utc": "2026-10-18T23:09:30.001702+00:00",
+    "finished_utc": "2026-10-18T23:28:37.713290+00:00",
+    "duration_seconds": 1147.712,
+    "active": false,
+    "original_active_caddy_restored": true,
+    "application_recreated_during_release": false
+  },
+  "switch": {
+    "started_utc": "2026-10-18T23:09:38.764187+00:00",
+    "last_component_healthy_utc": "2026-10-18T23:10:15.218933+00:00",
+    "all_safety_gates_utc": "2026-10-18T23:10:27.952568+00:00",
+    "rollback": false
+  },
+  "paid_before": {
+    "image": {
+      "requested": true,
+      "effective": true
+    },
+    "video": {
+      "requested": false,
+      "effective": false
+    }
+  },
+  "paid_after": {
+    "image": {
+      "requested": true,
+      "effective": true
+    },
+    "video": {
+      "requested": false,
+      "effective": false
+    }
+  },
+  "preflight": {
+    "pass": true,
+    "specs_checked": 1870,
+    "wall_ms": 1100,
+    "server_second_pass": true,
+    "server_second_specs": 1870
+  },
+  "protection": {
+    "table_count": 32,
+    "table_fingerprints_before": {
+      "account_groups": {
+        "rows": 2,
+        "sha256": "f2a4a435c2c1e3e80b4ef229e665983de575b821ee8d70cf2d47f061b40fb25a"
+      },
+      "accounts": {
+        "rows": 77,
+        "sha256": "9fde4dbe6229d874d8a1e494ac010aeee95f486b48eaf9c55f9f85ad5bf8c24e"
+      },
+      "api_keys": {
+        "rows": 4,
+        "sha256": "b9ef080bd228ee59ed2c04a4b634e4ac6ae58f1614a10813717640981d26b72b"
+      },
+      "auth_identity_channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_rules": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_groups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_aggregation_watermark": {
+        "rows": 1,
+        "sha256": "2e35c5944998883bd172e893626fe21d68fba20a18827072925d6d72c587c26a"
+      },
+      "channel_monitor_daily_rollups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_histories": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_request_templates": {
+        "rows": 5,
+        "sha256": "b27149d4887442b1f7f343b4c9c0c0b921e789decbd4ae2961a827c2d03afdf7"
+      },
+      "channel_monitor_v2_config": {
+        "rows": 1,
+        "sha256": "10ce7e77ba718b9b45c0c99f33cf270678008edf975b3ff84bce7e9198915087"
+      },
+      "channel_monitor_v2_error_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_error_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_watermarks": {
+        "rows": 1,
+        "sha256": "3aff8a5b75c36e738b64b38065d7c329cedd9b75a6d1a5dbaad847560cddc861"
+      },
+      "channel_monitors": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "groups": {
+        "rows": 31,
+        "sha256": "a5115ca2277caac85ec4b2aad6cba60653174a2065bd5ac5dd6621a485e3b14c"
+      },
+      "schema_migrations": {
+        "rows": 293,
+        "sha256": "8f2d72cd111f13d8f9ac5c037e1a3437ddca41085ad11e22d04ab43cec8bb7fa"
+      },
+      "studio_video_orders": {
+        "rows": 2,
+        "sha256": "1faced8dc9a6646fd5c84ca8f3cca9105ac8fa9934cedd8a55cbb4af3a947415"
+      },
+      "usage_billing_dedup": {
+        "rows": 26,
+        "sha256": "cec1bf18d68197c6099e6b16ddc8b09006fd408cdfaa0daab8d4cc09be3fb1ed"
+      },
+      "usage_logs": {
+        "rows": 26,
+        "sha256": "9c3140692d707e9f0b766b70479d4092dbe3160bb7ef0b1995975cf898d80716"
+      },
+      "users": {
+        "rows": 2,
+        "sha256": "84affda2ae5e2f3abed005b656d14f470c80692247258e570f890d4287b00382"
+      }
+    },
+    "table_fingerprints_after": {
+      "account_groups": {
+        "rows": 2,
+        "sha256": "f2a4a435c2c1e3e80b4ef229e665983de575b821ee8d70cf2d47f061b40fb25a"
+      },
+      "accounts": {
+        "rows": 77,
+        "sha256": "9fde4dbe6229d874d8a1e494ac010aeee95f486b48eaf9c55f9f85ad5bf8c24e"
+      },
+      "api_keys": {
+        "rows": 4,
+        "sha256": "b9ef080bd228ee59ed2c04a4b634e4ac6ae58f1614a10813717640981d26b72b"
+      },
+      "auth_identity_channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_rules": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_groups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_aggregation_watermark": {
+        "rows": 1,
+        "sha256": "2e35c5944998883bd172e893626fe21d68fba20a18827072925d6d72c587c26a"
+      },
+      "channel_monitor_daily_rollups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_histories": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_request_templates": {
+        "rows": 5,
+        "sha256": "b27149d4887442b1f7f343b4c9c0c0b921e789decbd4ae2961a827c2d03afdf7"
+      },
+      "channel_monitor_v2_config": {
+        "rows": 1,
+        "sha256": "10ce7e77ba718b9b45c0c99f33cf270678008edf975b3ff84bce7e9198915087"
+      },
+      "channel_monitor_v2_error_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_error_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_watermarks": {
+        "rows": 1,
+        "sha256": "3aff8a5b75c36e738b64b38065d7c329cedd9b75a6d1a5dbaad847560cddc861"
+      },
+      "channel_monitors": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "groups": {
+        "rows": 31,
+        "sha256": "a5115ca2277caac85ec4b2aad6cba60653174a2065bd5ac5dd6621a485e3b14c"
+      },
+      "schema_migrations": {
+        "rows": 293,
+        "sha256": "8f2d72cd111f13d8f9ac5c037e1a3437ddca41085ad11e22d04ab43cec8bb7fa"
+      },
+      "studio_video_orders": {
+        "rows": 2,
+        "sha256": "1faced8dc9a6646fd5c84ca8f3cca9105ac8fa9934cedd8a55cbb4af3a947415"
+      },
+      "usage_billing_dedup": {
+        "rows": 26,
+        "sha256": "cec1bf18d68197c6099e6b16ddc8b09006fd408cdfaa0daab8d4cc09be3fb1ed"
+      },
+      "usage_logs": {
+        "rows": 26,
+        "sha256": "9c3140692d707e9f0b766b70479d4092dbe3160bb7ef0b1995975cf898d80716"
+      },
+      "users": {
+        "rows": 2,
+        "sha256": "84affda2ae5e2f3abed005b656d14f470c80692247258e570f890d4287b00382"
+      }
+    },
+    "business_file_roots_before": {
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/image-receipts": {
+        "count": 2,
+        "sha256": "f1eebb687fd01b4c6e4f38046d3714ab31c0c92a8c84ff1e3881578c63c6d43e"
+      },
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings": {
+        "count": 77,
+        "sha256": "52a88c814d515faf8fff8ec2a451bedeeffe85b39ad9a653f17af94544d6d46b"
+      },
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-video-bindings": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "/var/lib/ai-gateway/studio-v2": {
+        "count": 45,
+        "sha256": "6355cf34bbf1b95bfb62b3994cdd5a1d91c3005ae08db7568334fe702396f49d"
+      }
+    },
+    "business_file_roots_after": {
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/image-receipts": {
+        "count": 2,
+        "sha256": "f1eebb687fd01b4c6e4f38046d3714ab31c0c92a8c84ff1e3881578c63c6d43e"
+      },
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-image-bindings": {
+        "count": 77,
+        "sha256": "52a88c814d515faf8fff8ec2a451bedeeffe85b39ad9a653f17af94544d6d46b"
+      },
+      "/var/lib/docker/volumes/deploy_sub2api_data/_data/studio-video-bindings": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "/var/lib/ai-gateway/studio-v2": {
+        "count": 45,
+        "sha256": "6355cf34bbf1b95bfb62b3994cdd5a1d91c3005ae08db7568334fe702396f49d"
+      }
+    },
+    "media_account_configs_unchanged": true,
+    "media_account_versions": [
+      {
+        "account_id": 13,
+        "record_version": 1,
+        "sales_enabled": false
+      },
+      {
+        "account_id": 20,
+        "record_version": 1,
+        "sales_enabled": false
+      },
+      {
+        "account_id": 44,
+        "record_version": 5,
+        "sales_enabled": true
+      },
+      {
+        "account_id": 77,
+        "record_version": 35,
+        "sales_enabled": true
+      }
+    ],
+    "postgres_redis_containers_unchanged": true,
+    "production_database_restored": false,
+    "schema_migration_changed": false,
+    "new_cost_config_written": false,
+    "supplier_generation_by_executor": 0
+  },
+  "public_html": {
+    "observed_utc": "2026-10-18T23:28:38.065592+00:00",
+    "status": "PASS",
+    "path": "/video-studio",
+    "normal_url": true,
+    "scope": "all HTML bytes after response-bound 16-byte CSP nonce and one exact pinned end-of-body RUM script plus one LF; static JS/CSS checked independently",
+    "normalized_sha256": "f45eae3d7a1075719b9087443c74e28e24b9e03d5a0e5222cb113cb01e26bc81",
+    "beacon_src": "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092",
+    "beacon_sri_content_verified": true,
+    "beacon_integrity_sha256": "ee5d34692196c0a96f911cd94cb5b4c38992452e06571c8151daeae019bbd650",
+    "beacon_token_sha256": "51dad60d4a093269b5b41e408ef3ecd3c46d50a826c9810f8b11d4f0be477a45",
+    "counterexamples_rejected": [
+      "changed_asset",
+      "unknown_script",
+      "duplicate_beacon",
+      "different_beacon_version",
+      "wrong_integrity",
+      "changed_beacon_token",
+      "extra_whitespace",
+      "wrong_nonce"
+    ],
+    "server_or_proxy_modified": false,
+    "official_basis": "https://developers.cloudflare.com/speed/observatory/rum-beacon/"
+  },
+  "public_routes": {
+    "observed_utc": "2026-10-18T23:28:38.169986+00:00",
+    "public": {
+      "/": {
+        "status": 200,
+        "final_url": "https://laifufu.top/",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 769273,
+        "sha256": "4ca1afcdfe7a6668e2e3332988aa0196a59b562590a4d38248c517659980a6c3",
+        "cf_mitigated": null,
+        "cf_cache_status": "DYNAMIC",
+        "cf_ray": "a4cb520efa81309a-SEA"
+      },
+      "/health": {
+        "status": 200,
+        "final_url": "https://laifufu.top/health",
+        "content_type": "application/json; charset=utf-8",
+        "bytes": 15,
+        "sha256": "a29ee2b15c494311c52521766e44af56a3ad2248e7a8ab465e5206463c13d288",
+        "cf_mitigated": null,
+        "cf_cache_status": "DYNAMIC",
+        "cf_ray": "a4cb520fbd4fd311-SEA"
+      },
+      "/studio/": {
+        "status": 200,
+        "final_url": "https://laifufu.top/studio/",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 6283,
+        "sha256": "6b01001d7d21996f8a2014dcad11dfa467c23b21c49616bea43b2a1ce7d7b5ea",
+        "cf_mitigated": null,
+        "cf_cache_status": "DYNAMIC",
+        "cf_ray": "a4cb52102b5355d1-SEA"
+      },
+      "/video-studio": {
+        "status": 200,
+        "final_url": "https://laifufu.top/video-studio",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 769273,
+        "sha256": "883eaa02035681ca2ec890824d8f25c8e4d26dd2f191ed1c795793e30e30d740",
+        "cf_mitigated": null,
+        "cf_cache_status": "DYNAMIC",
+        "cf_ray": "a4cb5210c8c8a338-SEA"
+      }
+    },
+    "assets": [
+      {
+        "path": "/assets/index-BiOI67aw.css",
+        "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+        "bytes": 293040,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      },
+      {
+        "path": "/assets/index-zNxqqBdx.js",
+        "sha256": "53c108f89d2973a896d4690ba2617e412c515128d1eadcc6b9faf54f28949b22",
+        "bytes": 194108,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      },
+      {
+        "path": "/assets/vendor-i18n-frIc4eVX.js",
+        "sha256": "3aca833e2453ca2970625c770a67e8909997ad63e716535a3b717d0ff9638263",
+        "bytes": 63323,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      },
+      {
+        "path": "/assets/vendor-misc-D-9tiuF-.js",
+        "sha256": "7a2abc88bd1f399203229784083068b8f2d6a7ebf8a413949c932d91d0630a10",
+        "bytes": 279017,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      },
+      {
+        "path": "/assets/vendor-misc-DB0Q8XAf.css",
+        "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+        "bytes": 3938,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      },
+      {
+        "path": "/assets/vendor-vue-DB4H1Kl3.js",
+        "sha256": "eeeec0003ce8736d4b71bc36d5a74fe9ee19c647e6ffd81bf8da47b531e21d61",
+        "bytes": 113799,
+        "origin_matches": true,
+        "status": 200,
+        "cf_cache_status": "HIT"
+      }
+    ],
+    "native_page_origin": {
+      "status": 200,
+      "final_url": "http://127.0.0.1:8080/video-studio",
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 768873,
+      "sha256": "90d51f851696768271ac6c54fe7e173f1c8aa6f6934017b1e82a419834afa23c",
+      "cf_mitigated": null,
+      "cf_cache_status": null,
+      "cf_ray": null,
+      "public_exact_equal": false
+    },
+    "image_dispatch_observation": {
+      "tasks": 5,
+      "state_counts": {
+        "completed": 2,
+        "failed": 3
+      },
+      "unparseable_tasks": 0,
+      "claim_files": 5,
+      "claims_without_saved_response": 0,
+      "nonterminal_tasks": 0,
+      "note": "file-only observation; no recovery/dispatch invoked; recheck under cutover gate"
+    },
+    "active_caddy": {
+      "readable": true,
+      "sha256": "e50bfc87e3f0ee359f35438d3b72bdca04b2cf179e6a6eb60ad2b5b22103a196",
+      "upstreams": [
+        "127.0.0.1:4173",
+        "127.0.0.1:4174",
+        "127.0.0.1:8080",
+        "127.0.0.1:8091",
+        "127.0.0.1:8094"
+      ],
+      "config_file_sha256": "93f8d302978a6ceed1f5b9621c3ec5159309ea907f75a507500364bf41da0e23"
+    },
+    "pass": true
+  },
+  "native_api_readonly": {
+    "status": "PASS",
+    "observed_utc": "2026-10-18T23:28:28.381950+00:00",
+    "native_models_GET": 200,
+    "model_count": 74,
+    "model_ids_sha256": "67290f8f08cdf8f59e449042a9b4805f0515557d0407694bc44d82b832f9ebd3",
+    "invalid_key_GET": 401,
+    "billing_fingerprints_unchanged": true,
+    "generation_POSTs": 0,
+    "scope": "NATIVE_MODEL_LIST_AUTHORIZATION_ONLY_NOT_SUPPLIER_FORWARDING"
+  },
+  "browser": {
+    "status": "PENDING_AUTHENTICATED_RECHECK",
+    "previous_attempt": "Actual production browser; admin identity/readiness/editor loaded, but temporary identity transport and Save-step assertions failed. Not accepted.",
+    "failed_checks": [
+      "published-ratio-options",
+      "existing-image-detail",
+      "admin-account-77",
+      "admin-account-44"
+    ],
+    "fixed_fixture_tests": 27,
+    "fixed_fixture_screenshots": 48,
+    "fixture_is_not_production": true,
+    "corrected_public_identity_routes": true,
+    "credential_values_in_evidence": false
+  },
+  "backup": {
+    "checkpoint": "/var/lib/ai-gateway/checkpoints/predeploy-8ad2eff-20261018T212207Z",
+    "seal_sha256": "ef3894e8bab9288039c15e23615c9d97f226b4250e0aff90101b551f160fb90b",
+    "integrity_rechecked": true,
+    "prior_real_isolated_restore_reused": true,
+    "old_runtime_assets": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0",
+    "rollback_requires_no_new_cost_fields_and_controlled_drain": true
+  },
+  "execution": {
+    "v2": "Timezone mismatch safely stopped before maintenance, original baseline retained.",
+    "v3_seal": "154972beefa2bb8eda3f85af7bbe145cb300854b7f28e4eb9ebee92d46d75493",
+    "v3_result_preserved": true,
+    "release_only_seal": "9ebfb86bb8951da72c0f24a7f78a0d01920734c6a0867ee4fbb314bd0fc5a5a0",
+    "release_only_does_not_claim_original_browser_gate_passed": true,
+    "final_browser_seal": "6b5dc6618386a2f57517d81951b65166e60c5d05445584e5d6575508592d786b"
+  },
+  "vps_free_bytes": 23734591488
+}
