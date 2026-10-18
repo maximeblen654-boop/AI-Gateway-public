@@ -1,0 +1,18 @@
+{
+  "pass": true,
+  "scope": "LOCAL_FIXTURE_ACTUAL_LOGIN_AND_ACCEPT_SCRIPTS",
+  "intentionalFailure": false,
+  "loginPosts": 1,
+  "contextCount": 1,
+  "checks": 26,
+  "screenshots": 48,
+  "productionRequests": 0,
+  "stdin": "closed deliberately",
+  "lifecycle": [
+    "authentication_verified",
+    "single_context_created",
+    "all_checks_finished",
+    "evidence_saved_before_cleanup",
+    "browser_closed_after_complete"
+  ]
+}

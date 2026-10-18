@@ -1,0 +1,739 @@
+{
+  "source": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+  "scope": "PRODUCTION_READ_ONLY",
+  "lifecycle": [
+    "authentication_verified",
+    "single_context_created",
+    "all_checks_finished",
+    "evidence_saved_before_cleanup",
+    "browser_closed_after_complete"
+  ],
+  "checks": [
+    {
+      "name": "authenticated-studio",
+      "pass": true,
+      "detail": {
+        "path": "/video-studio"
+      }
+    },
+    {
+      "name": "text-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "published-ratio-options",
+      "pass": true,
+      "detail": {
+        "options": [
+          "9:21",
+          "9:16",
+          "2:3",
+          "3:4",
+          "4:5",
+          "1:1",
+          "5:4",
+          "4:3",
+          "3:2",
+          "16:9",
+          "21:9"
+        ],
+        "catalog_match": true,
+        "output_format_visible": false
+      }
+    },
+    {
+      "name": "existing-image-detail",
+      "pass": true,
+      "detail": {
+        "available": true,
+        "dimensions": {
+          "width": 3840,
+          "height": 2160
+        },
+        "download_link": true,
+        "continue_creation": true
+      }
+    },
+    {
+      "name": "admin-readiness",
+      "pass": true,
+      "detail": {
+        "image": {
+          "requested": true,
+          "effective": true
+        },
+        "video": {
+          "requested": false,
+          "effective": false
+        }
+      }
+    },
+    {
+      "name": "admin-account-77",
+      "pass": false,
+      "error": "Editor usable width too small"
+    },
+    {
+      "name": "admin-account-44",
+      "pass": false,
+      "error": "Editor usable width too small"
+    }
+  ],
+  "screenshots": [
+    "text-1440x900.png",
+    "edit-1440x900.png",
+    "video-1440x900.png",
+    "history-1440x900.png",
+    "text-1366x650.png",
+    "edit-1366x650.png",
+    "video-1366x650.png",
+    "history-1366x650.png",
+    "text-768x844.png",
+    "edit-768x844.png",
+    "video-768x844.png",
+    "history-768x844.png",
+    "text-390x844.png",
+    "edit-390x844.png",
+    "video-390x844.png",
+    "history-390x844.png",
+    "text-360x844.png",
+    "edit-360x844.png",
+    "video-360x844.png",
+    "history-360x844.png",
+    "published-ratios.png",
+    "existing-image-detail.png",
+    "failure-admin-account-77.png",
+    "failure-admin-account-44.png"
+  ],
+  "blocked": [],
+  "api": [
+    {
+      "path": "/studio-v2/api/session",
+      "status": 401
+    },
+    {
+      "path": "/studio-v2/api/session/exchange",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_c63d955bce8833b231864c1f1f379e8f/results/0",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_9304aca988a70a6e300e5329112f5454/results/0",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_9304aca988a70a6e300e5329112f5454/results/0",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/img_c63d955bce8833b231864c1f1f379e8f/results/0",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "status": 200
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "status": 200
+    }
+  ],
+  "errors": [],
+  "auth": {
+    "official_me": 200,
+    "role": "admin"
+  },
+  "expired_owner_journals": 0,
+  "existing_key_count": 1,
+  "status": "PARTIAL"
+}
