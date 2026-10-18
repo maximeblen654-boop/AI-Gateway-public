@@ -78,19 +78,53 @@ func TestMediaPublishPostgresDependenciesAndReadiness(t *testing.T) {
 	after, err := repo.Get(ctx, a.ID)
 	require.NoError(t, err)
 	require.Equal(t, mediaworkbench.DependenciesFor(before), mediaworkbench.DependenciesFor(after))
-	// A non-media Account edit between compilation and CAS must fail inside the
-	// locked transaction, even though record_version did not change.
+	// API aliases are independent of the v1 Studio contract, including an edit
+	// between compilation and the locked media CAS.
+	publishedRevision := after.Config.Published.Revision
+	expected = after.Config.RecordVersion
+	dependencies := mediaworkbench.DependenciesFor(after)
 	c := after.Config
 	c.RecordVersion++
 	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET credentials=jsonb_set(credentials,'{model_mapping}','{"gpt-image-*":"gpt-image-new"}'::jsonb) WHERE id=$1`, a.ID)
 	require.NoError(t, err)
-	require.ErrorIs(t, repo.CompareAndSwapChecked(ctx, a.ID, after.Config.RecordVersion-1, mediaworkbench.DependenciesFor(after), c), mediaworkbench.ErrStale)
+	mapped, err := repo.Get(ctx, a.ID)
+	require.NoError(t, err)
+	require.Equal(t, "gpt-image-new", mapped.ModelMapping["gpt-image-*"])
+	require.Equal(t, dependencies, mediaworkbench.DependenciesFor(mapped))
+	require.NoError(t, repo.CompareAndSwapChecked(ctx, a.ID, expected, dependencies, c))
 	d, err = svc.Detail(ctx, a.ID)
 	require.NoError(t, err)
+	require.True(t, d.EffectiveSales)
+	require.Equal(t, product.UpstreamModel, d.Config.Published.Offers[0].UpstreamModel)
+	require.Equal(t, publishedRevision, d.Config.Published.Revision)
+	d, err = svc.Publish(ctx, a.ID, d.Config.RecordVersion, d.Config.Draft.Revision)
+	require.NoError(t, err)
+	require.True(t, d.EffectiveSales)
+	// Removing the actual Studio model remains a real dependency change. The
+	// row version is unchanged, so the stale CAS must reject the catalog drift.
+	checked, err = repo.Get(ctx, a.ID)
+	require.NoError(t, err)
+	expected = checked.Config.RecordVersion
+	dependencies = mediaworkbench.DependenciesFor(checked)
+	checked.Config.RecordVersion++
+	_, err = integrationDB.ExecContext(ctx, `UPDATE accounts SET extra=jsonb_set(extra,'{upstream_model_catalog_snapshot,models}','["gpt-image-new"]'::jsonb) WHERE id=$1`, a.ID)
+	require.NoError(t, err)
+	require.ErrorIs(t, repo.CompareAndSwapChecked(ctx, a.ID, expected, dependencies, checked.Config), mediaworkbench.ErrStale)
+	d, err = svc.Detail(ctx, a.ID)
+	require.NoError(t, err)
+	require.Equal(t, expected, d.Config.RecordVersion)
 	require.False(t, d.EffectiveSales)
 	d, err = svc.Publish(ctx, a.ID, d.Config.RecordVersion, d.Config.Draft.Revision)
 	require.ErrorIs(t, err, mediaworkbench.ErrValidation)
 	require.False(t, d.Config.Validation.PublishReady)
+	require.Equal(t, publishedRevision, d.Config.Published.Revision)
+	missingModel := false
+	for _, diagnostic := range d.Config.Validation.Diagnostics {
+		if diagnostic.Code == "MODEL_NOT_DISCOVERED" && diagnostic.Scope == product.ProductID {
+			missingModel = true
+		}
+	}
+	require.True(t, missingModel, "publication must reject the removed Studio model")
 	var count int
 	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT count(*) FROM scheduler_outbox WHERE account_id=$1", a.ID).Scan(&count))
 	require.Zero(t, count)
