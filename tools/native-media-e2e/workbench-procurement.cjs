@@ -100,7 +100,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
       const checked = await core(admin, path + '/check', 'POST', {})
       assert.equal(checked.pass, true, JSON.stringify(checked))
       const current = await core(admin, path)
-      const enabled = await core(admin, path, 'PUT', { enabled: true, expected_revision: current.revision, fingerprint: checked.fingerprint })
+      await core(admin, path, 'PUT', { enabled: true, expected_revision: current.revision, fingerprint: checked.fingerprint })
+      const enabled = await core(admin, path)
       assert.equal(enabled.effective_enabled, true, JSON.stringify(enabled))
     }
     assert.equal(stats().image_posts, before.image_posts, 'Paid preflight generated an image')
