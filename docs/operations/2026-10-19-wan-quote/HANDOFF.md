@@ -1,4 +1,54 @@
-# Account #44 WAN3.0 原生报价诊断
+# Account #44 WAN3.0 原生报价诊断与配置引导
+
+## 后续增量：双业务成本配置引导
+
+源码状态：**SOURCE_READY_NOT_DEPLOYED**。生产报价状态仍为 **BLOCKED_QUOTE_CONFIGURATION**。
+
+固定源码 `1ce98f14979009a54801f553267b053e6596ce90`，继承诊断修复47847205。已读取私有规则提交 `cda81316597f12ef0fb516cc295187bd78cc5747` 的双业务约束；只fetch和读取，没有覆盖主工作区未提交AGENTS。正式Constraints/Handoff原件未改。
+
+### 最新生产只读审计
+
+2026-10-19再次通过登记SSH、BEGIN READ ONLY查询：channels表为空，channel_groups表为空；不存在可无冲突直接复用的Channel。Account44仍active/schedulable、销售enabled=true、record_version=5。精确商品、SiteModel、UpstreamModel、Offer与下文证据一致；本轮不扩大到同Account其他WAN、聊天或图片模型。
+
+原生链路：Key/Group决定访问与模型权限；Group关联Channel后，视频报价从该Channel的AccountStatsPricingRules中匹配Account ID、平台和UpstreamModel，之后仍须通过原生Account调度/运行准入。Studio只从PublishedVideoOffers/PublishedImageOffers形成目录，未发布模型不会因此出现在Studio；同Account其他聊天模型的原生API权限独立。原生Channel还可能影响模型限制、映射、计费模型来源和定价，不能当作一个无副作用的媒体成本容器。
+
+### 实现
+
+- 视频缺失/无效Channel：`quote_cost_channel_missing`。
+- Channel存在但没有精确匹配的采购成本：`quote_cost_rule_missing`。
+- 匹配规则为非按次、带区间或time_pricing：`quote_cost_contract`。
+- 其余成本校验保留`quote_account_cost`；所有原有拒绝条件和errors.Is原因保留，图片原有可选/必需成本逻辑不变。
+- 管理员预检报告携带实际检查Group ID（只读上下文，不是路由覆盖值）；诊断保留Account、Product及可读取的精确UpstreamModel。
+- 成本失败时展示Group/Channel职责、普通API影响、采购价/售价/浏览器估算区别，并提供已有 `/admin/channels` 新标签页入口。没有创建/绑定/保存按钮，没有自动写入，没有新增成本引擎或供应商体系。
+- 现有浏览器成本换算器未修改，其估算不写入原生成本。
+
+### 验证
+
+PASS：WAN有/无参考两路径，缺渠道/缺精确规则/不兼容计费、映射/Group/调度/权限/非法规格拒绝；已有Channel对象前后序列化完全一致；预检不新增报价文件。新增同Account聊天+已发布视频目录测试，Studio只显示视频Offer，移除视频Group权限不影响聊天原生允许状态。原生 `TestGroupIsolation_` 调度回归、图片报价保护、StudioPaid和视频preflight系列PASS。
+
+PASS：MediaPaidControls 5项组件测试；完整vue-tsc --noEmit；相关Vue/TS ESLint。类型检查发现published.products可能缺省，已用可选访问修正后重跑通过。没有生产浏览器写入测试，没有供应商网络请求。
+
+命令：
+```
+go test ./internal/service -run 'Test(WANQuote|QuoteDiagnostic|StudioVideoPreflight|StudioPaid|StudioImage(QuoteOwnership|IssuedAccounting|IssueFreezes|AccountingAdmission|NativeKeyPolicy|ExactAccountDrift)|GroupIsolation_)' -count=1
+go test ./internal/service -run TestWANStudioCatalogDoesNotOwnChatPermissions -count=1
+node node_modules/vitest/vitest.mjs run src/components/admin/media/__tests__/MediaPaidControls.spec.ts
+node node_modules/vue-tsc/bin/vue-tsc.js --noEmit
+node node_modules/eslint/bin/eslint.js src/components/admin/media/MediaPaidControls.vue src/components/admin/media/__tests__/MediaPaidControls.spec.ts src/api/admin/mediaPaid.ts
+```
+
+### Account44最小配置方案（未执行）
+
+1. 用户确认 `WAN3.0-可参考视频` 的真实采购币种、金额及单位：每次、每秒还是随时长/分辨率/素材变化；不得把客户5/10/15秒售价当成本。
+2. 若确为固定按次采购，另行审批在现有原生渠道管理创建一个经影响审查的Channel、关联已有Group31，并仅为Account44/openai/精确UpstreamModel配置明确的按次采购规则。无需新建Group或重复录入Account密钥。
+3. 创建前必须核对模型限制、Channel mapping、计费模型来源、客户定价、账号统计定价等设置对Group31现有聊天/图片API的影响；不得把渠道限制为仅WAN从而误封其他业务，不擅自填写默认值宣称无影响。
+4. 若采购按秒/规格变化，当前视频成本快照仅支持明确per_request且不接受interval/time_pricing。此轮不能给出安全的固定按次配置；需先确定真实合同及后续兼容方案，不猜价、不绕过。
+5. 单独授权写入后才能执行配置与非付费预检；视频false/false保持，商品售价、发布和销售不动。通过报价检查不等于允许视频付费提交。
+
+本轮未部署或重启；图片true/true、视频false/false沿用最近认证验收事实，本轮未重新取得管理员会话，不冒报实时effective读取。C/D收尾约4.71/27.35GiB可用，无磁盘清理；复用现有依赖与Go缓存。停止等待审核与商业数据，不自动构建/部署。
+
+---
+
 
 状态：**BLOCKED_QUOTE_CONFIGURATION**。诊断源码已就绪，生产报价仍需要独立授权补齐成本配置。本轮没有部署、生产写入、开关调整或供应商请求。
 
