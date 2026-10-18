@@ -22,6 +22,15 @@ function assertPublic(value, path = '$') {
   assert(!/synthetic-native-only|localhost:19090/.test(JSON.stringify(value)), 'Supplier credential or endpoint leaked')
 }
 
+function assertZeroBalanceRejection(before, after, postsBefore, postsAfter, response) {
+  assert.equal(money(before.balance), 0, 'Native zero-balance fixture required; a low positive balance is not a projected-sale-price rejection')
+  assert.deepEqual(after, before, 'Rejected zero-balance request changed native balance, usage or Account quota')
+  assert.equal(postsAfter, postsBefore, 'Rejected zero-balance request reached the supplier')
+  // BFF task responses may use HTTP 200 with a failed/unknown task state.
+  // Transport success cannot replace the native ledger and supplier evidence.
+  assert(!['completed', 'partial', 'captured', 'billed'].includes(response?.body?.status), 'Zero-balance rejection reported successful delivery')
+}
+
 module.exports = async function run(root, suppliedCompose, suppliedFixture, suppliedReport) {
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
   assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO, 'paid-controls')
@@ -196,13 +205,19 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     await refreshPaidGrants()
     report.checks.push('Incomplete cost saves; server rejects incomplete selected publication; selected complete products publish atomically with server cost_version=1; sales stays separate; both Studio Groups have no Channel')
     const user = await customer('funded', 100, [imageGroup, videoGroup, apiGroup.id])
-    const poor = await customer('poor', 0.01, [imageGroup, videoGroup])
-    const unauthorized = await customer('no-group', 100, [])
-    const noGroup = await raw(unauthorized.token, '/keys', 'POST', { name: 'Denied synthetic key', group_id: apiGroup.id })
+    // Native admission rejects exhausted balances; a positive balance below the
+    // sale price is not a promise of projected-price pre-reservation.
+    const poor = await customer('zero-balance', 0, [imageGroup, videoGroup])
+    const unbound = await customer('no-studio-key', 100, [])
+    const noGroup = await raw(unbound.token, '/keys', 'POST', { name: 'Denied synthetic key', group_id: apiGroup.id })
     assert([400, 403].includes(noGroup.status), JSON.stringify(noGroup))
-    const deniedCatalog = await media(unauthorized, 'image', 'catalog')
+    // Public Studio Groups remain bindable under native policy. This customer
+    // has not created its own Studio Key; ticket exchange never creates one.
+    const unboundKeys = await core(unbound.token, '/keys?page=1&page_size=100')
+    assert(!unboundKeys.items.some(key => key.group_id === imageGroup))
+    const deniedCatalog = await media(unbound, 'image', 'catalog')
     assert(deniedCatalog.status >= 400 || !deniedCatalog.body.offers?.some(item => item.product_id === image.product_id))
-    report.checks.push('Unprivileged customer cannot create a Group key or obtain the Studio offer')
+    report.checks.push('Customer cannot bind the unauthorized exclusive API Group; a separate customer without its own Studio Key cannot obtain the Studio offer (public Group binding policy unchanged)')
     const imgOffer = await offer(user, 'image', image.product_id), wanOffer = await offer(user, 'video', wan.product_id)
     const beforeAlias = await prepare(user, 'image', imgOffer, 0, 'SYNTHETIC procurement pre-alias', 2)
     const native = await core(admin, '/admin/accounts/' + account.id)
@@ -242,13 +257,19 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.deepEqual(snapshot(user), currentBalance)
     report.checks.push('Explicit zero cost is preserved; later published costs and sale prices do not rewrite or recharge completed original tasks')
     const poorBefore = snapshot(poor), postsBefore = stats().image_posts
-    const poorCatalog = await offer(poor, 'image', image.product_id)
-    const poorQuote = await media(poor, 'image', 'quotes', { offer_id: poorCatalog.offer_id, spec: { resolution: '1K', aspect_ratio: '1:1', quality: '', duration_seconds: 0, count: 1, images: 0, videos: 0, audio: 0 } })
+    // The zero-balance native gate may also reject catalog reads. Use the
+    // already-verified public offer identity and retain this customer's own Key.
+    await media(poor, 'image', 'catalog')
+    const poorQuote = await media(poor, 'image', 'quotes', { offer_id: zeroOffer.offer_id, spec: { resolution: '1K', aspect_ratio: '1:1', quality: '', duration_seconds: 0, count: 1, images: 0, videos: 0, audio: 0 } })
+    let poorResult = poorQuote
     if (poorQuote.status === 200) {
       const prepared = await media(poor, 'image', 'prepare', { quote_token: poorQuote.body.quote_token, client_key: randomUUID(), prompt: 'SYNTHETIC poor rejected', asset_refs: [] })
-      if (prepared.status === 200) assert((await media(poor, 'image', 'tasks', { task_id: prepared.body.task_id })).status >= 400)
+      poorResult = prepared
+      if (prepared.status === 200) poorResult = await media(poor, 'image', 'tasks', { task_id: prepared.body.task_id })
     }
-    assert.deepEqual(snapshot(poor), poorBefore); assert.equal(stats().image_posts, postsBefore)
+    const poorAfter = snapshot(poor)
+    assertZeroBalanceRejection(poorBefore, poorAfter, postsBefore, stats().image_posts, poorResult)
+    report.balance_gate = { fixture_balance: poorBefore.balance, native_policy: 'nonpositive balance rejected; no projected-sale-price assumption', http_status: poorResult.status, task_status: poorResult.body.status, diagnostic_stage: poorResult.body.diagnostic_stage, supplier_posts: 0, usage_delta: poorAfter.usage - poorBefore.usage, balance_unchanged: true }
     await media(user, 'image', 'tasks'); await media(user, 'video', 'operations')
     const beforeBlocked = stats().video_posts
     await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: false })
@@ -274,7 +295,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.equal(apiAfterStudio.model_pricing[0].per_request_price, 0.25)
     assert.equal(apiAfterStudio.account_stats_pricing_rules[0].pricing[0].per_request_price, 99)
     assert.deepEqual((await core(admin, '/admin/accounts/' + account.id)).credentials.model_mapping, mapped.model_mapping)
-    report.checks.push('Insufficient balance, shared Account quota, real Account schedulability and inactive native Group key block generation; Studio writes preserve API prices, mappings and permissions; catalog/quote/task/history/errors expose no private costs or credentials')
+    report.checks.push('Exhausted native balance, shared Account quota, real Account schedulability and inactive native Group key block generation; Studio writes preserve API prices, mappings and permissions; catalog/quote/task/history/errors expose no private costs or credentials')
     report.pass = true
   } finally {
     const errors = []
@@ -293,4 +314,5 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
 }
 
 module.exports.assertPublic = assertPublic
+module.exports.assertZeroBalanceRejection = assertZeroBalanceRejection
 if (require.main === module) module.exports(process.argv[2]).catch(error => { console.error(error); process.exitCode = 1 })
