@@ -1,0 +1,158 @@
+{
+  "source_sha": "b9796b975c1ced95366d7e65c8976364664f658c",
+  "candidate_run": 39121193014,
+  "full_artifact": 12134492554,
+  "evidence_artifact": 12134214293,
+  "manifest_sha256": "01ca381bb0bba31a02a2bd50520803fed6ce20e9973b7d7c4bfebe08252c5c7d",
+  "acceptance": {
+    "source_sha": "b9796b975c1ced95366d7e65c8976364664f658c",
+    "script_sha": "b9796b975c1ced95366d7e65c8976364664f658c",
+    "scope": "model-lifecycle-isolation-and-media-regression",
+    "status": "PASS",
+    "containers": [
+      {
+        "name": "/ai-gateway-native-core-20261012",
+        "image": "sha256:831ec1f57b8448e02fb139a8e033b8ec89aa904102cab353487d8375e723535a",
+        "health": "healthy",
+        "network": "ai-gateway-native-net-20261012",
+        "mounts": [
+          {
+            "type": "volume",
+            "destination": "/app/data",
+            "rw": true
+          },
+          {
+            "type": "bind",
+            "destination": "/app/data/simulator-ca.crt",
+            "rw": false
+          }
+        ]
+      },
+      {
+        "name": "/ai-gateway-native-bridge-20261012",
+        "image": "sha256:faa22f2ff76325b2c6757cce146f28d846aa9406a64f97e5e69b42c889238837",
+        "health": "healthy",
+        "network": "container:0cddd63e6f51442bf44df30451b9dfa6a7563f3028affe25715053f2fb3d830f",
+        "mounts": [
+          {
+            "type": "volume",
+            "destination": "/app/data",
+            "rw": false
+          }
+        ]
+      },
+      {
+        "name": "/ai-gateway-native-bff-20261012",
+        "image": "sha256:f5f3361dc93805413bbf64bea76c49681c769ffef44aa8b0d7a9fd67a98ab05c",
+        "health": "healthy",
+        "network": "container:0cddd63e6f51442bf44df30451b9dfa6a7563f3028affe25715053f2fb3d830f",
+        "mounts": [
+          {
+            "type": "volume",
+            "destination": "/state/assets",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "destination": "/state/images",
+            "rw": true
+          },
+          {
+            "type": "volume",
+            "destination": "/state/videos",
+            "rw": true
+          }
+        ]
+      }
+    ]
+  },
+  "custom_ratio_checks": [
+    "Real UI save and API re-read preserve product IDs/prices/sibling/video; unpublished ratio excluded from catalog and rejected by quote; isolated publish admits text/edit quotes without size mappings",
+    "Admin custom 7:5 persists through save/re-read and is available only after publication; the original Vue ratio picker selects it without quote/generation requests; final frozen quote and supplier receive exact 7:5; original price remains 0.70",
+    "Custom ratio and auto/png/jpeg/webp reach real simulated text/edit POST unchanged; selected-format bytes and MIME verified; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle"
+  ],
+  "execution_count": 8,
+  "execution_summary": [
+    {
+      "mode": "text",
+      "format": "auto",
+      "ratio": "7:5",
+      "task_id": "img_460ed93b07818f199d0f788d28476e8d",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "text",
+      "format": "png",
+      "ratio": "7:5",
+      "task_id": "img_8c6e6d3949dca0fac54911d3e12d9956",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "text",
+      "format": "jpeg",
+      "ratio": "7:5",
+      "task_id": "img_b05fb0ddc03cb7153bdb442405030a24",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "text",
+      "format": "webp",
+      "ratio": "7:5",
+      "task_id": "img_236df4dc191faa9d25ea0f44d2a8d571",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "edit",
+      "format": "auto",
+      "ratio": "7:5",
+      "task_id": "img_3eed54db2de1965451f57267540bb2e3",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "edit",
+      "format": "png",
+      "ratio": "7:5",
+      "task_id": "img_e5fae2dc2d9f1c7c4f85f426b0231c01",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "edit",
+      "format": "jpeg",
+      "ratio": "7:5",
+      "task_id": "img_b76f730c8ef1b718224b07c8da8b7a5e",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    },
+    {
+      "mode": "edit",
+      "format": "webp",
+      "ratio": "7:5",
+      "task_id": "img_fe8be83116f8643b714860495b16454c",
+      "ratio_picker": {
+        "selected_ratio": "7:5",
+        "quote_or_generation_posts": 0
+      }
+    }
+  ],
+  "production_action": false
+}
