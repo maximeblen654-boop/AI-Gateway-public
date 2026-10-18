@@ -4,6 +4,7 @@ import { syncUpstreamModels } from './accounts'
 export interface Range { min: number; max: number }
 export interface References { image: Range; video: Range; audio: Range; total_max: number }
 export interface Match {
+  output_formats?: string[]
   resolution?: string[]; duration_seconds?: number[]; aspect_ratio?: string[]; quality?: string[]
   count?: Range; references?: References
 }
@@ -77,6 +78,7 @@ const references = (value: References): References => ({
 })
 function match(value: Match): Match {
   return {
+    ...(value.output_formats ? { output_formats: [...value.output_formats] } : {}),
     ...(value.resolution ? { resolution: [...value.resolution] } : {}),
     ...(value.duration_seconds ? { duration_seconds: [...value.duration_seconds] } : {}),
     ...(value.aspect_ratio ? { aspect_ratio: [...value.aspect_ratio] } : {}),

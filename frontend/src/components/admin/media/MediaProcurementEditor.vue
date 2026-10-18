@@ -6,7 +6,7 @@
       <label v-for="dimension in available" :key="dimension.key" class="mw-check-card" :class="{ 'mw-check-card-selected': dimensions.includes(dimension.key) }"><input type="checkbox" :checked="dimensions.includes(dimension.key)" :disabled="disabled || complexReferences" :data-test="`cost-dimension-${dimension.key}`" @change="toggle(dimension.key, $event)" /><span>{{ dimension.label }}分别配置成本</span></label>
       <label v-if="supportsCreationModePricing(product)" class="mw-check-card"><input type="checkbox" :checked="separateMode" :disabled="disabled || complexReferences" data-test="cost-creation-mode" @change="changeMode" /><span>文生图 / 图生图分别配置成本</span></label>
     </div>
-    <p v-if="complexReferences" class="mw-muted">已有更细的参考素材成本条件，保留原规则；可逐行修改成本，不会合并。</p>
+    <p v-if="complexReferences" class="mw-muted">已有更细的输出格式或参考素材成本条件，保留原规则；可逐行修改成本，不会合并。</p>
     <p v-if="matrixMessage" class="mw-field-error" role="status">{{ matrixMessage }}</p>
     <div class="mw-price-table" role="table" aria-label="采购成本表">
       <div class="mw-price-table-head" role="row"><span role="columnheader">成本适用规格</span><span role="columnheader">单{{ unit }}采购成本 · CNY</span><span role="columnheader">填写状态</span></div>
@@ -36,7 +36,7 @@ const unit = computed(() => props.product.media_type === 'video' ? '条' : '张'
 const rows = computed(() => costRows(props.product))
 const dimensions = computed(() => costDimensions(props.product))
 const separateMode = computed(() => rows.value.some(row => row.match.references))
-const complexReferences = computed(() => hasDetailedReferencePricingRules({ ...props.product, pricing_rules: rows.value.map(row => ({ match: row.match, sale_price: row.cost })) }))
+const complexReferences = computed(() => rows.value.some(row => row.match.output_formats?.length) || hasDetailedReferencePricingRules({ ...props.product, pricing_rules: rows.value.map(row => ({ match: row.match, sale_price: row.cost })) }))
 const available = computed(() => ([{ key: 'resolution', label: '分辨率', values: props.product.capabilities.resolutions }, { key: 'aspect_ratio', label: '比例', values: props.product.capabilities.aspect_ratios }, { key: 'quality', label: '画质', values: props.product.capabilities.qualities }, { key: 'duration_seconds', label: '时长', values: props.product.capabilities.durations_seconds }] as const).filter(item => item.values.length || dimensions.value.includes(item.key)))
 const calculator = ref<InstanceType<typeof MediaCostCalculator>>()
 const adopted = ref(false)

@@ -83,13 +83,14 @@ it('persists independent procurement rules atomically and excludes the server co
  p.cost_rules = [
   {match:{resolution:['1K']},cost:null,source:'manual'},
   {match:{resolution:['2K']},cost:{amount:'0',currency:'CNY',billing_mode:'per_request'},source:'manual'},
-  {match:{resolution:['4K']},cost:{amount:'0.12345678',currency:'CNY',billing_mode:'per_request'},source:'calculator'}
+  {match:{resolution:['4K'],output_formats:['png']},cost:{amount:'0.12345678',currency:'CNY',billing_mode:'per_request'},source:'calculator'}
  ]
  Object.assign(p.cost_rules[2]!.cost!,{credentials:'SYNTHETIC-DO-NOT-SEND'})
  const payload=draftInput([p]).products[0]!
  expect(payload).not.toHaveProperty('cost_version')
  expect(payload.cost_rules![0]!.cost).toBeNull()
  expect(payload.cost_rules![1]!.cost!.amount).toBe('0')
+ expect(payload.cost_rules![2]!.match.output_formats).toEqual(['png'])
  expect(payload.cost_rules![2]!.cost).toEqual({amount:'0.12345678',currency:'CNY',billing_mode:'per_request'})
  expect(payload.pricing_rules).toEqual(p.pricing_rules)
  await mediaWorkbenchAPI.saveDraft(44,5,[p])

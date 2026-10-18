@@ -1,7 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import MediaProcurementEditor from '../MediaProcurementEditor.vue'
-import { buildCostRules, costRows } from '../procurementMatrix'
+import { costLabel, buildCostRules, costRows } from '../procurementMatrix'
 import { imageProduct } from './fixtures'
 import type { Product } from '@/api/admin/mediaWorkbench'
 
@@ -76,4 +76,18 @@ it('video costs are whole-item prices with independent duration matching', () =>
   const product = fixture(); product.media_type = 'video'; product.capabilities.durations_seconds = [5, 10]
   product.cost_rules = [{ match: { duration_seconds: [5] }, cost: price('0.5') }, { match: { duration_seconds: [10] }, cost: price('1') }]
   expect(buildCostRules(product, ['duration_seconds'], false)!.map(row => row.cost!.amount)).toEqual(['0.5', '1'])
+})
+
+it('labels an explicit output-format cost condition without hiding its identity', () => {
+ expect(costLabel({output_formats:['png']})).toContain('输出格式 png')
+})
+
+it('keeps format-specific costs editable without merging their applicability', async () => {
+  const product = fixture()
+  product.cost_rules = [{ match: { output_formats: ['png'] }, cost: price('0.1') }, { match: { output_formats: ['webp'] }, cost: price('0.2') }]
+  const wrapper = editor(product)
+  expect(wrapper.get('[data-test="cost-dimension-resolution"]').attributes('disabled')).toBeDefined()
+  await wrapper.get('[data-test="procurement-cost-0"]').setValue('0.15')
+  expect(wrapper.props('product').cost_rules![0]!.match.output_formats).toEqual(['png'])
+  expect(wrapper.props('product').cost_rules![1]!.cost!.amount).toBe('0.2')
 })
