@@ -1,6 +1,6 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, setKeyStatus } = require('./workbench-procurement.cjs')
+const { assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, setKeyStatus, disableFixtureSales } = require('./workbench-procurement.cjs')
 
 test('customer privacy audit permits sale price, model, offer and task identity', () => {
   assert.doesNotThrow(() => assertPublic({ offers: [{ offer_id: 'offer-1', product_id: 'product-1', model: 'public-model', sale_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } }], task_id: 'task-1' }))
@@ -80,4 +80,35 @@ test('native Key status updates and restoration require matching owned-Key GET s
     await assert.rejects(setKeyStatus(async () => ({ id: 7, status: status === 'active' ? 'inactive' : 'active' }), 'customer-token', 7, status), /not persisted/)
   }
   await assert.rejects(setKeyStatus(async () => ({ id: 8, status: 'inactive' }), 'customer-token', 7, 'inactive'), /another Key/)
+})
+
+test('fixture sales cleanup uses the current Account CAS version and preserves Draft/Published', async () => {
+  for (const enabled of [true, false]) {
+    const before = { id: 6, media_workbench_v1: { record_version: 17, sales: { enabled }, draft: { revision: 'draft-1' }, published: { revision: 'published-1' } } }
+    const readback = structuredClone(before); readback.media_workbench_v1.sales.enabled = false
+    const calls = []; let reads = 0
+    const core = async (token, path, method = 'GET', body) => {
+      calls.push({ token, path, method, body })
+      return method === 'GET' ? (++reads === 1 ? before : readback) : { acknowledged: true }
+    }
+    assert.equal(await disableFixtureSales(core, 'admin-token', 6), false)
+    const path = '/admin/media-workbench/accounts/6'
+    assert.deepEqual(calls, [
+      { token: 'admin-token', path, method: 'GET', body: undefined },
+      ...(enabled ? [{ token: 'admin-token', path: path + '/sales', method: 'PUT', body: { expected_record_version: 17, enabled: false } }] : []),
+      { token: 'admin-token', path, method: 'GET', body: undefined }
+    ])
+  }
+})
+
+test('fixture sales cleanup rejects stale CAS, ignored writes or destructive readbacks', async () => {
+  const before = { id: 6, media_workbench_v1: { record_version: 17, sales: { enabled: true }, draft: { revision: 'draft-1' }, published: { revision: 'published-1' } } }
+  await assert.rejects(disableFixtureSales(async (_token, _path, method = 'GET') => {
+    if (method === 'PUT') throw new Error('409 stale record version')
+    return before
+  }, 'admin-token', 6), /409 stale record version/)
+  await assert.rejects(disableFixtureSales(async () => before, 'admin-token', 6), /not persisted/)
+  const destructive = structuredClone(before); destructive.media_workbench_v1.sales.enabled = false; delete destructive.media_workbench_v1.published
+  let reads = 0
+  await assert.rejects(disableFixtureSales(async (_token, _path, method = 'GET') => method === 'GET' && ++reads === 1 ? before : destructive, 'admin-token', 6), /changed the fixture Published/)
 })

@@ -59,6 +59,23 @@ async function setKeyStatus(core, token, keyID, status) {
   return readback
 }
 
+async function disableFixtureSales(core, token, accountID) {
+  const path = '/admin/media-workbench/accounts/' + accountID
+  const before = await core(token, path)
+  assert.equal(before.id, accountID, 'Sales cleanup read returned another Account')
+  const config = before.media_workbench_v1
+  if (config?.sales.enabled === true) {
+    assert(Number.isSafeInteger(config.record_version), 'Sales cleanup requires the current record version')
+    await core(token, path + '/sales', 'PUT', { expected_record_version: config.record_version, enabled: false })
+  }
+  const readback = await core(token, path)
+  assert.equal(readback.id, accountID, 'Sales cleanup readback returned another Account')
+  assert.equal(readback.media_workbench_v1?.sales.enabled ?? false, false, 'Fixture sales cleanup was not persisted')
+  assert.deepEqual(readback.media_workbench_v1?.draft, config?.draft, 'Sales cleanup changed the fixture Draft')
+  assert.deepEqual(readback.media_workbench_v1?.published, config?.published, 'Sales cleanup changed the fixture Published snapshot')
+  return false
+}
+
 module.exports = async function run(root, suppliedCompose, suppliedFixture, suppliedReport) {
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
   assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO, 'paid-controls')
@@ -331,9 +348,11 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
       try { await core(admin, '/admin/channels/' + channel.id, 'PUT', { group_ids: channel.group_ids }) } catch (error) { errors.push(error.message) }
     }
     if (account) {
+      try { report.cleanup_sales_enabled = await disableFixtureSales(core, admin, account.id) } catch (error) { errors.push(error.message) }
       try { report.cleanup_account_schedulable = (await setAccountSchedulable(core, admin, account.id, false)).schedulable } catch (error) { errors.push(error.message) }
     }
     report.restored = errors.length === 0
+    if (errors.length) report.pass = false
     report.restore_errors = errors
     saveReport()
     assert.equal(errors.length, 0, 'Failed to restore isolated Channel associations or disable the fixture Account')
@@ -346,4 +365,5 @@ module.exports.assertZeroBalanceRejection = assertZeroBalanceRejection
 module.exports.setAccountSchedulable = setAccountSchedulable
 module.exports.setAccountQuota = setAccountQuota
 module.exports.setKeyStatus = setKeyStatus
+module.exports.disableFixtureSales = disableFixtureSales
 if (require.main === module) module.exports(process.argv[2]).catch(error => { console.error(error); process.exitCode = 1 })
