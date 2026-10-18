@@ -1,6 +1,6 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { assertPublic, assertZeroBalanceRejection } = require('./workbench-procurement.cjs')
+const { assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, setKeyStatus } = require('./workbench-procurement.cjs')
 
 test('customer privacy audit permits sale price, model, offer and task identity', () => {
   assert.doesNotThrow(() => assertPublic({ offers: [{ offer_id: 'offer-1', product_id: 'product-1', model: 'public-model', sale_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } }], task_id: 'task-1' }))
@@ -35,4 +35,49 @@ test('zero-balance evidence fails on supplier execution, native billing or false
   assert.throws(() => assertZeroBalanceRejection(zero, zero, 7, 8, { status: 200, body: { status: 'unknown' } }), /reached the supplier/)
   assert.throws(() => assertZeroBalanceRejection(zero, { ...zero, balance: '-1.1', usage: 1 }, 7, 7, { status: 200, body: { status: 'failed' } }), /changed native balance/)
   assert.throws(() => assertZeroBalanceRejection(zero, zero, 7, 7, { status: 200, body: { status: 'completed' } }), /successful delivery/)
+})
+
+test('Account schedulability uses its official POST endpoint and requires persisted GET state', async () => {
+  for (const schedulable of [false, true]) {
+    const calls = []
+    const core = async (token, path, method = 'GET', body) => { calls.push({ token, path, method, body }); return { id: 44, schedulable } }
+    await setAccountSchedulable(core, 'admin-token', 44, schedulable)
+    assert.deepEqual(calls, [
+      { token: 'admin-token', path: '/admin/accounts/44/schedulable', method: 'POST', body: { schedulable } },
+      { token: 'admin-token', path: '/admin/accounts/44', method: 'GET', body: undefined }
+    ])
+    await assert.rejects(setAccountSchedulable(async () => ({ id: 44, schedulable: !schedulable }), 'admin-token', 44, schedulable), /not persisted/)
+  }
+})
+
+test('Account quota updates preserve extra and native usage, with GET confirmation before testing the gate', async () => {
+  const account = { id: 44, extra: { quota_limit: 100, quota_used: 1.05, fixture_extra: true } }
+  for (const quotaLimit of [0.00000001, 100]) {
+    const calls = []
+    const core = async (token, path, method = 'GET', body) => {
+      calls.push({ token, path, method, body })
+      return { id: 44, extra: { ...account.extra, quota_limit: String(quotaLimit) } }
+    }
+    await setAccountQuota(core, 'admin-token', account, quotaLimit)
+    assert.deepEqual(calls, [
+      { token: 'admin-token', path: '/admin/accounts/44', method: 'PUT', body: { extra: { ...account.extra, quota_limit: quotaLimit } } },
+      { token: 'admin-token', path: '/admin/accounts/44', method: 'GET', body: undefined }
+    ])
+  }
+  await assert.rejects(setAccountQuota(async () => account, 'admin-token', account, 0.00000001), /not persisted/)
+  await assert.rejects(setAccountQuota(async () => ({ id: 44, extra: { quota_limit: 0.00000001, quota_used: 0 } }), 'admin-token', account, 0.00000001), /rewrote native usage/)
+})
+
+test('native Key status updates and restoration require matching owned-Key GET state', async () => {
+  for (const status of ['inactive', 'active']) {
+    const calls = []
+    const core = async (token, path, method = 'GET', body) => { calls.push({ token, path, method, body }); return { id: 7, status } }
+    await setKeyStatus(core, 'customer-token', 7, status)
+    assert.deepEqual(calls, [
+      { token: 'customer-token', path: '/keys/7', method: 'PUT', body: { status } },
+      { token: 'customer-token', path: '/keys/7', method: 'GET', body: undefined }
+    ])
+    await assert.rejects(setKeyStatus(async () => ({ id: 7, status: status === 'active' ? 'inactive' : 'active' }), 'customer-token', 7, status), /not persisted/)
+  }
+  await assert.rejects(setKeyStatus(async () => ({ id: 8, status: 'inactive' }), 'customer-token', 7, 'inactive'), /another Key/)
 })

@@ -31,6 +31,34 @@ function assertZeroBalanceRejection(before, after, postsBefore, postsAfter, resp
   assert(!['completed', 'partial', 'captured', 'billed'].includes(response?.body?.status), 'Zero-balance rejection reported successful delivery')
 }
 
+async function setAccountSchedulable(core, token, accountID, schedulable) {
+  const path = '/admin/accounts/' + accountID
+  await core(token, path + '/schedulable', 'POST', { schedulable })
+  const readback = await core(token, path)
+  assert.equal(readback.id, accountID, 'Schedulability readback returned another Account')
+  assert.equal(readback.schedulable, schedulable, 'Account schedulability update was not persisted')
+  return readback
+}
+
+async function setAccountQuota(core, token, account, quotaLimit) {
+  const path = '/admin/accounts/' + account.id
+  await core(token, path, 'PUT', { extra: { ...account.extra, quota_limit: quotaLimit } })
+  const readback = await core(token, path)
+  assert.equal(readback.id, account.id, 'Quota readback returned another Account')
+  assert.equal(money(readback.extra?.quota_limit), money(quotaLimit), 'Account quota limit update was not persisted')
+  assert.equal(money(readback.extra?.quota_used ?? 0), money(account.extra?.quota_used ?? 0), 'Changing the Account quota limit rewrote native usage')
+  return readback
+}
+
+async function setKeyStatus(core, token, keyID, status) {
+  const path = '/keys/' + keyID
+  await core(token, path, 'PUT', { status })
+  const readback = await core(token, path)
+  assert.equal(readback.id, keyID, 'Key status readback returned another Key')
+  assert.equal(readback.status, status, 'Native Key status update was not persisted')
+  return readback
+}
+
 module.exports = async function run(root, suppliedCompose, suppliedFixture, suppliedReport) {
   assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
   assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO, 'paid-controls')
@@ -272,25 +300,25 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     report.balance_gate = { fixture_balance: poorBefore.balance, native_policy: 'nonpositive balance rejected; no projected-sale-price assumption', http_status: poorResult.status, task_status: poorResult.body.status, diagnostic_stage: poorResult.body.diagnostic_stage, supplier_posts: 0, usage_delta: poorAfter.usage - poorBefore.usage, balance_unchanged: true }
     await media(user, 'image', 'tasks'); await media(user, 'video', 'operations')
     const beforeBlocked = stats().video_posts
-    await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: false })
+    report.native_controls = { schedulable_disabled: (await setAccountSchedulable(core, admin, account.id, false)).schedulable }
     const blocked = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: (await offer(user, 'video', wan.product_id).catch(() => wanOffer)).offer_id, model: wan.site_model, prompt: 'SYNTHETIC blocked', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })
     assert(blocked.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
-    await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: true })
+    report.native_controls.schedulable_restored = (await setAccountSchedulable(core, admin, account.id, true)).schedulable
     const quotaAccount = await core(admin, '/admin/accounts/' + account.id)
     assert(money(snapshot(user).account_quota) > 1, 'Completed simulated tasks must have consumed shared Account quota')
     // Preserve the native current-usage gate; this acceptance does not invent
     // a second pre-reservation or a projected-quota accounting contract.
-    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: 0.00000001 } })
+    report.native_controls.quota_limited = (await setAccountQuota(core, admin, quotaAccount, 0.00000001)).extra.quota_limit
     const limitedOffer = await offer(user, 'video', wan.product_id).catch(() => wanOffer)
     const quotaDenied = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: limitedOffer.offer_id, model: wan.site_model, prompt: 'SYNTHETIC quota denied', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })
     assert(quotaDenied.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
-    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: 100 } })
+    report.native_controls.quota_restored = (await setAccountQuota(core, admin, quotaAccount, 100)).extra.quota_limit
     const videoKey = user.keys.find(key => key.group_id === videoGroup)
-    await core(user.token, '/keys/' + id(videoKey.id), 'PUT', { status: 'inactive' })
+    report.native_controls.key_disabled = (await setKeyStatus(core, user.token, id(videoKey.id), 'inactive')).status
     await session(user)
     const inactiveKey = await media(user, 'video', 'catalog')
     assert(inactiveKey.status >= 400 || !inactiveKey.body.offers?.some(item => item.product_id === wan.product_id))
-    await core(user.token, '/keys/' + videoKey.id, 'PUT', { status: 'active' })
+    report.native_controls.key_restored = (await setKeyStatus(core, user.token, videoKey.id, 'active')).status
     const apiAfterStudio = await core(admin, '/admin/channels/' + apiChannel.id)
     assert.equal(apiAfterStudio.model_pricing[0].per_request_price, 0.25)
     assert.equal(apiAfterStudio.account_stats_pricing_rules[0].pricing[0].per_request_price, 99)
@@ -303,16 +331,19 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
       try { await core(admin, '/admin/channels/' + channel.id, 'PUT', { group_ids: channel.group_ids }) } catch (error) { errors.push(error.message) }
     }
     if (account) {
-      try { await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: false }) } catch (error) { errors.push(error.message) }
+      try { report.cleanup_account_schedulable = (await setAccountSchedulable(core, admin, account.id, false)).schedulable } catch (error) { errors.push(error.message) }
     }
     report.restored = errors.length === 0
     report.restore_errors = errors
     saveReport()
-    assert.equal(errors.length, 0, 'Failed to restore isolated Channel associations')
+    assert.equal(errors.length, 0, 'Failed to restore isolated Channel associations or disable the fixture Account')
   }
   return report
 }
 
 module.exports.assertPublic = assertPublic
 module.exports.assertZeroBalanceRejection = assertZeroBalanceRejection
+module.exports.setAccountSchedulable = setAccountSchedulable
+module.exports.setAccountQuota = setAccountQuota
+module.exports.setKeyStatus = setKeyStatus
 if (require.main === module) module.exports(process.argv[2]).catch(error => { console.error(error); process.exitCode = 1 })
