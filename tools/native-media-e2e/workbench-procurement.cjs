@@ -210,15 +210,18 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     }
     report.checks.push('One shared Account routes native API alias and charges API Channel price; Channel cost 99 and Account aliases leave Studio exact model/price/cost unchanged; WAN refs0/1 execute, deliver, settle and recover once')
     const prior = structuredClone(report.tasks)
-    const saved = await draft([{ ...image, cost_rules: [{ match: {}, cost: price('0'), source: 'manual' }] }, { ...wan, cost_rules: [{ match: {}, cost: price('0.44'), source: 'manual' }] }, incomplete])
+    const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }], cost_rules: [{ match: {}, cost: price('0'), source: 'manual' }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }], cost_rules: [{ match: {}, cost: price('0.44'), source: 'manual' }] }, incomplete])
     await publish(saved, [image.product_id, wan.product_id])
     const zeroOffer = await offer(user, 'image', image.product_id)
     const zeroPrompt = 'SYNTHETIC procurement explicit zero'
-    await execute(user, 'image', await prepare(user, 'image', zeroOffer, 0, zeroPrompt), '0.9', '0', zeroPrompt)
+    await execute(user, 'image', await prepare(user, 'image', zeroOffer, 0, zeroPrompt), '1.1', '0', zeroPrompt)
     const currentBalance = snapshot(user)
-    for (const original of prior) await media(user, original.kind, (original.kind === 'image' ? 'tasks/' : 'operations/') + original.id)
+    for (const original of prior) {
+      const recovered = ok(await media(user, original.kind, (original.kind === 'image' ? 'tasks/' : 'operations/') + original.id))
+      assert.equal(money((recovered.total_price || recovered.sale_price).amount), money(original.expected_sale))
+    }
     assert.deepEqual(snapshot(user), currentBalance)
-    report.checks.push('Explicit zero cost is preserved; later published costs do not rewrite or recharge completed original tasks')
+    report.checks.push('Explicit zero cost is preserved; later published costs and sale prices do not rewrite or recharge completed original tasks')
     const poorBefore = snapshot(poor), postsBefore = stats().image_posts
     const poorCatalog = await offer(poor, 'image', image.product_id)
     const poorQuote = await media(poor, 'image', 'quotes', { offer_id: poorCatalog.offer_id, spec: { resolution: '1K', aspect_ratio: '1:1', quality: '', duration_seconds: 0, count: 1, images: 0, videos: 0, audio: 0 } })
@@ -233,11 +236,24 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const blocked = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: (await offer(user, 'video', wan.product_id).catch(() => wanOffer)).offer_id, model: wan.site_model, prompt: 'SYNTHETIC blocked', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })
     assert(blocked.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
     await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: true })
+    const quotaAccount = await core(admin, '/admin/accounts/' + account.id)
+    const quotaSnapshot = snapshot(user)
+    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: Number(quotaSnapshot.account_quota) + 0.1 } })
+    const limitedOffer = await offer(user, 'video', wan.product_id).catch(() => wanOffer)
+    const quotaDenied = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: limitedOffer.offer_id, model: wan.site_model, prompt: 'SYNTHETIC quota denied', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })
+    assert(quotaDenied.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
+    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: 100 } })
+    const videoKey = user.keys.find(key => key.group_id === videoGroup)
+    await core(user.token, '/keys/' + id(videoKey.id), 'PUT', { status: 'inactive' })
+    await session(user)
+    const inactiveKey = await media(user, 'video', 'catalog')
+    assert(inactiveKey.status >= 400 || !inactiveKey.body.offers?.some(item => item.product_id === wan.product_id))
+    await core(user.token, '/keys/' + videoKey.id, 'PUT', { status: 'active' })
     const apiAfterStudio = await core(admin, '/admin/channels/' + apiChannel.id)
     assert.equal(apiAfterStudio.model_pricing[0].per_request_price, 0.25)
     assert.equal(apiAfterStudio.account_stats_pricing_rules[0].pricing[0].per_request_price, 99)
     assert.deepEqual((await core(admin, '/admin/accounts/' + account.id)).credentials.model_mapping, mapped.model_mapping)
-    report.checks.push('Insufficient customer balance and real Account schedulability block generation; Studio writes preserve API prices, mappings and permissions; catalog/quote/task/history/errors expose no private costs or credentials')
+    report.checks.push('Insufficient balance, shared Account quota, real Account schedulability and inactive native Group key block generation; Studio writes preserve API prices, mappings and permissions; catalog/quote/task/history/errors expose no private costs or credentials')
     report.pass = true
   } finally {
     const errors = []
