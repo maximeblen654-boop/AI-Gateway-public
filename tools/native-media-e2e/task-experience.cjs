@@ -25,7 +25,13 @@ const report={production:false,api_mocking:false,checks:[],screenshots:[],tasks:
   await page.getByTestId(edit?'studio-mode-edit':'studio-mode-text').click();await expect(page.getByTestId('studio-prompt')).toBeVisible()
   await page.getByTestId('studio-model-toggle').click();await page.locator(`[data-offer-id="${offer.offer_id}"]`).click()
   await page.getByTestId('studio-resolution').click();await page.locator('#studio-resolution-menu [data-value="4K"]').click()
-  await page.getByTestId('studio-ratio-toggle').click();await page.locator('[data-ratio="16:9"]').click()
+  const slider=page.locator('#studio-ratio-slider')
+  if(await slider.count()){
+   const ratios=[...offer.spec.aspect_ratio].sort((a,b)=>{const [aw,ah]=a.split(':').map(Number),[bw,bh]=b.split(':').map(Number);return aw/ah-bw/bh})
+   assert(ratios.includes('16:9'));await slider.focus();await slider.press('Home')
+   for(let i=0;i<ratios.indexOf('16:9');i++)await slider.press('ArrowRight')
+   await expect(slider).toHaveAttribute('aria-valuetext','16:9')
+  }else{await page.getByTestId('studio-ratio-toggle').click();await page.locator('[data-ratio="16:9"]').click()}
   await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()
   if(edit){await page.getByTestId('studio-asset-input').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:png});await expect(page.getByTestId('studio-asset-success')).toHaveCount(1)}
   await page.getByTestId('studio-prompt').fill(prompt)
