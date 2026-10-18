@@ -256,8 +256,10 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert(blocked.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
     await core(admin, '/admin/accounts/' + account.id, 'PUT', { schedulable: true })
     const quotaAccount = await core(admin, '/admin/accounts/' + account.id)
-    const quotaSnapshot = snapshot(user)
-    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: Number(quotaSnapshot.account_quota) + 0.1 } })
+    assert(money(snapshot(user).account_quota) > 1, 'Completed simulated tasks must have consumed shared Account quota')
+    // Preserve the native current-usage gate; this acceptance does not invent
+    // a second pre-reservation or a projected-quota accounting contract.
+    await core(admin, '/admin/accounts/' + account.id, 'PUT', { extra: { ...quotaAccount.extra, quota_limit: 0.00000001 } })
     const limitedOffer = await offer(user, 'video', wan.product_id).catch(() => wanOffer)
     const quotaDenied = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: limitedOffer.offer_id, model: wan.site_model, prompt: 'SYNTHETIC quota denied', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })
     assert(quotaDenied.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
