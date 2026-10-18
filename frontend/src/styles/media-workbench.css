@@ -237,3 +237,6 @@
 .mw-field-located{outline:3px solid var(--mw-accent);outline-offset:5px;border-radius:8px}
 [data-test=procurement-editor]{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--mw-border)}
 .mw-sales-card{margin-top:0;margin-bottom:16px}.mw-sales-card strong{font-size:18px}
+
+.mw-account-actions{display:flex;align-items:flex-end;gap:12px;flex-shrink:0}.mw-account-sales{display:grid;gap:8px;text-align:center;font-size:13px}.mw-account-sales .btn{min-width:8rem;min-height:44px}.mw-step-models .mw-page{scroll-margin-top:5.5rem}
+@media(max-width:767px){.mw-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}.mw-account-actions .btn{width:100%;min-width:0;white-space:normal}.mw-account-publication{gap:12px;margin:12px 0;padding:12px}.mw-publication-description h3{font-size:15px}.mw-publication-description .mw-muted{margin:0}.mw-publication-note{margin-top:6px}.mw-step-models [data-test=selected-account-summary]{display:none}.mw-step-models .mw-account-context{margin-bottom:12px;gap:8px}.mw-step-models .mw-account-context h2{font-size:20px}.mw-step-models .mw-back{margin-bottom:12px}}

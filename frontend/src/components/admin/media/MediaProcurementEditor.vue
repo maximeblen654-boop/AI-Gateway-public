@@ -16,7 +16,7 @@
         <div role="cell" class="mw-cost-state"><span>{{ rule.cost === null ? '待填写' : costError(rule) ? '需要修正' : '已填写' }}</span><span v-if="rule.source === 'calculator'">来自管理员确认的计算结果</span><button v-if="rule.cost" type="button" class="mw-link" :disabled="disabled" @click="setAmount(index, '')">清空成本</button></div>
       </div>
     </div>
-    <button type="button" class="btn btn-secondary" data-test="add-cost-rule" :disabled="disabled || rows.length >= 256" @click="replace([...rows, { match: {}, cost: null }])">新增独立成本条件</button>
+    <button type="button" class="btn btn-secondary" data-test="add-cost-rule" :disabled="disabled || rows.length >= maxCostRules" @click="replace([...rows, { match: {}, cost: null }])">新增独立成本条件</button>
     <p class="mw-muted">细分条件只影响采购成本；请覆盖全部合法规格并避免重叠。修改规格后已有输入会保留，保存和发布时由服务器重新检查。</p>
     <p v-if="adopted" class="mw-banner" role="status" data-test="cost-adopted">已采用，尚未保存：计算结果已填入采购成本。请前往第 5 步保存草稿。</p>
     <MediaCostCalculator ref="calculator" :active="active" :product="product" :account-id="accountId" :admin-id="adminId" :labels="rows.map(row => costLabel(row.match))" :cost-rules="rows" :disabled="disabled" :dirty="dirty" @toggle="emit('cost-toggle', $event)" @apply="applyResult" />
@@ -26,7 +26,7 @@
 import { computed, ref, watch } from 'vue'
 import type { CostRule, Match, Product } from '@/api/admin/mediaWorkbench'
 import { decimalError } from './costCalculator'
-import { buildCostRules, costDimensions, costLabel, costRows } from './procurementMatrix'
+import { buildCostRules, costDimensions, costLabel, costRows, maxCostRules } from './procurementMatrix'
 import { hasDetailedReferencePricingRules, supportsCreationModePricing, type PricingDimension } from './pricingMatrix'
 import MediaCostCalculator from './MediaCostCalculator.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
@@ -46,7 +46,7 @@ const costError = (rule: CostRule) => rule.cost ? decimalError(rule.cost.amount)
 function replace(next: CostRule[]) { if (!props.disabled) emit('update:product', { ...props.product, cost_rules: next }) }
 function rebuild(nextDimensions: PricingDimension[], mode: boolean): boolean {
   const next = buildCostRules(props.product, nextDimensions, mode)
-  if (!next) { matrixMessage.value = '请先修正规格或组合限制；成本行最多 256 行。已有成本保留。'; return false }
+  if (!next) { matrixMessage.value = '请先修正规格或组合限制；成本行最多 100 行。已有成本保留。'; return false }
   if (rows.value.some(row => row.cost) && next.some(row => row.cost === null) && !window.confirm('此修改可能合并不同成本或改变覆盖范围，冲突项会待填写。确认修改采购成本条件？')) return false
   matrixMessage.value = ''; adopted.value = false; replace(next); return true
 }

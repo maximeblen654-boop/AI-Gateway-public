@@ -66,8 +66,11 @@ it('cost matrix honors excluded combinations, bounded domain and conflicting cos
   product.cost_rules = [{ match: { resolution: ['1K'] }, cost: price('0.1') }, { match: { resolution: ['4K'] }, cost: price('0.2') }]
   expect(buildCostRules(product, [], false)![0]!.cost).toBeNull()
   product.capabilities.resolutions = Array.from({ length: 32 }, (_, i) => `r${i}`)
-  product.capabilities.aspect_ratios = Array.from({ length: 32 }, (_, i) => `a${i}`)
+  product.capabilities.aspect_ratios = Array.from({ length: 4 }, (_, i) => `a${i}`)
   expect(buildCostRules(product, ['resolution', 'aspect_ratio'], false)).toBeUndefined()
+  product.capabilities.resolutions = product.capabilities.resolutions.slice(0, 10)
+  product.capabilities.aspect_ratios = Array.from({ length: 10 }, (_, i) => `a${i}`)
+  expect(buildCostRules(product, ['resolution', 'aspect_ratio'], false)).toHaveLength(100)
 })
 it('video costs are whole-item prices with independent duration matching', () => {
   const product = fixture(); product.media_type = 'video'; product.capabilities.durations_seconds = [5, 10]

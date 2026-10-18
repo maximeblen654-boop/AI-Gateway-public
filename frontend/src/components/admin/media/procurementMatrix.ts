@@ -1,6 +1,7 @@
 import type { CostRule, Match, Product } from '@/api/admin/mediaWorkbench'
 import { allowedSpecs, matchesSpec, pricingDimensions, type PricingDimension } from './pricingMatrix'
 
+export const maxCostRules = 100
 export const costRows = (product: Product): CostRule[] => product.cost_rules?.length ? product.cost_rules : [{ match: {}, cost: null }]
 export const costDimensions = (product: Product) => pricingDimensions.filter(key => costRows(product).some(rule => rule.match[key]?.length))
 export const costLabel = (match: Match): string => {
@@ -25,7 +26,7 @@ export function buildCostRules(product: Product, dimensions: PricingDimension[],
     const group = groups.get(key) ?? { match, costs: [] }
     group.costs.push(old.length === 1 ? old[0] : undefined)
     groups.set(key, group)
-    if (groups.size > 256) return undefined
+    if (groups.size > maxCostRules) return undefined
   }
   return [...groups.values()].map(({ match, costs }) => {
     const first = costs[0]

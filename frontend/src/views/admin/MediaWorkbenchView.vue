@@ -58,26 +58,24 @@
           <p class="mw-source-note">域名只用于分组；每个 Account 的模型和销售状态独立管理。</p>
         </section>
 
-        <section v-else-if="step === 'models'" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
+        <section v-else-if="step === 'models'" ref="modelPage" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
           <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 返回来源与账号</button>
           <div v-if="detail" class="mw-page-heading mw-account-context">
             <div><p class="mw-eyebrow">模型管理 · Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
             <div class="mw-selection-feedback" data-test="selected-account-summary"><strong>已选择账号</strong><span>#{{ detail.id }} · {{ detail.name }}</span></div>
           </div>
-          <section class="mw-account-publication" aria-label="选择商品发布配置" data-test="account-publication">
+          <section class="mw-account-publication" aria-label="Account 发布与销售操作" data-test="account-publication">
             <div class="mw-publication-description">
-              <h3>发布 Account 配置</h3>
-              <p class="mw-muted">明确选择本次要发布的商品；后台仅校验并发布勾选项。其他商品的已发布配置和草稿保留。</p>
+              <h3>Account #{{ detail?.id }} · 工作台操作</h3>
+              <p class="mw-muted">发布仅影响勾选商品；销售开关影响此 Account 的全部已发布工作台商品。</p>
               <p class="mw-publication-note">发布配置不会自动开启销售</p>
             </div>
-            <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+            <div class="mw-account-actions">
+              <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
+              <div class="mw-account-sales" data-test="sales-state"><strong>{{ salesLabel }}</strong><button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="managementDisabled || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button><span v-else class="mw-badge">首次保存后可开启</span></div>
+            </div>
           </section>
-            <section class="mw-sales-card" data-test="sales-state">
-              <div><p class="mw-eyebrow">Account #{{ detail?.id }} · 工作台销售状态</p><strong>{{ salesLabel }}</strong><p class="mw-muted">此开关影响本 Account 的全部已发布工作台商品。</p></div>
-              <button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="busy || deleted || conflict || saveState === 'unconfirmed' || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button>
-              <span v-else class="mw-badge">首次保存后可开启</span>
-            </section>
-            <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
+          <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
           <p v-if="salesFeedback" class="mw-banner" role="status" data-test="account-sales-feedback">{{ salesFeedback }}</p>
           <p v-if="publicationFeedback" class="mw-banner" role="status" data-test="publication-feedback">{{ publicationFeedback }}</p>
           <section class="mw-product-management" aria-label="配置与销售状态" data-test="publication-layers">
@@ -308,6 +306,7 @@ const filter = ref('')
 const showArchived = ref(false)
 const lifecycleRequest = ref<{ action: LifecycleAction; target: LifecycleTarget } | null>(null)
 const editorElement = ref<HTMLElement>()
+const modelPage = ref<HTMLElement>()
 const auth = useAuthStore()
 const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
@@ -496,7 +495,7 @@ function changeProduct(event: Event) {
 }
 function updateProduct(value: Product) { const index = products.value.findIndex(p => p.product_id === selectedProduct.value); if (index >= 0) products.value[index] = value }
 function navigate(action: () => void | Promise<void>) { if (busy.value) return; if (dirty.value) nextNavigation.value = action; else void action() }
-async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) { step.value = 'models'; void readPaidStatus() } }
+async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) { step.value = 'models'; void readPaidStatus(); await nextTick(); modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }) } }
 async function openEditor(modelId: string) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
   modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }
