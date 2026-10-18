@@ -130,7 +130,9 @@ func TestWANStudioCatalogDoesNotOwnChatPermissions(t *testing.T) {
 	ma := studioCostMediaFixture(t, r.Media)
 	ma.a.Catalog.Models = append(ma.a.Catalog.Models, "chat-fixture")
 	ma.a.ModelMapping["chat-fixture"] = "chat-fixture"
-	accounts.a.Credentials["model_mapping"].(map[string]any)["chat-fixture"] = "chat-fixture"
+	mapping, ok := accounts.a.Credentials["model_mapping"].(map[string]any)
+	require.True(t, ok)
+	mapping["chat-fixture"] = "chat-fixture"
 	key.Group.ModelAllowlist = GroupModelAllowlist{Enabled: true, Models: []string{p.SiteModel, "chat-fixture"}}
 	offers, e := r.Catalog(context.Background(), StudioImageOwner{1, 2, 3}, key)
 	require.NoError(t, e)
