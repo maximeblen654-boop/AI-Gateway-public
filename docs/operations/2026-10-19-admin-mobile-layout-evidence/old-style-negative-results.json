@@ -1,0 +1,163 @@
+{
+  "config": {
+    "argv": [
+      "D:\\nodejs\\node.exe",
+      "D:\\AI-Gateway-public-staging\\frontend\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "--config",
+      "playwright.media.config.ts",
+      "layout.spec.ts",
+      "--grep",
+      "navigation 390"
+    ],
+    "configFile": "D:\\AI-Gateway-public-staging\\frontend\\playwright.media.config.ts",
+    "rootDir": "D:/AI-Gateway-public-staging/frontend/tests/media-workbench",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/AI-Gateway-public-staging/frontend/test-results/media-workbench",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "D:/AI-Gateway-public-staging/frontend/tests/media-workbench",
+        "testIgnore": [],
+        "testMatch": [
+          "*.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "./test-results/media-workbench/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node node_modules/vite/bin/vite.js --config tests/media-workbench/vite.config.ts",
+      "url": "http://127.0.0.1:4190/tests/media-workbench/index.html",
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "layout.spec.ts",
+      "file": "layout.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real shell editor width and navigation 390",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5233,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m13.1995\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m13.1995\u001b[39m\n    at D:\\AI-Gateway-public-staging\\frontend\\tests\\media-workbench\\layout.spec.ts:14:33",
+                    "location": {
+                      "file": "D:\\AI-Gateway-public-staging\\frontend\\tests\\media-workbench\\layout.spec.ts",
+                      "column": 33,
+                      "line": 14
+                    },
+                    "snippet": "  12 |   await page.screenshot({path:info.outputPath(`resize-${width}.png`)})\n  13 |   const margin=await content.evaluate(e=>parseFloat(getComputedStyle(e).marginLeft))\n> 14 |   if(width<1024) expect(margin).toBe(0)\n     |                                 ^\n  15 |   await expect.poll(async()=> (await content.boundingBox())!.width).toBeGreaterThanOrEqual(width<1024?width:width-256)\n  16 |   const editor=page.locator('.mw-editor-page')\n  17 |   expect((await editor.boundingBox())!.width).toBeGreaterThan(width<1024?width-100:650)"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "D:\\AI-Gateway-public-staging\\frontend\\tests\\media-workbench\\layout.spec.ts",
+                        "column": 33,
+                        "line": 14
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m13.1995\u001b[39m\n\n  12 |   await page.screenshot({path:info.outputPath(`resize-${width}.png`)})\n  13 |   const margin=await content.evaluate(e=>parseFloat(getComputedStyle(e).marginLeft))\n> 14 |   if(width<1024) expect(margin).toBe(0)\n     |                                 ^\n  15 |   await expect.poll(async()=> (await content.boundingBox())!.width).toBeGreaterThanOrEqual(width<1024?width:width-256)\n  16 |   const editor=page.locator('.mw-editor-page')\n  17 |   expect((await editor.boundingBox())!.width).toBeGreaterThan(width<1024?width-100:650)\n    at D:\\AI-Gateway-public-staging\\frontend\\tests\\media-workbench\\layout.spec.ts:14:33"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-18T16:11:31.758Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "D:\\AI-Gateway-public-staging\\frontend\\test-results\\media-workbench\\layout-real-shell-editor-width-and-navigation-390\\error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "D:\\AI-Gateway-public-staging\\frontend\\test-results\\media-workbench\\layout-real-shell-editor-width-and-navigation-390\\trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "D:\\AI-Gateway-public-staging\\frontend\\tests\\media-workbench\\layout.spec.ts",
+                    "column": 33,
+                    "line": 14
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "9f98fd8c8d1538f5ebbb-81bb211a478d19c51bc1",
+          "file": "layout.spec.ts",
+          "line": 3,
+          "column": 2
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-18T16:11:29.829Z",
+    "duration": 7993.292,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

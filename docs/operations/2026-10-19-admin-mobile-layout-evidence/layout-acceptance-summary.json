@@ -1,0 +1,27 @@
+{
+  "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+  "scope": "local real Vue AppLayout/AppSidebar/MediaWorkbenchView; mocked API, no production",
+  "viewports": [
+    360,
+    390,
+    768,
+    1366,
+    1440
+  ],
+  "fixed_tests_passed": 5,
+  "old_style_negative_test": "FAIL as expected: expected margin 0, received 13.1995px after screenshot; separate immediate probe 254.152px",
+  "files": {
+    "frontend/src/components/layout/AppLayout.vue": "a8af25873bdc54ad09d4f17026d91ba2a0a74a8746d4fdb57801f1089f5d1e8d",
+    "frontend/tests/media-workbench/layout.spec.ts": "34a227b73acfdecda86674aa5b57e4a0b5976088a1e478b2ff0c478f6d04f5fd"
+  },
+  "runtime_change": "mobile breakpoint content transition only",
+  "production_action": false,
+  "screenshots": {
+    "after-editor-1366.png": "41dd128c5be35c3c6891e277e4bf96da42c952f22dd0f1f3ee6e76508ddb6ddb",
+    "after-editor-1440.png": "b789b176217355fd2237c7cf1edbaa28f164be39bdce80f789b0af06a0e46cc0",
+    "after-editor-360.png": "df0db0e6eb55922c40e3a7107af6efbaad5547807bf878772b58429648b3467e",
+    "after-editor-390.png": "85cc072340a4d35faca359f7950cd1109bccaf20675fc725315aa8bf8fe9188a",
+    "after-editor-768.png": "e38b5ad60d96b0f45b01015ee1646d5e0258cbc552a165c88b44920be4c3c9c2",
+    "before-resize-390.png": "d7b89e6d9292e520442ad3464caa9e469b7fcf54aa27b752c81a4a43a10ac91b"
+  }
+}
