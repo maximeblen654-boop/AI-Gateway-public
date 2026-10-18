@@ -14,7 +14,7 @@ import (
 )
 
 func validProduct() Product {
-	return Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true,
+	return Product{CostRules: []CostRule{{Cost: &Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true,
 		Capabilities:  Capabilities{Resolutions: []string{"1K"}, AspectRatios: []string{"1:1", "16:9"}, Count: Range{1, 2}, References: References{Image: Range{0, 4}, TotalMax: 4}},
 		AdapterConfig: ImageConfig{SizeMappings: []SizeMapping{{"1K", "1:1", "1024x1024"}, {"1K", "16:9", "1536x864"}}},
 		PricingRules: []PricingRule{{Match: Match{References: &References{TotalMax: 0}}, SalePrice: &Price{Amount: "0.01", Currency: "CNY", BillingMode: "per_request"}},
@@ -454,9 +454,9 @@ func TestStaleDependenciesAndPublishedRuntimeGates(t *testing.T) {
 	r.a.Status = "active"
 	r.a.Schedulable = true
 	r.a.ModelMapping = map[string]string{"gpt-image-2": "gpt-image-new"}
-	if _, err = s.SetSales(ctx, 7, version, true); !errors.Is(err, ErrSales) {
-		t.Fatal("stale mapping enabled")
-	}
+	d, err = s.SetSales(ctx, 7, version, true)
+	must(t, err)
+	version = d.Config.RecordVersion
 	r.a.ModelMapping = nil
 	_, err = s.SetSales(ctx, 7, version, true)
 	must(t, err)

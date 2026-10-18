@@ -9,7 +9,7 @@ import (
 const representativeUpstreamModel = "特价2.0-需要过人脸技术-可参考过人脸素材库"
 
 func representativeVideoProduct(salePrice *Price) Product {
-	return Product{
+	return Product{CostRules: []CostRule{{Cost: &Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}},
 		ProductID: "video-3-0", MediaType: "video", SiteModel: "3.0", DisplayName: "本站产品别名",
 		UpstreamModel: representativeUpstreamModel, Enabled: true,
 		Capabilities: Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5}, Count: Range{Min: 1, Max: 1}, References: References{Image: Range{0, 0}, Video: Range{0, 0}, Audio: Range{0, 0}, TotalMax: 0}},

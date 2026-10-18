@@ -104,7 +104,6 @@ func TestPreflightInvalidSnapshotNeverCached(t *testing.T) {
 		name   string
 		mutate func(*Account)
 	}{
-		{"mapping", func(a *Account) { a.ModelMapping = map[string]string{"gpt-image-2": "other"} }},
 		{"routing", func(a *Account) { a.RoutingFingerprint = "changed" }},
 		{"sales", func(a *Account) { a.Config.Sales.Enabled = false }},
 		{"revision", func(a *Account) { a.Config.Published.Revision = "changed" }},

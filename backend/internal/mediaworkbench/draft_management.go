@@ -14,6 +14,9 @@ type DraftRemoval struct {
 // inherited from the Account do not turn a blank business draft into an offer.
 func blankDraftProduct(p Product) bool {
 	c := p.Capabilities
+	if len(p.CostRules) > 0 {
+		return false
+	}
 	for _, rule := range p.PricingRules {
 		m := rule.Match
 		if rule.SalePrice != nil || len(m.Resolution)+len(m.DurationSeconds)+len(m.AspectRatio)+len(m.Quality) > 0 || m.Count != nil || m.References != nil {

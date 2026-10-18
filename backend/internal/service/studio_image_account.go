@@ -22,6 +22,9 @@ func (s *OpenAIGatewayService) SelectQuotedImageAccount(ctx context.Context, q S
 	if !studioMediaAccountSupported(a) || a.Type != firstNonEmptyString(q.AccountType, AccountTypeAPIKey) || a.Platform != firstNonEmptyString(q.Platform, PlatformOpenAI) || a.ParentAccountID != nil || !a.IsSchedulable() || !slices.Contains(a.GroupIDs, q.Owner.GroupID) {
 		return fail()
 	}
+	if a.HasAnyQuotaLimit() && !q.AccountQuotaEnabled {
+		return fail()
+	}
 	if a.Platform == PlatformGrok {
 		if eligible, _ := a.GrokMediaGenerationEligibility(); !eligible {
 			return fail()
@@ -35,26 +38,31 @@ func (s *OpenAIGatewayService) SelectQuotedImageAccount(ctx context.Context, q S
 	if err != nil || studioHash(current) != studioHash(q.Binding) {
 		return fail()
 	}
-	ctx = withPublishedMediaModel(ctx, a, current.Offer.SiteModel, current.Offer.UpstreamModel)
+	requested := current.Offer.SiteModel
+	if current.Offer.CostVersion >= 1 {
+		requested = current.Offer.UpstreamModel
+	}
+	ctx = withPublishedMediaModel(ctx, a, requested, current.Offer.UpstreamModel, current.Offer.CostVersion >= 1)
+	a = publishedMediaExecutionAccount(ctx, a, requested)
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	gid := q.Owner.GroupID
 	if a.Platform == PlatformGemini {
-		if len(gemini) == 0 || gemini[0] == nil || !gemini[0].isAccountUsableForRequest(ctx, a, q.Binding.Offer.SiteModel, PlatformGemini, false) {
+		if len(gemini) == 0 || gemini[0] == nil || !gemini[0].isAccountUsableForRequest(ctx, a, requested, PlatformGemini, false) {
 			return fail()
 		}
 	} else {
-		a = s.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, q.Binding.Offer.SiteModel, false, "")
+		a = s.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, requested, false, "")
 	}
 	checker := defaultOpenAIAccountScheduler{service: s}
 	capability := OpenAIImagesCapability("")
 	if a != nil && a.Platform == PlatformOpenAI {
 		capability = OpenAIImagesCapabilityNative
 	}
-	req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: q.Platform, RequestedModel: q.Binding.Offer.SiteModel, RequiredImageCapability: capability, RequirePrivacySet: s.openAIGroupRequiresPrivacySet(ctx, &gid)}
-	if a == nil || !a.IsSchedulable() || !slices.Contains(a.GroupIDs, gid) || !checker.isAccountRequestCompatible(ctx, a, req) || s.isOpenAIAccountRequestRuntimeBlocked(a, q.Binding.Offer.SiteModel) {
+	req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: q.Platform, RequestedModel: requested, RequiredImageCapability: capability, RequirePrivacySet: s.openAIGroupRequiresPrivacySet(ctx, &gid)}
+	if a == nil || !a.IsSchedulable() || !slices.Contains(a.GroupIDs, gid) || !checker.isAccountRequestCompatible(ctx, a, req) || s.isOpenAIAccountRequestRuntimeBlocked(a, requested) {
 		return fail()
 	}
-	if a.GetMappedModel(q.Binding.Offer.SiteModel) != q.Binding.Offer.UpstreamModel || studioMediaBaseURL(a) != q.BaseURL || studioCredentialFingerprint(a) != q.CredentialFingerprint {
+	if (q.Binding.Offer.CostVersion == 0 && a.GetMappedModel(q.Binding.Offer.SiteModel) != q.Binding.Offer.UpstreamModel) || studioMediaBaseURL(a) != q.BaseURL || studioOfferCredentialFingerprint(a, q.Binding.Offer) != q.CredentialFingerprint {
 		return fail()
 	}
 	if a.ProxyID != nil && (a.Proxy == nil || a.Proxy.ID != *a.ProxyID) {

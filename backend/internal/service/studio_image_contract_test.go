@@ -122,12 +122,12 @@ func TestStudioImageIssuedAccountingSnapshot(t *testing.T) {
 		calls++
 		return studioResult(t, "png"), "original-id", nil
 	}
-	// Freeze .35/rate 1, then change the live independent rule and multiplier.
+	// Freeze Published .35/rate 1; changing the API Channel cannot reprice it.
 	live.channel = studioAccountPrice("0.40")
 	v := 2.0
 	account.a.RateMultiplier = &v
 	newQ := issue()
-	if q.Accounting.BaseAmount != "0.35" || newQ.Accounting.BaseAmount != "0.4" || newQ.Accounting.EffectiveAccountQuotaCost != "0.8" || q.Binding.Offer.SalePrice.Amount != "0.80" {
+	if q.Accounting.BaseAmount != "0.35" || newQ.Accounting.BaseAmount != "0.35" || newQ.Accounting.EffectiveAccountQuotaCost != "0.7" || q.Binding.Offer.SalePrice.Amount != "0.80" {
 		t.Fatal(q.Accounting, newQ.Accounting)
 	}
 	_, e := r.Dispatch(context.Background(), nil, q, "snapshot", "prompt", nil, key)
@@ -164,33 +164,23 @@ func TestStudioImageAccountingAdmissionBeforeNetwork(t *testing.T) {
 	for _, quota := range []bool{true, false} {
 		t.Run(fmt.Sprintf("quota_%t", quota), func(t *testing.T) {
 			r, q, key, account, billing := studioContractFixture(t)
-			calls := 0
-			r.network = func(context.Context, *gin.Context, *Account, []byte, string) ([]byte, string, error) {
-				calls++
-				return studioResult(t, "png"), "id", nil
-			}
 			if !quota {
 				account.a.Extra = map[string]any{}
 			}
 			token, e := r.Issue(context.Background(), q.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, nil)
-			if quota {
-				if e == nil || calls != 0 || billing.applied != 0 {
-					t.Fatal("missing cost crossed admission", e, calls)
-				}
-				return
-			}
 			if e != nil {
 				t.Fatal(e)
 			}
 			allowed, e := r.Store.Quote(token, q.Owner, time.Now())
-			if e != nil {
-				t.Fatal(e)
+			if e != nil || allowed.Accounting.SourceType != "studio_published_cost" || allowed.Accounting.BaseAmount != "0.35" {
+				t.Fatal(allowed.Accounting, e)
 			}
-			if allowed.Accounting.SourceState != "not_required" || allowed.Accounting.BaseAmount != "0" {
-				t.Fatal(allowed.Accounting)
+			_, e = r.Dispatch(context.Background(), nil, allowed, "published-cost", "prompt", nil, key)
+			want := "0"
+			if quota {
+				want = "0.35"
 			}
-			_, e = r.Dispatch(context.Background(), nil, allowed, "no-quota", "prompt", nil, key)
-			if e != nil || calls != 1 || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0" {
+			if e != nil || billing.cmd == nil || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != want {
 				t.Fatal(e, billing.cmd)
 			}
 		})
@@ -242,7 +232,7 @@ func studioContractFixture(t *testing.T, origins ...string) (*StudioImageRuntime
 		t.Fatal(err)
 	}
 	match := mediaworkbench.Match{Count: &mediaworkbench.Range{Min: 1, Max: 2}, References: &mediaworkbench.References{TotalMax: 0}}
-	p := mediaworkbench.Product{ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"1K"}, AspectRatios: []string{"1:1"}, Count: mediaworkbench.Range{Min: 1, Max: 2}}, AdapterConfig: mediaworkbench.ImageConfig{SizeMappings: []mediaworkbench.SizeMapping{{Resolution: "1K", AspectRatio: "1:1", WireSize: "1024x1024"}}}, PricingRules: []mediaworkbench.PricingRule{{Match: match, SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
+	p := mediaworkbench.Product{CostRules: []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "p", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: "gpt-image-2", Enabled: true, Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"1K"}, AspectRatios: []string{"1:1"}, Count: mediaworkbench.Range{Min: 1, Max: 2}}, AdapterConfig: mediaworkbench.ImageConfig{SizeMappings: []mediaworkbench.SizeMapping{{Resolution: "1K", AspectRatio: "1:1", WireSize: "1024x1024"}}}, PricingRules: []mediaworkbench.PricingRule{{Match: match, SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
 	d, err := service.SaveDraft(ctx, 7, 1, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
 	if err != nil {
 		t.Fatal(err)
@@ -268,8 +258,8 @@ func studioContractFixture(t *testing.T, origins ...string) (*StudioImageRuntime
 	runtime := NewStudioImageRuntime(core, ma)
 	runtime.Store = NewStudioImageStore(t.TempDir())
 	runtime.enabled = true
-	q := StudioImageQuote{Owner: StudioImageOwner{1, 2, 3}, Binding: binding, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), KeyQuotaEnabled: true, KeyRateEnabled: true, AccountQuotaEnabled: a.HasAnyQuotaLimit()}
-	q.Accounting, err = ResolveStudioImageAccountCost(a, binding, studioAccountPrice("0.35"), q.CreatedAt)
+	q := StudioImageQuote{Owner: StudioImageOwner{1, 2, 3}, Binding: binding, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioOfferCredentialFingerprint(a, binding.Offer), CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), KeyQuotaEnabled: true, KeyRateEnabled: true, AccountQuotaEnabled: a.HasAnyQuotaLimit()}
+	q.Accounting, err = ResolveStudioPublishedAccountCost(a, &ma.a, binding, q.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,9 +382,6 @@ func TestStudioImageExactAccountDrift(t *testing.T) {
 		{"unschedulable", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) { a.a.Schedulable = false }},
 		{"oauth", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) { a.a.Type = AccountTypeOAuth }},
 		{"group_removed", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) { a.a.GroupIDs = nil }},
-		{"mapping", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) {
-			a.a.Credentials["model_mapping"] = map[string]any{"gpt-image-2": "other"}
-		}},
 		{"credential_missing", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) {
 			delete(a.a.Credentials, "api_key")
 		}},
@@ -462,6 +449,7 @@ func TestStudioImageExactAccountDrift(t *testing.T) {
 
 func TestStudioImageIndependentAccounting(t *testing.T) {
 	r, q, _, a, _ := studioContractFixture(t)
+	q.Binding.Offer.CostVersion = 0
 	for _, sale := range []string{"0.80", "1.20"} {
 		t.Run("sale_"+sale, func(t *testing.T) {
 			binding := q.Binding
@@ -502,6 +490,7 @@ func TestStudioImageIndependentAccounting(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, q, _, a, _ := studioContractFixture(t)
+			q.Binding.Offer.CostVersion = 0
 			ch := studioAccountPrice("0.35")
 			tc.mutate(a.a, ch)
 			if _, e := ResolveStudioImageAccountCost(a.a, q.Binding, ch, time.Now()); e == nil {

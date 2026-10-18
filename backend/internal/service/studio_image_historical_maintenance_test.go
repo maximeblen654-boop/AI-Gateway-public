@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
@@ -40,7 +41,11 @@ func TestStudioHistorical502Maintenance(t *testing.T) {
 		"status": "unknown", "billing_state": "pending", "quote": map[string]any{"spec": q.Binding.Spec}, "results": []any{}}
 	input, err := json.Marshal(map[string]any{"receipt": receipt, "outcome": outcome, "journal": journal})
 	require.NoError(t, err)
-	cmd := exec.Command("python3", "../../../tools/maintenance/historical_image_502.py")
+	python := "python3"
+	if runtime.GOOS == "windows" {
+		python = "python"
+	}
+	cmd := exec.Command(python, "../../../tools/maintenance/historical_image_502.py")
 	cmd.Stdin = bytes.NewReader(input)
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)

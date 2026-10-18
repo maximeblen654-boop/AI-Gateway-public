@@ -173,7 +173,7 @@ func paidPreflightFixture(t *testing.T) (*studioPaidPreflight, *studioMediaFixtu
 	return &studioPaidPreflight{image: image, video: video, keys: &APIKeyService{apiKeyRepo: paidPreflightKeys{key: key}}}, media, key
 }
 
-func TestStudioPaidPreflightIsolatesNativeOfferFailure(t *testing.T) {
+func TestStudioPaidPreflightIgnoresNativeAPIAliasMapping(t *testing.T) {
 	ctx := context.Background()
 	p, repo, key := paidPreflightFixture(t)
 	product := repo.a.Config.Published.Products[0]
@@ -191,20 +191,11 @@ func TestStudioPaidPreflightIsolatesNativeOfferFailure(t *testing.T) {
 	if _, err = svc.Publish(ctx, 7, draft.Config.RecordVersion, draft.Config.Draft.Revision); err != nil {
 		t.Fatal(err)
 	}
-	// Media configuration is valid, but the second native Account mapping is not.
-	// Its quote must fail without revoking the original product.
+	// Both products bind the explicit upstream model. The API alias map cannot
+	// revoke either Studio contract.
 	report := p.check(ctx, "image", 1)
-	if !report.Pass || len(report.dependencies.Offers) != 1 {
+	if !report.Pass || len(report.dependencies.Offers) != 2 {
 		t.Fatalf("mixed report: %+v grants=%v", report, report.dependencies.Offers)
-	}
-	rejected := false
-	for _, check := range report.Checks {
-		if check.ProductID == "other" && !check.Pass {
-			rejected = true
-		}
-	}
-	if !rejected {
-		t.Fatal("missing failed offer diagnostic")
 	}
 	before, err := os.ReadDir(p.image.Store.Root)
 	if err != nil {
@@ -256,8 +247,23 @@ func TestStudioPaidSnapshotScopesCostAndMapping(t *testing.T) {
 	amount := "0.99"
 	ch.AccountStatsPricingRules[0].Pricing[0].AccountStatsPerRequestExact = &amount
 	after, err = p.snapshot(ctx, "image", 1)
+	if err != nil || before.fingerprint != after.fingerprint || studioHash(before.grants) != studioHash(after.grants) {
+		t.Fatal("API Channel cost invalidated Studio grant", err)
+	}
+	admin := mediaworkbench.NewService(repo)
+	product := studioCopyCostProduct(repo.a.Config.Draft.Products[0])
+	product.CostRules[0].Cost.Amount = "0.99"
+	saved, err := admin.SaveDraft(ctx, 7, repo.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = admin.PublishSelected(ctx, 7, saved.Config.RecordVersion, saved.Config.Draft.Revision, []string{product.ProductID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err = p.snapshot(ctx, "image", 1)
 	if err != nil || before.fingerprint != after.fingerprint || studioHash(before.grants) == studioHash(after.grants) {
-		t.Fatal("own exact cost change not isolated into grant", err)
+		t.Fatal("Published cost change did not invalidate product grant", err)
 	}
 	// A closed paid control must still allow ordinary non-paid quote previews.
 	p.image.PaidControl = &StudioPaidControl{Managed: true, Settings: &paidSettingsFake{values: map[string]string{}}}

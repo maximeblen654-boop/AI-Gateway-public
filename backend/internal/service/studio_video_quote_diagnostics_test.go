@@ -21,7 +21,7 @@ func wanQuoteFixture(t *testing.T) (*StudioVideoRuntime, *APIKey, *studioAccount
 	ma.a.ModelMapping = map[string]string{model: model}
 	ma.a.Catalog.Models = []string{model}
 	accounts.a.Credentials["model_mapping"] = map[string]any{model: model}
-	p := mediaworkbench.Product{ProductID: "wan-fixture", MediaType: "video", SiteModel: model, UpstreamModel: model, Enabled: true,
+	p := mediaworkbench.Product{CostRules: []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "wan-fixture", MediaType: "video", SiteModel: model, UpstreamModel: model, Enabled: true,
 		AdapterConfig: mediaworkbench.ImageConfig{Version: 1, WireProfile: "inline_multimedia"},
 		Capabilities:  mediaworkbench.Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"9:16", "16:9", "1:1", "3:4", "4:3", "21:9"}, DurationsSeconds: []int{5, 10, 15}, Count: mediaworkbench.Range{Min: 1, Max: 1}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 10}, Video: mediaworkbench.Range{Max: 5}, Audio: mediaworkbench.Range{Max: 5}, TotalMax: 14}},
 		PricingRules:  []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "1.5", Currency: "CNY", BillingMode: "per_request"}}}}
@@ -60,19 +60,15 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 					accounts.a.Credentials["model_mapping"] = map[string]any{"unrelated": "unrelated"}
 				case "missing_cost":
 					r.Core.channelService = nil
-					want = "cost_channel_missing"
 				case "wrong_cost_model":
 					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].Models = []string{"different-upstream"}
-					want = "cost_rule_missing"
 				case "wrong_cost_mode":
 					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].BillingMode = BillingModeImage
-					want = "cost_contract"
 				case "group":
 					accounts.a.GroupIDs = []int64{99}
 					want = "published_offer"
 				case "mapping":
 					accounts.a.Credentials["model_mapping"] = map[string]any{p.SiteModel: "different-upstream"}
-					want = "account_admission"
 				case "schedule":
 					accounts.a.Schedulable = false
 					want = "account_admission"
@@ -150,7 +146,7 @@ func TestWANStudioCatalogDoesNotOwnChatPermissions(t *testing.T) {
 	require.False(t, key.Group.ModelAllowlist.Allows(p.SiteModel))
 }
 
-func TestWANQuoteMissingCostReproduction(t *testing.T) {
+func TestWANQuoteWithoutAPIChannel(t *testing.T) {
 	for _, refs := range []int{0, 1} {
 		t.Run(map[int]string{0: "without_reference", 1: "with_reference"}[refs], func(t *testing.T) {
 			r, key, _, p := wanQuoteFixture(t)
@@ -162,8 +158,7 @@ func TestWANQuoteMissingCostReproduction(t *testing.T) {
 			offer := r.Media.(*studioMediaFixture).a.Config.Published.Offers[0].OfferID
 			r.Core.channelService = nil
 			e = r.quotePreflight(context.Background(), StudioImageOwner{1, 2, 3}, key, offer, spec, plan.Body)
-			require.ErrorIs(t, e, ErrStudioImageAccounting)
-			require.Equal(t, "cost_channel_missing", QuoteFailureStage(e))
+			require.NoError(t, e)
 		})
 	}
 }

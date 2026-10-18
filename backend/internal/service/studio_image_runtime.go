@@ -117,6 +117,21 @@ func studioGroupAllows(k *APIKey, model string) bool {
 	return k != nil && k.Group != nil && GroupAllowsImageGeneration(k.Group) && k.Group.ModelAllowlist.Allows(model)
 }
 
+func studioOfferCredentialFingerprint(a *Account, offer mediaworkbench.Offer) string {
+	if offer.CostVersion == 0 {
+		return studioCredentialFingerprint(a)
+	}
+	credentials := make(map[string]any, len(a.Credentials))
+	for k, v := range a.Credentials {
+		if k != "model_mapping" && k != "compact_model_mapping" {
+			credentials[k] = v
+		}
+	}
+	copy := *a
+	copy.Credentials = credentials
+	return studioCredentialFingerprint(&copy)
+}
+
 func (r *StudioImageRuntime) Issue(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, subscriptionID *int64) (string, error) {
 	return r.issueQuote(ctx, owner, key, offerID, spec, subscriptionID, false)
 }
@@ -156,14 +171,14 @@ func (r *StudioImageRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	if err != nil || a == nil {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
-	q := StudioImageQuote{Owner: owner, Binding: resolved, QuotaPlatform: QuotaPlatform(ctx, key), AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: studioCredentialFingerprint(a), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
+	q := StudioImageQuote{Owner: owner, Binding: resolved, QuotaPlatform: QuotaPlatform(ctx, key), AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: studioOfferCredentialFingerprint(a, resolved.Offer), CreatedAt: time.Now().UTC(), SubscriptionID: subscriptionID, KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), UnitPrice: &unitPrice, Quantity: resolved.Spec.Count, TotalPrice: &totalPrice}
 	execution, err := mediaworkbench.PublishedImageExecution(resolved)
 	if err != nil || execution.Mode == mediaworkbench.ImageExecutionProviderAsync {
 		return "", mediaworkbench.ErrRuntimeBinding
 	}
 	q.Execution = &execution
 	q.ExpiresAt = q.CreatedAt.Add(2 * time.Minute)
-	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt)
+	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt, r.Media)
 	if err != nil {
 		return "", QuoteFailure("account_cost", err)
 	}

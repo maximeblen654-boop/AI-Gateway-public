@@ -57,7 +57,6 @@ func TestPublishedImageRuntimeContract(t *testing.T) {
 		{"runtime_not_ready", func(a *Account) { a.RuntimeReady = false }},
 		{"catalog_drift", func(a *Account) { a.Catalog.Models = []string{"other"} }},
 		{"base_drift", func(a *Account) { a.BaseURL = "https://changed.example/v1" }},
-		{"mapping_drift", func(a *Account) { a.ModelMapping = map[string]string{"gpt-image-2": "other"} }},
 		{"routing_drift", func(a *Account) { a.RoutingFingerprint = "changed" }},
 		{"revision_tamper", func(a *Account) { a.Config.Published.Revision = "changed" }},
 		{"price_tamper", func(a *Account) { a.Config.Published.Offers[0].SalePrice.Amount = "1.20" }},

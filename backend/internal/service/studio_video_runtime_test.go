@@ -79,7 +79,7 @@ func videoRuntimeFixture(t *testing.T) (*StudioVideoRuntime, string, StudioVideo
 	svc := mediaworkbench.NewService(ma)
 	_, e := svc.Initialize(ctx, 7, []string{"video"})
 	require.NoError(t, e)
-	p := mediaworkbench.Product{ProductID: "video", MediaType: "video", SiteModel: "3.0", UpstreamModel: model.Upstream, Enabled: true,
+	p := mediaworkbench.Product{CostRules: []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "video", MediaType: "video", SiteModel: "3.0", UpstreamModel: model.Upstream, Enabled: true,
 		Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5}, Count: mediaworkbench.Range{Min: 1, Max: 1}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 1}, TotalMax: 1}},
 		PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
 	d, e := svc.SaveDraft(ctx, 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
@@ -203,7 +203,7 @@ func TestVideoRuntimeRejectsDroppedOrOverriddenSpecBeforeQuote(t *testing.T) {
 }
 
 func TestVideoRuntimeIdentityDrift(t *testing.T) {
-	for _, kind := range []string{"credential", "account", "endpoint", "published", "cost_unknown"} {
+	for _, kind := range []string{"credential", "account", "endpoint", "published", "cost_snapshot_tampered"} {
 		t.Run(kind, func(t *testing.T) {
 			r, token, q, key, a, _ := videoRuntimeFixture(t)
 			calls := 0
@@ -222,10 +222,9 @@ func TestVideoRuntimeIdentityDrift(t *testing.T) {
 				ma, ok := r.Media.(*studioMediaFixture)
 				require.True(t, ok)
 				ma.a.Config.Published.Revision = "changed"
-			case "cost_unknown":
-				r.Core.channelService = nil
-				_, _, e := r.Issue(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, q.Plan.Body)
-				require.Error(t, e)
+			case "cost_snapshot_tampered":
+				q.Binding.Accounting.BaseAmount = "0"
+				require.Error(t, q.Binding.Validate())
 				return
 			}
 			_, e := r.Submit(context.Background(), q.Binding.Owner, key, token, "av_drift")

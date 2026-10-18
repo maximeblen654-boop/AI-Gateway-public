@@ -51,7 +51,7 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				cost.AccountStatsPricingRules[0].Pricing[0].Platform = platform
 				cost.AccountStatsPricingRules[0].Pricing[0].Models = []string{upstreamModel}
 				r.Core.channelService = &ChannelService{repo: &studioChannelFixture{channel: cost}}
-				p := mediaworkbench.Product{ProductID: "native", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: upstreamModel, Enabled: true,
+				p := mediaworkbench.Product{CostRules: []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "native", MediaType: "image", SiteModel: "gpt-image-2", UpstreamModel: upstreamModel, Enabled: true,
 					Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"2K"}, AspectRatios: []string{"3:2"}, Count: mediaworkbench.Range{Min: 1, Max: 10}, References: mediaworkbench.References{Image: mediaworkbench.Range{Max: 1}, TotalMax: 1}},
 					PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.70", Currency: "CNY", BillingMode: "per_request"}}}}
 				admin := mediaworkbench.NewService(ma)
@@ -197,7 +197,7 @@ func TestStudioNativeVideoParity(t *testing.T) {
 			ma.a.Config = nil
 			ma.a.ModelMapping = map[string]string{"video-alias": "grok-imagine-video", "grok-imagine-video": "must-not-map-twice"}
 			ma.a.Catalog.Models = []string{"grok-imagine-video"}
-			p := mediaworkbench.Product{ProductID: "native-video", MediaType: "video", SiteModel: "video-alias", UpstreamModel: "grok-imagine-video", Enabled: true,
+			p := mediaworkbench.Product{CostRules: []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}}, ProductID: "native-video", MediaType: "video", SiteModel: "video-alias", UpstreamModel: "grok-imagine-video", Enabled: true,
 				Capabilities: mediaworkbench.Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5}, Count: mediaworkbench.Range{Min: 1, Max: 1}},
 				PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
 			admin := mediaworkbench.NewService(ma)

@@ -61,10 +61,13 @@ func (b *StudioVideoBinding) Validate() error {
 	rate, e2 := mediaworkbench.DecimalAmount(a.AccountRateMultiplier)
 	effective, e3 := mediaworkbench.DecimalAmount(a.EffectiveAccountQuotaCost)
 	if e1 != nil || e2 != nil || e3 != nil || a.Version != StudioImageAccountingVersion ||
-		a.SourceState != "resolved" || a.SourceType != "explicit_account_stats_rule" || a.SourceID == "" || !videoDigest(a.SourceHash) ||
+		a.SourceState != "resolved" || (a.SourceType != "explicit_account_stats_rule" && a.SourceType != "studio_published_cost") || a.SourceID == "" || !videoDigest(a.SourceHash) ||
 		a.AccountID != b.Offer.AccountID || a.UpstreamModel != b.Offer.UpstreamModel || a.SpecHash != b.SpecHash || a.RequestCount != 1 ||
 		a.Unit != sale.Currency || a.PricingAt.IsZero() || rate.Exponent() < -4 || rate.GreaterThanOrEqual(decimal.New(1, 6)) ||
 		base.GreaterThanOrEqual(decimalSubscriptionLimit) || !base.Mul(rate).Equal(effective) {
+		return ErrStudioVideoInvalidOrder
+	}
+	if b.Offer.CostVersion >= 1 && (a.SourceType != "studio_published_cost" || a.Unit != "CNY" || a.SourceID != studioPublishedCostSourceID(b.Offer.AccountID, b.Offer.ProductID, b.PublishedRevision)) {
 		return ErrStudioVideoInvalidOrder
 	}
 	return nil

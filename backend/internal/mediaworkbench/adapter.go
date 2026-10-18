@@ -494,7 +494,24 @@ func DependenciesFor(a *Account) Dependencies {
 	if u != nil {
 		endpoint = strings.ToLower(u.Scheme+"://"+u.Host) + u.EscapedPath()
 	} // excludes userinfo and query
-	return Dependencies{AccountID: a.ID, RoutingSHA256: hash([]string{a.Platform, a.Type, endpoint, a.RoutingFingerprint}), CatalogSHA256: hash(a.Catalog), MappingSHA256: hash(a.ModelMapping), BindingSHA256: hash(bindings), RegistryRevision: RegistryRevision}
+	mapping := hash(a.ModelMapping)
+	if a.Config != nil && directProducts(a.Config.Draft.Products) {
+		mapping = "studio-exact-v1"
+	}
+	return Dependencies{AccountID: a.ID, RoutingSHA256: hash([]string{a.Platform, a.Type, endpoint, a.RoutingFingerprint}), CatalogSHA256: hash(a.Catalog), MappingSHA256: mapping, BindingSHA256: hash(bindings), RegistryRevision: RegistryRevision}
+}
+
+func directProducts(products []Product) bool {
+	direct := false
+	for _, p := range products {
+		if p.Enabled && p.CostVersion == 0 {
+			return false
+		}
+		if p.Enabled && p.CostVersion >= 1 {
+			direct = true
+		}
+	}
+	return direct
 }
 
 // Published dependency checks only bind catalog membership of the models sold.
@@ -503,6 +520,11 @@ const publishedCatalogPrefix = "published-models-v1:"
 
 func dependenciesForProducts(a *Account, products []Product) Dependencies {
 	d := DependenciesFor(a)
+	if directProducts(products) {
+		d.MappingSHA256 = "studio-exact-v1"
+	} else {
+		d.MappingSHA256 = hash(a.ModelMapping)
+	}
 	models := map[string]bool{}
 	for _, p := range products {
 		if p.Enabled {
@@ -517,6 +539,7 @@ func dependenciesForProducts(a *Account, products []Product) Dependencies {
 // scopes fail closed; reading a snapshot never rewrites it or upgrades its scope.
 func PublishedDependenciesFor(a *Account) Dependencies {
 	d := DependenciesFor(a)
+	d.MappingSHA256 = hash(a.ModelMapping) // original immutable snapshot semantics
 	if a.Config != nil && a.Config.Published != nil && strings.HasPrefix(a.Config.Published.Dependencies.CatalogSHA256, publishedCatalogPrefix) {
 		return dependenciesForProducts(a, a.Config.Published.Products)
 	}

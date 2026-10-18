@@ -60,7 +60,7 @@ func (r *StudioImageRuntime) materializeResult(ctx context.Context, q StudioImag
 		return nil, err
 	}
 	a, err := r.Core.accountRepo.GetByID(ctx, q.Binding.Offer.AccountID)
-	if err != nil || a == nil || studioCredentialFingerprint(a) != q.CredentialFingerprint {
+	if err != nil || a == nil || studioOfferCredentialFingerprint(a, q.Binding.Offer) != q.CredentialFingerprint {
 		return nil, ErrStudioImageUnknown
 	}
 	client := &http.Client{Transport: studioImageDownloadTransport{r.Core, a}, Timeout: 60 * time.Second,

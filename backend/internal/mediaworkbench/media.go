@@ -68,19 +68,21 @@ type DraftInput struct {
 type Product struct {
 	ProductID string `json:"product_id"`
 	MediaType string `json:"media_type"`
-	// SiteModel is the customer-facing requested model/alias for this offer;
-	// it is not an Account model mapping and is never used as a second mapping
-	// store. Multiple products may carry different offer identities while
-	// resolving through the same Account mapping.
+	// SiteModel is the customer-facing model identity used for offer selection
+	// and Group permissions. V1 dispatch binds UpstreamModel directly; v0
+	// snapshots retain their historical Account alias contract.
 	SiteModel   string `json:"site_model"`
 	DisplayName string `json:"display_name"`
-	// UpstreamModel is the canonical Account catalog model captured by the
-	// product snapshot. Mapping ownership remains with the Account.
+	// UpstreamModel is the exact Account catalog model captured by the product.
+	// New Studio contracts do not resolve it through the API model mapping.
 	UpstreamModel string        `json:"upstream_model"`
 	Enabled       bool          `json:"enabled"`
 	Capabilities  Capabilities  `json:"capabilities"`
 	PricingRules  []PricingRule `json:"pricing_rules"`
-	AdapterConfig ImageConfig   `json:"adapter_config"`
+	// Server-owned discriminator. Absent on immutable historical snapshots.
+	CostVersion   int         `json:"cost_version,omitempty"`
+	CostRules     []CostRule  `json:"cost_rules,omitempty"`
+	AdapterConfig ImageConfig `json:"adapter_config"`
 }
 type Range struct {
 	Min int `json:"min"`
@@ -124,6 +126,11 @@ type Price struct {
 type PricingRule struct {
 	Match     Match  `json:"match"`
 	SalePrice *Price `json:"sale_price"`
+}
+type CostRule struct {
+	Match  Match  `json:"match"`
+	Cost   *Price `json:"cost"`
+	Source string `json:"source,omitempty"`
 }
 type Diagnostic struct {
 	Class    string `json:"class"`
@@ -170,6 +177,7 @@ type Published struct {
 	ProductDependencies map[string]Dependencies `json:"product_dependencies,omitempty"`
 }
 type Offer struct {
+	CostVersion    int            `json:"cost_version,omitempty"`
 	OfferID        string         `json:"offer_id"`
 	ProductID      string         `json:"product_id"`
 	AccountID      int64          `json:"account_id"`
@@ -496,6 +504,7 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 	}
 	now := time.Now().UTC()
 	for i := range input.Products {
+		input.Products[i].CostVersion = 1
 		inheritNativeProduct(a, &input.Products[i])
 	}
 	c.Draft = makeDraft(input, basedOn, now)
@@ -589,11 +598,16 @@ func (s *Service) Publish(ctx context.Context, id, expected int64, revision stri
 	// Always reread/recompile: this also automatically refreshes stale registry,
 	// catalog, mapping and routing dependencies without supplier calls.
 	now := time.Now().UTC()
-	v, offers := Validate(a, a.Config.Draft, now)
+	publication := a.Config.Draft
+	publication.Products = append([]Product(nil), publication.Products...)
+	for i := range publication.Products {
+		publication.Products[i].CostVersion = 1
+	}
+	v, offers := Validate(a, publication, now)
 	a.Config.Validation = v
 	if v.PublishReady {
 		products := []Product{}
-		for _, product := range a.Config.Draft.Products {
+		for _, product := range publication.Products {
 			if product.Enabled && a.Config.ProductLifecycle[product.ProductID].State != "archived" {
 				products = append(products, product)
 			}

@@ -224,23 +224,27 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	b := StudioVideoBinding{Version: StudioVideoBindingVersion, QuoteID: id, Owner: owner, PublishedRevision: resolved.PublishedRevision,
 		Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash, PlanHash: studioHash(plan), RequestHash: plan.RequestHash,
 		AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: videoCredentialFingerprint(a), KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), CreatedAt: now, ExpiresAt: now.Add(2 * time.Minute)}
-	var channel *Channel
-	if r.Core.channelService != nil && r.Core.channelService.repo != nil {
-		cid, err := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
-		if err != nil {
-			return "", q, QuoteFailure("account_cost", err)
-		}
-		if cid > 0 {
-			channel, e = r.Core.channelService.repo.GetByID(ctx, cid)
-			if e != nil {
-				return "", q, QuoteFailure("account_cost", e)
+	if resolved.Offer.CostVersion >= 1 {
+		b.Accounting, e = r.referenceAccounting(ctx, a, owner, resolved, now)
+	} else {
+		var channel *Channel
+		if r.Core.channelService != nil && r.Core.channelService.repo != nil {
+			cid, err := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
+			if err != nil {
+				return "", q, QuoteFailure("account_cost", err)
+			}
+			if cid > 0 {
+				channel, e = r.Core.channelService.repo.GetByID(ctx, cid)
+				if e != nil {
+					return "", q, QuoteFailure("account_cost", e)
+				}
 			}
 		}
+		if channel == nil || !channel.IsActive() {
+			return "", q, QuoteFailure("cost_channel_missing", ErrStudioImageAccounting)
+		}
+		b.Accounting, e = resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: b.Offer, Spec: b.Spec, SpecHash: b.SpecHash}, channel, now, "CNY", false)
 	}
-	if channel == nil || !channel.IsActive() {
-		return "", q, QuoteFailure("cost_channel_missing", ErrStudioImageAccounting)
-	}
-	b.Accounting, e = resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: b.Offer, Spec: b.Spec, SpecHash: b.SpecHash}, channel, now, "CNY", false)
 	if e != nil {
 		if QuoteFailureStage(e) == "cost_rule_missing" || QuoteFailureStage(e) == "cost_contract" {
 			return "", q, e
@@ -296,7 +300,7 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 				return fail()
 			}
 		}
-		if !a.IsSchedulable() || a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
+		if !a.IsSchedulable() || (b.Offer.CostVersion == 0 && a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel) || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
 			return fail()
 		}
 		ma, e := r.Media.Get(ctx, a.ID)
@@ -307,17 +311,22 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		if e != nil || current.PublishedRevision != b.PublishedRevision || studioHash(current.Offer) != studioHash(b.Offer) {
 			return fail()
 		}
-		ctx = withPublishedMediaModel(ctx, a, current.Offer.SiteModel, current.Offer.UpstreamModel)
+		requested := current.Offer.SiteModel
+		if current.Offer.CostVersion >= 1 {
+			requested = current.Offer.UpstreamModel
+		}
+		ctx = withPublishedMediaModel(ctx, a, requested, current.Offer.UpstreamModel, current.Offer.CostVersion >= 1)
+		a = publishedMediaExecutionAccount(ctx, a, requested)
 		gid := b.Owner.GroupID
 		ctx = r.Core.withOpenAIQuotaAutoPauseContext(ctx)
-		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, b.Offer.SiteModel, false, "")
+		a = r.Core.recheckSelectedOpenAIAccountFromDBBeforeProfit(ctx, a, &gid, a.Platform, requested, false, "")
 		checker := defaultOpenAIAccountScheduler{service: r.Core}
 		requiredCapability := OpenAIEndpointCapability("")
 		if b.Offer.Adapter.Kind == "seedance_video" {
 			requiredCapability = OpenAIEndpointCapabilitySeedance
 		}
-		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: b.Platform, RequestedModel: b.Offer.SiteModel, RequiredCapability: requiredCapability, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
-		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, b.Offer.SiteModel) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
+		req := OpenAIAccountScheduleRequest{GroupID: &gid, Platform: b.Platform, RequestedModel: requested, RequiredCapability: requiredCapability, RequirePrivacySet: r.Core.openAIGroupRequiresPrivacySet(ctx, &gid)}
+		if a == nil || !a.IsSchedulable() || !checker.isAccountRequestCompatible(ctx, a, req) || r.Core.isOpenAIAccountRequestRuntimeBlocked(a, requested) || studioMediaBaseURL(a) != b.BaseURL || videoCredentialFingerprint(a) != b.CredentialFingerprint {
 			return fail()
 		}
 

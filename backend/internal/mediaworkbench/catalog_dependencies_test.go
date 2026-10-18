@@ -20,7 +20,7 @@ func TestPublishedCatalogScope(t *testing.T) {
 			a.Config.Draft.Products = append(a.Config.Draft.Products, Product{ProductID: "banana", UpstreamModel: "banana"})
 		}, true},
 		{"deleted model", func(a *Account) { a.Catalog.Models = []string{"other"} }, false},
-		{"mapping", func(a *Account) { a.ModelMapping = map[string]string{"gpt-image-2": "other"} }, false},
+		{"mapping", func(a *Account) { a.ModelMapping = map[string]string{"gpt-image-2": "other"} }, true},
 		{"routing", func(a *Account) { a.BaseURL = "https://changed.example.invalid" }, false},
 		{"protocol", func(a *Account) {
 			a.Config.AdapterBindings["image"] = AdapterBinding{Kind: "gemini_images", Auth: "account_native", TaskFlow: "sync"}
@@ -45,6 +45,7 @@ func TestPublishedCatalogScope(t *testing.T) {
 
 func TestLegacyCatalogStaysStrictUntilExplicitRecovery(t *testing.T) {
 	a := preflight1870Fixture(t)
+	legacyPublishedFixture(t, a)
 	// Old records omit the scope field. Their revision/quote identity stays intact.
 	a.Config.Published.ProductDependencies = nil
 	a.Config.Published.Dependencies = DependenciesFor(a)
@@ -69,6 +70,7 @@ func TestLegacyCatalogStaysStrictUntilExplicitRecovery(t *testing.T) {
 
 func recoveryAccount(t *testing.T) *Account {
 	a := preflight1870Fixture(t)
+	legacyPublishedFixture(t, a)
 	a.ID = 77
 	old := a.Config.Published
 	v, offers := Validate(a, Draft{Revision: old.SourceDraftRevision, Products: old.Products}, old.PublishedAt)
@@ -164,8 +166,8 @@ func TestCatalogSyncKeepsFrozenQuoteAndVideo(t *testing.T) {
 		t.Fatal("unrelated sync changed frozen binding")
 	}
 	a.ModelMapping = map[string]string{"gpt-image-2": "changed"}
-	if _, e = ResolvePublishedImageOffer(a, old.Offer.OfferID, spec); e == nil {
-		t.Fatal("mapping drift accepted")
+	if _, e = ResolvePublishedImageOffer(a, old.Offer.OfferID, spec); e != nil {
+		t.Fatal("API mapping invalidated exact Studio binding", e)
 	}
 	s, r := fixture()
 	r.a.BaseURL = "https://supplier.example/v1"
@@ -190,4 +192,23 @@ func TestCatalogSyncKeepsFrozenQuoteAndVideo(t *testing.T) {
 	if publishedReady(&r.a) {
 		t.Fatal("removed video model accepted")
 	}
+}
+
+func legacyPublishedFixture(t *testing.T, a *Account) {
+	t.Helper()
+	for i := range a.Config.Draft.Products {
+		a.Config.Draft.Products[i].CostVersion = 0
+		a.Config.Draft.Products[i].CostRules = nil
+	}
+	pub := a.Config.Published
+	for i := range pub.Products {
+		pub.Products[i].CostVersion = 0
+		pub.Products[i].CostRules = nil
+	}
+	v, offers := Validate(a, Draft{Revision: pub.SourceDraftRevision, Products: pub.Products}, pub.PublishedAt)
+	if !v.PublishReady {
+		t.Fatal(v.Diagnostics)
+	}
+	pub.Offers, pub.Dependencies, pub.ProductDependencies = offers, v.Dependencies, nil
+	pub.Revision = publishedRevision(pub)
 }

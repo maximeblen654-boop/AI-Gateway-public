@@ -48,6 +48,7 @@ func TestOrdinaryCompatibleVideoUsesNativeContractOnFirstSave(t *testing.T) {
 	r.a.Catalog.Models = []string{"compat-upstream"}
 	r.a.ModelMapping = map[string]string{"compat-video": "compat-upstream"}
 	product := Product{
+		CostRules:     []CostRule{{Cost: &Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}}},
 		ProductID:     "compat-video-offer",
 		MediaType:     "video",
 		SiteModel:     "compat-video",

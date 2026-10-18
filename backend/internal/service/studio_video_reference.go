@@ -226,6 +226,13 @@ func slicesContainsInt64(values []int64, want int64) bool {
 }
 
 func (r *StudioVideoRuntime) referenceAccounting(ctx context.Context, a *Account, owner StudioImageOwner, resolved mediaworkbench.ResolvedVideoOffer, at time.Time) (AccountAccountingSnapshot, error) {
+	if resolved.Offer.CostVersion >= 1 {
+		ma, err := r.Media.Get(ctx, a.ID)
+		if err != nil {
+			return AccountAccountingSnapshot{}, err
+		}
+		return ResolveStudioPublishedAccountCost(a, ma, mediaworkbench.ResolvedImageOffer{PublishedRevision: resolved.PublishedRevision, Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash}, at)
+	}
 	var channel *Channel
 	if r.Core.channelService != nil && r.Core.channelService.repo != nil {
 		id, e := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)

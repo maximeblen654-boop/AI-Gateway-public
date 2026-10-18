@@ -16,9 +16,13 @@ import (
 
 const StudioImageAccountingVersion = "account_stats_snapshot_v1"
 
+func studioPublishedCostSourceID(account int64, product, revision string) string {
+	return fmt.Sprintf("account:%d/product:%s/published:%s", account, product, revision)
+}
+
 var ErrStudioImageAccounting = errors.New("independent Account-scoped image accounting unavailable")
 
-// Independent of Published/customer pricing. Stored with the quote, before a
+// Independent of customer pricing. Stored with the quote, before a
 // dispatch can be claimed; recovery never calls the live pricing resolver.
 type AccountAccountingSnapshot struct {
 	Version                   string    `json:"version"`
@@ -44,17 +48,53 @@ func studioAccountingDecimal(v float64) (decimal.Decimal, error) {
 	return mediaworkbench.DecimalAmount(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
-// V1 deliberately accepts only flat per-request/image AccountStats rules with
+// Historical v0 contracts accept only flat per-request/image AccountStats rules with
 // an explicit Account match. Group-only and customer pricing fallbacks do not
 // participate. RequestCount is the frozen image count, as in native stats.
 func ResolveStudioImageAccountCost(a *Account, binding mediaworkbench.ResolvedImageOffer, channel *Channel, at time.Time) (AccountAccountingSnapshot, error) {
 	return resolveStudioAccountCost(a, binding, channel, at, "CNY", true)
 }
 
+// ResolveStudioPublishedAccountCost freezes the administrator-confirmed product
+// cost. The Media repository projection is separately authorized server input.
+func ResolveStudioPublishedAccountCost(a *Account, published *mediaworkbench.Account, binding mediaworkbench.ResolvedImageOffer, at time.Time) (AccountAccountingSnapshot, error) {
+	if a == nil || binding.Offer.CostVersion != 1 || a.ID != binding.Offer.AccountID || at.IsZero() {
+		return AccountAccountingSnapshot{}, ErrStudioImageAccounting
+	}
+	price, sourceHash, err := mediaworkbench.ResolvePublishedCost(published, binding)
+	if err != nil {
+		return AccountAccountingSnapshot{}, QuoteFailure("cost_rule_missing", ErrStudioImageAccounting)
+	}
+	rateValue := 1.0
+	if a.RateMultiplier != nil {
+		rateValue = *a.RateMultiplier
+	}
+	rate, err := studioAccountingDecimal(rateValue)
+	if err != nil || rate.Exponent() < -4 || rate.GreaterThanOrEqual(decimal.New(1, 6)) {
+		return AccountAccountingSnapshot{}, ErrStudioImageAccounting
+	}
+	unit, err := mediaworkbench.DecimalAmount(price.Amount)
+	if err != nil || binding.Spec.Count < 1 {
+		return AccountAccountingSnapshot{}, ErrStudioImageAccounting
+	}
+	base := unit.Mul(decimal.NewFromInt(int64(binding.Spec.Count)))
+	effective := base.Mul(rate)
+	if _, err = mediaworkbench.DecimalAmount(base.String()); err != nil || base.GreaterThanOrEqual(decimalSubscriptionLimit) {
+		return AccountAccountingSnapshot{}, ErrStudioImageAccounting
+	}
+	if _, err = mediaworkbench.DecimalAmount(effective.String()); err != nil {
+		return AccountAccountingSnapshot{}, ErrStudioImageAccounting
+	}
+	return AccountAccountingSnapshot{Version: StudioImageAccountingVersion, SourceState: "resolved", SourceType: "studio_published_cost", SourceID: studioPublishedCostSourceID(a.ID, binding.Offer.ProductID, binding.PublishedRevision), SourceHash: sourceHash, AccountID: a.ID, UpstreamModel: binding.Offer.UpstreamModel, SpecHash: binding.SpecHash, RequestCount: binding.Spec.Count, PricingAt: at, BaseAmount: base.String(), Unit: "CNY", AccountRateMultiplier: rate.String(), EffectiveAccountQuotaCost: effective.String()}, nil
+}
+
 // Flat native Account Stats rules are shared. Video does not inherit image
 // fallback behavior: missing independent cost always prevents a new quote.
 func resolveStudioAccountCost(a *Account, binding mediaworkbench.ResolvedImageOffer, channel *Channel, at time.Time, unitName string, image bool) (AccountAccountingSnapshot, error) {
 	var out AccountAccountingSnapshot
+	if binding.Offer.CostVersion != 0 {
+		return out, ErrStudioImageAccounting
+	}
 	if a == nil || a.ID != binding.Offer.AccountID || binding.Spec.Count < 1 || at.IsZero() {
 		return out, ErrStudioImageAccounting
 	}
@@ -130,7 +170,14 @@ func resolveStudioAccountCost(a *Account, binding mediaworkbench.ResolvedImageOf
 	return out, nil
 }
 
-func (s *OpenAIGatewayService) studioImageAccountCost(ctx context.Context, a *Account, b mediaworkbench.ResolvedImageOffer, groupID int64, at time.Time) (AccountAccountingSnapshot, error) {
+func (s *OpenAIGatewayService) studioImageAccountCost(ctx context.Context, a *Account, b mediaworkbench.ResolvedImageOffer, groupID int64, at time.Time, repo mediaworkbench.Repository) (AccountAccountingSnapshot, error) {
+	if b.Offer.CostVersion >= 1 {
+		ma, err := repo.Get(ctx, a.ID)
+		if err != nil {
+			return AccountAccountingSnapshot{}, err
+		}
+		return ResolveStudioPublishedAccountCost(a, ma, b, at)
+	}
 	var ch *Channel
 	if s.channelService != nil && s.channelService.repo != nil {
 		// Fresh native reads, including group-to-channel ownership; no cache revision
@@ -161,7 +208,7 @@ func (s AccountAccountingSnapshot) Validate(q StudioImageQuote) error {
 	}
 	switch s.SourceState {
 	case "resolved":
-		if s.SourceType != "explicit_account_stats_rule" || s.SourceID == "" || len(s.SourceHash) != 64 {
+		if (s.SourceType != "explicit_account_stats_rule" && s.SourceType != "studio_published_cost") || s.SourceID == "" || len(s.SourceHash) != 64 {
 			return ErrStudioImageAccounting
 		}
 	case "not_required":
@@ -169,6 +216,9 @@ func (s AccountAccountingSnapshot) Validate(q StudioImageQuote) error {
 			return ErrStudioImageAccounting
 		}
 	default:
+		return ErrStudioImageAccounting
+	}
+	if q.Binding.Offer.CostVersion >= 1 && (s.SourceState != "resolved" || s.SourceType != "studio_published_cost" || s.SourceID != studioPublishedCostSourceID(s.AccountID, q.Binding.Offer.ProductID, q.Binding.PublishedRevision) || !videoDigest(s.SourceHash)) {
 		return ErrStudioImageAccounting
 	}
 	return nil

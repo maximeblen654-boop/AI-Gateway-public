@@ -31,6 +31,9 @@ func (s *Service) PublishSelected(ctx context.Context, id, expected int64, revis
 			if !p.Enabled || a.Config.ProductLifecycle[p.ProductID].State == "archived" {
 				return nil, ErrInvalid
 			}
+			// Explicit publication adopts the current cost contract, including
+			// saved drafts created before its introduction.
+			p.CostVersion = 1
 			products = append(products, p)
 		}
 	}

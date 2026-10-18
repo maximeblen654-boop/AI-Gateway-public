@@ -20,7 +20,7 @@ const maxPreviews = 64
 
 var dimensionPattern = regexp.MustCompile(`^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$`)
 
-// resolveAccountModel is the workbench's read-only view of the Account's
+// resolveAccountModel preserves legacy v0 snapshots' read-only view of Account's
 // canonical model mapping. The exact/wildcard precedence is delegated to the
 // same shared resolver used by the native Account service; a model present in
 // the last successful Account catalog can pass through unchanged when there
@@ -138,12 +138,14 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 		if a.Catalog != nil && !slices.Contains(a.Catalog.Models, p.UpstreamModel) {
 			add("UI_FIXABLE", "MODEL_NOT_DISCOVERED", pid, "upstream_model", "Upstream model is absent from the last successful snapshot")
 		}
-		mapped, mappingMatched, catalogMatched := resolveAccountModel(a, p.SiteModel)
-		if mapped != p.UpstreamModel {
-			add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "upstream_model", "Account model mapping differs from the selected upstream model")
-		}
-		if p.SiteModel != p.UpstreamModel && !mappingMatched && !catalogMatched {
-			add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "site_model", "Configure the Account model mapping")
+		if p.CostVersion == 0 {
+			mapped, mappingMatched, catalogMatched := resolveAccountModel(a, p.SiteModel)
+			if mapped != p.UpstreamModel {
+				add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "upstream_model", "Account model mapping differs from the selected upstream model")
+			}
+			if p.SiteModel != p.UpstreamModel && !mappingMatched && !catalogMatched {
+				add("UI_FIXABLE", "MODEL_MAPPING_MISMATCH", pid, "site_model", "Configure the Account model mapping")
+			}
 		}
 		binding := AdapterBinding{}
 		if a.Config != nil {
@@ -283,6 +285,9 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Customer sale price must be greater than 0 CNY, with at most 8 decimal places and per_request billing")
 			}
 		}
+		if p.CostVersion >= 1 {
+			validateCostRules(p, &v)
+		}
 		if len(v.Diagnostics) != start {
 			continue
 		}
@@ -296,6 +301,9 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			continue
 		}
 		v.CaseCount += len(cases)
+		if p.CostVersion >= 1 {
+			validateCostCoverage(p, cases, &v)
+		}
 		hits := make([]int, len(p.PricingRules))
 		missing, overlap, mappingMissing, compilerFailed := false, false, false, false
 		missingSpecs := []Spec{}
@@ -362,6 +370,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				o.Excluded = append(o.Excluded, canonicalMatch(rule.Deny))
 			}
 			sort.Slice(o.Excluded, func(i, j int) bool { return hash(o.Excluded[i]) < hash(o.Excluded[j]) })
+			o.CostVersion = p.CostVersion
 			o.OfferID = "mw_offer_" + hash(o)
 			offers = append(offers, o)
 		}

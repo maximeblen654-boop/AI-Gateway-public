@@ -9,8 +9,12 @@ import (
 // contract. Account routing/auth and registry remain mandatory shared boundaries.
 func productDependencies(a *Account, p Product) Dependencies {
 	d := dependenciesForProducts(a, []Product{p})
-	mapped, matched, catalog := resolveAccountModel(a, p.SiteModel)
-	d.MappingSHA256 = hash([]any{p.SiteModel, mapped, matched, catalog})
+	if p.CostVersion >= 1 {
+		d.MappingSHA256 = hash([]string{p.SiteModel, p.UpstreamModel})
+	} else {
+		mapped, matched, catalog := resolveAccountModel(a, p.SiteModel)
+		d.MappingSHA256 = hash([]any{p.SiteModel, mapped, matched, catalog})
+	}
 	d.BindingSHA256 = hash(bindingsFor(a, []string{p.MediaType}))
 	return d
 }

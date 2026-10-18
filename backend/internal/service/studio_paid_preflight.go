@@ -132,34 +132,16 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		ID          int64
 		UserID      int64
 		UserStatus  string
-		Group       *Group
+		Group       any
 		Status      string
 		Quota       float64
 		Expiry      *time.Time
 		Rates       [3]float64
 		Allow, Deny []string
-	}{key.ID, key.UserID, key.User.Status, key.Group, key.Status, key.Quota, key.ExpiresAt, [3]float64{key.RateLimit5h, key.RateLimit1d, key.RateLimit7d}, key.IPWhitelist, key.IPBlacklist}}
+	}{key.ID, key.UserID, key.User.Status, studioPaidGroupIdentity(key.Group), key.Status, key.Quota, key.ExpiresAt, [3]float64{key.RateLimit5h, key.RateLimit1d, key.RateLimit7d}, key.IPWhitelist, key.IPBlacklist}}
 	var costChannel *Channel
-	if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {
-		cid, e := ch.repo.GetChannelIDByGroupID(ctx, out.group)
-		if e != nil {
-			return out, e
-		}
-		if cid > 0 {
-			c, e := ch.repo.GetByID(ctx, cid)
-			if e != nil {
-				return out, e
-			}
-			if c == nil {
-				return out, ErrPaidControl
-			}
-			costChannel = c
-			sharedChannel := *c
-			sharedChannel.AccountStatsPricingRules = nil
-			sharedChannel.UpdatedAt = time.Time{}
-			parts = append(parts, sharedChannel)
-		}
-	}
+	legacyChannelRead := false
+	var legacyChannelError error
 	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 	for _, a := range rows {
 		if a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled {
@@ -192,6 +174,26 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			if !ok {
 				continue
 			}
+			// Channel is solely a historical v0 cost source. Its read failures or
+			// API pricing/mapping changes cannot invalidate a v1 Studio grant.
+			mappedModel := offer.UpstreamModel
+			var costIdentity any
+			if offer.CostVersion == 0 {
+				if !legacyChannelRead {
+					legacyChannelRead = true
+					if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {
+						var cid int64
+						cid, legacyChannelError = ch.repo.GetChannelIDByGroupID(ctx, out.group)
+						if legacyChannelError == nil && cid > 0 {
+							costChannel, legacyChannelError = ch.repo.GetByID(ctx, cid)
+						}
+					}
+				}
+				if legacyChannelError != nil {
+					continue
+				}
+				mappedModel, costIdentity = native.GetMappedModel(offer.SiteModel), paidOfferCostIdentity(costChannel, native, offer)
+			}
 			credentials := make(map[string]any, len(native.Credentials))
 			for k, v := range native.Credentials {
 				// Mapping for another product cannot invalidate this product's grant.
@@ -203,7 +205,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			if native.Proxy != nil {
 				proxy = native.Proxy.URL()
 			}
-			out.grants[paidOfferKey(a.ID, offer.OfferID)] = studioHash([]any{paidOfferCostIdentity(costChannel, native, offer), identity, native.ID, native.Type, native.Platform, native.ParentAccountID, credentials, native.ProxyID, proxy, studioMediaBaseURL(native), native.GetMappedModel(offer.SiteModel), native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
+			out.grants[paidOfferKey(a.ID, offer.OfferID)] = studioHash([]any{costIdentity, identity, native.ID, native.Type, native.Platform, native.ParentAccountID, credentials, native.ProxyID, proxy, studioMediaBaseURL(native), mappedModel, native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
 		}
 		out.accounts = append(out.accounts, a)
 	}
@@ -231,6 +233,18 @@ func paidOfferCostIdentity(channel *Channel, account *Account, offer mediaworkbe
 		}
 	}
 	return nil
+}
+
+// API pricing/aliases are independent. Retain actual Group access, identity and
+// shared quota/concurrency policies in the activation dependency fingerprint.
+func studioPaidGroupIdentity(g *Group) any {
+	if g == nil {
+		return nil
+	}
+	return []any{g.ID, g.Platform, g.Status, g.IsExclusive, g.SubscriptionType,
+		g.DailyLimitUSD, g.WeeklyLimitUSD, g.MonthlyLimitUSD, g.AllowImageGeneration,
+		g.AllowBatchImageGeneration, g.ModelAllowlist, g.RequirePrivacySet,
+		g.RequireOAuthOnly, g.RPMLimit}
 }
 
 func (p *studioPaidPreflight) sharedEligibility(ctx context.Context, m string, key *APIKey) (*UserSubscription, error) {
