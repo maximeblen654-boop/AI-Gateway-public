@@ -63,5 +63,7 @@ function applyResult(index: number, amount: string) { if (!props.disabled && !de
 </script>
 
 <style scoped>
+.mw-price-spec{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:8px;min-width:0}
+.mw-price-spec>strong,.mw-price-spec>details{min-width:0;max-width:100%;overflow-wrap:anywhere}
 .mw-cost-state{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--mw-muted)}
 </style>
