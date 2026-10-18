@@ -8,7 +8,9 @@ import "fmt"
 func validCostMatch(m Match, c Capabilities) bool {
 	formats := m.OutputFormats
 	m.OutputFormats = nil
-	return subset(formats, c.OutputFormats) && validMatch(m, c)
+	// Omitted native output_format is itself an allowed request. A cost rule
+	// may target it explicitly with "" without overlapping explicit formats.
+	return subset(formats, append([]string{""}, c.OutputFormats...)) && validMatch(m, c)
 }
 
 func costMatches(m Match, s Spec) bool {

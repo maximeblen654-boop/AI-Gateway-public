@@ -105,3 +105,18 @@ func TestCostPublishedExactModelIgnoresAPIMapping(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCostOutputFormatCoverageIncludesNativeDefault(t *testing.T) {
+	_, r := validatorFixture(t)
+	p := validProduct()
+	p.CostVersion = 1
+	p.Capabilities.OutputFormats = []string{"png", "jpeg"}
+	p.CostRules = nil
+	for _, format := range []string{"", "png", "jpeg"} {
+		p.CostRules = append(p.CostRules, CostRule{Match: Match{OutputFormats: []string{format}}, Cost: &Price{Amount: "0.10", Currency: "CNY", BillingMode: "per_request"}})
+	}
+	v, _ := Validate(&r.a, Draft{Revision: "format-cost", Products: []Product{p}}, time.Now())
+	if !v.PublishReady {
+		t.Fatal(v.Diagnostics)
+	}
+}

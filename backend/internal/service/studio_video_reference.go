@@ -124,6 +124,11 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 		Spec   mediaworkbench.Spec
 		Assets []StudioVideoReferenceAsset
 	}{owner, resolved.Offer, spec, assets})
+	if resolved.Offer.CostVersion >= 1 {
+		// Cost-only publications deliberately keep the retail OfferID stable.
+		// A new frozen commercial contract needs a distinct preparation identity.
+		intentHash = studioHash([]string{intentHash, resolved.PublishedRevision})
+	}
 	endpointFingerprint := studioHash(struct{ Base, Model string }{a.GetOpenAIBaseURL(), resolved.Offer.UpstreamModel})
 	proxyFingerprint := studioHash(func() string {
 		if a.Proxy == nil {

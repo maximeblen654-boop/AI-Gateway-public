@@ -97,7 +97,7 @@ func TestReferenceRejectsUnknownCostAndFalseCountsBeforeUpload(t *testing.T) {
 			r.SetReferenceUploader(u)
 			if scenario == "cost" {
 				q.Binding.Spec.Images = 1
-				r.Core.channelService = nil
+				r.Media.(*studioMediaFixture).a.Config.Published.Products[0].CostRules = nil
 			}
 			_, e := r.PrepareReferenceAssets(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, []StudioVideoReferenceAsset{asset})
 			require.Error(t, e)

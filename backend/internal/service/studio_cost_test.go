@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -150,4 +151,42 @@ func studioCopyCostProduct(p mediaworkbench.Product) mediaworkbench.Product {
 	var out mediaworkbench.Product
 	_ = json.Unmarshal(raw, &out)
 	return out
+}
+
+func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
+	r, _, q, key, _, _ := videoRuntimeFixture(t)
+	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
+	ma := r.Media.(*studioMediaFixture)
+	spec := q.Binding.Spec
+	spec.Images = 1
+	input := []byte("synthetic-reference")
+	asset := StudioVideoReferenceAsset{AssetRef: "cost-reference", Kind: "image", MimeType: "image/png", Size: len(input), SHA256: HashUsageRequestPayload(input), BytesBase64: base64.StdEncoding.EncodeToString(input)}
+	uploader := &localReferenceUploader{}
+	r.SetReferenceUploader(uploader)
+	prepare := func() StudioVideoReferencePreparationResult {
+		p, err := r.PrepareReferenceAssets(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, spec, []StudioVideoReferenceAsset{asset})
+		require.NoError(t, err)
+		return p
+	}
+	old := prepare()
+	require.Equal(t, old.PreparationID, prepare().PreparationID)
+	require.Equal(t, 1, uploader.calls)
+	product := studioCopyCostProduct(ma.a.Config.Draft.Products[0])
+	product.CostRules[0].Cost.Amount = "0.49"
+	admin := mediaworkbench.NewService(ma)
+	d, err := admin.SaveDraft(context.Background(), 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
+	require.NoError(t, err)
+	d, err = admin.PublishSelected(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{product.ProductID})
+	require.NoError(t, err)
+	require.Equal(t, q.Binding.Offer.OfferID, d.Config.Published.Offers[0].OfferID)
+	current := prepare()
+	require.NotEqual(t, old.PreparationID, current.PreparationID)
+	require.Equal(t, current.PreparationID, prepare().PreparationID)
+	require.Equal(t, 2, uploader.calls)
+	oldSnapshot, err := r.Store.ReferencePreparation(old.PreparationID, q.Binding.Owner)
+	require.NoError(t, err)
+	newSnapshot, err := r.Store.ReferencePreparation(current.PreparationID, q.Binding.Owner)
+	require.NoError(t, err)
+	require.Equal(t, "0.35", oldSnapshot.Accounting.BaseAmount)
+	require.Equal(t, "0.49", newSnapshot.Accounting.BaseAmount)
 }
