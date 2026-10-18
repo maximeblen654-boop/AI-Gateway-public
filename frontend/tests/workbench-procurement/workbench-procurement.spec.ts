@@ -70,6 +70,12 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
       await expect.poll(async () => { const r = (await sidebar.boundingBox())!; return r.x + r.width }).toBeLessThanOrEqual(1)
     }
     await page.getByTestId('procurement-editor').scrollIntoViewIfNeeded()
+    if (viewport.width <= 390) {
+      const label = (await page.getByTestId('procurement-editor').locator('.mw-price-spec strong').first().boundingBox())!
+      expect(label.width).toBeGreaterThanOrEqual(200)
+      expect(label.height).toBeLessThan(36)
+      expect((await page.getByTestId('open-cost-0').boundingBox())!.width).toBeGreaterThanOrEqual(200)
+    }
     await page.screenshot({ path: info.outputPath('cost-editor.png'), animations: 'disabled' })
     await page.getByTestId('wizard-step-5').click()
     await page.getByRole('button', { name: '← 返回模型列表', exact: true }).click()
