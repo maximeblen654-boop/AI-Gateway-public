@@ -17,7 +17,7 @@ export interface Product {
   product_id: string; media_type: string; site_model: string; display_name: string
   upstream_model: string; enabled: boolean
   capabilities: {
-    resolutions: string[]; aspect_ratios: string[]; qualities: string[]; durations_seconds: number[]
+    resolutions: string[]; aspect_ratios: string[]; qualities: string[]; durations_seconds: number[]; output_formats?: string[]
     count: Range; references: References; combination_rules: { deny: Match }[]
   }
   pricing_rules: PricingRule[]
@@ -92,6 +92,7 @@ export function draftInput(products: Product[]): { products: Product[] } {
     capabilities: {
       resolutions: [...(p.capabilities.resolutions ?? [])], aspect_ratios: [...(p.capabilities.aspect_ratios ?? [])],
       qualities: [...(p.capabilities.qualities ?? [])], durations_seconds: [...(p.capabilities.durations_seconds ?? [])],
+      ...(p.capabilities.output_formats?.length ? { output_formats: [...p.capabilities.output_formats] } : {}),
       count: range(p.capabilities.count), references: references(p.capabilities.references),
       combination_rules: (p.capabilities.combination_rules ?? []).map(rule => ({ deny: match(rule.deny) }))
     },

@@ -3,7 +3,7 @@
     <button ref="trigger" type="button" class="studio-chip" :disabled="disabled" :data-testid="id"
       :aria-expanded="open" :aria-controls="`${id}-menu`" :aria-invalid="invalid || undefined"
       :aria-describedby="describedby" @click="emit('update:open', !open)">
-      <span>{{ label }}</span><strong>{{ modelValue }}{{ unit ? ` ${unit}` : '' }}</strong><Icon name="chevronDown" />
+      <span>{{ label }}</span><strong>{{ displayValue(modelValue) }}{{ unit ? ` ${unit}` : '' }}</strong><Icon name="chevronDown" />
     </button>
     <Transition name="studio-pop">
       <div v-if="open" :id="`${id}-menu`" ref="menu" class="studio-popover studio-spec-menu"
@@ -12,7 +12,7 @@
         <div class="studio-spec-options" :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }" @keydown="navigate">
           <button v-for="value in options" :key="value" type="button" :disabled="disabled"
             :data-value="value" :aria-pressed="modelValue === value" :class="{ chosen: modelValue === value }"
-            @click="choose(value)">{{ value }}</button>
+            @click="choose(value)">{{ displayValue(value) }}</button>
         </div>
       </div>
     </Transition>
@@ -24,7 +24,7 @@ import { nextTick, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 const props = withDefaults(defineProps<{
   id: string; label: string; modelValue: string | number; options: readonly (string | number)[];
-  open: boolean; disabled?: boolean; unit?: string; columns?: number; invalid?: boolean; describedby?: string
+  optionLabels?: Record<string, string>; open: boolean; disabled?: boolean; unit?: string; columns?: number; invalid?: boolean; describedby?: string
 }>(), { columns: 2 })
 const emit = defineEmits<{ 'update:modelValue': [value: string | number]; 'update:open': [value: boolean] }>()
 const trigger = ref<HTMLButtonElement>(), menu = ref<HTMLElement>(), left = ref(0)
@@ -37,6 +37,7 @@ watch(() => props.open, async open => {
   left.value = Math.max(16 - box.left, Math.min(0, window.innerWidth - 16 - box.left - width))
   menu.value.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus()
 })
+function displayValue(value: string | number) { return props.optionLabels?.[String(value)] ?? value }
 function close() { emit('update:open', false); void nextTick(() => trigger.value?.focus()) }
 function choose(value: string | number) {
   if (props.disabled || !props.options.includes(value)) return

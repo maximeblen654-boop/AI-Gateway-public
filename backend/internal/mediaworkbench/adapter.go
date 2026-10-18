@@ -381,6 +381,7 @@ func PlanImageExecution(config ImageConfig, quantity int) (ImageExecutionPlan, e
 }
 
 type Spec struct {
+	OutputFormat    string `json:"output_format,omitempty"`
 	Resolution      string `json:"resolution"`
 	DurationSeconds int    `json:"duration_seconds"`
 	AspectRatio     string `json:"aspect_ratio"`
@@ -415,6 +416,12 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 	}
 
 	fields := map[string]any{"model": p.SiteModel, "prompt": "<dry-run-prompt>", "n": spec.Count}
+	if spec.OutputFormat != "" {
+		if !validOutputFormat(spec.OutputFormat) || (p.AdapterConfig.ModelFamily != "" && p.AdapterConfig.ModelFamily != "openai_json") {
+			return imageplan.Plan{}, fmt.Errorf("unsupported native output format")
+		}
+		fields["output_format"] = spec.OutputFormat
+	}
 	if p.AdapterConfig.ModelFamily == "gemini_images" {
 		if spec.Resolution != "" {
 			fields["image_size"] = spec.Resolution

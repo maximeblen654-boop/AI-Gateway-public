@@ -88,6 +88,9 @@ type ResolvedImageOffer struct {
 }
 
 func NormalizeImageSpec(s Spec) (Spec, string, error) {
+	if s.OutputFormat != "" && !validOutputFormat(s.OutputFormat) {
+		return Spec{}, "", ErrRuntimeBinding
+	}
 	if s.Count < 1 || s.Count > 10 || s.Images < 0 || s.Images > 16 || s.Videos != 0 || s.Audio != 0 || s.DurationSeconds != 0 {
 		return s, "", ErrRuntimeBinding
 	}

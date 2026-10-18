@@ -54,6 +54,12 @@ const handle=async (req, res) => {
       if (body.prompt.startsWith('SYNTHETIC_WAIT')) await new Promise(resolve => setTimeout(resolve, 15000))
       const calls = state.requests.filter(r => r.method === 'POST' && r.body.prompt === body.prompt)
       if (body.prompt.startsWith('SYNTHETIC_PARTIAL') && calls.length === 2) return reply(422, { error: 'synthetic_second_batch_rejected' })
+      if(body.output_format){
+        assert(['png','jpeg','webp'].includes(body.output_format),'Unsupported synthetic format')
+        const fixtures=JSON.parse(fs.readFileSync(path.join(root,'synthetic-output-formats.json'),'utf8'))
+        const image=fixtures[body.output_format];assert.equal(image.mime_type,'image/'+body.output_format)
+        return reply(200,{data:Array.from({length:body.n},()=>({...image,output_format:body.output_format}))})
+      }
       return reply(200, { data: Array.from({ length: body.n }, () => ({ b64_json: png })) })
     }
     if (req.method === 'POST' && url.pathname === '/api/v3/contents/generations/tasks') {

@@ -49,3 +49,17 @@ func TestStudioImagePublishedPlanUsesCompiledIdentity(t *testing.T) {
 	_, err := svc.ParsePublishedImagePlan(imageplan.Plan{Method: "POST", Path: imageplan.Generations, Encoding: "application/json"})
 	require.Error(t, err, "a deserialized browser object cannot fabricate compiled bytes")
 }
+
+func TestStudioNativeOutputFormatSurvivesParser(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	for _, endpoint := range []string{imageplan.Generations, imageplan.Edits} {
+		for _, format := range []string{"png", "jpeg", "webp"} {
+			body := []byte(`{"model":"gpt-image-2","prompt":"synthetic","n":1,"output_format":"` + format + `","images":[{"image_url":"data:image/png;base64,c3ludGhldGlj"}]}`)
+			plan, err := imageplan.CompileJSON(body, "gpt-image-2", endpoint)
+			require.NoError(t, err)
+			parsed, err := svc.ParsePublishedImagePlan(plan)
+			require.NoError(t, err)
+			require.Equal(t, format, parsed.OutputFormat)
+		}
+	}
+}

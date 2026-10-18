@@ -62,6 +62,9 @@ const p='/admin/media-workbench/paid-controls/'
    report.scale_fixture={target_product_id:product.product_id,preserved_sibling_id:siblingBefore.product_id,sibling_disabled_only_in_isolation:true}
    assert.equal(product.upstream_model,'gpt-image-2')
    Object.assign(product.capabilities,{resolutions:['4K'],aspect_ratios:['1:1','16:9','4:5','5:4','21:9','3:4','4:3','2:3','3:2','9:16','9:21'],qualities:[],durations_seconds:[],count:{min:1,max:10},references:{image:{min:0,max:16},video:{min:0,max:0},audio:{min:0,max:0},total_max:16},combination_rules:[]})
+   // Keep the established 1,870 legacy auto-format domain; explicit formats
+   // are independently verified by aspect-options with real simulated delivery.
+   delete product.capabilities.output_formats
    product.adapter_config.size_mappings=[]
    product.pricing_rules=[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}]
    detail=await api(accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products}})

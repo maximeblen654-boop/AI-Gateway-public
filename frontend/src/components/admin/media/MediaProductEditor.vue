@@ -19,6 +19,14 @@
         <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="setCapability('resolution', $event)" />
         <MediaTokensField label="比例" aspect-ratio :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="setCapability('aspect_ratio', $event)" />
         <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric duration-range :presets="durationPresets" placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="setCapability('duration_seconds', $event)" />
+        <div v-if="supportsNativeOutputFormat || product.capabilities.output_formats?.length" class="mw-field" data-test="native-output-formats">
+          <span>生成时的原生图片格式</span>
+          <div class="mw-token-presets" role="group" aria-label="已确认的上游输出格式">
+            <button v-for="format in ['png', 'jpeg', 'webp']" :key="format" type="button" class="mw-token-chip" :class="{ 'mw-token-chip-selected': product.capabilities.output_formats?.includes(format) }" :aria-pressed="!!product.capabilities.output_formats?.includes(format)" :disabled="disabled || !supportsNativeOutputFormat" :data-test="`native-output-${format}`" @click="toggleOutputFormat(format)">{{ format === 'jpeg' ? 'JPEG' : format.toUpperCase() }}</button>
+          </div>
+          <small>仅勾选已确认当前供应商线路支持的格式。不选则沿用上游默认格式；保存、校验并发布后才对客户生效。与生成后的本地格式转换不同，不改变现有价格。</small>
+          <small v-if="!supportsNativeOutputFormat">当前适配器不支持配置原生输出格式；保留原配置供核查，服务端会再次校验。</small>
+        </div>
         <div data-test="quantity-policy">
           <p class="mw-muted">{{ product.media_type === 'video' ? '视频固定为 1 条。' : '系统图片购买范围为 1～10 张；上游请求由系统按接口能力分批。' }}</p>
           <template v-if="product.media_type === 'image' && (product.capabilities.count.min !== 1 || product.capabilities.count.max !== 10)">
@@ -109,6 +117,14 @@ const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [o
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const baseRatioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const ratioPresets = computed(() => props.product.media_type === 'image' ? [...baseRatioPresets, '1:4', '4:1', '1:8', '8:1'] : baseRatioPresets)
+const supportsNativeOutputFormat = computed(() => props.product.media_type === 'image' && (props.nativeAdapter?.kind ?? props.binding?.kind) === 'openai_images')
+function toggleOutputFormat(format: string) {
+  if (props.disabled || !supportsNativeOutputFormat.value) return
+  edit(next => {
+    const formats = next.capabilities.output_formats ?? []
+    next.capabilities.output_formats = formats.includes(format) ? formats.filter(value => value !== format) : [...formats, format]
+  })
+}
 const durationPresets = ['5', '10', '15']
 const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
 const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = [

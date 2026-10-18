@@ -81,6 +81,7 @@
               <div v-if="offer?.spec.aspect_ratio?.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in offer.spec.aspect_ratio" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="ratio = r; closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
               <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="offer.spec.resolution" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="resolution = String($event)" @update:open="openControl = $event ? 'resolution' : null" />
               <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="offer.spec.quality" :disabled="busy" :open="openControl === 'quality'" @update:model-value="quality = String($event)" @update:open="openControl = $event ? 'quality' : null" />
+              <StudioSpecPicker v-if="kind === 'image' && outputFormats.length" id="studio-output-format" label="输出格式" :model-value="outputFormat" :options="['auto', ...outputFormats]" :option-labels="outputFormatLabels" :disabled="busy" :open="openControl === 'format'" @update:model-value="outputFormat = $event as StudioOutputFormat|'auto'" @update:open="openControl = $event ? 'format' : null" />
               <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="count = Number($event)" @update:open="openControl = $event ? 'count' : null" />
               <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="offer?.spec.duration_seconds || []" :disabled="busy" :open="openControl === 'duration'" @update:model-value="duration = Number($event)" @update:open="openControl = $event ? 'duration' : null" />
               <span class="studio-range">{{ kind === 'video' ? '每次 1 条视频' : countOptions.length ? `可选 ${countOptions[0]}–${countOptions[countOptions.length-1]} 张` : '' }}</span>
@@ -104,8 +105,8 @@
   </BaseDialog>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask } from '@/api/studioMedia'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
@@ -118,10 +119,10 @@ const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref(
 type UploadState = 'pending' | 'success' | 'failure'
 type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
 const uploads=ref<StudioAssetUpload[]>([])
-const resolution=ref(''), ratio=ref(''), quality=ref(''), count=ref(1), duration=ref(5), prompt=ref('')
+const resolution=ref(''), ratio=ref(''), quality=ref(''), outputFormat=ref<StudioOutputFormat|'auto'>('auto'), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 type HistoryFilter = 'all'|'image'|'video'
-const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|null>(null)
+const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|'format'|null>(null)
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
@@ -135,6 +136,9 @@ const composerRoot=ref<HTMLElement|null>(null), promptInput=ref<HTMLTextAreaElem
 const modeLabel=computed(()=>kind.value==='video' ? '视频创作' : imageMode.value==='edit' ? '图生图' : '文生图')
 const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || (imageMode.value==='edit' ? o.spec.references.image.max>0 && o.spec.references.total_max>0 : o.spec.references.image.min===0)))
 const offer=computed(()=>visibleOffers.value.find(o=>o.offer_id===offerId.value))
+const outputFormatLabels:Record<string,string>={auto:'由模型决定',png:'PNG',jpeg:'JPEG',webp:'WebP'}
+const outputFormats=computed(()=>kind.value==='image' ? (offer.value?.spec.output_formats||[]).filter(value=>['png','jpeg','webp'].includes(value)) : [])
+watch(outputFormats,formats=>{if(outputFormat.value!=='auto'&&!formats.includes(outputFormat.value)){outputFormat.value='auto';intent=undefined}},{flush:'sync'})
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
 const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
@@ -195,7 +199,7 @@ const waitingMessage=computed(()=>{
 const statuses:Record<string,string>={prepared:'报价已冻结，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
 const statusText=(status:string)=>statuses[status]||'结果待确认'
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||(!/^media[-_]/.test(task.model)?task.model:'')||'已保存的创作'
-const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
+const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.kind==='image'&&typeof task.spec.output_format==='string'?outputFormatLabels[task.spec.output_format]||task.spec.output_format:'',task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
 function remember(){try{if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,view:active.value?'task':'compose',attempted:[...attempted]}))}catch{/* Durable server history remains available when browser storage is unavailable. */}}
 function resultLoaded(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=false}
 function resultUnavailable(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=true}
@@ -317,7 +321,7 @@ function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFi
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
 async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value||incompatible.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
- const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
+ const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={...(kind.value==='image'&&outputFormat.value!=='auto'&&outputFormats.value.includes(outputFormat.value)?{output_format:outputFormat.value}:{}),resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
  if(kind.value==='video'){
    if(o.input_mode==='references'&&assets.value.length&&!intent.preparationId){const p=await studioRequest<{preparation_id:string}>('video','prepare',{offer_id:o.offer_id,model:o.model,spec,assets:refs});if(typeof p.preparation_id!=='string')throw new StudioError('studio_contract');intent.preparationId=p.preparation_id}

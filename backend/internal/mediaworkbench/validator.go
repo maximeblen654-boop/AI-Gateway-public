@@ -225,6 +225,18 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				}
 			}
 		}
+		if len(p.Capabilities.OutputFormats) > 3 {
+			add("UI_FIXABLE", "OUTPUT_FORMAT_UNSUPPORTED", pid, "capabilities.output_formats", "At most three native output formats are supported")
+		}
+		if len(p.Capabilities.OutputFormats) > 0 {
+			seenFormats := map[string]bool{}
+			for _, format := range p.Capabilities.OutputFormats {
+				if !known || descriptor.Kind != "openai_images" || p.MediaType != "image" || !validOutputFormat(format) || seenFormats[format] {
+					add("UI_FIXABLE", "OUTPUT_FORMAT_UNSUPPORTED", pid, "capabilities.output_formats", "Select only confirmed png/jpeg/webp formats for the OpenAI-compatible image route")
+				}
+				seenFormats[format] = true
+			}
+		}
 		if !validCapabilities(p.Capabilities) {
 			add("UI_FIXABLE", "INVALID_REFERENCE_LIMIT", pid, "capabilities", "Use valid bounded count/reference ranges and nonempty unique specification values")
 		}
@@ -428,6 +440,10 @@ func inside(r, domain Range) bool {
 	return r.Min >= domain.Min && r.Max <= domain.Max && r.Max >= r.Min
 }
 func validMatch(m Match, c Capabilities) bool {
+	// Output formats belong to the product capability, never a second price axis.
+	if len(m.OutputFormats) != 0 {
+		return false
+	}
 	if !subset(m.Resolution, c.Resolutions) || !subset(m.DurationSeconds, c.DurationsSeconds) || !subset(m.AspectRatio, c.AspectRatios) || !subset(m.Quality, c.Qualities) {
 		return false
 	}
@@ -449,7 +465,14 @@ func Matches(m Match, s Spec) bool {
 	}
 	return m.References == nil || (in(m.References.Image, s.Images) && in(m.References.Video, s.Videos) && in(m.References.Audio, s.Audio) && s.Images+s.Videos+s.Audio <= m.References.TotalMax)
 }
+func validOutputFormat(format string) bool {
+	return format == "png" || format == "jpeg" || format == "webp"
+}
+
 func (o Offer) Matches(s Spec) bool {
+	if s.OutputFormat != "" && (o.MediaType != "image" || o.Adapter.Kind != "openai_images" || !validOutputFormat(s.OutputFormat) || !slices.Contains(o.SpecMatch.OutputFormats, s.OutputFormat)) {
+		return false
+	}
 	if !Matches(o.SpecMatch, s) {
 		return false
 	}
@@ -472,6 +495,8 @@ func canonicalMatch(m Match) Match {
 	return m
 }
 func completeMatch(m Match, c Capabilities) Match {
+	m.OutputFormats = slices.Clone(c.OutputFormats)
+	sort.Strings(m.OutputFormats)
 	if len(m.Resolution) == 0 {
 		m.Resolution = choices(c.Resolutions)
 	}
@@ -505,7 +530,7 @@ func specs(c Capabilities, budget int) ([]Spec, error) {
 	// Reject excessive domains before allocating or looping over the Cartesian
 	// product. Safety limits here bound CPU and memory, not supplier capability.
 	size := int64(1)
-	for _, n := range []int{len(choices(c.Resolutions)), len(choices(c.AspectRatios)), len(choices(c.Qualities)), len(choices(c.DurationsSeconds)), c.Count.Max - c.Count.Min + 1, c.References.Image.Max - c.References.Image.Min + 1, c.References.Video.Max - c.References.Video.Min + 1, c.References.Audio.Max - c.References.Audio.Min + 1} {
+	for _, n := range []int{1 + len(c.OutputFormats), len(choices(c.Resolutions)), len(choices(c.AspectRatios)), len(choices(c.Qualities)), len(choices(c.DurationsSeconds)), c.Count.Max - c.Count.Min + 1, c.References.Image.Max - c.References.Image.Min + 1, c.References.Video.Max - c.References.Video.Min + 1, c.References.Audio.Max - c.References.Audio.Min + 1} {
 		size *= int64(n)
 		if size > maxCases {
 			return nil, fmt.Errorf("matrix too large")
@@ -525,7 +550,7 @@ func specs(c Capabilities, budget int) ([]Spec, error) {
 									if image+video+audio > c.References.TotalMax {
 										continue
 									}
-									s := Spec{res, duration, ratio, quality, n, image, video, audio}
+									s := Spec{Resolution: res, DurationSeconds: duration, AspectRatio: ratio, Quality: quality, Count: n, Images: image, Videos: video, Audio: audio}
 									denied := false
 									for _, r := range c.CombinationRules {
 										if Matches(r.Deny, s) {
@@ -535,6 +560,10 @@ func specs(c Capabilities, budget int) ([]Spec, error) {
 									}
 									if !denied {
 										result = append(result, s)
+										for _, format := range c.OutputFormats {
+											s.OutputFormat = format
+											result = append(result, s)
+										}
 									}
 								}
 							}

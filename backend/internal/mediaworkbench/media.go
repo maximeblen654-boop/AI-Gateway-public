@@ -93,6 +93,7 @@ type References struct {
 	TotalMax int   `json:"total_max"`
 }
 type Match struct {
+	OutputFormats   []string    `json:"output_formats,omitempty"`
 	Resolution      []string    `json:"resolution,omitempty"`
 	DurationSeconds []int       `json:"duration_seconds,omitempty"`
 	AspectRatio     []string    `json:"aspect_ratio,omitempty"`
@@ -104,6 +105,7 @@ type CombinationRule struct {
 	Deny Match `json:"deny"`
 }
 type Capabilities struct {
+	OutputFormats    []string          `json:"output_formats,omitempty"`
 	Resolutions      []string          `json:"resolutions"`
 	AspectRatios     []string          `json:"aspect_ratios"`
 	Qualities        []string          `json:"qualities"`

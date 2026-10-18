@@ -44,6 +44,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    const oldOffer=catalogBefore.body.offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('1K'))
    assert(oldOffer);assert(!oldOffer.spec.aspect_ratio.includes('3:5'))
    await openEditor(product.product_id)
+   for(const format of ['png','jpeg','webp']){await expect(w(`native-output-${format}`)).toHaveAttribute('aria-pressed','false');await w(`native-output-${format}`).click()}
    for(const ratio of ['1:4','4:1','1:8','8:1']){const chip=w('wizard-page-1').getByRole('button',{name:ratio,exact:true});await expect(chip).toHaveAttribute('aria-pressed','false');await chip.click();await expect(chip).toHaveAttribute('aria-pressed','true');await chip.click();await expect(chip).toHaveAttribute('aria-pressed','false')}
    await w('wizard-page-1').getByRole('button',{name:'1:4',exact:true}).click();await w('custom-ratio-toggle').click()
    await w('custom-ratio-input').fill('0:1');await w('custom-ratio-add').click();await expect(admin.getByRole('alert').filter({hasText:'正整数比例'})).toBeVisible()
@@ -56,8 +57,8 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    await w('save').click();const saved=await saving;assert.equal(saved.status(),200);report.save_request=saved.request().postDataJSON()
    const reread=(await api(accountPath)).media_workbench_v1
    assert.equal(reread.validation.publish_ready,true,JSON.stringify(reread.validation.diagnostics));assert.deepEqual(reread.draft.products.map(p=>p.product_id),report.before.product_ids)
-   const changed=reread.draft.products.find(p=>p.product_id===product.product_id),expected=structuredClone(product);expected.capabilities.aspect_ratios.push('1:4','3:5')
-   assert.deepEqual(changed,expected,'Only the selected product ratio list may change');assert.deepEqual(reread.draft.products.find(p=>p.product_id!==product.product_id),report.before.sibling);assert.deepEqual(reread.published,config.published,'Draft save must not publish');assert.equal(changed.adapter_config.size_mappings?.length||0,0)
+   const changed=reread.draft.products.find(p=>p.product_id===product.product_id),expected=structuredClone(product);expected.capabilities.aspect_ratios.push('1:4','3:5');expected.capabilities.output_formats=['png','jpeg','webp']
+   assert.deepEqual(changed,expected,'Only the selected product ratio and native format lists may change');assert.deepEqual(reread.draft.products.find(p=>p.product_id!==product.product_id),report.before.sibling);assert.deepEqual(reread.published,config.published,'Draft save must not publish');assert.equal(changed.adapter_config.size_mappings?.length||0,0)
    const persisted=JSON.parse(sql(`SELECT extra->'media_workbench_v1' FROM accounts WHERE id=${account} AND name='Synthetic openai'`))
    assert.deepEqual(persisted.draft.products,reread.draft.products,'Database draft must equal server re-read')
    report.database_product_ids=persisted.draft.products.map(p=>p.product_id)
@@ -66,43 +67,52 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
    const draftCatalog=await media('catalog');assert.equal(draftCatalog.status,200);assert.deepEqual(draftCatalog.body.offers,catalogBefore.body.offers,'Unpublished ratios must not enter customer catalog')
    const spec={resolution:'1K',aspect_ratio:'3:5',count:1,images:0,videos:0,audio:0,duration_seconds:0,quality:''}
    const refused=await media('quotes','POST',{offer_id:oldOffer.offer_id,spec});assert(refused.status>=400&&refused.status<500,JSON.stringify(refused));report.unpublished_quote=refused
+   const unpublishedFormat=await media('quotes','POST',{offer_id:oldOffer.offer_id,spec:{...spec,aspect_ratio:oldOffer.spec.aspect_ratio[0],output_format:'jpeg'}});assert(unpublishedFormat.status>=400&&unpublishedFormat.status<500,JSON.stringify(unpublishedFormat));report.unpublished_format_quote=unpublishedFormat
    await w('wizard-step-5').click();await w('return-models').click();await w('publish').click();await expect(w('confirm-publish')).toBeVisible();await w('confirm-publish').click();await expect(w('sales')).toBeEnabled()
    const published=(await api(accountPath)).media_workbench_v1;assert.deepEqual(published.published.products.find(p=>p.product_id===product.product_id),expected)
    await customerPage();const catalog=await media('catalog');assert.equal(catalog.status,200)
    const offer=catalog.body.offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('1K'));assert(offer&&offer.spec.aspect_ratio.includes('3:5')&&offer.spec.aspect_ratio.includes('1:4'))
+   assert.deepEqual([...offer.spec.output_formats].sort(),['jpeg','png','webp'])
+   const unsupported=await media('quotes','POST',{offer_id:offer.offer_id,spec:{...spec,output_format:'gif'}});assert(unsupported.status>=400&&unsupported.status<500,JSON.stringify(unsupported));report.unsupported_format_quote=unsupported
    report.quote_checks=[]
    for(const images of [0,1]){const quote=await media('quotes','POST',{offer_id:offer.offer_id,spec:{...spec,images}});assert.equal(quote.status,200,JSON.stringify(quote));report.quote_checks.push({images,status:quote.status,body:quote.body})}
    assert.deepEqual((await api('/admin/media-workbench/accounts/'+videoAccount)).media_workbench_v1,report.before.video)
    assert.deepEqual(stats(),supplierBefore,'UI save/publish/quote must not generate');assert.deepEqual(ledger(),ledgerBefore,'UI save/publish/quote must not settle')
+   // Browser codecs produce actual non-paid fixtures; the simulator returns these bytes.
+   const formats=await customer.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=1;canvas.height=1;const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,1,1);const result={};for(const format of ['png','jpeg','webp']){const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/'+format,.95));if(!blob||blob.type!=='image/'+format)throw Error('Missing browser codec '+format);const bytes=new Uint8Array(await blob.arrayBuffer());result[format]={mime_type:blob.type,b64_json:btoa(String.fromCharCode(...bytes))}}return result})
+   fs.writeFileSync(root+'/evidence/synthetic-output-formats.json',JSON.stringify(formats))
+   report.format_fixtures=Object.fromEntries(Object.entries(formats).map(([format,value])=>[format,{mime_type:value.mime_type,sha256:hash(Buffer.from(value.b64_json,'base64'))}]))
    report.configuration_pass=true
    report.checks.push('Real UI save and API re-read preserve product IDs/prices/sibling/video; unpublished ratio excluded from catalog and rejected by quote; isolated publish admits text/edit quotes without size mappings')
   }else{
    report.execution=[]
-   for(const edit of [false,true]){
-    const result={mode:edit?'edit':'text',before:{supplier:stats(),ledger:ledger()}};report.execution.push(result);fs.writeFileSync(reportPath,JSON.stringify(report,null,2))
+   for(const edit of [false,true])for(const format of ['auto','png','jpeg','webp']){
+    const result={mode:edit?'edit':'text',format,before:{supplier:stats(),ledger:ledger()}};report.execution.push(result);fs.writeFileSync(reportPath,JSON.stringify(report,null,2))
     await customerPage();await customer.getByTestId(edit?'studio-mode-edit':'studio-mode-text').click();await customer.getByTestId('studio-model-toggle').click()
     const catalog=await media('catalog');assert.equal(catalog.status,200)
     const offer=catalog.body.offers.find(o=>o.product_id===report.saved_product.product_id&&o.spec.resolution.includes('1K'));assert(offer)
     await customer.locator(`[data-offer-id="${offer.offer_id}"]`).click()
     await customer.getByTestId('studio-resolution').click();await customer.locator('#studio-resolution-menu [data-value]').filter({hasText:/^1K$/}).click()
     await customer.getByTestId('studio-ratio-toggle').click();await customer.locator('[data-ratio="3:5"]').click();await customer.getByTestId('studio-count').click();await customer.locator('#studio-count-menu [data-value="1"]').click()
+    await customer.getByTestId('studio-output-format').click();await customer.locator(`#studio-output-format-menu [data-value="${format}"]`).click()
     if(edit)await customer.getByTestId('studio-asset-input').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:png})
-    await customer.getByTestId('studio-prompt').fill('SYNTHETIC custom ratio '+result.mode+' '+randomUUID())
+    await customer.getByTestId('studio-prompt').fill('SYNTHETIC custom ratio '+result.mode+' '+format+' '+randomUUID())
     const quoting=customer.waitForResponse(r=>r.url().endsWith('/studio-v2/api/image/prepare')&&r.request().method()==='POST')
-    await customer.getByTestId('studio-quote').click();const quoted=await quoting;result.quote=await quoted.json();assert.equal(quoted.status(),200,JSON.stringify(result.quote));assert.equal(Number(result.quote.sale_price.amount),0.7);result.task_id=result.quote.task_id
+    await customer.getByTestId('studio-quote').click();const quoted=await quoting;result.quote=await quoted.json();assert.equal(quoted.status(),200,JSON.stringify(result.quote));assert.equal(Number(result.quote.sale_price.amount),0.7);result.task_id=result.quote.task_id;assert.equal(result.quote.spec.output_format,format==='auto'?undefined:format)
     fs.writeFileSync(reportPath,JSON.stringify(report,null,2));assert.deepEqual(ledger(),result.before.ledger);assert.equal(stats().image_posts,result.before.supplier.image_posts)
     await customer.getByTestId('studio-confirm-generate').click();await expect(customer.getByTestId('studio-status')).toContainText('生成完成',{timeout:60000});await expect(customer.getByTestId('studio-result-image')).toHaveCount(1)
     const downloadEvent=customer.waitForEvent('download');await customer.getByTestId('studio-download').click();const download=await downloadEvent
-    assert.equal(await download.failure(),null);result.download_sha256=hash(fs.readFileSync(await download.path()));assert.equal(result.download_sha256,hash(png))
+    assert.equal(await download.failure(),null);result.download_sha256=hash(fs.readFileSync(await download.path()));assert.equal(result.download_sha256,format==='auto'?hash(png):report.format_fixtures[format].sha256)
+    const originalHref=await customer.getByTestId('studio-download').getAttribute('href');assert(originalHref);const original=await customer.request.get(new URL(originalHref,base).href);assert.equal(original.status(),200);assert.match(original.headers()['content-type'],new RegExp('^image/'+(format==='auto'?'png':format)));assert.equal(hash(await original.body()),result.download_sha256)
     result.after={supplier:stats(),ledger:ledger()}
     const requests=result.after.supplier.requests.slice(result.before.supplier.requests.length).filter(r=>r.method==='POST');assert.equal(requests.length,1);const request=requests[0]
-    assert.equal(request.path,edit?'/v1/images/edits':'/v1/images/generations');assert.equal(request.body.model,'gpt-image-2');assert.equal(request.body.resolution,'1K');assert.equal(request.body.aspect_ratio,'3:5');assert.equal(request.body.size,undefined);assert.equal(request.body.n,1);assert.equal(request.body.images?.length||0,edit?1:0)
+    assert.equal(request.path,edit?'/v1/images/edits':'/v1/images/generations');assert.equal(request.body.model,'gpt-image-2');assert.equal(request.body.resolution,'1K');assert.equal(request.body.aspect_ratio,'3:5');assert.equal(request.body.size,undefined);assert.equal(request.body.output_format,format==='auto'?undefined:format);assert.equal(request.body.n,1);assert.equal(request.body.images?.length||0,edit?1:0)
     assert.equal(result.after.ledger.usage-result.before.ledger.usage,1);assert.equal(result.after.ledger.dedup-result.before.ledger.dedup,1);assert.equal(Math.round((result.before.ledger.balance-result.after.ledger.balance)*100),70);assert.equal(result.after.ledger.frozen_balance,result.before.ledger.frozen_balance)
     await customer.reload();await expect(customer.getByTestId('studio-task-id')).toContainText(result.task_id);await customer.getByTestId('studio-refresh').click();await expect(customer.getByTestId('studio-refresh')).toBeEnabled()
-    assert.equal(stats().image_posts,result.after.supplier.image_posts);assert.deepEqual(ledger(),result.after.ledger);await shot(customer,`native-aspect-options-${result.mode}-result.png`)
+    assert.equal(stats().image_posts,result.after.supplier.image_posts);assert.deepEqual(ledger(),result.after.ledger);await shot(customer,`native-aspect-options-${result.mode}-${format}-result.png`)
    }
    report.execution_pass=true
-   report.checks.push('Custom ratio reaches real simulated text/edit POST unchanged; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle')
+   report.checks.push('Custom ratio and auto/png/jpeg/webp reach real simulated text/edit POST unchanged; selected-format bytes and MIME verified; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle')
   }
   report.assets??={};report.assets[phase]={admin:phase==='configure'?await proof():undefined,customer:await customerProof()}
  }catch(error){report.error=error.message;report.overflow=await admin.evaluate(()=>[...document.querySelectorAll('body *')].map(e=>({tag:e.tagName,cls:e.className,left:e.getBoundingClientRect().left,right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e=>e.right>innerWidth+1&&e.width>0).slice(0,25));await shot(phase==='configure'?admin:customer,'native-aspect-options-failure.png');throw error}
