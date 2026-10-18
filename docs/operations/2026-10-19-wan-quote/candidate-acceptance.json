@@ -1,0 +1,62 @@
+{
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "script_sha": "bc90cb09105eaca5434c4464a9fd1e0d09a81f71",
+  "scope": "workbench-procurement-dual-business-and-media-regression",
+  "status": "PASS",
+  "containers": [
+    {
+      "name": "/ai-gateway-native-core-20261012",
+      "image": "sha256:76a084ae2d253dfaf1d48fa5af2c8dfa8775a230c6e95822686fc25d5a0e965c",
+      "health": "healthy",
+      "network": "ai-gateway-native-net-20261012",
+      "mounts": [
+        {
+          "type": "bind",
+          "destination": "/app/data/simulator-ca.crt",
+          "rw": false
+        },
+        {
+          "type": "volume",
+          "destination": "/app/data",
+          "rw": true
+        }
+      ]
+    },
+    {
+      "name": "/ai-gateway-native-bridge-20261012",
+      "image": "sha256:5845bd670349d4c363c2732c248744a1de03b6329b7a34d9f1296c8150189bc0",
+      "health": "healthy",
+      "network": "container:92bf0aa58741e1c4cc9d3d2028d05d01cd929f11e142dc4c2d3960254a9dac17",
+      "mounts": [
+        {
+          "type": "volume",
+          "destination": "/app/data",
+          "rw": false
+        }
+      ]
+    },
+    {
+      "name": "/ai-gateway-native-bff-20261012",
+      "image": "sha256:88ad43ec7b56f4f47ef653f26d3eed6187c8dcd9f00a433bedc2c9698cde39c8",
+      "health": "healthy",
+      "network": "container:92bf0aa58741e1c4cc9d3d2028d05d01cd929f11e142dc4c2d3960254a9dac17",
+      "mounts": [
+        {
+          "type": "volume",
+          "destination": "/state/assets",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "destination": "/state/images",
+          "rw": true
+        },
+        {
+          "type": "volume",
+          "destination": "/state/videos",
+          "rw": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "original_build_run": "39161087117",
+  "evidence_sha256": "2bb04b727ce40626f7ef730f992019dce357f609379d8a9e61e695c9fb11aaba",
+  "tasks": 104,
+  "pass": true,
+  "reexecuted": false,
+  "reason": "same immutable three-component archives and unchanged funds test inputs"
+}

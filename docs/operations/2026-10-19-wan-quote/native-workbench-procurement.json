@@ -1,0 +1,373 @@
+{
+  "checks": [
+    "Official isolated preflight refreshed both paid grants for the newly published offers without generation",
+    "Incomplete cost saves; server rejects incomplete selected publication; selected complete products publish atomically with server cost_version=1; sales stays separate; both Studio Groups have no Channel",
+    "Customer cannot bind the unauthorized exclusive API Group; a separate customer without its own Studio Key cannot obtain the Studio offer (public Group binding policy unchanged)",
+    "One shared Account routes native API alias and charges API Channel price; Channel cost 99 and Account aliases leave Studio exact model/price/cost unchanged; WAN refs0/1 execute, deliver, settle and recover once",
+    "Official isolated preflight refreshed both paid grants for the newly published offers without generation",
+    "Explicit zero cost is preserved; later published costs and sale prices do not rewrite or recharge completed original tasks",
+    "Exhausted native balance, shared Account quota, real Account schedulability and inactive native Group key block generation; Studio writes preserve API prices, mappings and permissions; catalog/quote/task/history/errors expose no private costs or credentials"
+  ],
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "production_action": false,
+  "api_mocking": false,
+  "upstream": "local simulator only",
+  "tasks": [
+    {
+      "kind": "image",
+      "id": "img_6e7c5a57553f946860f5cb1047b1bd57",
+      "before": {
+        "balance": "99.87500000",
+        "frozen": "0.00000000",
+        "usage": 1,
+        "cost": "0.1250000000",
+        "account_quota": "0.15625"
+      },
+      "after": {
+        "balance": "98.07500000",
+        "frozen": "0.00000000",
+        "usage": 2,
+        "cost": "1.9250000000",
+        "account_quota": "0.45625"
+      },
+      "expected_sale": "1.8",
+      "expected_account_quota": "0.3",
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "supplier_posts": 1,
+      "recovery_reposts": 0
+    },
+    {
+      "kind": "video",
+      "id": "op_f560ff3c56dfce9c8a06d4a49999e29b7f05e368c85b1004c496efd8dcbb5abd",
+      "before": {
+        "balance": "98.07500000",
+        "frozen": "0.00000000",
+        "usage": 2,
+        "cost": "1.9250000000",
+        "account_quota": "0.45625"
+      },
+      "after": {
+        "balance": "96.07500000",
+        "frozen": "0.00000000",
+        "usage": 3,
+        "cost": "3.9250000000",
+        "account_quota": "0.83125"
+      },
+      "expected_sale": "2",
+      "expected_account_quota": "0.375",
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "supplier_posts": 1,
+      "recovery_reposts": 0
+    },
+    {
+      "kind": "video",
+      "id": "op_11d4ed00188bd71baae04c8be4d82390289dc31ecba1d7c525449f748bf5caef",
+      "before": {
+        "balance": "96.07500000",
+        "frozen": "0.00000000",
+        "usage": 3,
+        "cost": "3.9250000000",
+        "account_quota": "0.83125"
+      },
+      "after": {
+        "balance": "94.07500000",
+        "frozen": "0.00000000",
+        "usage": 4,
+        "cost": "5.9250000000",
+        "account_quota": "1.20625"
+      },
+      "expected_sale": "2",
+      "expected_account_quota": "0.375",
+      "original_sha256": "9738ac5e6756d120b3a6805420362e31390b3b4a26b604dcacac86c660f72299",
+      "supplier_posts": 1,
+      "recovery_reposts": 0
+    },
+    {
+      "kind": "image",
+      "id": "img_1e805b0078054e0b0a23a3f1619462b1",
+      "before": {
+        "balance": "94.07500000",
+        "frozen": "0.00000000",
+        "usage": 4,
+        "cost": "5.9250000000",
+        "account_quota": "1.20625"
+      },
+      "after": {
+        "balance": "92.97500000",
+        "frozen": "0.00000000",
+        "usage": 5,
+        "cost": "7.0250000000",
+        "account_quota": "1.20625"
+      },
+      "expected_sale": "1.1",
+      "expected_account_quota": "0",
+      "original_sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "supplier_posts": 1,
+      "recovery_reposts": 0
+    }
+  ],
+  "responses": [
+    {
+      "kind": "image",
+      "operation": "catalog",
+      "status": 409,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "quotes",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "prepare",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks/img_6e7c5a57553f946860f5cb1047b1bd57",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks/img_6e7c5a57553f946860f5cb1047b1bd57",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "quotes",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_f560ff3c56dfce9c8a06d4a49999e29b7f05e368c85b1004c496efd8dcbb5abd",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_f560ff3c56dfce9c8a06d4a49999e29b7f05e368c85b1004c496efd8dcbb5abd",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "quotes",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_11d4ed00188bd71baae04c8be4d82390289dc31ecba1d7c525449f748bf5caef",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_11d4ed00188bd71baae04c8be4d82390289dc31ecba1d7c525449f748bf5caef",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "quotes",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "prepare",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks/img_1e805b0078054e0b0a23a3f1619462b1",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks/img_1e805b0078054e0b0a23a3f1619462b1",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks/img_6e7c5a57553f946860f5cb1047b1bd57",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_f560ff3c56dfce9c8a06d4a49999e29b7f05e368c85b1004c496efd8dcbb5abd",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations/op_11d4ed00188bd71baae04c8be4d82390289dc31ecba1d7c525449f748bf5caef",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "catalog",
+      "status": 409,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "quotes",
+      "status": 409,
+      "private_fields": false
+    },
+    {
+      "kind": "image",
+      "operation": "tasks",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "operations",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "quotes",
+      "status": 422,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "catalog",
+      "status": 200,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "quotes",
+      "status": 422,
+      "private_fields": false
+    },
+    {
+      "kind": "video",
+      "operation": "catalog",
+      "status": 409,
+      "private_fields": false
+    }
+  ],
+  "restored": true,
+  "balance_gate": {
+    "fixture_balance": "0.00000000",
+    "native_policy": "nonpositive balance rejected; no projected-sale-price assumption",
+    "http_status": 409,
+    "diagnostic_stage": "billing_eligibility",
+    "supplier_posts": 0,
+    "usage_delta": 0,
+    "balance_unchanged": true
+  },
+  "native_controls": {
+    "schedulable_disabled": false,
+    "schedulable_restored": true,
+    "quota_limited": 1e-8,
+    "quota_restored": 100,
+    "key_disabled": "inactive",
+    "key_restored": "active"
+  },
+  "pass": true,
+  "cleanup_sales_enabled": false,
+  "cleanup_account_schedulable": false,
+  "restore_errors": []
+}

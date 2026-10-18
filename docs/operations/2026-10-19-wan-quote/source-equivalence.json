@@ -1,0 +1,23 @@
+{
+  "runtime_source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "ci_source_sha": "ebeb7ee9bb73c429687cdfaf7f132023d27ef6c7",
+  "acceptance_script_sha": "bc90cb09105eaca5434c4464a9fd1e0d09a81f71",
+  "changes_are_tests_and_acceptance_only": true,
+  "ci_changed_paths": [
+    "backend/internal/repository/media_config_repo_integration_test.go",
+    "backend/internal/service/studio_video_quote_diagnostics_test.go",
+    "frontend/tests/media-workbench/cost-calculator.spec.ts",
+    "frontend/tests/media-workbench/wizard.spec.ts",
+    "frontend/tests/workbench-procurement/workbench-procurement.spec.ts",
+    "tools/native-media-e2e/candidate.mjs",
+    "tools/native-media-e2e/workbench-procurement.cjs",
+    "tools/native-media-e2e/workbench-procurement.test.cjs"
+  ],
+  "runtime_manifest_sha256": "138f523771fe9839ae4a01f47569dc5498c49da123259f68d02865b163a9f6bd",
+  "tracked_runtime_entries": 2415,
+  "runtime_entries_identical": true,
+  "acceptance_changed_paths": [
+    "tools/native-media-e2e/workbench-procurement.cjs",
+    "tools/native-media-e2e/workbench-procurement.test.cjs"
+  ]
+}

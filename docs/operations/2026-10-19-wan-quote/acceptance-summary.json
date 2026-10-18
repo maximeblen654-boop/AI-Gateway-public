@@ -1,0 +1,75 @@
+{
+  "status": "CANDIDATE_READY_NOT_DEPLOYED",
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "acceptance_script_sha": "bc90cb09105eaca5434c4464a9fd1e0d09a81f71",
+  "ci_run": "39163329810",
+  "security_run": "39163329880",
+  "build_run": "39161087117",
+  "acceptance_run": "39164189216",
+  "full_image_artifact": "12149012613",
+  "final_evidence_artifact": "12149958347",
+  "manifest_sha256": "485c4a8fcc54b31bb415304366f9244d33ed95a9fb63a6c43f0779451a7d0dca",
+  "production_action": false,
+  "real_supplier_calls": false,
+  "evidence_layers": {
+    "browser": "real Vue AppLayout/AppSidebar with HTTP fixture, 19 existing and 24 procurement browser cases in CI",
+    "integration": "fixed final Core/Bridge/BFF, real PostgreSQL/native ledger/session; local simulator supplier only"
+  },
+  "funds": {
+    "pass": true,
+    "phase": "complete",
+    "tasks": 104,
+    "counts": {
+      "502": 16,
+      "OK": 24,
+      "PARTIAL": 12,
+      "REJECT": 12,
+      "DISCONNECT": 12,
+      "TIMEOUT": 12,
+      "LATE": 8,
+      "DUPLICATE": 8
+    },
+    "reused_same_image_evidence": true,
+    "sha256": "2bb04b727ce40626f7ef730f992019dce357f609379d8a9e61e695c9fb11aaba"
+  },
+  "scale": {
+    "pass": true,
+    "specs": 1870,
+    "wall_ms": [
+      1047,
+      705,
+      799
+    ],
+    "catalog_dependencies_pass": true
+  },
+  "reports": {
+    "native-customer-image-geometry-1k.json": {
+      "pass": true,
+      "sha256": "f0c7bf72b03b58b0c43c1fef46b25dc6c53317fce89826325a49f856462df334"
+    },
+    "native-customer-edit-geometry-2k.json": {
+      "pass": true,
+      "sha256": "6c12ebc5606511633015592aed9cef5bd67148941ea1fcd38664dc46fde9e9f6"
+    },
+    "native-customer-video-compatible.json": {
+      "pass": true,
+      "sha256": "6fb1e7c42b0ad6516c8e560bdd0f3bb75ce5e6f33a38e6f31e86d573d4be9374"
+    },
+    "native-workbench-procurement.json": {
+      "pass": true,
+      "sha256": "8e054f0e71003bf93c9d344fb72a9e34c142a078db21987ef8b58685dcac63e0"
+    },
+    "native-task-experience.json": {
+      "pass": true,
+      "sha256": "eab397664ea9640b0c59f01c5227b00344d63fe84f9418e7aa14ce922b593f02"
+    },
+    "native-model-lifecycle.json": {
+      "pass": true,
+      "sha256": "db3a01ef8620721311a491ad2abe16430a23e8fda1c907a0ee453a1fcc5bc24b"
+    },
+    "native-ops.json": {
+      "pass": true,
+      "sha256": "ff4c828bfbc8c14378120c98cff564fbc08b37628637ad7b543ee876ce360ec8"
+    }
+  }
+}
