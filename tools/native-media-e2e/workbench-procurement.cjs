@@ -93,6 +93,20 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const config = detail.media_workbench_v1
     return core(admin, configPath() + '/publish', 'POST', { expected_record_version: config.record_version, expected_draft_revision: config.draft.revision, product_ids })
   }
+  async function refreshPaidGrants() {
+    const before = stats()
+    for (const kind of ['image', 'video']) {
+      const path = '/admin/media-workbench/paid-controls/' + kind
+      const checked = await core(admin, path + '/check', 'POST', {})
+      assert.equal(checked.pass, true, JSON.stringify(checked))
+      const current = await core(admin, path)
+      const enabled = await core(admin, path, 'PUT', { enabled: true, expected_revision: current.revision, fingerprint: checked.fingerprint })
+      assert.equal(enabled.effective_enabled, true, JSON.stringify(enabled))
+    }
+    assert.equal(stats().image_posts, before.image_posts, 'Paid preflight generated an image')
+    assert.equal(stats().video_posts, before.video_posts, 'Paid preflight generated a video')
+    report.checks.push('Official isolated preflight refreshed both paid grants for the newly published offers without generation')
+  }
   async function offer(user, kind, productID) {
     const result = ok(await media(user, kind, 'catalog'))
     const selected = result.offers.find(item => item.product_id === productID)
@@ -178,6 +192,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert(detail.media_workbench_v1.published.products.every(product => product.cost_version === 1))
     assert.equal(detail.media_workbench_v1.sales.enabled, false)
     await core(admin, configPath() + '/sales', 'PUT', { expected_record_version: detail.media_workbench_v1.record_version, enabled: true })
+    await refreshPaidGrants()
     report.checks.push('Incomplete cost saves; server rejects incomplete selected publication; selected complete products publish atomically with server cost_version=1; sales stays separate; both Studio Groups have no Channel')
     const user = await customer('funded', 100, [imageGroup, videoGroup, apiGroup.id])
     const poor = await customer('poor', 0.01, [imageGroup, videoGroup])
@@ -214,6 +229,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const prior = structuredClone(report.tasks)
     const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }], cost_rules: [{ match: {}, cost: price('0'), source: 'manual' }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }], cost_rules: [{ match: {}, cost: price('0.44'), source: 'manual' }] }, incomplete])
     await publish(saved, [image.product_id, wan.product_id])
+    await refreshPaidGrants()
     const zeroOffer = await offer(user, 'image', image.product_id)
     const zeroPrompt = 'SYNTHETIC procurement explicit zero'
     await execute(user, 'image', await prepare(user, 'image', zeroOffer, 0, zeroPrompt), '1.1', '0', zeroPrompt)
