@@ -80,6 +80,20 @@ if (mode === 'load-existing') {
     assert.equal(loaded.Id,i.image_id);assert.equal(loaded.Id,i.config_digest)
     assert.equal(loaded.Config.Labels['org.opencontainers.image.revision'],sha);assert.equal(`${loaded.Os}/${loaded.Architecture}`,'linux/amd64')
   }
+  // A test-only follow-up can reuse an already completed funds audit on these
+  // exact archives. Validate both its runtime identity and unchanged test inputs.
+  const fundsPath=path.join(dir,'native-funds-batch.json')
+  if(procurementContract && fs.existsSync(fundsPath)){
+    const funds=JSON.parse(fs.readFileSync(fundsPath,'utf8'))
+    assert.equal(funds.source_sha,sha);assert.equal(funds.pass,true);assert.equal(funds.phase,'complete')
+    assert.equal(funds.production,false);assert.equal(funds.api_mocking,false);assert.equal(funds.tasks.length,104)
+    for(const input of ['tools/native-media-e2e/funds-batch.cjs','tools/native-media-e2e/simulator.mjs','tools/native-media-e2e/seed.mjs','tools/native-media-e2e/browser.cjs']){
+      assert.equal(capture('git',['hash-object',input]),capture('git',['-C',source,'rev-parse',`HEAD:${input}`]),`funds input changed: ${input}`)
+    }
+    fs.copyFileSync(fundsPath,path.join(out,'native-funds-batch.json'))
+    if(fs.existsSync(path.join(dir,'native-funds-batch.csv'))) fs.copyFileSync(path.join(dir,'native-funds-batch.csv'),path.join(out,'native-funds-batch.csv'))
+    fs.writeFileSync(path.join(out,'funds-reuse.json'),JSON.stringify({source_sha:sha,original_build_run:prior.build_run_id,evidence_sha256:await hash(fundsPath),tasks:104,pass:true,reexecuted:false,reason:'same immutable three-component archives and unchanged funds test inputs'},null,2))
+  }
   fs.writeFileSync(path.join(out,'manifest-tested-candidate.json'),JSON.stringify(prior,null,2))
   fs.writeFileSync(path.join(out,'reuse-existing.json'),JSON.stringify({source_sha:sha,original_manifest_sha256:await hash(manifestPath),original_build_run:prior.build_run_id,acceptance_script_sha:scriptSha,acceptance_run_id:process.env.GITHUB_RUN_ID,rebuild:false,reexport:false},null,2))
 } else if (mode === 'build') {
@@ -203,7 +217,14 @@ if (mode === 'load-existing') {
       for (const scenario of ['image-geometry-1k','edit-geometry-2k','video-compatible']) run(process.execPath,['tools/native-media-e2e/customer.cjs',root,scenario])
       run(process.execPath,['tools/native-media-e2e/task-experience.cjs',root])
       if (focusedEntry) run(process.execPath,['tools/native-media-e2e/studio-entry.cjs',root,'verify'])
-      else run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
+      else {
+        const proofPath=path.join(out,'funds-reuse.json')
+        if(fs.existsSync(proofPath)){
+          const proof=JSON.parse(fs.readFileSync(proofPath,'utf8'))
+          assert.equal(proof.source_sha,sha);assert.equal(proof.pass,true);assert.equal(proof.tasks,104)
+          assert.equal(await hash(path.join(out,'native-funds-batch.json')),proof.evidence_sha256)
+        }else run(process.execPath,['tools/native-media-e2e/funds-batch.cjs',root])
+      }
       if(focusedEntry) run(process.execPath,['tools/native-media-e2e/image-finality.cjs',root])
       if (mediaOptions) run(process.execPath,['tools/native-media-e2e/passive-status.cjs',root])
       if (procurementContract) run(process.execPath,['tools/native-media-e2e/workbench-procurement.cjs',root,'verify'])
