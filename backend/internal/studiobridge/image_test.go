@@ -178,7 +178,7 @@ func TestImageStudioTicketNativeRevocation(t *testing.T) {
 }
 
 func TestImageBridgeNativeBillingFailureDiagnostic(t *testing.T) {
-	for _, tc := range []struct{ code, stage string }{{"INSUFFICIENT_BALANCE", "billing_eligibility"}, {"API_KEY_QUOTA_EXHAUSTED", "billing_eligibility"}, {"SUBSCRIPTION_INVALID", "billing_eligibility"}, {"untrusted-secret-route", "binding"}} {
+	for _, tc := range []struct{ code, stage string }{{"INSUFFICIENT_BALANCE", "billing_eligibility"}, {"API_KEY_QUOTA_EXHAUSTED", "billing_eligibility"}, {"SUBSCRIPTION_INVALID", "billing_eligibility"}, {"USAGE_LIMIT_EXCEEDED", "billing_eligibility"}, {"untrusted-secret-route", "unknown"}} {
 		t.Run(tc.code, func(t *testing.T) {
 			core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")

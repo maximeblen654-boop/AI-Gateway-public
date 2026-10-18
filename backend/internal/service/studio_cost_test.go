@@ -28,7 +28,7 @@ func (studioNoChannel) ListAll(context.Context) ([]Channel, error) {
 
 func TestStudioPublishedCostFrozenExecutionIgnoresAPIMapping(t *testing.T) {
 	r, q, key, accounts, billing := studioContractFixture(t)
-	ma := r.Media.(*studioMediaFixture)
+	ma := studioCostMediaFixture(t, r.Media)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
 	accounts.a.Credentials["model_mapping"] = map[string]any{"gpt-image-2": "api-only-model", "*": "api-fallback"}
 	ma.a.ModelMapping = map[string]string{"gpt-image-2": "api-only-model"}
@@ -66,7 +66,7 @@ func TestStudioPublishedCostFrozenExecutionIgnoresAPIMapping(t *testing.T) {
 
 func TestStudioPublishedCostZeroIsExplicitAndRequired(t *testing.T) {
 	r, original, key, _, _ := studioContractFixture(t)
-	ma := r.Media.(*studioMediaFixture)
+	ma := studioCostMediaFixture(t, r.Media)
 	p := studioCopyCostProduct(ma.a.Config.Draft.Products[0])
 	p.CostRules[0].Cost.Amount = "0"
 	admin := mediaworkbench.NewService(ma)
@@ -96,7 +96,7 @@ func TestStudioVideoPublishedCostNoChannelFrozenBilling(t *testing.T) {
 	r, token, q, key, accounts, orders := videoRuntimeFixture(t)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
 	accounts.a.Credentials["model_mapping"] = map[string]any{q.Binding.Offer.SiteModel: "api-only-model", q.Binding.Offer.UpstreamModel: "api-twice"}
-	r.Media.(*studioMediaFixture).a.ModelMapping = map[string]string{q.Binding.Offer.SiteModel: "api-only-model"}
+	studioCostMediaFixture(t, r.Media).a.ModelMapping = map[string]string{q.Binding.Offer.SiteModel: "api-only-model"}
 	before, _ := json.Marshal(accounts.a.Credentials)
 	posts, gets := 0, 0
 	r.request = func(_ context.Context, a *Account, method, _ string, body []byte) ([]byte, string, error) {
@@ -156,7 +156,7 @@ func studioCopyCostProduct(p mediaworkbench.Product) mediaworkbench.Product {
 func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
 	r, _, q, key, _, _ := videoRuntimeFixture(t)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
-	ma := r.Media.(*studioMediaFixture)
+	ma := studioCostMediaFixture(t, r.Media)
 	spec := q.Binding.Spec
 	spec.Images = 1
 	input := []byte("synthetic-reference")
@@ -189,4 +189,18 @@ func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "0.35", oldSnapshot.Accounting.BaseAmount)
 	require.Equal(t, "0.49", newSnapshot.Accounting.BaseAmount)
+}
+
+func studioCostMediaFixture(t *testing.T, repo mediaworkbench.Repository) *studioMediaFixture {
+	t.Helper()
+	fixture, ok := repo.(*studioMediaFixture)
+	require.True(t, ok, "unexpected media repository fixture")
+	return fixture
+}
+
+func studioCostChannelFixture(t *testing.T, repo ChannelRepository) *studioChannelFixture {
+	t.Helper()
+	fixture, ok := repo.(*studioChannelFixture)
+	require.True(t, ok, "unexpected channel repository fixture")
+	return fixture
 }

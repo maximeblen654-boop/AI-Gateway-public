@@ -232,7 +232,7 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		stage := service.QuoteFailureStage(&service.StudioQuoteError{Stage: failure.Stage})
 		// Native authentication can reject before the Studio handler runs.
 		// Preserve only a finite category, never its message or raw response.
-		if stage == "binding" {
+		if stage == "binding" || stage == "unknown" {
 			var code string
 			_ = json.Unmarshal(failure.Code, &code)
 			switch code {

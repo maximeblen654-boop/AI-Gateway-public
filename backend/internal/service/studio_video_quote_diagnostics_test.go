@@ -16,7 +16,7 @@ import (
 func wanQuoteFixture(t *testing.T) (*StudioVideoRuntime, *APIKey, *studioAccountFixture, mediaworkbench.Product) {
 	r, _, _, key, accounts, _ := videoRuntimeFixture(t)
 	model := "WAN3.0-可参考视频"
-	ma := r.Media.(*studioMediaFixture)
+	ma := studioCostMediaFixture(t, r.Media)
 	ma.a.Config = nil
 	ma.a.ModelMapping = map[string]string{model: model}
 	ma.a.Catalog.Models = []string{model}
@@ -50,7 +50,7 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 				plan, e := videoplan.PreviewWithModel(m, p.UpstreamModel, "720p", "16:9", 5, refs, 0, 0)
 				require.NoError(t, e)
 				spec := mediaworkbench.Spec{Count: 1, Resolution: "720p", AspectRatio: "16:9", DurationSeconds: 5, Images: refs}
-				offer := r.Media.(*studioMediaFixture).a.Config.Published.Offers[0].OfferID
+				offer := studioCostMediaFixture(t, r.Media).a.Config.Published.Offers[0].OfferID
 				want := ""
 				switch name {
 				case "permission":
@@ -61,9 +61,9 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 				case "missing_cost":
 					r.Core.channelService = nil
 				case "wrong_cost_model":
-					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].Models = []string{"different-upstream"}
+					studioCostChannelFixture(t, r.Core.channelService.repo).channel.AccountStatsPricingRules[0].Pricing[0].Models = []string{"different-upstream"}
 				case "wrong_cost_mode":
-					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].BillingMode = BillingModeImage
+					studioCostChannelFixture(t, r.Core.channelService.repo).channel.AccountStatsPricingRules[0].Pricing[0].BillingMode = BillingModeImage
 				case "group":
 					accounts.a.GroupIDs = []int64{99}
 					want = "published_offer"
@@ -88,7 +88,7 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 				}
 				var channelBefore []byte
 				if r.Core.channelService != nil {
-					channelBefore, _ = json.Marshal(r.Core.channelService.repo.(*studioChannelFixture).channel)
+					channelBefore, _ = json.Marshal(studioCostChannelFixture(t, r.Core.channelService.repo).channel)
 				}
 				before, e := os.ReadDir(r.Store.Root)
 				require.NoError(t, e)
@@ -100,7 +100,7 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 					require.Equal(t, want, QuoteFailureStage(e))
 				}
 				if r.Core.channelService != nil {
-					channelAfter, _ := json.Marshal(r.Core.channelService.repo.(*studioChannelFixture).channel)
+					channelAfter, _ := json.Marshal(studioCostChannelFixture(t, r.Core.channelService.repo).channel)
 					require.Equal(t, channelBefore, channelAfter, "quote must not mutate existing Channel")
 				}
 				after, e := os.ReadDir(r.Store.Root)
@@ -127,7 +127,7 @@ func TestQuoteDiagnosticAllowlist(t *testing.T) {
 
 func TestWANStudioCatalogDoesNotOwnChatPermissions(t *testing.T) {
 	r, key, accounts, p := wanQuoteFixture(t)
-	ma := r.Media.(*studioMediaFixture)
+	ma := studioCostMediaFixture(t, r.Media)
 	ma.a.Catalog.Models = append(ma.a.Catalog.Models, "chat-fixture")
 	ma.a.ModelMapping["chat-fixture"] = "chat-fixture"
 	accounts.a.Credentials["model_mapping"].(map[string]any)["chat-fixture"] = "chat-fixture"
@@ -155,7 +155,7 @@ func TestWANQuoteWithoutAPIChannel(t *testing.T) {
 			plan, e := videoplan.PreviewWithModel(m, p.UpstreamModel, "720p", "16:9", 5, refs, 0, 0)
 			require.NoError(t, e)
 			spec := mediaworkbench.Spec{Count: 1, Resolution: "720p", AspectRatio: "16:9", DurationSeconds: 5, Images: refs}
-			offer := r.Media.(*studioMediaFixture).a.Config.Published.Offers[0].OfferID
+			offer := studioCostMediaFixture(t, r.Media).a.Config.Published.Offers[0].OfferID
 			r.Core.channelService = nil
 			e = r.quotePreflight(context.Background(), StudioImageOwner{1, 2, 3}, key, offer, spec, plan.Body)
 			require.NoError(t, e)
