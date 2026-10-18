@@ -1,0 +1,83 @@
+{
+  "runtime_source_sha": "dbc02a03d31a0529e3f8c47d3e87d454cca8bed5",
+  "acceptance_script_sha": "813faf31c0f08b7d7b4748a27d6133af97d3a4a6",
+  "build_run": 39116456231,
+  "full_artifact": 12132413581,
+  "final_acceptance_run": 39117731526,
+  "final_evidence_artifact": 12132993605,
+  "manifest_sha256": "3f7302bc6c09c904032557892d64a8dc44117ed414f02e376730bb0f47908169",
+  "runtime_ci": 39116455487,
+  "runtime_security": 39116455500,
+  "image_identity_matches_original_artifact": true,
+  "production_action": false,
+  "status": "CANDIDATE_READY_NOT_DEPLOYED",
+  "checks": {
+    "native-aspect-options.json": {
+      "pass": true,
+      "checks": [
+        "Real UI save and API re-read preserve product IDs/prices/sibling/video; unpublished ratio excluded from catalog and rejected by quote; isolated publish admits text/edit quotes without size mappings",
+        "Published discrete slider persists through admin save/re-read; real Vue mouse and keyboard snap to legal ratios without quote/generation requests; final frozen quote and supplier receive exact 3:5; original price remains 0.70",
+        "Custom ratio and auto/png/jpeg/webp reach real simulated text/edit POST unchanged; selected-format bytes and MIME verified; original digest matches; native usage/dedup/balance settle once; refresh/query do not regenerate or settle"
+      ],
+      "executions": 8,
+      "slider_quote_posts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "native-task-experience.json": {
+      "pass": true,
+      "checks": [
+        "502 retains unknown receipt, zero charge; text/edit/video navigation and refresh stay usable; query has loading, timestamp and persistent offline failure",
+        "Two explicit independent image tasks and frozen prices; edit outputs delivered and original hash verified; exactly one native settlement per completed task; no replay on query/download/relogin; video submissions unchanged"
+      ]
+    },
+    "native-image-finality.json": {
+      "pass": true,
+      "checks": [
+        "Per-customer balance conservation and zero frozen balance before/during/after; one native dedup+usage per delivered task; no debit for rejected/unknown tasks",
+        "Original task queries and explicit duplicate submissions do not replay supplier POST; real Core restart preserves ledger and original identity",
+        "transport-unknown remains unknown; explicit scoped 502 ends without charge, not declared supplier-refunded",
+        "No supplier per-request query exists for this synchronous contract; restart and queries never manufacture an endpoint"
+      ],
+      "counts": {
+        "502": 4,
+        "OK": 4,
+        "PARTIAL502": 4,
+        "DISCONNECT": 4,
+        "TIMEOUT": 4
+      }
+    },
+    "native-passive-status.json": {
+      "pass": true,
+      "checks": [
+        "Real authenticated catalog: V1 disabled, no watermark, wrong Group/platform/model, insufficient samples, observed aggregate and stale states",
+        "Catalog identities/specs/prices unchanged; no private counts, credentials, raw errors or Account-health claim; image/video scope isolated"
+      ]
+    },
+    "native-paid-controls-scale.json": {
+      "pass": true,
+      "checks": [
+        "All 1870 specs checked; three real admin UI preflights and enable recheck under 15s with zero supplier requests; optional lifecycle delivery reported separately; video stayed closed; final both closed"
+      ]
+    },
+    "native-model-lifecycle.json": {
+      "pass": true,
+      "checks": [
+        "Independent native customer API Key executes gpt-image-1 through original native endpoint on the same Account while its Studio product is unlisted or not ready; protected Image2Pro canvas-image-01 still requires Studio task flow",
+        "Actual admin publication selects one product from a 53-model catalog with two Published products and an unfinished third Draft; the unfinished and unselected products are not published",
+        "Single product unlist/archive/restore/relist preserves saved Draft, Published snapshot, Account sales and shared paid gate",
+        "Frozen old quote rejected while unlisted; independent never-attempted old quote first submitted after relist also rejects with no supplier call, usage, dedup or balance change; archive restore stays unlisted",
+        "Healthy sibling completes through actual BFF/Bridge/Core, downloads original bytes and settles once; duplicate and reads do not regenerate; unlisting that delivered product preserves original task/result bytes and ledger",
+        "Missing native catalog model isolates only the affected product; same Account model and same Group peer Account remain quotable",
+        "Final embedded admin confirmation and customer unavailable prompt exercised without API mocks or Vite"
+      ]
+    }
+  }
+}
