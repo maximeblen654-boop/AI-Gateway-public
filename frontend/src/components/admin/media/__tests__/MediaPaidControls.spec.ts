@@ -62,3 +62,23 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  expect(video.findAll('button')[1].attributes('disabled')).toBeDefined()
  expect(api.apply).not.toHaveBeenCalled()
 })
+
+it('guides an administrator to existing channel settings without changing native configuration', async () => {
+ api.check.mockResolvedValue({pass:false, group_id:31, checks:[
+ {code:'quote_cost_channel_missing',pass:false,account_id:44},
+ {code:'quote_cost_rule_missing',pass:false,account_id:44},
+ {code:'quote_cost_contract',pass:false,account_id:44}
+ ]})
+ const w=create(); await flushPromises(); const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ const guide=video.get('[data-test="cost-guide"]')
+ expect(guide.text()).toContain('Group #31')
+ expect(guide.text()).toContain('同组普通 API')
+ expect(guide.text()).toContain('浏览器成本估算均不等于')
+ expect(guide.get('a').attributes('href')).toBe('/admin/channels')
+ expect(guide.get('a').attributes('target')).toBe('_blank')
+ expect(video.text()).toContain('没有匹配当前 Account')
+ expect(video.text()).toContain('不接受按秒')
+ expect(api.apply).not.toHaveBeenCalled()
+ expect(w.find('[data-test="paid-image"] [data-test="cost-guide"]').exists()).toBe(false)
+})

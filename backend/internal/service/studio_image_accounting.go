@@ -77,6 +77,9 @@ func resolveStudioAccountCost(a *Account, binding mediaworkbench.ResolvedImageOf
 				continue
 			}
 			if (p.BillingMode != BillingModePerRequest && (!image || p.BillingMode != BillingModeImage)) || len(p.Intervals) > 0 || p.TimePricing != nil {
+				if !image {
+					return out, QuoteFailure("cost_contract", ErrStudioImageAccounting)
+				}
 				return out, ErrStudioImageAccounting
 			}
 			var unit decimal.Decimal
@@ -118,7 +121,10 @@ func resolveStudioAccountCost(a *Account, binding mediaworkbench.ResolvedImageOf
 			return out, nil
 		}
 	}
-	if a.HasAnyQuotaLimit() || !image {
+	if !image {
+		return out, QuoteFailure("cost_rule_missing", ErrStudioImageAccounting)
+	}
+	if a.HasAnyQuotaLimit() {
 		return out, ErrStudioImageAccounting
 	}
 	return out, nil

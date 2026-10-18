@@ -316,6 +316,7 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 	report.dependencies = paidDependencies{Shared: snap.fingerprint, Offers: map[string]string{}}
 	key := snap.key
 	owner := StudioImageOwner{key.UserID, key.ID, *key.GroupID}
+	report.GroupID = owner.GroupID
 	sub := snap.subscription
 	var sid *int64
 	if sub != nil {

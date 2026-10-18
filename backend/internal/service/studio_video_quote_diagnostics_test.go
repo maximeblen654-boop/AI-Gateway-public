@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
@@ -59,13 +60,13 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 					accounts.a.Credentials["model_mapping"] = map[string]any{"unrelated": "unrelated"}
 				case "missing_cost":
 					r.Core.channelService = nil
-					want = "account_cost"
+					want = "cost_channel_missing"
 				case "wrong_cost_model":
 					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].Models = []string{"different-upstream"}
-					want = "account_cost"
+					want = "cost_rule_missing"
 				case "wrong_cost_mode":
 					r.Core.channelService.repo.(*studioChannelFixture).channel.AccountStatsPricingRules[0].Pricing[0].BillingMode = BillingModeImage
-					want = "account_cost"
+					want = "cost_contract"
 				case "group":
 					accounts.a.GroupIDs = []int64{99}
 					want = "published_offer"
@@ -89,6 +90,10 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 					spec.Images = 11
 					want = "published_offer"
 				}
+				var channelBefore []byte
+				if r.Core.channelService != nil {
+					channelBefore, _ = json.Marshal(r.Core.channelService.repo.(*studioChannelFixture).channel)
+				}
 				before, e := os.ReadDir(r.Store.Root)
 				require.NoError(t, e)
 				e = r.quotePreflight(context.Background(), StudioImageOwner{1, 2, 3}, key, offer, spec, plan.Body)
@@ -97,6 +102,10 @@ func TestWANQuoteDiagnosticBranches(t *testing.T) {
 				} else {
 					require.Error(t, e)
 					require.Equal(t, want, QuoteFailureStage(e))
+				}
+				if r.Core.channelService != nil {
+					channelAfter, _ := json.Marshal(r.Core.channelService.repo.(*studioChannelFixture).channel)
+					require.Equal(t, channelBefore, channelAfter, "quote must not mutate existing Channel")
 				}
 				after, e := os.ReadDir(r.Store.Root)
 				require.NoError(t, e)
@@ -111,13 +120,34 @@ func TestQuoteDiagnosticAllowlist(t *testing.T) {
 	require.Equal(t, "unknown", QuoteFailureStage(secret))
 	require.Equal(t, "unknown", QuoteFailureStage(QuoteFailure(secret.Error(), secret)))
 	require.NotContains(t, QuoteFailure(secret.Error(), secret).Error(), "secret")
-	for _, stage := range []string{"request", "model_permission", "reference_preparation", "execution", "published_offer", "account", "account_admission", "account_cost", "quote_store", "billing_eligibility", "price"} {
+	for _, stage := range []string{"cost_channel_missing", "cost_rule_missing", "cost_contract", "request", "model_permission", "reference_preparation", "execution", "published_offer", "account", "account_admission", "account_cost", "quote_store", "billing_eligibility", "price"} {
 		e := QuoteFailure(stage, secret)
 		require.Equal(t, stage, QuoteFailureStage(e))
 		require.ErrorIs(t, e, secret)
 		require.NotContains(t, e.Error(), "secret")
 	}
 	require.Nil(t, QuoteFailure("account_cost", nil))
+}
+
+func TestWANStudioCatalogDoesNotOwnChatPermissions(t *testing.T) {
+	r, key, accounts, p := wanQuoteFixture(t)
+	ma := r.Media.(*studioMediaFixture)
+	ma.a.Catalog.Models = append(ma.a.Catalog.Models, "chat-fixture")
+	ma.a.ModelMapping["chat-fixture"] = "chat-fixture"
+	accounts.a.Credentials["model_mapping"].(map[string]any)["chat-fixture"] = "chat-fixture"
+	key.Group.ModelAllowlist = GroupModelAllowlist{Enabled: true, Models: []string{p.SiteModel, "chat-fixture"}}
+	offers, e := r.Catalog(context.Background(), StudioImageOwner{1, 2, 3}, key)
+	require.NoError(t, e)
+	require.Len(t, offers, 1)
+	require.Equal(t, p.SiteModel, offers[0].Model)
+	// Ordinary API permissions remain on the native Key/Group, not Published.
+	key.Group.ModelAllowlist.Models = []string{"chat-fixture"}
+	offers, e = r.Catalog(context.Background(), StudioImageOwner{1, 2, 3}, key)
+	require.NoError(t, e)
+	require.Empty(t, offers)
+	require.True(t, key.Group.ModelAllowlist.Allows("chat-fixture"))
+	require.Equal(t, "chat-fixture", accounts.a.GetMappedModel("chat-fixture"))
+	require.False(t, key.Group.ModelAllowlist.Allows(p.SiteModel))
 }
 
 func TestWANQuoteMissingCostReproduction(t *testing.T) {
@@ -133,7 +163,7 @@ func TestWANQuoteMissingCostReproduction(t *testing.T) {
 			r.Core.channelService = nil
 			e = r.quotePreflight(context.Background(), StudioImageOwner{1, 2, 3}, key, offer, spec, plan.Body)
 			require.ErrorIs(t, e, ErrStudioImageAccounting)
-			require.Equal(t, "account_cost", QuoteFailureStage(e))
+			require.Equal(t, "cost_channel_missing", QuoteFailureStage(e))
 		})
 	}
 }

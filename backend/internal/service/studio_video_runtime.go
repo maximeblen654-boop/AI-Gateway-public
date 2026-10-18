@@ -237,8 +237,14 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 			}
 		}
 	}
+	if channel == nil || !channel.IsActive() {
+		return "", q, QuoteFailure("cost_channel_missing", ErrStudioImageAccounting)
+	}
 	b.Accounting, e = resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: b.Offer, Spec: b.Spec, SpecHash: b.SpecHash}, channel, now, "CNY", false)
 	if e != nil {
+		if QuoteFailureStage(e) == "cost_rule_missing" || QuoteFailureStage(e) == "cost_contract" {
+			return "", q, e
+		}
 		return "", q, QuoteFailure("account_cost", e)
 	}
 	if preparation != nil {

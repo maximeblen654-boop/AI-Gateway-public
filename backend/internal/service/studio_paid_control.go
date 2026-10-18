@@ -52,6 +52,7 @@ func paidDependenciesContain(current, approved paidDependencies) bool {
 }
 
 type PaidReport struct {
+	GroupID       int64 `json:"group_id,omitempty"` // Administrator diagnostic context, never a routing override.
 	dependencies  paidDependencies
 	sharedFailure bool
 	Metrics       *PaidCheckMetrics `json:"metrics,omitempty"`

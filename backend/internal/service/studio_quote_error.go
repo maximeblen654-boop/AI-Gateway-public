@@ -21,7 +21,7 @@ func QuoteFailureStage(err error) string {
 	var q *StudioQuoteError
 	if errors.As(err, &q) {
 		switch q.Stage {
-		case "request", "model_permission", "reference_preparation", "billing_eligibility", "published_offer", "price", "account", "account_admission", "execution", "account_cost", "quote_store":
+		case "cost_channel_missing", "cost_rule_missing", "cost_contract", "request", "model_permission", "reference_preparation", "billing_eligibility", "published_offer", "price", "account", "account_admission", "execution", "account_cost", "quote_store":
 			return q.Stage
 		}
 	}
