@@ -54,6 +54,7 @@ const report = { cases: [], http: [] }
     await page.screenshot({ path: `${root}/evidence/${prefix}-dimensions-desktop.png`, fullPage: true, animations: 'disabled' })
     await w('wizard-next').click()
     for (let i = 0; i < (video ? 1 : 3); i++) await w(`price-${i}`).fill(video ? '2.00' : geometry ? ['0.70','0.90','1.10'][i] : '0.70')
+    await w('procurement-cost-0').fill('0.35') // explicit synthetic procurement, never a retail fallback
     await page.waitForTimeout(500)
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-prices-desktop.png`, fullPage: true })
@@ -87,6 +88,7 @@ const report = { cases: [], http: [] }
       await w('wizard-next').click(); await w('wizard-next').click()
       await expect(w('price-0')).toHaveValue('')
       await w('price-0').fill('1.30')
+      await w('procurement-cost-0').fill('0.35')
       await w('wizard-next').click(); await w('display-name').fill('Synthetic geometry independent price')
       const saveSecond = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith('/accounts/'+accountId+'/draft'))
       await w('save').click(); const result = await saveSecond

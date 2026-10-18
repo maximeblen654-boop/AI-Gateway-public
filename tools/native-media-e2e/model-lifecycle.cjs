@@ -57,6 +57,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const [a,b]=products
   const configure=(product,model,name)=>Object.assign(product,{enabled:true,upstream_model:model,site_model:model,display_name:name,
    capabilities:{resolutions:['1024x1024'],aspect_ratios:['1:1'],qualities:[],durations_seconds:[],count:{min:1,max:1},references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},total_max:0},combination_rules:[]},
+   cost_rules:[{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}],
    pricing_rules:[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}],adapter_config:{version:1,model_family:'openai_json',size_mappings:[],execution:{mode:'single',max_output_images:1}}})
   configure(a,'gpt-image-2','Synthetic lifecycle target')
   configure(b,'gpt-image-1','Synthetic lifecycle healthy sibling')
@@ -65,21 +66,8 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   // a different customer or a different Group. Credentials target only localhost.
   const peer=await api('/admin/accounts','POST',{name:'Synthetic lifecycle peer',platform:'openai',type:'apikey',credentials:{api_key:'synthetic-native-only',base_url:'https://localhost:19090',model_mapping:{'gpt-image-2':'gpt-image-2'}},extra:{quota_limit:100},concurrency:5,priority:1,group_ids:[gid],upstream_billing_probe_enabled:false})
   assert(Number.isSafeInteger(peer.id));const peerPath='/admin/media-workbench/accounts/'+peer.id
-  // Group channel costs are Account-specific. Preserve the original wildcard
-  // rule (covers both models on Account A), append a peer rule to that same
-  // channel, and never replace the Group's channel with a new one.
-  const channels=await api('/admin/channels?page=1&page_size=100')
-  const costChannel=channels.items.find(channel=>channel.name==='Synthetic openai cost'&&channel.group_ids.includes(gid))
-  assert(costChannel,'existing synthetic Group cost channel is required')
-  const sourceCosts=costChannel.account_stats_pricing_rules.find(rule=>rule.account_ids.includes(id)&&rule.pricing.some(price=>price.platform==='openai'&&price.models.includes('*')&&price.billing_mode==='per_request'&&Number(price.per_request_price)>0))
-  assert(sourceCosts,'gpt-image-1 must be covered by original Account wildcard cost')
-  const costRules=structuredClone(costChannel.account_stats_pricing_rules)
-  costRules.push({name:'Synthetic exact lifecycle peer Account cost',group_ids:[],account_ids:[peer.id],pricing:[{platform:'openai',models:['*'],billing_mode:'per_request',per_request_price:0.35}]})
-  await api('/admin/channels/'+costChannel.id,'PUT',{account_stats_pricing_rules:costRules})
-  const savedCosts=await api('/admin/channels/'+costChannel.id)
-  assert(savedCosts.group_ids.includes(gid));assert(savedCosts.account_stats_pricing_rules.some(rule=>rule.account_ids.includes(id)))
-  assert(savedCosts.account_stats_pricing_rules.some(rule=>rule.account_ids.includes(peer.id)&&rule.pricing.some(price=>price.models.includes('*')&&Number(price.per_request_price)===0.35)))
-  report.native_cost={channel_id:costChannel.id,original_account_wildcard_preserved:true,peer_account_rule_added:true}
+  // Each Published product carries explicit synthetic procurement independent of API Channels.
+  report.native_cost={source:'studio_published_cost',channel_mutated:false,peer_account_rule_added:false}
   await api('/admin/accounts/'+peer.id+'/models/sync-upstream','POST',{})
   const peerProduct=structuredClone(a);peerProduct.product_id='synthetic-lifecycle-peer';peerProduct.display_name='Synthetic lifecycle same Group peer'
   c=await saveDraft(peerPath,[peerProduct]);assert.equal(c.validation.publish_ready,true,JSON.stringify(c.validation));await publish(peerPath,c);await salesOn(peerPath)

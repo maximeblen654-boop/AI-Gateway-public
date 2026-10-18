@@ -76,12 +76,18 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts media-limits.spec.ts
 
+      - name: Isolated procurement, publication and Account sales browser acceptance
+        working-directory: frontend
+        run: pnpm exec playwright test --config playwright.procurement.config.ts
+
       - name: Upload isolated wizard screenshots and results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: product-wizard-browser-evidence
-          path: frontend/test-results/media-workbench/
+          path: |
+            frontend/test-results/media-workbench/
+            frontend/test-results/workbench-procurement/
           retention-days: 14
 
       - name: Synthetic usage display fixture regression

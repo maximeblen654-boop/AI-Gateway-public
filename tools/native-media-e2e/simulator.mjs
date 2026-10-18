@@ -4,6 +4,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
 
 const root = process.env.NATIVE_EVIDENCE_ROOT || '/evidence'
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
@@ -17,15 +18,42 @@ const handle=async (req, res) => {
     const url = new URL(req.url, 'https://localhost:19090')
     const parts = []; let size = 0
     for await (const part of req) { size += part.length; assert(size <= 4 * 1024 * 1024); parts.push(part) }
-    const raw = Buffer.concat(parts).toString('utf8')
-    const body = raw ? JSON.parse(raw) : {}
+    const bytes=Buffer.concat(parts)
+    const raw = bytes.toString('utf8')
+    const binary=req.method==='PUT' && /\/media\/uploads\/[^/]+\/chunks\/\d+$/.test(url.pathname)
+    const body = binary ? {binary_bytes:bytes.length} : raw ? JSON.parse(raw) : {}
     const auth = req.headers.authorization === 'Bearer synthetic-native-only' ? 'bearer' : req.headers['x-goog-api-key'] === 'synthetic-native-only' ? 'gemini-key' : 'missing'
     state.requests.push({ method: req.method, path: url.pathname, auth, body }); save()
     const signedResult = req.method === 'GET' && /^\/v1\/videos\/seedance-task-\d+\/content$/.test(url.pathname) && url.searchParams.get('signature') === 'synthetic-result-only'
     if (signedResult) assert.equal(auth, 'missing', 'result download must not forward supplier credentials')
     if (auth === 'missing' && !signedResult) return reply(401, { error: 'synthetic_auth' })
-    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['gpt-image-2', 'gpt-image-1', 'grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream'].map(id => ({ id, object: 'model' })) })
+    // Account-bound upload protocol is confined to this disposable simulator.
+    const uploadPath=/^\/(?:v1\/)?media\/uploads(?:\/([^/]+))?(?:\/(chunks)\/(\d+)|\/(complete))?$/.exec(url.pathname)
+    if(uploadPath){
+      state.uploads ||= {}
+      if(req.method==='POST' && !uploadPath[1]){
+        assert(Number.isSafeInteger(body.size)&&body.size>0&&body.size<4*1024*1024)
+        const id='synthetic-upload-'+(Object.keys(state.uploads).length+1)
+        state.uploads[id]={id,size:body.size,sha256:body.sha256,chunk_size:1024*1024,chunk_count:Math.ceil(body.size/(1024*1024)),received:[],status:'uploading',chunks:{}};save();return reply(200,{id})
+      }
+      const u=state.uploads[uploadPath[1]];assert(u,'unknown synthetic upload')
+      if(req.method==='GET')return reply(200,u)
+      if(req.method==='PUT'&&uploadPath[2]==='chunks'){
+        const n=Number(uploadPath[3]);assert(n>=0&&n<u.chunk_count);u.chunks[n]=bytes.toString('base64');if(!u.received.includes(n))u.received.push(n);save();return reply(200,{ok:true})
+      }
+      if(req.method==='POST'&&uploadPath[4]==='complete'){
+        const all=Buffer.concat(Array.from({length:u.chunk_count},(_,n)=>Buffer.from(u.chunks[n]||'','base64')))
+        assert.equal(all.length,u.size);assert.equal(createHash('sha256').update(all).digest('hex'),u.sha256)
+        u.status='complete';u.source='https://localhost:19090/synthetic-reference/'+u.id;save();return reply(200,{status:u.status,source:u.source})
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/v1/models') return reply(200, { object: 'list', data: ['gpt-image-2', 'gpt-image-1', 'grok-imagine-image', 'grok-imagine-video', 'native-openai-image', 'synthetic-compatible-video', 'synthetic-compatible-upstream', 'synthetic-seedance-video', 'synthetic-seedance-upstream', 'WAN3.0-可参考视频', 'synthetic-chat-upstream'].map(id => ({ id, object: 'model' })) })
     if (req.method === 'GET' && url.pathname === '/v1beta/models') return reply(200, { models: [{ name: 'models/gemini-3.1-flash-image', displayName: 'Synthetic Gemini Image', supportedGenerationMethods: ['generateContent'] }] })
+    if (req.method === 'POST' && url.pathname === '/v1/chat/completions') {
+      assert.equal(auth, 'bearer'); assert.equal(body.model, 'synthetic-chat-upstream')
+      assert.equal(body.stream, false); assert(Array.isArray(body.messages))
+      return reply(200, { id:'chatcmpl-synthetic-procurement', object:'chat.completion', created:1, model:body.model, choices:[{index:0,message:{role:'assistant',content:'Isolated API route remains independent.'},finish_reason:'stop'}], usage:{prompt_tokens:7,completion_tokens:9,total_tokens:16} })
+    }
     if (req.method === 'POST' && url.pathname.endsWith(':generateContent')) {
       state.image_posts++; save()
       assert.equal(url.pathname, '/v1beta/models/gemini-3.1-flash-image:generateContent')
@@ -72,7 +100,7 @@ const handle=async (req, res) => {
     }
     if (req.method === 'POST' && ['/v1/videos', '/v1/videos/generations'].includes(url.pathname)) {
       state.video_posts++
-      assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-video'].includes(body.model))
+      assert.equal(auth, 'bearer'); assert(['grok-imagine-video', 'synthetic-compatible-video', 'WAN3.0-可参考视频'].includes(body.model))
       const id = `native-video-${state.video_posts}`
       state.tasks[id] = { id, polls: 0, kind: body.model === 'grok-imagine-video' ? 'grok' : 'compatible' }; save()
       return reply(200, { id, request_id: id, status: 'pending' })

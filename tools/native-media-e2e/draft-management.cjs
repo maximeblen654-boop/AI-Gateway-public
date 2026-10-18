@@ -31,7 +31,7 @@ const blank = (d, i) => ({ product_id: `${d.kind}-blank-${i}`, site_model: d.mod
   capabilities: { resolutions: [], aspect_ratios: [], qualities: [], durations_seconds: [], count: { min: 1, max: d.kind === 'image' ? 10 : 1 }, references: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }, combination_rules: [] }, pricing_rules: [], adapter_config: { size_mappings: [] } })
 const configured = d => ({ ...blank(d, 0), product_id: `${d.kind}-configured`, display_name: `已配置${d.kind === 'image' ? '图片' : '视频'}商品`, enabled: true,
   capabilities: { ...blank(d, 0).capabilities, resolutions: [d.resolution], aspect_ratios: [d.ratio], durations_seconds: d.kind === 'video' ? [5] : [], references: { ...blank(d, 0).capabilities.references, image: { min: 0, max: 2 }, total_max: 2 } },
-  pricing_rules: [{ match: {}, sale_price: { amount: d.amount, currency: 'CNY', billing_mode: 'per_request' } }] })
+  cost_rules: [{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}], pricing_rules: [{ match: {}, sale_price: { amount: d.amount, currency: 'CNY', billing_mode: 'per_request' } }] })
 function protectedState() {
   // Never inspect a production database: container name, credentials and test
   // customer identity are fixed to the existing disposable candidate harness.

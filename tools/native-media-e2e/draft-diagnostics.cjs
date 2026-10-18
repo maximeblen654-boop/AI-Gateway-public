@@ -15,7 +15,7 @@ const copy = value => JSON.parse(JSON.stringify(value))
 const product = {
   product_id: 'synthetic-draft-configured', site_model: model, upstream_model: model, media_type: 'image', display_name: '已配置图片商品', enabled: true,
   capabilities: { resolutions: ['1K'], aspect_ratios: ['1:1'], qualities: [], durations_seconds: [], count: { min: 1, max: 10 }, references: { image: { min: 0, max: 2 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 2 }, combination_rules: [] },
-  pricing_rules: [{ match: {}, sale_price: { amount: '0.70', currency: 'CNY', billing_mode: 'per_request' } }],
+  cost_rules: [{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}], pricing_rules: [{ match: {}, sale_price: { amount: '0.70', currency: 'CNY', billing_mode: 'per_request' } }],
   // An existing valid mapping isolates count edits from the separate size issue.
   // This test makes no claim that symbolic K labels determine a universal wire grid.
   adapter_config: { size_mappings: [{ resolution: '1K', aspect_ratio: '1:1', wire_size: '1024x1024' }], execution: { mode: 'single', max_output_images: 1 }, edit_execution: { mode: 'single', max_output_images: 1 } }

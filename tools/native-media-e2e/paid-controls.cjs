@@ -57,6 +57,7 @@ const p='/admin/media-workbench/paid-controls/'
    const imageProducts=products.filter(p=>p.media_type==='image')
    assert.equal(imageProducts.length,2)
    const product=imageProducts[0]
+   product.cost_rules=[{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}]
    const siblingBefore=structuredClone(imageProducts[1])
    imageProducts[1].enabled=false
    report.scale_fixture={target_product_id:product.product_id,preserved_sibling_id:siblingBefore.product_id,sibling_disabled_only_in_isolation:true}
@@ -168,19 +169,19 @@ const p='/admin/media-workbench/paid-controls/'
    for(const [op,method,body] of [['/check','POST',{}],['','PUT',{enabled:true}]]){
     const denied=await fetch(base+'/api/v1'+p+'image'+op,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+customer.data.access_token},body:JSON.stringify(body)});assert.equal(denied.status,403)
    }
-   // Drift the synthetic mapping only; quote errors must carry a safe stage.
+   // API alias changes are not a Studio product/model dependency in v1.
    const original=await api('/admin/accounts/'+fixture.accounts.openai)
    setMapping(original.id,{'gpt-image-2':'different-upstream'})
-   assert.equal((await current('image')).effective_enabled,false)
-   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','catalog')).status,{message:'Real UI session exchange and catalog must finish before direct contract checks'}).toBe(200)
+   assert.equal((await current('image')).effective_enabled,true)
+   await page.goto(base+'/video-studio');await expect.poll(async()=> (await media('image','catalog')).status,{message:'Real UI session exchange and catalog'}).toBe(200)
    for(const images of [0,1]){
     const r=await media('image','quotes','POST',{offer_id:offer.offer_id,spec:{resolution:'1K',aspect_ratio:'1:1',count:1,images,videos:0,audio:0,duration_seconds:0,quality:''}})
-    assert.equal(r.status,409);assert.equal(r.body.diagnostic_stage,'published_offer');assert(!JSON.stringify(r.body).includes('synthetic-native-only'))
+    assert.equal(r.status,200,JSON.stringify(r.body));assert(!JSON.stringify(r.body).includes('synthetic-native-only'))
    }
-   const failed=await api(p+'image/check','POST',{});assert.equal(failed.pass,false)
-   assert.equal((await change('image',true,imageCheck)).status,409)
+   const independent=await api(p+'image/check','POST',{});assert.equal(independent.pass,true)
+   assert.equal(independent.fingerprint,imageCheck.fingerprint,'Unrelated API mapping must not invalidate Studio grants')
    setMapping(original.id,original.credentials.model_mapping)
-   assert.equal((await current('image')).effective_enabled,false,'restoring a dependency does not restore old PASS')
+   assert.equal((await current('image')).effective_enabled,true)
    // A real sidecar outage fails the server opening action, not merely the UI.
    dc('stop','bff')
    try{assert.equal((await change('image',true,imageCheck)).status,409);assert.equal((await current('image')).effective_enabled,false)}finally{dc('up','-d','--no-deps','--wait','--wait-timeout','60','bff')}
@@ -190,7 +191,7 @@ const p='/admin/media-workbench/paid-controls/'
    // Open video independently, solely for the following existing simulated E2E.
    assert.equal((await change('video',true,await check('video'))).status,200)
    assert.equal((await current('image')).effective_enabled,true);assert.equal((await current('video')).effective_enabled,true)
-   report.checks.push('Server recheck rejects stale PASS; native permission rejects customer; mapping drift invalidates text/edit; BFF outage blocks opening; independent video enable; no supplier activity during any preflight')
+   report.checks.push('Server recheck rejects stale PASS; native permission rejects customer; API mapping drift preserves explicit Studio identity; BFF outage blocks opening; independent video enable; no supplier activity during any preflight')
    report.image_preflight=imageCheck;report.video_preflight=videoCheck;report.assets=await proof()
   }
   report.pass=true
