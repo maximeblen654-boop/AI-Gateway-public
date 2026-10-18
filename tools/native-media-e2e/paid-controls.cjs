@@ -65,6 +65,7 @@ const p='/admin/media-workbench/paid-controls/'
    // Keep the established 1,870 legacy auto-format domain; explicit formats
    // are independently verified by aspect-options with real simulated delivery.
    delete product.capabilities.output_formats
+   delete product.capabilities.aspect_ratio_slider
    product.adapter_config.size_mappings=[]
    product.pricing_rules=[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}]
    detail=await api(accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products}})

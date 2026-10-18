@@ -225,6 +225,9 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				}
 			}
 		}
+		if !validRatioSlider(p) {
+			add("UI_FIXABLE", "INVALID_RATIO_SLIDER", pid, "capabilities.aspect_ratio_slider", "Use discrete image ratios with supported endpoints; all configured ratios must fit the bounds. Adjust specifications and review prices explicitly before publication.")
+		}
 		if len(p.Capabilities.OutputFormats) > 3 {
 			add("UI_FIXABLE", "OUTPUT_FORMAT_UNSUPPORTED", pid, "capabilities.output_formats", "At most three native output formats are supported")
 		}
@@ -441,7 +444,7 @@ func inside(r, domain Range) bool {
 }
 func validMatch(m Match, c Capabilities) bool {
 	// Output formats belong to the product capability, never a second price axis.
-	if len(m.OutputFormats) != 0 {
+	if len(m.OutputFormats) != 0 || m.AspectRatioSlider != nil {
 		return false
 	}
 	if !subset(m.Resolution, c.Resolutions) || !subset(m.DurationSeconds, c.DurationsSeconds) || !subset(m.AspectRatio, c.AspectRatios) || !subset(m.Quality, c.Qualities) {
@@ -470,6 +473,9 @@ func validOutputFormat(format string) bool {
 }
 
 func (o Offer) Matches(s Spec) bool {
+	if !sliderAllows(o.SpecMatch.AspectRatioSlider, s.AspectRatio) {
+		return false
+	}
 	if s.OutputFormat != "" && (o.MediaType != "image" || o.Adapter.Kind != "openai_images" || !validOutputFormat(s.OutputFormat) || !slices.Contains(o.SpecMatch.OutputFormats, s.OutputFormat)) {
 		return false
 	}
@@ -495,6 +501,10 @@ func canonicalMatch(m Match) Match {
 	return m
 }
 func completeMatch(m Match, c Capabilities) Match {
+	if c.AspectRatioSlider != nil {
+		v := *c.AspectRatioSlider
+		m.AspectRatioSlider = &v
+	}
 	m.OutputFormats = slices.Clone(c.OutputFormats)
 	sort.Strings(m.OutputFormats)
 	if len(m.Resolution) == 0 {

@@ -78,7 +78,8 @@
             </div>
             <div class="studio-composer-bottom"><div class="studio-specs">
               <button v-if="showUploader" type="button" class="studio-attachment" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" :title="accept ? '添加素材，也可拖入或粘贴图片' : '当前模型不支持参考素材'" @click="fileInput?.click()"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 13 6.5-6.5a2.8 2.8 0 0 1 4 4L10 19a4.3 4.3 0 0 1-6-6l9-9a1.4 1.4 0 0 1 2 2L6 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-              <div v-if="offer?.spec.aspect_ratio?.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in offer.spec.aspect_ratio" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="ratio = r; closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
+              <StudioRatioSlider v-if="ratioSliderEnabled" :model-value="ratio" :options="[...ratioSliderOffers.keys()]" :disabled="busy || catalogLoading" @update:model-value="chooseSliderRatio" />
+              <div v-else-if="offer?.spec.aspect_ratio?.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in offer.spec.aspect_ratio" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="ratio = r; closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
               <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="offer.spec.resolution" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="resolution = String($event)" @update:open="openControl = $event ? 'resolution' : null" />
               <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="offer.spec.quality" :disabled="busy" :open="openControl === 'quality'" @update:model-value="quality = String($event)" @update:open="openControl = $event ? 'quality' : null" />
               <StudioSpecPicker v-if="kind === 'image' && outputFormats.length" id="studio-output-format" label="输出格式" :model-value="outputFormat" :options="['auto', ...outputFormats]" :option-labels="outputFormatLabels" :disabled="busy" :open="openControl === 'format'" @update:model-value="outputFormat = $event as StudioOutputFormat|'auto'" @update:open="openControl = $event ? 'format' : null" />
@@ -112,6 +113,8 @@ import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
 import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
+import StudioRatioSlider from './StudioRatioSlider.vue'
+import { ratioOfferOptions } from './studioRatioOptions'
 import StudioModelPicker from './StudioModelPicker.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import '@/styles/studio-workspace.css'
@@ -177,6 +180,10 @@ const countOptions=computed(()=>{
 const invalidCount=computed(()=>kind.value==='image' && !countOptions.value.includes(count.value))
 const accept=computed(()=>['image','video','audio'].filter(k=>offer.value?.spec.references[k as StudioAssetReceipt['kind']].max).map(k=>`${k}/*`).join(','))
 const assets=computed(()=>uploads.value.flatMap(item=>item.receipt ? [item.receipt] : []))
+const ratioSliderEnabled=computed(()=>kind.value==='image' && offer.value?.spec.aspect_ratio_slider?.enabled===true && offer.value.spec.aspect_ratio_slider.mode==='discrete')
+const ratioSliderOffers=computed(()=>ratioOfferOptions(offer.value,visibleOffers.value,{resolution:resolution.value,quality:quality.value,count:count.value,images:assets.value.filter(item=>item.kind==='image').length,videos:assets.value.filter(item=>item.kind==='video').length,audio:assets.value.filter(item=>item.kind==='audio').length,...(outputFormat.value!=='auto'?{output_format:outputFormat.value}:{})}))
+function chooseSliderRatio(value:string){if(busy.value||catalogLoading.value||active.value)return;const target=ratioSliderOffers.value.get(value);if(!target)return;offerId.value=target.offer_id;ratio.value=value;intent=undefined}
+
 const incompatible=computed(()=>!offer.value || kind.value==='image' && (imageMode.value==='edit' ? !assets.value.some(a=>a.kind==='image') : assets.value.length>0) || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
 const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
@@ -221,7 +228,11 @@ async function loadHistory(){if(busy.value||historyLoading.value)return;const ep
  const seen=new Set<string>();history.value=tasks.filter(task=>!seen.has(task.id)&&seen.add(task.id)).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))
  }catch(e){error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
 async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;readinessState.value='unknown';offers.value=[];history.value=[];try{
- const [catalog,tasks,readiness]=await Promise.allSettled([studioCatalog(kind.value),studioHistory(kind.value),studioRequest<{paid_enabled:boolean}>(kind.value,'readiness')]);
+ const originalKind=kind.value,catalogRequest=studioCatalog(originalKind)
+ // Creation entry provisions the owner's native Key. Read its gate only after
+ // that operation settles; history reads remain independent and never provision.
+ const readinessRequest=catalogRequest.catch(()=>undefined).then(()=>studioRequest<{paid_enabled:boolean}>(originalKind,'readiness'))
+ const [catalog,tasks,readiness]=await Promise.allSettled([catalogRequest,studioHistory(originalKind),readinessRequest]);
  if(epoch!==generation)return;
  if(catalog.status==='fulfilled')offers.value=catalog.value;
  if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
@@ -244,7 +255,8 @@ async function refreshCatalog(){
  const epoch=generation,originalKind=kind.value
  catalogLoading.value=true
  try{
-  const [catalog,readiness]=await Promise.allSettled([studioCatalog(originalKind),studioRequest<{paid_enabled:boolean}>(originalKind,'readiness')])
+  const catalogRequest=studioCatalog(originalKind)
+  const [catalog,readiness]=await Promise.allSettled([catalogRequest,catalogRequest.catch(()=>undefined).then(()=>studioRequest<{paid_enabled:boolean}>(originalKind,'readiness'))])
   if(!mounted||epoch!==generation||originalKind!==kind.value)return
    if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
    else {enabled.value=false;readinessState.value='unknown'}

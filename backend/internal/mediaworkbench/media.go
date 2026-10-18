@@ -93,26 +93,28 @@ type References struct {
 	TotalMax int   `json:"total_max"`
 }
 type Match struct {
-	OutputFormats   []string    `json:"output_formats,omitempty"`
-	Resolution      []string    `json:"resolution,omitempty"`
-	DurationSeconds []int       `json:"duration_seconds,omitempty"`
-	AspectRatio     []string    `json:"aspect_ratio,omitempty"`
-	Quality         []string    `json:"quality,omitempty"`
-	Count           *Range      `json:"count,omitempty"`
-	References      *References `json:"references,omitempty"`
+	AspectRatioSlider *AspectRatioSlider `json:"aspect_ratio_slider,omitempty"`
+	OutputFormats     []string           `json:"output_formats,omitempty"`
+	Resolution        []string           `json:"resolution,omitempty"`
+	DurationSeconds   []int              `json:"duration_seconds,omitempty"`
+	AspectRatio       []string           `json:"aspect_ratio,omitempty"`
+	Quality           []string           `json:"quality,omitempty"`
+	Count             *Range             `json:"count,omitempty"`
+	References        *References        `json:"references,omitempty"`
 }
 type CombinationRule struct {
 	Deny Match `json:"deny"`
 }
 type Capabilities struct {
-	OutputFormats    []string          `json:"output_formats,omitempty"`
-	Resolutions      []string          `json:"resolutions"`
-	AspectRatios     []string          `json:"aspect_ratios"`
-	Qualities        []string          `json:"qualities"`
-	DurationsSeconds []int             `json:"durations_seconds"`
-	Count            Range             `json:"count"`
-	References       References        `json:"references"`
-	CombinationRules []CombinationRule `json:"combination_rules"`
+	AspectRatioSlider *AspectRatioSlider `json:"aspect_ratio_slider,omitempty"`
+	OutputFormats     []string           `json:"output_formats,omitempty"`
+	Resolutions       []string           `json:"resolutions"`
+	AspectRatios      []string           `json:"aspect_ratios"`
+	Qualities         []string           `json:"qualities"`
+	DurationsSeconds  []int              `json:"durations_seconds"`
+	Count             Range              `json:"count"`
+	References        References         `json:"references"`
+	CombinationRules  []CombinationRule  `json:"combination_rules"`
 }
 
 // Amount stays decimal text: nil price is missing; "0" is explicitly zero.

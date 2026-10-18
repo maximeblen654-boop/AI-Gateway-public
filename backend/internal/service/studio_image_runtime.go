@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +36,7 @@ type StudioImageRuntime struct {
 var studioImageTaskID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 type StudioImageCatalogOffer struct {
+	ProductScope   string               `json:"product_scope,omitempty"`
 	PassiveStatus  *StudioPassiveStatus `json:"passive_status,omitempty"`
 	statusPlatform string
 	InputMode      string                 `json:"input_mode,omitempty"`
@@ -71,7 +74,7 @@ func (r *StudioImageRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 			if !mediaworkbench.PublishedImageOfferQuoteable(a, o.OfferID) {
 				continue
 			}
-			out = append(out, StudioImageCatalogOffer{statusPlatform: studioPassivePlatform(original, key), OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: a.Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel})
+			out = append(out, StudioImageCatalogOffer{ProductScope: studioImageProductScope(a.ID, o.ProductID, a.Config.Published.Revision), statusPlatform: studioPassivePlatform(original, key), OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: a.Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel})
 		}
 	}
 	attachStudioPassiveStatuses(ctx, r.Monitor, owner, key, out)
@@ -381,4 +384,10 @@ func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, outer *gin.Contex
 	}
 	result, err := r.Core.ForwardImages(c.Request.Context(), c, a, body, parsed, "")
 	return studioNativeResult(capture, result, err)
+}
+
+// Catalog grouping never merges same-named products from different accounts or
+// published revisions. It grants no additional authority; quotes bind OfferID.
+func studioImageProductScope(accountID int64, productID, revision string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("image-product:%d:%s:%s", accountID, productID, revision))))
 }

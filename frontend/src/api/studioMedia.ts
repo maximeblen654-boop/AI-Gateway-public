@@ -10,10 +10,13 @@ export interface StudioPassiveStatus {
   data_through?: string; computed_at?: string; error_rate?: number
 }
 export interface StudioOffer {
+  product_scope?: string
+  excluded?: StudioSpecMatch[]
   passive_status?: StudioPassiveStatus
   input_mode?: string; offer_id: string; model: string; display_name: string; upstream_model: string
-  spec: { output_formats?: StudioOutputFormat[]; resolution?: string[]; duration_seconds?: number[]; aspect_ratio?: string[]; quality?: string[]; count: { min: number; max: number }; references: { image: {min: number; max: number}; video: {min: number; max: number}; audio: {min: number; max: number}; total_max: number } }
+  spec: { aspect_ratio_slider?: {enabled: boolean; mode: 'discrete'; min: string; max: string}; output_formats?: StudioOutputFormat[]; resolution?: string[]; duration_seconds?: number[]; aspect_ratio?: string[]; quality?: string[]; count: { min: number; max: number }; references: { image: {min: number; max: number}; video: {min: number; max: number}; audio: {min: number; max: number}; total_max: number } }
 }
+export type StudioSpecMatch = Partial<StudioOffer['spec']>
 export interface StudioPrice { amount: string; currency: string; billing_mode: string }
 export interface StudioTask {
   id: string; kind: StudioKind; status: string; createdAt: string; expiresAt: string

@@ -94,7 +94,15 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     if (!video) {if(workspace){await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()}else await page.getByTestId('studio-count').fill(String(count))}
     if (geometry) {
       if(workspace){await page.getByTestId('studio-resolution').click();await page.locator('#studio-resolution-menu [data-value]').filter({hasText:geometry.resolution}).click()}else await page.getByTestId('studio-resolution').selectOption(geometry.resolution)
-      if(workspace){await page.getByTestId('studio-ratio-toggle').click();await page.locator(`[data-ratio="${geometry.ratio}"]`).click()}else await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
+      if(workspace){
+        const slider=page.locator('#studio-ratio-slider')
+        if(await slider.count()){
+          const ratios=[...offer.spec.aspect_ratio].sort((a,b)=>{const [aw,ah]=a.split(':').map(Number),[bw,bh]=b.split(':').map(Number);return aw/ah-bw/bh})
+          assert(ratios.includes(geometry.ratio));await slider.focus();await slider.press('Home')
+          for(let i=0;i<ratios.indexOf(geometry.ratio);i++)await slider.press('ArrowRight')
+          await expect(slider).toHaveAttribute('aria-valuetext',geometry.ratio)
+        }else{await page.getByTestId('studio-ratio-toggle').click();await page.locator(`[data-ratio="${geometry.ratio}"]`).click()}
+      }else await page.getByTestId('studio-ratio').selectOption(geometry.ratio)
     }
     if (scenario === 'edit' || geometry?.edit) {
       await page.getByTestId('studio-asset-input').setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') })
