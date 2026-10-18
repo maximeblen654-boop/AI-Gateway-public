@@ -143,25 +143,28 @@ func (r *StudioVideoRuntime) quotePreflight(ctx context.Context, owner StudioIma
 func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, body []byte, preparationID string, preflight bool) (string, StudioVideoQuote, error) {
 	var q StudioVideoQuote
 	if r == nil || r.Core == nil || r.Media == nil || r.Store == nil || len(body) > 24<<20 || !videoOwnerKey(owner, key) {
-		return "", q, ErrStudioVideoInvalidOrder
+		return "", q, QuoteFailure("request", ErrStudioVideoInvalidOrder)
 	}
 	resolved, e := mediaworkbench.NewService(r.Media).ResolvePublishedVideoOffer(ctx, offerID, spec, func(id int64) bool {
 		a, e := r.Core.accountRepo.GetByID(ctx, id)
 		return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
 	})
-	if e != nil || !key.Group.ModelAllowlist.Allows(resolved.Offer.SiteModel) {
-		return "", q, ErrStudioVideoInvalidOrder
+	if e != nil {
+		return "", q, QuoteFailure("published_offer", ErrStudioVideoInvalidOrder)
+	}
+	if !key.Group.ModelAllowlist.Allows(resolved.Offer.SiteModel) {
+		return "", q, QuoteFailure("model_permission", ErrStudioVideoInvalidOrder)
 	}
 	plan, e := mediaworkbench.CompilePublishedVideoPlan(resolved, body)
 	if e != nil {
-		return "", q, e
+		return "", q, QuoteFailure("execution", e)
 	}
 	aCurrent, e := r.Core.accountRepo.GetByID(ctx, resolved.Offer.AccountID)
 	if e != nil || aCurrent == nil {
-		return "", q, ErrStudioVideoInvalidOrder
+		return "", q, QuoteFailure("account", ErrStudioVideoInvalidOrder)
 	}
 	if !preflight && preparationID == "" && gjson.GetBytes(body, "references.#").Int() > 0 {
-		return "", q, ErrStudioVideoConflict
+		return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 	}
 	var preparation *StudioVideoReferencePreparation
 	if preparationID != "" {
@@ -182,16 +185,16 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 			return aCurrent.Proxy.URL()
 		}())
 		if e != nil || prep.Status != "ready" || prep.OfferID != offerID || prep.AccountID != resolved.Offer.AccountID || prep.PublishedRevision != resolved.PublishedRevision || prep.AdapterRevision != resolved.Offer.Adapter.Revision || prep.Spec != spec || prep.SalePrice != resolved.Offer.SalePrice || prep.EndpointFingerprint != endpointFingerprint || prep.ProxyFingerprint != proxyFingerprint || prep.CredentialFingerprint != videoCredentialFingerprint(aCurrent) {
-			return "", q, ErrStudioVideoConflict
+			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		preparation = &prep
 		if prep.FinalQuoteToken != "" {
 			if prep.FinalRequestHash != plan.RequestHash {
-				return "", q, ErrStudioVideoConflict
+				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 			}
 			old, err := r.Store.Quote(prep.FinalQuoteToken, owner)
 			if err != nil || !time.Now().Before(old.Binding.ExpiresAt) {
-				return "", q, ErrStudioVideoConflict
+				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 			}
 			return prep.FinalQuoteToken, old, nil
 		}
@@ -200,15 +203,15 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 			Source string `json:"source"`
 		}
 		if !gjson.ValidBytes(body) || !gjson.GetBytes(body, "references").Exists() || gjson.GetBytes(body, "references.#").Int() != int64(len(prep.Receipts)) || json.Unmarshal([]byte(gjson.GetBytes(body, "references").Raw), &refs) != nil || len(refs) != len(prep.Receipts) {
-			return "", q, ErrStudioVideoConflict
+			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		if len(prep.Assets) != len(prep.Receipts) {
-			return "", q, ErrStudioVideoConflict
+			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		for i, receipt := range prep.Receipts {
 			asset := prep.Assets[i]
 			if asset.AssetRef != receipt.AssetRef || asset.Kind != receipt.Kind || asset.MimeType != receipt.MimeType || asset.Size != receipt.Size || asset.SHA256 != receipt.SHA256 || refs[i].Type != receipt.Kind || refs[i].Source != receipt.Source || refs[i].Source == "" {
-				return "", q, ErrStudioVideoConflict
+				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 			}
 		}
 	}
@@ -225,29 +228,29 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	if r.Core.channelService != nil && r.Core.channelService.repo != nil {
 		cid, err := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
 		if err != nil {
-			return "", q, err
+			return "", q, QuoteFailure("account_cost", err)
 		}
 		if cid > 0 {
 			channel, e = r.Core.channelService.repo.GetByID(ctx, cid)
 			if e != nil {
-				return "", q, e
+				return "", q, QuoteFailure("account_cost", e)
 			}
 		}
 	}
 	b.Accounting, e = resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: b.Offer, Spec: b.Spec, SpecHash: b.SpecHash}, channel, now, "CNY", false)
 	if e != nil {
-		return "", q, e
+		return "", q, QuoteFailure("account_cost", e)
 	}
 	if preparation != nil {
 		currentCost, err := r.referenceAccounting(ctx, a, owner, resolved, preparation.Accounting.PricingAt)
 		if err != nil || currentCost != preparation.Accounting {
-			return "", q, ErrStudioVideoConflict
+			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		b.Accounting = preparation.Accounting
 	}
 	q = StudioVideoQuote{Binding: b, BindingHash: b.Hash(), Plan: plan}
 	if _, release, e := r.account(ctx, b, true, false); e != nil {
-		return "", q, e
+		return "", q, QuoteFailure("account_admission", e)
 	} else {
 		release()
 	}
@@ -260,7 +263,7 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 		preparation.FinalRequestHash = plan.RequestHash
 		e = r.Store.UpdateReferencePreparation(*preparation)
 	}
-	return token, q, e
+	return token, q, QuoteFailure("quote_store", e)
 }
 
 // New dispatch checks current eligibility AND the frozen identity. Recovery

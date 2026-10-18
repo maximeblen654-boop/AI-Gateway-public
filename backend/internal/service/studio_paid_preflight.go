@@ -375,12 +375,14 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 					}
 					profile, ok := mediaworkbench.VideoProfileModel(product)
 					if !ok {
-						err = ErrPaidControl
+						err = QuoteFailure("execution", ErrPaidControl)
 					} else {
 						var plan videoplan.Plan
 						plan, err = videoplan.PreviewWithModel(profile, o.UpstreamModel, spec.Resolution, spec.AspectRatio, spec.DurationSeconds, spec.Images, spec.Videos, spec.Audio)
 						if err == nil {
 							err = p.video.quotePreflight(ctx, owner, key, o.OfferID, spec, plan.Body)
+						} else {
+							err = QuoteFailure("execution", err)
 						}
 					}
 				}

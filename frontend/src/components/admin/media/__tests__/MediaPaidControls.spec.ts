@@ -42,3 +42,23 @@ it('labels partial preflight by real product name and keeps failures distinct fr
  expect(image.findAll('button')[1].attributes('disabled')).toBeUndefined();expect(api.apply).not.toHaveBeenCalled()
  expect(w.text()).toContain('全局开关开放不代表每个商品或每个客户均可生成')
 })
+
+it('explains safe quote stages without exposing arbitrary server error text or enabling sales', async () => {
+ api.check.mockResolvedValue({pass:false, checks:[
+  {code:'quote_account_cost',pass:false,account_id:44,path:'without_references'},
+  {code:'quote_execution',pass:false,account_id:44,path:'with_references'},
+  {code:'quote_unknown',pass:false},
+  {code:'https://secret.invalid?token=private',pass:false},
+  {code:'published_offer',pass:false}
+ ]})
+ const w=create();await flushPromises();const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ expect(video.text()).toContain('Group 的 Channel 绑定')
+ expect(video.text()).toContain('按次成本规则')
+ expect(video.text()).toContain('视频协议或规格不兼容')
+ expect(video.text()).toContain('报价检查原因未分类')
+ expect(video.text()).toContain('至少一个已发布商品通过检查')
+ expect(video.text()).not.toContain('secret.invalid')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeDefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})

@@ -9,7 +9,7 @@ type StudioQuoteError struct {
 	Cause error
 }
 
-func (e *StudioQuoteError) Error() string { return "studio quote rejected: " + e.Stage }
+func (e *StudioQuoteError) Error() string { return "studio quote rejected: " + QuoteFailureStage(e) }
 func (e *StudioQuoteError) Unwrap() error { return e.Cause }
 func QuoteFailure(stage string, err error) error {
 	if err == nil {
@@ -21,9 +21,9 @@ func QuoteFailureStage(err error) string {
 	var q *StudioQuoteError
 	if errors.As(err, &q) {
 		switch q.Stage {
-		case "billing_eligibility", "published_offer", "price", "account", "account_admission", "execution", "account_cost", "quote_store":
+		case "request", "model_permission", "reference_preparation", "billing_eligibility", "published_offer", "price", "account", "account_admission", "execution", "account_cost", "quote_store":
 			return q.Stage
 		}
 	}
-	return "binding"
+	return "unknown"
 }
