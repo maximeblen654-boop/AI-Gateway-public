@@ -56,7 +56,7 @@
               <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
               <video :key="`video-${resultRead}-${i}`" v-else :src="studioResultUrl(active,i-1)" controls preload="metadata" data-testid="studio-result-video" @loadedmetadata="unavailableResults[`${active.id}-${i}`] = false" @error="unavailableResults[`${active.id}-${i}`] = true" />
             </div>
-            <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download"><Icon name="download" /><span>下载原片</span></a></figcaption>
+            <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download"><Icon name="download" /><span>下载原片</span></a></figcaption><StudioImageExport v-if="active.kind === 'image' && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="studioResultUrl(active,i-1)" :filename="`${active.id}-${i}`" />
           </figure>
         </div>
         <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '继续创作' }}</button></div>
@@ -109,6 +109,7 @@ import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, stud
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
+import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
 import StudioModelPicker from './StudioModelPicker.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -300,7 +301,18 @@ function currentUpload(item:StudioAssetUpload){return uploads.value.find(candida
 async function uploadOne(item:StudioAssetUpload){const current=currentUpload(item);if(!mounted||!current||current.status!=='pending')return;const controller=new AbortController();current.controller=controller;try{
  await ensureStudioSession();if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;const receipt=await uploadStudioAsset(current.file,current.kind,controller.signal);if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;current.receipt=receipt;current.status='success';notice.value='素材已私有保存，顺序如上。'
  }catch(e){if(!mounted||currentUpload(item)!==current||controller.signal.aborted||e instanceof DOMException&&e.name==='AbortError')return;current.status='failure';current.error=assetError(e);error.value=current.error;notice.value=''}}
-async function enqueueFiles(files:File[]){if(!files.length||busy.value||active.value)return;if(kind.value==='image'&&offer.value?.spec.references.image.max){imageMode.value='edit'}busy.value=true;error.value='';notice.value='素材上传中…';const pending=files.map(addUpload).filter(item=>item.status==='pending');try{await Promise.all(pending.map(uploadOne))}finally{if(mounted){busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}}
+async function enqueueFiles(files:File[]){
+ if(!files.length||busy.value||active.value)return
+ const refs=offer.value?.spec.references
+ const existing=uploads.value.filter(item=>item.status!=='failure')
+ if(refs && (existing.length+files.length>refs.total_max || (['image','video','audio'] as const).some(type=>existing.filter(item=>item.kind===type).length+files.filter(file=>assetKind(file)===type).length>refs[type].max))){error.value='已达到该模型的素材数量上限，请减少本次选择的素材。';return}
+ if(kind.value==='image'&&refs?.image.max){imageMode.value='edit'}
+ busy.value=true;error.value='';notice.value='素材上传中…'
+ const pending=files.map(addUpload).filter(item=>item.status==='pending')
+ let cursor=0
+ try{await Promise.all(Array.from({length:Math.min(3,pending.length)},async()=>{while(cursor<pending.length && mounted){const item=pending[cursor++]!;await uploadOne(item)}}))}
+ finally{if(mounted){busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}
+}
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}

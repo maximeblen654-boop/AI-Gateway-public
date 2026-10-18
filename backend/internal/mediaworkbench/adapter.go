@@ -16,6 +16,17 @@ import (
 
 func VideoProfileModel(p Product) (videoplan.Model, bool) {
 	profile := p.AdapterConfig.WireProfile
+	// An explicit wire profile must not turn a known model's declared product
+	// capabilities into its own authority, bypassing fixed reference/duration limits.
+	if known, ok := videoplan.DocumentedModel(p.SiteModel); ok && known.Upstream == p.UpstreamModel {
+		if known.Status != "enabled" || profile != "" && (p.AdapterConfig.Version != 1 || profile != known.Mode) {
+			return videoplan.Model{}, false
+		}
+		if profile == "" && p.AdapterConfig.Version != 0 {
+			return videoplan.Model{}, false
+		}
+		return known, true
+	}
 	if profile == "" {
 		if p.AdapterConfig.Version != 0 {
 			return videoplan.Model{}, false
@@ -112,7 +123,7 @@ func Descriptor(kind string) (AdapterDescriptor, bool) {
 		return d, true
 	}
 	if kind == "laoli_video" {
-		return AdapterDescriptor{Kind: kind, Revision: videoplan.Revision, MediaType: "video", Auth: "account_apikey", Transport: "https_json", TaskFlow: "async", MaxReferences: 16, Parameters: map[string]Parameter{
+		return AdapterDescriptor{Kind: kind, Revision: videoplan.Revision, MediaType: "video", Auth: "account_apikey", Transport: "https_json", TaskFlow: "async", MaxReferences: 30, Parameters: map[string]Parameter{
 			"model": {Mode: CodeEnum, ValueType: "video_contract_model"}, "resolution": {Mode: CodeEnum}, "aspect_ratio": {Mode: CodeEnum}, "duration_seconds": {Mode: CodeEnum}, "count": {Mode: FixedByModel, ValueType: "one"}, "quality": {Mode: Unsupported}, "reference_images": {Mode: Derived}, "reference_video": {Mode: Derived}, "reference_audio": {Mode: Derived},
 		}}, true
 	}

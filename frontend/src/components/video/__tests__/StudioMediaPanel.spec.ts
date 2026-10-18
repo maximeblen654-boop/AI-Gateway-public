@@ -33,12 +33,23 @@ describe('Reference asset input',()=>{
   await wrapper.get('[data-testid="studio-assets-clear"]').trigger('click');expect(wrapper.find('[data-testid="studio-assets"]').exists()).toBe(false)
  })
 
- it('keeps a failed item visible and enforces the model count limit before upload',async()=>{
+ it('rejects an excessive batch before allocating previews or uploading',async()=>{
   api.catalog.mockResolvedValue([withImageReferences(1)]);api.history.mockResolvedValue([]);wrapper=mount(StudioMediaPanel);await flushPromises()
   const input=wrapper.get('[data-testid="studio-asset-input"]'),first=imageFile('first.png');Object.defineProperty(input.element,'files',{value:[first],configurable:true});await input.trigger('change');await flushPromises()
   const second=imageFile('second.png');Object.defineProperty(input.element,'files',{value:[second],configurable:true});await input.trigger('change');await flushPromises()
-  expect(api.upload).toHaveBeenCalledTimes(1);expect(wrapper.find('[data-testid="studio-asset-failure"]').exists()).toBe(true);expect(wrapper.text()).toContain('上传失败')
-  const failed=wrapper.find('[data-testid="studio-asset-failure"] button');await failed.trigger('click');expect(wrapper.find('[data-testid="studio-asset-failure"]').exists()).toBe(false)
+  expect(api.upload).toHaveBeenCalledTimes(1);expect(wrapper.find('[data-testid="studio-asset-failure"]').exists()).toBe(false);expect(wrapper.text()).toContain('素材数量上限');expect(wrapper.findAll('[data-testid="studio-asset-success"]')).toHaveLength(1)
+ })
+
+ it('uploads 30 permitted assets with at most three concurrent requests and rejects 31',async()=>{
+  api.catalog.mockResolvedValue([withImageReferences(30)]);api.history.mockResolvedValue([])
+  const pending=Array.from({length:30},()=>deferred<StudioAssetReceipt>())
+  pending.forEach(item=>api.upload.mockReturnValueOnce(item.promise))
+  wrapper=mount(StudioMediaPanel);await flushPromises()
+  const files=Array.from({length:30},(_,i)=>imageFile(`${i}.png`))
+  await pick([...files,imageFile('extra.png')]);expect(api.upload).not.toHaveBeenCalled();expect(wrapper.text()).toContain('素材数量上限')
+  await pick(files);expect(api.upload).toHaveBeenCalledTimes(3)
+  for(let i=0;i<30;i++){pending[i]!.resolve(receipt(files[i]!));await flushPromises();expect(api.upload.mock.calls.length).toBeLessThanOrEqual(Math.min(30,i+4))}
+  expect(api.upload).toHaveBeenCalledTimes(30);expect(wrapper.findAll('[data-testid="studio-asset-success"]')).toHaveLength(30);expect(api.generate).not.toHaveBeenCalled()
  })
 
  it('ignores non-image clipboard content without reading text or uploading',async()=>{

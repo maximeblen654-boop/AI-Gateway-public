@@ -75,3 +75,16 @@ describe('pricing matrix follows sellable combinations', () => {
     expect(editPrices.every(rule => rule.sale_price?.amount === '0.08')).toBe(true)
   })
 })
+
+it('supports bounded thirty references without dropping matrix protections', () => {
+  const c = copy(imageProduct).capabilities
+  c.references = { image: { min: 0, max: 30 }, video: { min: 0, max: 10 }, audio: { min: 0, max: 10 }, total_max: 30 }
+  c.count = {min: 1, max: 1}; c.resolutions = ['1K']; c.aspect_ratios = ['1:1']; c.qualities = []; c.durations_seconds = []
+  const specs = allowedSpecs(c)!
+  expect(specs.some(s => s.images === 20 && s.videos === 5 && s.audio === 5)).toBe(true)
+  expect(specs.every(s => s.images + s.videos + s.audio <= 30)).toBe(true)
+  c.durations_seconds = Array.from({length: 27}, (_, i) => i+4)
+  expect(allowedSpecs(c)).toBeUndefined()
+  c.durations_seconds = []; c.references.image.max = 31
+  expect(allowedSpecs(c)).toBeUndefined()
+})

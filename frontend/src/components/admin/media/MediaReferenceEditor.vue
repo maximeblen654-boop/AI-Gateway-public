@@ -31,7 +31,7 @@ import { computed, nextTick } from 'vue'
 import type { References } from '@/api/admin/mediaWorkbench'
 const props = defineProps<{ modelValue: References; mediaType: string; maxReferences?: number }>()
 const emit = defineEmits<{ 'update:modelValue': [value: References] }>()
-const effectiveMax = computed(() => Math.min(16, props.maxReferences ?? 16))
+const effectiveMax = computed(() => Math.min(props.mediaType === 'image' ? 16 : 30, props.maxReferences ?? 16))
 type Kind = 'image' | 'video' | 'audio'
 const kinds = computed(() => props.mediaType === 'image' ? [{ key: 'image' as const, label: '参考图片' }] : [
   { key: 'image' as const, label: '参考图片' }, { key: 'video' as const, label: '参考视频' }, { key: 'audio' as const, label: '参考音频' }

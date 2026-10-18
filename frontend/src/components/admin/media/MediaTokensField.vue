@@ -15,6 +15,19 @@
       </div>
       <p v-if="customError" :id="`${customId}-error`" class="mw-field-error" role="alert">{{ customError }}</p>
     </div>
+    <div v-if="durationRange" class="mw-custom-ratio" data-test="duration-range">
+      <div class="mw-duration-range-entry">
+        <label>最低秒数<input v-model="rangeStart" type="number" min="1" max="3600" step="1" class="input" :disabled="disabled" data-test="duration-start" /></label>
+        <label>最高秒数<input v-model="rangeEnd" type="number" min="1" max="3600" step="1" class="input" :disabled="disabled" data-test="duration-end" /></label>
+        <label>间隔秒数<input v-model="rangeStep" type="number" min="1" max="3600" step="1" class="input" :disabled="disabled" data-test="duration-step" /></label>
+        <button type="button" class="btn btn-secondary" :disabled="disabled" data-test="duration-add" @click="addDurationRange">添加范围</button>
+      </div>
+      <small>仅批量添加已确认支持的秒数，不代表模型支持整个区间。最多 32 个时长；规格与价格组合仍须通过服务端校验。</small>
+      <p v-if="rangeError" class="mw-field-error" role="alert">{{ rangeError }}</p>
+    </div>
+    <div v-if="durationRange && customValues.length" class="mw-token-presets" role="group" aria-label="已选其他时长">
+      <button v-for="value in customValues" :key="value" type="button" class="mw-token-chip mw-token-chip-selected" :disabled="disabled" :aria-label="`移除时长 ${value} 秒`" @click="toggle(value)">{{ value }} 秒 <span aria-hidden="true">×</span></button>
+    </div>
     <input :id="inputId" class="input" :value="modelValue.join(', ')" :disabled="disabled" :placeholder="placeholder" :aria-invalid="!!listError" :aria-describedby="listError ? `${hintId} ${inputId}-error` : hintId" data-test="tokens-input" @change="change" />
     <small :id="hintId">{{ numeric ? '用逗号分隔整数' : aspectRatio ? '也可用逗号批量编辑。仅配置已确认支持的比例，保存校验并发布后才对客户生效。' : '用逗号分隔多个值' }}</small>
     <p v-if="listError" :id="`${inputId}-error`" class="mw-field-error" role="alert">{{ listError }}</p>
@@ -23,7 +36,7 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from 'vue'
-const props = defineProps<{ label: string; modelValue: string[] | number[]; numeric?: boolean; disabled?: boolean; presets?: string[]; placeholder?: string; aspectRatio?: boolean }>()
+const props = defineProps<{ label: string; modelValue: string[] | number[]; numeric?: boolean; disabled?: boolean; presets?: string[]; placeholder?: string; aspectRatio?: boolean; durationRange?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string[] | number[]] }>()
 const inputId = `media-tokens-${useId()}`
 const hintId = `${inputId}-hint`
@@ -34,6 +47,28 @@ const customInput = ref<HTMLInputElement>()
 const customError = ref('')
 const listError = ref('')
 const notice = ref('')
+const rangeStart = ref<number | string>('')
+const rangeEnd = ref<number | string>('')
+const rangeStep = ref<number | string>(1)
+const rangeError = ref('')
+function durationError(items: string[]) {
+  if (items.some(value => !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > 3600)) return '时长须为 1～3600 的整数秒。'
+  return new Set(items.map(Number)).size > 32 ? '最多配置 32 个时长，请缩小范围或移除部分秒数。' : ''
+}
+function addDurationRange() {
+  if (props.disabled) return
+  const start = Number(rangeStart.value), end = Number(rangeEnd.value), step = Number(rangeStep.value)
+  if (![start, end, step].every(value => Number.isSafeInteger(value) && value >= 1 && value <= 3600) || start > end) {
+    rangeError.value = '请输入 1～3600 的整数，最高秒数不小于最低秒数，间隔至少为 1。'; return
+  }
+  const count = Math.floor((end - start) / step) + 1
+  if (count > 32) { rangeError.value = '最多配置 32 个时长，请缩小范围或增大间隔。'; return }
+  const next = [...new Set([...props.modelValue.map(Number), ...Array.from({ length: count }, (_, index) => start + index * step)])].sort((a, b) => a - b)
+  rangeError.value = durationError(next.map(String))
+  if (rangeError.value) return
+  listError.value = ''; notice.value = '时长已添加，可单独移除；保存校验并发布后才对客户生效。'
+  emit('update:modelValue', next)
+}
 const values = computed(() => props.modelValue.map(String))
 const customValues = computed(() => values.value.filter(value => !props.presets?.includes(value)))
 const ratioError = '请输入正整数比例，例如 3:5；冒号两侧都须大于 0。'
@@ -60,18 +95,20 @@ async function change(event: Event) {
   if (props.disabled) return
   const target = event.target as HTMLInputElement
   const parsed = target.value.split(/[,，]/).map(normalize).filter(Boolean)
-  const next = props.aspectRatio ? [...new Set(parsed)] : parsed
+  const next = props.aspectRatio || props.durationRange ? [...new Set(parsed)] : parsed
+  if (props.durationRange && durationError(next)) { listError.value = durationError(next); return }
   if (props.aspectRatio && next.some(value => !validRatio(value))) { listError.value = ratioError; return }
   listError.value = ''; notice.value = ''
-  emit('update:modelValue', props.numeric ? next.map(Number) : next)
+  emit('update:modelValue', props.durationRange ? [...new Set(next.map(Number))] : props.numeric ? next.map(Number) : next)
   await nextTick()
   target.value = props.modelValue.join(', ')
 }
 function toggle(value: string) {
   if (props.disabled) return
   const next = values.value.includes(value) ? values.value.filter(item => item !== value) : [...values.value, value]
+  if (props.durationRange && durationError(next)) { listError.value = durationError(next); return }
   listError.value = ''; notice.value = ''
-  emit('update:modelValue', props.numeric ? next.map(Number) : next)
+  emit('update:modelValue', props.durationRange ? [...new Set(next.map(Number))] : props.numeric ? next.map(Number) : next)
 }
 </script>
 <style scoped>
@@ -80,5 +117,9 @@ function toggle(value: string) {
 .mw-custom-ratio-entry { display: flex; align-items: center; gap: .5rem; }
 .mw-custom-ratio-entry .input { flex: 1; width: 0; }
 .mw-custom-ratio-entry button { flex-shrink: 0; min-height: 44px; }
+.mw-duration-range-entry { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-bottom: .5rem; }
+.mw-duration-range-entry label { min-width: 0; font-size: .8rem; }
+.mw-duration-range-entry .input { width: 100%; min-width: 0; }
+.mw-duration-range-entry button { grid-column: 1 / -1; min-height: 44px; }
 .mw-token-notice { color: var(--mw-muted); font-size: .8rem; }
 </style>

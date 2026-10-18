@@ -21,6 +21,10 @@ if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.
 const savedManagement = management ? sessionStorage.getItem(scenario) : null
 const dto = savedManagement ? JSON.parse(savedManagement) as typeof initialDTO : initialDTO
 if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
+if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
+  // Browser fixture only: the real model contract remains validated by Core.
+  dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
+}
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
 if (scenario.startsWith('WIZARD')) {

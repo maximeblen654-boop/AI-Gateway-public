@@ -28,8 +28,8 @@ export function matchesSpec(match: Match, spec: MatrixSpec): boolean {
 // Mirror validator.go's bounded spec domain only; prices and publication remain server-authoritative.
 export function allowedSpecs(c: Product['capabilities']): MatrixSpec[] | undefined {
   const ranges = [c.count, c.references.image, c.references.video, c.references.audio]
-  if (ranges.some((r, i) => !Number.isInteger(r.min) || !Number.isInteger(r.max) || r.min < (i ? 0 : 1) || r.max < r.min || r.max > (i ? 16 : 10))) return undefined
-  if (!Number.isInteger(c.references.total_max) || c.references.total_max > 16 || c.references.total_max < ranges.slice(1).reduce((sum, r) => sum + r.min, 0)) return undefined
+  if (ranges.some((r, i) => !Number.isInteger(r.min) || !Number.isInteger(r.max) || r.min < (i ? 0 : 1) || r.max < r.min || r.max > (i ? 30 : 10))) return undefined
+  if (!Number.isInteger(c.references.total_max) || c.references.total_max > 30 || c.references.total_max < ranges.slice(1).reduce((sum, r) => sum + r.min, 0)) return undefined
   if (!validStrings(c.resolutions) || !validStrings(c.aspect_ratios) || !validStrings(c.qualities) || !validDurations(c.durations_seconds)) return undefined
   if (c.durations_seconds.length > 32 || c.combination_rules.length > 100 || c.combination_rules.some(({ deny }) => !validMatch(deny, c))) return undefined
   // An empty deny is an unfinished editor row, rejected by the server too.

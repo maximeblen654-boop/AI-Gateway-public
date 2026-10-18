@@ -52,6 +52,17 @@ func init() {
 		panic(err)
 	}
 }
+
+// DocumentedModel retains paused contracts for capability validation; it does not enable them.
+func DocumentedModel(id string) (Model, bool) {
+	for _, m := range registry.Models {
+		if m.ID == id {
+			return m, true
+		}
+	}
+	return Model{}, false
+}
+
 func Lookup(id string) (Model, bool) {
 	for _, m := range registry.Models {
 		if m.ID == id && m.Status == "enabled" {
@@ -225,7 +236,7 @@ func PreviewWithMedia(modelID, upstream, resolution, ratio string, duration, ima
 }
 
 func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
-	if m.Status != "enabled" || m.Upstream != upstream || !ValidWireProfile(m.Mode) {
+	if m.Status != "enabled" || m.Upstream != upstream || !ValidWireProfile(m.Mode) || images < 0 || videos < 0 || audio < 0 || images > m.Limits.Image || videos > m.Limits.Video || audio > m.Limits.Audio || images+videos+audio > m.Limits.Total || images+videos+audio > 30 {
 		return Plan{}, ErrPlan
 	}
 	if m.Mode == "seedance" {
@@ -248,7 +259,7 @@ func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, ima
 		f[k] = v
 	}
 	for i, n := range []int{images, videos, audio} {
-		if n < 0 || n > 16 {
+		if n < 0 || n > 30 {
 			return Plan{}, ErrPlan
 		}
 		kind := []string{"image", "video", "audio"}[i]

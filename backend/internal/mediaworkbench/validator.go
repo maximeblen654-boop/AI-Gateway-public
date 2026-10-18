@@ -233,7 +233,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			continue
 		}
 		if known {
-			if p.Capabilities.References.TotalMax > descriptor.MaxReferences || p.Capabilities.References.Image.Max > descriptor.MaxReferences {
+			if p.Capabilities.References.TotalMax > descriptor.MaxReferences || p.Capabilities.References.Image.Max > descriptor.MaxReferences || p.Capabilities.References.Video.Max > descriptor.MaxReferences || p.Capabilities.References.Audio.Max > descriptor.MaxReferences {
 				add("UI_FIXABLE", "REFERENCE_LIMIT_EXCEEDED", pid, "capabilities.references", "Reference count exceeds the native adapter limit")
 			}
 			for _, m := range p.AdapterConfig.SizeMappings {
@@ -393,7 +393,7 @@ func validStrings(values []string) bool {
 }
 func validCapabilities(c Capabilities) bool {
 	r := c.References
-	if !validRange(c.Count, 10) || c.Count.Min < 1 || !validRange(r.Image, 16) || !validRange(r.Video, 16) || !validRange(r.Audio, 16) || r.TotalMax < r.Image.Min+r.Video.Min+r.Audio.Min || r.TotalMax > 16 {
+	if !validRange(c.Count, 10) || c.Count.Min < 1 || !validRange(r.Image, 30) || !validRange(r.Video, 30) || !validRange(r.Audio, 30) || r.TotalMax < r.Image.Min+r.Video.Min+r.Audio.Min || r.TotalMax > 30 {
 		return false
 	}
 	if !validStrings(c.Resolutions) || !validStrings(c.AspectRatios) || !validStrings(c.Qualities) {

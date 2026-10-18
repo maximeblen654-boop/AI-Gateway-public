@@ -11,8 +11,18 @@ export function createVideoAssetResolver({ intake, tasks }) {
     if (!configured) throw Error('unsupported_model');
     const model = configured.video_profile ?? contract.models.find(m => m.apiModelId === modelId);
     if (!model || model.documentedStatus !== 'enabled') throw Error('unsupported_model');
+    const limits = model.mediaLimits;
+    const counts = {image: 0, video: 0, audio: 0};
+    if (!Array.isArray(requested) || requested.length > 30 || requested.length > limits.total) throw Error('media_reference_limit_exceeded');
+    for (const ref of requested) {
+      if (!(ref.kind in counts) || ++counts[ref.kind] > limits[ref.kind]) throw Error('media_reference_limit_exceeded');
+    }
+    // Bound retained bytes before base64 copies; the existing wire budget is 24 MiB.
+    let totalBytes = 0;
     const stored = requested.map(ref => {
       const a = intake.uploadPayload(session.ownerId, ref.asset_ref);
+      totalBytes += a.size;
+      if (!Number.isSafeInteger(a.size) || a.size < 1 || totalBytes > 18 * 1024 * 1024) throw Error('media_request_too_large');
       if (a.kind !== ref.kind) throw Error('asset_type_mismatch');
       return { asset_ref: ref.asset_ref, kind: a.kind, mime_type: a.mimeType, size: a.size,
         sha256: a.sha256, ...(a.durationSeconds ? { duration_seconds: a.durationSeconds } : {}), bytes_base64: Buffer.from(a.bytes).toString('base64') };
