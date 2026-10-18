@@ -21,18 +21,16 @@ function matches(match: StudioSpecMatch, selected: RatioSelection, ratio: string
 
 // A UI convenience only: the selected exact offer and spec still go through Core quotation.
 export function ratioOfferOptions(current: StudioOffer | undefined, offers: StudioOffer[], selected: RatioSelection): Map<string, StudioOffer> {
-  const slider = current?.spec.aspect_ratio_slider
   const result = new Map<string, StudioOffer>()
-  if (!current || !slider?.enabled || slider.mode !== 'discrete') return result
-  const min = ratioValue(slider.min), max = ratioValue(slider.max)
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) return result
+  if (!current) return result
   const candidates = offers.filter(item => item.offer_id === current.offer_id || Boolean(current.product_scope && item.product_scope === current.product_scope && item.model === current.model && item.upstream_model === current.upstream_model))
   const grouped = new Map<string, StudioOffer[]>()
   for (const item of candidates) {
     if (selected.output_format && !item.spec.output_formats?.includes(selected.output_format as 'png' | 'jpeg' | 'webp')) continue
     for (const ratio of item.spec.aspect_ratio || []) {
-      const value = ratioValue(ratio)
-      if (!Number.isFinite(value) || value < min || value > max || !matches(item.spec, selected, ratio) || item.excluded?.some(rule => matches(rule, selected, ratio))) continue
+      // Keep this offer's published choices visible while required references are still being added.
+      // Crossing to another price offer requires a fully matching selection; quotation remains authoritative.
+      if (!ratio || (item.offer_id !== current.offer_id && !matches(item.spec, selected, ratio)) || item.excluded?.some(rule => matches(rule, selected, ratio))) continue
       const group = grouped.get(ratio) || []
       if (!group.some(other => other.offer_id === item.offer_id)) group.push(item)
       grouped.set(ratio, group)

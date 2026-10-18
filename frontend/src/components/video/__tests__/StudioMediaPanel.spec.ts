@@ -223,7 +223,7 @@ describe('Customer image purchase quantity',()=>{
 
 
 describe('Artwork desk navigation',()=>{
- async function setup(){sessionStorage.clear();api.history.mockResolvedValue([]);api.catalog.mockResolvedValue([{...offer,display_name:'图片商品',spec:{...offer.spec,count:{min:1,max:10}}}]);wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises()}
+ async function setup(){sessionStorage.clear();api.history.mockResolvedValue([]);api.catalog.mockResolvedValue([{...offer,display_name:'图片商品',spec:{...offer.spec,duration_seconds:[],count:{min:1,max:10}}}]);wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises()}
  it('starts with text-to-image, a bounded quantity and no attachment button',async()=>{await setup();expect(wrapper.get('[data-testid="studio-mode-text"]').attributes('aria-pressed')).toBe('true');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.get('[data-testid="studio-quote"]').text()).toContain('开始生成');expect(await quantityChoices()).toHaveLength(10);expect(wrapper.findAll('svg.studio-mark')).toHaveLength(2)})
  it('requires a reference for edit while preserving independent output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await chooseQuantity(5);await wrapper.get('[data-testid="studio-prompt"]').setValue('change background');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();await pick([imageFile()]);api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:1})}));expect(api.generate).not.toHaveBeenCalled()})
  it('switching explicitly to text removes references but preserves prompt and output count',async()=>{await setup();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await chooseQuantity(5);await wrapper.get('[data-testid="studio-prompt"]').setValue('keep this prompt');await pick([imageFile()]);await wrapper.get('[data-testid="studio-mode-text"]').trigger('click');expect(wrapper.find('[data-testid="studio-attachment"]').exists()).toBe(false);expect(wrapper.find('[data-testid="studio-asset-success"]').exists()).toBe(false);expect((wrapper.get('[data-testid="studio-prompt"]').element as HTMLTextAreaElement).value).toBe('keep this prompt');expect(wrapper.get('[data-testid="studio-count"]').text()).toContain('5 张');api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({spec:expect.objectContaining({count:5,images:0})}));expect(api.generate).not.toHaveBeenCalled()})
@@ -426,20 +426,30 @@ describe('Published native output format',()=>{
 })
 
 
-it('ratio slider changes only the exact same-product offer, preserves specifications and waits for explicit quote',async()=>{
+it('keeps published edit ratios visible before reference upload without enabling generation',async()=>{
  sessionStorage.clear();api.history.mockResolvedValue([])
- const sibling=(id:string,ratio:string)=>({...offer,offer_id:id,product_scope:'published-product',spec:{...offer.spec,duration_seconds:[],resolution:['2K','4K'],aspect_ratio:[ratio],quality:['high'],count:{min:1,max:3},output_formats:['png'],aspect_ratio_slider:{enabled:true,mode:'discrete',min:'9:16',max:'16:9'}}})
- api.catalog.mockResolvedValue([sibling('portrait','9:16'),sibling('square','1:1'),sibling('wide','16:9')])
+ api.catalog.mockResolvedValue([{...offer,product_scope:'edit-product',spec:{...offer.spec,duration_seconds:[],aspect_ratio:['7:5','3:5'],references:{...offer.spec.references,image:{min:1,max:2},total_max:2}}}])
+ wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await flushPromises()
+ await wrapper.get('[data-testid="studio-ratio-toggle"]').trigger('click');await wrapper.get('[data-ratio="3:5"]').trigger('click')
+ expect(wrapper.get('[data-testid="studio-ratio-toggle"]').text()).toContain('3:5')
+ await wrapper.get('[data-testid="studio-prompt"]').setValue('Reference required')
+ expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined()
+ expect(api.generate).not.toHaveBeenCalled()
+})
+it('published ratio picker changes only the exact same-product offer, preserves specifications and waits for explicit quote',async()=>{
+ sessionStorage.clear();api.history.mockResolvedValue([])
+ const sibling=(id:string,ratio:string)=>({...offer,offer_id:id,product_scope:'published-product',spec:{...offer.spec,duration_seconds:[],resolution:['2K','4K'],aspect_ratio:[ratio],quality:['high'],count:{min:1,max:3},output_formats:['png']}})
+ api.catalog.mockResolvedValue([sibling('portrait','9:16'),sibling('custom','7:5'),sibling('wide','16:9')])
  wrapper=mount(StudioMediaPanel);await flushPromises()
  await wrapper.get('[data-testid="studio-resolution"]').trigger('click');await wrapper.get('#studio-resolution-menu [data-value="4K"]').trigger('click')
  await chooseQuantity(2)
  await wrapper.get('[data-testid="studio-output-format"]').trigger('click');await wrapper.get('#studio-output-format-menu [data-value="png"]').trigger('click')
  await wrapper.get('[data-testid="studio-prompt"]').setValue('Preserve my draft')
- api.request.mockClear();await wrapper.get('#studio-ratio-slider').setValue('500');await flushPromises()
+ api.request.mockClear();await wrapper.get('[data-testid="studio-ratio-toggle"]').trigger('click');await wrapper.get('[data-ratio="7:5"]').trigger('click');await flushPromises()
  expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
  expect(wrapper.get('[data-testid="studio-resolution"]').text()).toContain('4K');expect(wrapper.get('[data-testid="studio-count"]').text()).toContain('2 张');expect(wrapper.get('[data-testid="studio-output-format"]').text()).toContain('PNG')
  api.request.mockRejectedValueOnce(new Error('inspect only'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
- expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({offer_id:'square',spec:expect.objectContaining({aspect_ratio:'1:1',resolution:'4K',count:2,quality:'high',output_format:'png'})}));expect(api.generate).not.toHaveBeenCalled()
+ expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({offer_id:'custom',spec:expect.objectContaining({aspect_ratio:'7:5',resolution:'4K',count:2,quality:'high',output_format:'png'})}));expect(api.generate).not.toHaveBeenCalled()
 })
 it('waits for catalog provisioning before readiness while history remains independent',async()=>{
  const pending=deferred<typeof offer[]>();api.catalog.mockReturnValueOnce(pending.promise);api.history.mockResolvedValue([])

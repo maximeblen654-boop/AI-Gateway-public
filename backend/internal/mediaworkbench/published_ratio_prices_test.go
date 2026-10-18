@@ -4,20 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 )
 
-func TestRatioSliderPreservesPublishedPrices(t *testing.T) {
+func TestPublishedRatioSelectionPreservesPrices(t *testing.T) {
 	for _, priced := range []bool{false, true} {
 		s, r := validatorFixture(t)
 		p := validProduct()
-		p.Capabilities.AspectRatioSlider = &AspectRatioSlider{Enabled: true, Mode: "discrete", Min: "1:1", Max: "16:9"}
+		p.Capabilities.AspectRatios = append(p.Capabilities.AspectRatios, "7:5")
+		p.AdapterConfig.SizeMappings = append(p.AdapterConfig.SizeMappings, SizeMapping{"1K", "7:5", "1120x800"})
 		if priced {
 			p.PricingRules = nil
-			for i, ratio := range []string{"1:1", "16:9"} {
+			for i, ratio := range []string{"1:1", "16:9", "7:5"} {
 				for mode, rule := range validProduct().PricingRules {
 					rule.Match.AspectRatio = []string{ratio}
-					amount := []string{"0.01", "0.10", "0.02", "0.20"}[i*2+mode]
+					amount := []string{"0.01", "0.10", "0.02", "0.20", "0.03", "0.30"}[i*2+mode]
 					rule.SalePrice = &Price{Amount: amount, Currency: "CNY", BillingMode: "per_request"}
 					p.PricingRules = append(p.PricingRules, rule)
 				}
@@ -26,8 +26,8 @@ func TestRatioSliderPreservesPublishedPrices(t *testing.T) {
 		before, _ := json.Marshal(p.PricingRules)
 		d, err := s.SaveDraft(context.Background(), 7, r.a.Config.RecordVersion, DraftInput{Products: []Product{p}})
 		must(t, err)
-		if d.Config.Validation.Status != "PASS" || d.Config.Validation.CaseCount != 20 {
-			t.Fatalf("slider changed domain: %+v", d.Config.Validation)
+		if d.Config.Validation.Status != "PASS" || d.Config.Validation.CaseCount != 30 {
+			t.Fatalf("published ratio domain changed: %+v", d.Config.Validation)
 		}
 		d, err = s.Publish(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
 		must(t, err)
@@ -35,9 +35,9 @@ func TestRatioSliderPreservesPublishedPrices(t *testing.T) {
 		must(t, err)
 		after, _ := json.Marshal(r.a.Config.Published.Products[0].PricingRules)
 		if string(before) != string(after) {
-			t.Fatal("slider rewrote prices")
+			t.Fatal("publication rewrote prices")
 		}
-		for _, ratio := range []string{"1:1", "16:9"} {
+		for _, ratio := range []string{"1:1", "16:9", "7:5"} {
 			for _, images := range []int{0, 1, 2} {
 				spec := Spec{Resolution: "1K", AspectRatio: ratio, Count: 1, Images: images}
 				hits := 0
@@ -57,6 +57,13 @@ func TestRatioSliderPreservesPublishedPrices(t *testing.T) {
 							want = "0.20"
 						} else {
 							want = "0.02"
+						}
+					}
+					if priced && ratio == "7:5" {
+						if images > 0 {
+							want = "0.30"
+						} else {
+							want = "0.03"
 						}
 					}
 					if binding.Offer.SalePrice.Amount != want {
@@ -79,41 +86,5 @@ func TestRatioSliderPreservesPublishedPrices(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func TestRatioSliderRangeAndLegacySafety(t *testing.T) {
-	if !ratioWithin("01:1", "01:1", "16:9") || ratioWithin("+1:1", "1:1", "16:9") {
-		t.Fatal("numeric ratio identifiers must match the client without normalization")
-	}
-	_, r := validatorFixture(t)
-	for _, config := range []*AspectRatioSlider{
-		{true, "continuous", "1:1", "16:9"}, {true, "discrete", "1:1", "1:1"},
-		{true, "discrete", "16:9", "1:1"}, {true, "discrete", "0:1", "16:9"},
-		{true, "discrete", "1:2", "16:9"},
-	} {
-		p := validProduct()
-		p.Capabilities.AspectRatioSlider = config
-		v, _ := Validate(&r.a, Draft{Revision: "test", Products: []Product{p}}, time.Now())
-		if !hasCode(v, "INVALID_RATIO_SLIDER", "UI_FIXABLE") {
-			t.Fatalf("unsafe slider accepted: %+v", config)
-		}
-	}
-	p := validProduct()
-	p.Capabilities.AspectRatioSlider = &AspectRatioSlider{false, "discrete", "", ""}
-	v, _ := Validate(&r.a, Draft{Revision: "test", Products: []Product{p}}, time.Now())
-	if v.Status != "PASS" {
-		t.Fatal(v)
-	}
-	for _, row := range [][3]string{{"1:2", "1:2", "16:9"}, {"1:1", "1:2", "16:9"}, {"16:9", "1:2", "16:9"}} {
-		if !ratioWithin(row[0], row[1], row[2]) {
-			t.Fatal(row)
-		}
-	}
-	legacy, _ := json.Marshal(validProduct().Capabilities)
-	var fields map[string]any
-	must(t, json.Unmarshal(legacy, &fields))
-	if _, found := fields["aspect_ratio_slider"]; found {
-		t.Fatal("legacy serialization changed")
 	}
 }

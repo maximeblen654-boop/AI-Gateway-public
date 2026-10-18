@@ -19,15 +19,6 @@
         <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="setCapability('resolution', $event)" />
         <MediaTokensField label="比例" aspect-ratio :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="setCapability('aspect_ratio', $event)" />
         <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric duration-range :presets="durationPresets" placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="setCapability('duration_seconds', $event)" />
-        <div v-if="product.media_type === 'image'" class="mw-field" data-test="aspect-slider-config">
-          <label><input type="checkbox" :checked="!!product.capabilities.aspect_ratio_slider?.enabled" :disabled="disabled || !sliderRatioOptions.length" data-test="aspect-slider-enabled" @change="toggleAspectSlider" /> 客户比例滑块（吸附已配置比例）</label>
-          <small>仅在已发布比例之间选择，不新增任意比例。连续比例尚无可靠的供应商范围及价格合同支持，本次不开放。</small>
-          <div v-if="product.capabilities.aspect_ratio_slider?.enabled" class="mw-field-grid">
-            <label class="mw-field">最小宽高比<select class="input" :value="product.capabilities.aspect_ratio_slider.min" data-test="aspect-slider-min" @change="setSliderEndpoint('min', $event)"><option v-for="ratio in sliderRatioOptions" :key="ratio" :value="ratio">{{ ratio }}</option></select></label>
-            <label class="mw-field">最大宽高比<select class="input" :value="product.capabilities.aspect_ratio_slider.max" data-test="aspect-slider-max" @change="setSliderEndpoint('max', $event)"><option v-for="ratio in sliderRatioOptions" :key="ratio" :value="ratio">{{ ratio }}</option></select></label>
-          </div>
-          <p v-if="aspectSliderError" class="mw-field-error" role="alert" data-test="aspect-slider-error">{{ aspectSliderError }}</p>
-        </div>
         <div v-if="supportsNativeOutputFormat || product.capabilities.output_formats?.length" class="mw-field" data-test="native-output-formats">
           <span>生成时的原生图片格式</span>
           <div class="mw-token-presets" role="group" aria-label="已确认的上游输出格式">
@@ -126,36 +117,6 @@ const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [o
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const baseRatioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const ratioPresets = computed(() => props.product.media_type === 'image' ? [...baseRatioPresets, '1:4', '4:1', '1:8', '8:1'] : baseRatioPresets)
-function ratioNumber(value: string): number | undefined {
-  if (!/^\d+:\d+$/.test(value)) return undefined
-  const [width, height] = value.split(':').map(Number)
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || !width || !height || width > 32768 || height > 32768) return undefined
-  return width / height
-}
-const sliderRatioOptions = computed(() => [...new Set(props.product.capabilities.aspect_ratios)].filter(value => ratioNumber(value) !== undefined).sort((a, b) => ratioNumber(a)! - ratioNumber(b)!))
-const aspectSliderError = computed(() => {
-  const slider = props.product.capabilities.aspect_ratio_slider
-  if (!slider?.enabled) return ''
-  const min = ratioNumber(slider.min), max = ratioNumber(slider.max)
-  if (min === undefined || max === undefined || min > max || !sliderRatioOptions.value.includes(slider.min) || !sliderRatioOptions.value.includes(slider.max)) return '滑块端点须为已配置的正整数比例，且最小宽高比不大于最大宽高比。'
-  if (props.product.capabilities.aspect_ratios.some(value => { const n = ratioNumber(value); return n === undefined || n < min || n > max })) return '存在范围外或非数值比例。请先调整比例列表并核对售价；当前不会自动删除比例或重写价格，服务端校验通过后才能发布。'
-  return ''
-})
-function toggleAspectSlider(event: Event) {
-  if (props.disabled || props.product.media_type !== 'image') return
-  const enabled = (event.target as HTMLInputElement).checked
-  const options = sliderRatioOptions.value
-  if (enabled && !options.length) return
-  edit(next => {
-    next.capabilities.aspect_ratio_slider = { enabled, mode: 'discrete', min: next.capabilities.aspect_ratio_slider?.min || options[0] || '', max: next.capabilities.aspect_ratio_slider?.max || options[options.length - 1] || '' }
-  })
-}
-function setSliderEndpoint(endpoint: 'min' | 'max', event: Event) {
-  if (props.disabled || props.product.media_type !== 'image') return
-  const value = (event.target as HTMLSelectElement).value
-  if (!sliderRatioOptions.value.includes(value)) return
-  edit(next => { if (next.capabilities.aspect_ratio_slider) next.capabilities.aspect_ratio_slider[endpoint] = value })
-}
 const supportsNativeOutputFormat = computed(() => props.product.media_type === 'image' && (props.nativeAdapter?.kind ?? props.binding?.kind) === 'openai_images')
 function toggleOutputFormat(format: string) {
   if (props.disabled || !supportsNativeOutputFormat.value) return
