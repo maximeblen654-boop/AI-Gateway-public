@@ -108,7 +108,9 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     }
     const assets = refs ? [{ kind: 'image', asset_ref: await upload(user) }] : []
     let preparation_id
-    if (refs && selected.video_profile?.inputMode === 'references') {
+    // The real WAN inline_multimedia profile still requires Account-bound
+    // reference preparation. Its inputMode is the wire mode, not "references".
+    if (refs) {
       preparation_id = ok(await media(user, kind, 'prepare', { offer_id: selected.offer_id, model: 'WAN3.0-可参考视频', spec: { resolution: '720p', duration_seconds: 5, aspect_ratio: '16:9' }, assets })).preparation_id
     }
     return ok(await media(user, kind, 'quotes', { client_key: randomUUID(), offer_id: selected.offer_id, model: 'WAN3.0-可参考视频', prompt, duration: 5, resolution: '720p', ratio: '16:9', assets, ...(preparation_id ? { preparation_id } : {}) }))
