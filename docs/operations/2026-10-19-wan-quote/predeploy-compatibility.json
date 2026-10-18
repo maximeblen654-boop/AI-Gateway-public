@@ -1,0 +1,54 @@
+{
+  "verification_assertions_pass": true,
+  "old_v0_config_readable": true,
+  "old_new_cost_config_readable": false,
+  "new_v0_and_new_cost_config_readable": true,
+  "old_loose_roundtrip_discards_new_cost_fields": true,
+  "semantic_publish_validation_tested": false,
+  "service_or_worker_started": false,
+  "database_or_production_accessed": false,
+  "dependency_downloads": false,
+  "result_sha256": "085d7702fd09453bc90934f8cdc36d07b2aa8ae18b37fe6981ea8fef2d6559d0",
+  "source_revisions": {
+    "old": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+    "new": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1"
+  },
+  "matrix": {
+    "old": {
+      "cases": 7,
+      "assertions_passed": 7,
+      "strict_accepted": 1,
+      "source_files": 22
+    },
+    "new": {
+      "cases": 7,
+      "assertions_passed": 7,
+      "strict_accepted": 7,
+      "source_files": 23
+    }
+  },
+  "stages": [
+    {
+      "stage": "no_new_format_written",
+      "application_downgrade": "CONDITIONAL",
+      "condition": "quiesced related writers, old strict decoder accepts all protected Config/task snapshots, ownership and in-flight gates pass; never restore whole DB"
+    },
+    {
+      "stage": "new_cost_draft_written",
+      "application_downgrade": "UNSAFE",
+      "reason": "old strict Config decoder rejects cost_version/cost_rules even when Published remains v0"
+    },
+    {
+      "stage": "new_cost_publication_written",
+      "application_downgrade": "UNSAFE",
+      "reason": "old Product/Offer types reject new fields; data and frozen identity must stay intact"
+    },
+    {
+      "stage": "new_cost_quote_order_task_written",
+      "application_downgrade": "UNSAFE",
+      "reason": "old strict stores and Accounting Source validators reject studio_published_cost; compatible recovery owner required"
+    }
+  ],
+  "removed_compilation_cache_bytes": 122468365,
+  "retained_bytes_before_summary": 585509
+}

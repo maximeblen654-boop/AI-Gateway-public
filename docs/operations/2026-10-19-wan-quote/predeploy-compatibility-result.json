@@ -1,0 +1,516 @@
+{
+  "scope": "offline synthetic Config decoding; no Core/worker/database/network/production action",
+  "production_action": false,
+  "dependency_downloads": false,
+  "versions": {
+    "old": {
+      "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+      "package_roots": [
+        "internal/imageplan",
+        "internal/mediaworkbench",
+        "internal/modelmapping",
+        "internal/pkg/errors",
+        "internal/videoplan"
+      ],
+      "source_manifest": [
+        {
+          "path": "backend/go.mod",
+          "bytes": 10317,
+          "sha256": "06f0c3298455011ba189754f5e2c21be1d6dbbf36bf35071db0bf242c4d6d94c",
+          "git_blob": "3c147c52013c09891f1292454f68d6d3ff99b4f8"
+        },
+        {
+          "path": "backend/go.sum",
+          "bytes": 71967,
+          "sha256": "e05df3103c41770e7ee1103dbd749a2c1201504b39147fdd1bf16e96acc8e46b",
+          "git_blob": "5870b50097539c6fa180db54904d23d67a88214d"
+        },
+        {
+          "path": "backend/internal/imageplan/json.go",
+          "bytes": 7119,
+          "sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b",
+          "git_blob": "dd29a9fea5e4c9755179171232e2774c8177c1a7"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/adapter.go",
+          "bytes": 23409,
+          "sha256": "bc93e8540e301c5d8c8341a2b06040254ada4b8a378d19dc4490cb4b74376258",
+          "git_blob": "4aad9531dcc0beaa12c86236f310824d0b845359"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/draft_management.go",
+          "bytes": 3008,
+          "sha256": "48f1a7ea27c0efed0a5910bc2870eda95de06a0dd0fc59c82d958b9b21f08e51",
+          "git_blob": "2fb1f4824d13737f736f678c56a569231236cb9f"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/image_dimensions.go",
+          "bytes": 2677,
+          "sha256": "e1ce8b682c29ef2ceada1a5cd057f8f94e2f4b883afe090923c36834250ae9b9",
+          "git_blob": "0d82178431713c1050f4cc3b375a12b363a07543"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/lifecycle.go",
+          "bytes": 5232,
+          "sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4",
+          "git_blob": "6e4c9bae489fc2f6a0afc5b5e30078af7773760c"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/media.go",
+          "bytes": 22822,
+          "sha256": "231c8d47be8bad21cd70f2335ec995824027174f7d375749b9a87aa8aa373088",
+          "git_blob": "8e4e89848685069c23fae14af000ae7cb1761165"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/preflight.go",
+          "bytes": 3080,
+          "sha256": "89013c88678fe7d3393be17a639aefc3b3c1650103c600f816dbf15d95e765e4",
+          "git_blob": "d15d7e4fb843c1e60fcb1c9a10c64c64671488c8"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/product_availability.go",
+          "bytes": 4181,
+          "sha256": "28ffcaa2e832d2e1f58974f3b3f0ba71b6b8fa0107aa31b5c3f16435b4774f80",
+          "git_blob": "13f0bc630118f7f45794722700e70c084468e1d1"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/product_state.go",
+          "bytes": 4311,
+          "sha256": "3c613bf05509a2dd5cccd98dda1f1957160817c3ec506013ec82ad4d82c1f48c",
+          "git_blob": "dc42c0351e19ef97262763988e3b1150ce2b04ee"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/publish_selected.go",
+          "bytes": 2934,
+          "sha256": "bef6f02b0d93a764470fb520ea6d12e4feeeb3f1d74adbff2187a9b9e0d4ae5a",
+          "git_blob": "fd7f96473f320184988072e38a5c2e9a3f3cb708"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/published_recovery.go",
+          "bytes": 1979,
+          "sha256": "40477c598d68fa88c5d890c0da012024cf6122ac86af3f2ae0cef7fc4bc24f6b",
+          "git_blob": "6024c4f482f979e279ab97a63845d3241955d9f1"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/runtime.go",
+          "bytes": 9832,
+          "sha256": "d52d4e2dd9fd7c5af90093c47458ad25eb4cc177c56dedb117d3b13058e6b2fa",
+          "git_blob": "633a3cd5b5794eab5b9ff7f0d1ee9211651b18dc"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/validator.go",
+          "bytes": 25474,
+          "sha256": "6843dc65d50381c5cfd460f45144583648f33f4c29026abfae0e67cfb9aee4e0",
+          "git_blob": "8e6598c6d16540dd068542289a91346c68bf759c"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/video_runtime.go",
+          "bytes": 5125,
+          "sha256": "54b1a426738a713355396bf27d7036abf4582ef328118a5bdb9152a40b11fcd1",
+          "git_blob": "b38efd6983a600aa95a8c0f6cad9f089bf458420"
+        },
+        {
+          "path": "backend/internal/modelmapping/mapping.go",
+          "bytes": 1756,
+          "sha256": "2279ff84870899e059920d3793e0e5c70f3f464aa8b394d4d6c428c266019f7f",
+          "git_blob": "58de96c2e86bc07cebf45ea70fb4aa9dc797f00c"
+        },
+        {
+          "path": "backend/internal/pkg/errors/errors.go",
+          "bytes": 3903,
+          "sha256": "631a3e14a7120471cb3e11a328af439379350f023172ff75e1410c860bb72425",
+          "git_blob": "89977f99cb52550bd2aaf65cf6c2263fa43b1348"
+        },
+        {
+          "path": "backend/internal/pkg/errors/http.go",
+          "bytes": 753,
+          "sha256": "e206ee307b2f54c85b1bd0cfed76ca0f805451f73f6ed128fc1411ac8c117699",
+          "git_blob": "420c69a3b26ba0d83de149f57e258c4b60e78b42"
+        },
+        {
+          "path": "backend/internal/pkg/errors/types.go",
+          "bytes": 4043,
+          "sha256": "9cbe2f0eee91eab85194363668784c17948ef8bac5b4caeb55a09eb3fb014569",
+          "git_blob": "21dfbeb8106e1d66b773bc66d45872c1d5639ea3"
+        },
+        {
+          "path": "backend/internal/videoplan/contract.json",
+          "bytes": 28608,
+          "sha256": "0132085e1c47433b6db1d99786277f2389440772dc946c9b746ed4317163e37a",
+          "git_blob": "02016029324aa71db7109f52e7017072dbc69cc1"
+        },
+        {
+          "path": "backend/internal/videoplan/plan.go",
+          "bytes": 12938,
+          "sha256": "c2c19ccb43e688d1d6c183044236b99ecf2378d96f94289c14ec15b04fdc63f7",
+          "git_blob": "d4e7a78548e6f214aa75e5a3126074c3c8a0fe4a"
+        }
+      ],
+      "command": [
+        "C:\\Users\\pc\\go\\pkg\\mod\\golang.org\\toolchain@v0.0.1-go1.27.2.windows-amd64\\bin\\go.exe",
+        "run",
+        "-mod=readonly",
+        "-modfile=offline.mod",
+        "-p=1",
+        "./cmd/compatibility",
+        "old"
+      ],
+      "cwd": "D:\\AI-Gateway\\.codex-tmp\\predeploy-8ad2eff-20261019\\compatibility\\sources\\old\\backend",
+      "offline_build_module_sha256": "dc4074b84f7cafdab545fcaded828f5b0977b9d281f3820ddaf8251e9db34ca7",
+      "harness_sha256": "ea447d0d8267c7dfc5fe0dcf68463d0aef69cc590921ad8278cc781afd8baf36",
+      "exit_code": 0,
+      "result": {
+        "cases": [
+          {
+            "name": "v0_baseline",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 0,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "draft_product_cost_version",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_version\"",
+            "strict_expected": false,
+            "new_fields_before": 1,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          },
+          {
+            "name": "draft_product_cost_rules",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_rules\"",
+            "strict_expected": false,
+            "new_fields_before": 1,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          },
+          {
+            "name": "published_product_cost_version",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_version\"",
+            "strict_expected": false,
+            "new_fields_before": 1,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          },
+          {
+            "name": "published_product_cost_rules",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_rules\"",
+            "strict_expected": false,
+            "new_fields_before": 1,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          },
+          {
+            "name": "published_offer_cost_version",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_version\"",
+            "strict_expected": false,
+            "new_fields_before": 1,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          },
+          {
+            "name": "full_v1_config",
+            "strict_accepted": false,
+            "strict_error": "json: unknown field \"cost_rules\"",
+            "strict_expected": false,
+            "new_fields_before": 5,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": false,
+            "pass": true
+          }
+        ],
+        "pass": true,
+        "scope": "actual typed Config strict decoder and loose roundtrip only; no business validation, DB, application or worker",
+        "version": "old"
+      }
+    },
+    "new": {
+      "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+      "package_roots": [
+        "internal/imageplan",
+        "internal/mediaworkbench",
+        "internal/modelmapping",
+        "internal/pkg/errors",
+        "internal/videoplan"
+      ],
+      "source_manifest": [
+        {
+          "path": "backend/go.mod",
+          "bytes": 10317,
+          "sha256": "06f0c3298455011ba189754f5e2c21be1d6dbbf36bf35071db0bf242c4d6d94c",
+          "git_blob": "3c147c52013c09891f1292454f68d6d3ff99b4f8"
+        },
+        {
+          "path": "backend/go.sum",
+          "bytes": 71967,
+          "sha256": "e05df3103c41770e7ee1103dbd749a2c1201504b39147fdd1bf16e96acc8e46b",
+          "git_blob": "5870b50097539c6fa180db54904d23d67a88214d"
+        },
+        {
+          "path": "backend/internal/imageplan/json.go",
+          "bytes": 7119,
+          "sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b",
+          "git_blob": "dd29a9fea5e4c9755179171232e2774c8177c1a7"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/adapter.go",
+          "bytes": 23965,
+          "sha256": "23b6faf6c65b96229cc379c09768064ed519732b2b6e7704dd6797641ae6d1bb",
+          "git_blob": "ef1288fc454d037058f4debfb4b696beeeda1791"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/cost.go",
+          "bytes": 4552,
+          "sha256": "a452a6091a6eab8018e5f44b1312d270c5b8d6a5dc0c040d2b65bfb0a690e564",
+          "git_blob": "221cf65dfd07874bc67059fce89a6a6895eece55"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/draft_management.go",
+          "bytes": 3053,
+          "sha256": "61f6b02bf3f44313a80249bda8526e088ce434f59700432e6fcb482c39ac894c",
+          "git_blob": "79b0539f3374bd765945adf98f9f8380cd969eb1"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/image_dimensions.go",
+          "bytes": 2677,
+          "sha256": "e1ce8b682c29ef2ceada1a5cd057f8f94e2f4b883afe090923c36834250ae9b9",
+          "git_blob": "0d82178431713c1050f4cc3b375a12b363a07543"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/lifecycle.go",
+          "bytes": 5232,
+          "sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4",
+          "git_blob": "6e4c9bae489fc2f6a0afc5b5e30078af7773760c"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/media.go",
+          "bytes": 23367,
+          "sha256": "da9f07d59adaf720dee8a020bf8a51b1e0c68e0bc5da7fd36cd3c7a148a54ea9",
+          "git_blob": "e8ca39fa683bd24aa0c8c15b09424ddb0d930ddc"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/preflight.go",
+          "bytes": 3080,
+          "sha256": "89013c88678fe7d3393be17a639aefc3b3c1650103c600f816dbf15d95e765e4",
+          "git_blob": "d15d7e4fb843c1e60fcb1c9a10c64c64671488c8"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/product_availability.go",
+          "bytes": 4286,
+          "sha256": "b331ae90c2992ddd65ed01dddaa635dfc7d7a170db5e0c92488371af9ba7d3d0",
+          "git_blob": "6a27afafcc97a25cd6ade15bde9843a218f0feb4"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/product_state.go",
+          "bytes": 4311,
+          "sha256": "3c613bf05509a2dd5cccd98dda1f1957160817c3ec506013ec82ad4d82c1f48c",
+          "git_blob": "dc42c0351e19ef97262763988e3b1150ce2b04ee"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/publish_selected.go",
+          "bytes": 3078,
+          "sha256": "713b97cf49f4bca06ad35a53765d22a65819306cecfa30b84d50a79a5f03f2b2",
+          "git_blob": "f9e0a955e55e2ed1d94ce5cc8381cc2e6a3aab3e"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/published_recovery.go",
+          "bytes": 1979,
+          "sha256": "40477c598d68fa88c5d890c0da012024cf6122ac86af3f2ae0cef7fc4bc24f6b",
+          "git_blob": "6024c4f482f979e279ab97a63845d3241955d9f1"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/runtime.go",
+          "bytes": 9832,
+          "sha256": "d52d4e2dd9fd7c5af90093c47458ad25eb4cc177c56dedb117d3b13058e6b2fa",
+          "git_blob": "633a3cd5b5794eab5b9ff7f0d1ee9211651b18dc"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/validator.go",
+          "bytes": 25678,
+          "sha256": "9ee68e98cb71a6b3fe345023ec7842466ef16ada66bbafbeb10c7ff5eae4a290",
+          "git_blob": "3a41d5cd272e181b35d0e47227852dfbe3eb6d40"
+        },
+        {
+          "path": "backend/internal/mediaworkbench/video_runtime.go",
+          "bytes": 5125,
+          "sha256": "54b1a426738a713355396bf27d7036abf4582ef328118a5bdb9152a40b11fcd1",
+          "git_blob": "b38efd6983a600aa95a8c0f6cad9f089bf458420"
+        },
+        {
+          "path": "backend/internal/modelmapping/mapping.go",
+          "bytes": 1756,
+          "sha256": "2279ff84870899e059920d3793e0e5c70f3f464aa8b394d4d6c428c266019f7f",
+          "git_blob": "58de96c2e86bc07cebf45ea70fb4aa9dc797f00c"
+        },
+        {
+          "path": "backend/internal/pkg/errors/errors.go",
+          "bytes": 3903,
+          "sha256": "631a3e14a7120471cb3e11a328af439379350f023172ff75e1410c860bb72425",
+          "git_blob": "89977f99cb52550bd2aaf65cf6c2263fa43b1348"
+        },
+        {
+          "path": "backend/internal/pkg/errors/http.go",
+          "bytes": 753,
+          "sha256": "e206ee307b2f54c85b1bd0cfed76ca0f805451f73f6ed128fc1411ac8c117699",
+          "git_blob": "420c69a3b26ba0d83de149f57e258c4b60e78b42"
+        },
+        {
+          "path": "backend/internal/pkg/errors/types.go",
+          "bytes": 4043,
+          "sha256": "9cbe2f0eee91eab85194363668784c17948ef8bac5b4caeb55a09eb3fb014569",
+          "git_blob": "21dfbeb8106e1d66b773bc66d45872c1d5639ea3"
+        },
+        {
+          "path": "backend/internal/videoplan/contract.json",
+          "bytes": 28608,
+          "sha256": "0132085e1c47433b6db1d99786277f2389440772dc946c9b746ed4317163e37a",
+          "git_blob": "02016029324aa71db7109f52e7017072dbc69cc1"
+        },
+        {
+          "path": "backend/internal/videoplan/plan.go",
+          "bytes": 12938,
+          "sha256": "c2c19ccb43e688d1d6c183044236b99ecf2378d96f94289c14ec15b04fdc63f7",
+          "git_blob": "d4e7a78548e6f214aa75e5a3126074c3c8a0fe4a"
+        }
+      ],
+      "command": [
+        "C:\\Users\\pc\\go\\pkg\\mod\\golang.org\\toolchain@v0.0.1-go1.27.2.windows-amd64\\bin\\go.exe",
+        "run",
+        "-mod=readonly",
+        "-modfile=offline.mod",
+        "-p=1",
+        "./cmd/compatibility",
+        "new"
+      ],
+      "cwd": "D:\\AI-Gateway\\.codex-tmp\\predeploy-8ad2eff-20261019\\compatibility\\sources\\new\\backend",
+      "offline_build_module_sha256": "dc4074b84f7cafdab545fcaded828f5b0977b9d281f3820ddaf8251e9db34ca7",
+      "harness_sha256": "ea447d0d8267c7dfc5fe0dcf68463d0aef69cc590921ad8278cc781afd8baf36",
+      "exit_code": 0,
+      "result": {
+        "cases": [
+          {
+            "name": "v0_baseline",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 0,
+            "new_fields_after": 0,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "draft_product_cost_version",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 1,
+            "new_fields_after": 1,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "draft_product_cost_rules",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 1,
+            "new_fields_after": 1,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "published_product_cost_version",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 1,
+            "new_fields_after": 1,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "published_product_cost_rules",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 1,
+            "new_fields_after": 1,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "published_offer_cost_version",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 1,
+            "new_fields_after": 1,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          },
+          {
+            "name": "full_v1_config",
+            "strict_accepted": true,
+            "strict_expected": true,
+            "new_fields_before": 5,
+            "new_fields_after": 5,
+            "loose_preserves_new_fields": true,
+            "pass": true
+          }
+        ],
+        "pass": true,
+        "scope": "actual typed Config strict decoder and loose roundtrip only; no business validation, DB, application or worker",
+        "version": "new"
+      }
+    }
+  },
+  "pass": true,
+  "go_version": "go version go1.27.2 windows/amd64",
+  "environment": {
+    "GOPROXY": "off",
+    "GOSUMDB": "off",
+    "GOTOOLCHAIN": "local",
+    "GOWORK": "off",
+    "GOMODCACHE": "D:\\AI-Gateway\\.codex-tmp\\predeploy-8ad2eff-20261019\\compatibility\\module-cache",
+    "GOCACHE": "D:\\AI-Gateway\\.codex-tmp\\predeploy-8ad2eff-20261019\\compatibility\\go-cache",
+    "GOTMPDIR": "D:\\AI-Gateway\\.codex-tmp\\predeploy-8ad2eff-20261019\\compatibility\\go-tmp",
+    "GOMEMLIMIT": "128MiB",
+    "GOMAXPROCS": "2"
+  },
+  "offline_dependencies": [
+    {
+      "module": "github.com/shopspring/decimal",
+      "version": "v1.4.0",
+      "cached_go_mod_sha256": "fc8a8e1fa14e49884ec9f962563a4ef51fa0a9bbfb7dbcb2ec8958e1f00988c9"
+    },
+    {
+      "module": "github.com/tidwall/gjson",
+      "version": "v1.18.0",
+      "cached_go_mod_sha256": "d94eecd8050cffc957b99bed8a308efeaa669ac13854290d081a2ded5478af93"
+    },
+    {
+      "module": "github.com/tidwall/sjson",
+      "version": "v1.2.5",
+      "cached_go_mod_sha256": "38b09323ab8ef8f803b3d86bae2c94765d3815a2d5b751fd4f07039f4551cc6f"
+    },
+    {
+      "module": "github.com/tidwall/match",
+      "version": "v1.1.1",
+      "cached_go_mod_sha256": "02364e515327d9988d1f6bd37af9c584f8b98d3b4f43f9e1f18e26d76aec0f44"
+    },
+    {
+      "module": "github.com/tidwall/pretty",
+      "version": "v1.2.0",
+      "cached_go_mod_sha256": "6e5c5fa493d8f18e8974b38ed63e8c71863cce59e659d98d0ef8417bf81e3ecf"
+    }
+  ],
+  "elapsed_seconds": 11.813,
+  "script_sha256": "e76d87287fbf522aaa3798a908d05124ff79efdb156ad4727eac619ceb71c4f2",
+  "total_bytes": 123053980
+}

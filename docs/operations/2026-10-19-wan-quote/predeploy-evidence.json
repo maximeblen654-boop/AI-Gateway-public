@@ -1,0 +1,1267 @@
+{
+  "status": "READY_FOR_EXPLICIT_DEPLOY_AUTHORIZATION",
+  "production_application_switched": false,
+  "candidate": {
+    "status": "ARTIFACTS_VERIFIED_NOT_LOADED_NOT_DEPLOYED",
+    "observed_utc": "2026-10-18T21:16:50.079459+00:00",
+    "directory": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z",
+    "artifacts": [
+      {
+        "artifact": 12149012613,
+        "run": 39161087117,
+        "head_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+        "size": 243903787,
+        "digest": "sha256:e3c0f01272a2964a6e52d2ebc0cf070e825548238c113b0c526c5400a3d16c7a",
+        "expires_at": "2026-11-01T20:16:08Z",
+        "zip_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/artifact-12149012613.zip",
+        "zip_sha256": "e3c0f01272a2964a6e52d2ebc0cf070e825548238c113b0c526c5400a3d16c7a",
+        "extracted_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/original"
+      },
+      {
+        "artifact": 12149958347,
+        "run": 39164189216,
+        "head_sha": "bc90cb09105eaca5434c4464a9fd1e0d09a81f71",
+        "size": 21746223,
+        "digest": "sha256:b996a052802086a3b8d6f5bff66de32019266f0abebc9ef0c32b772807915232",
+        "expires_at": "2026-11-01T20:42:47Z",
+        "zip_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/artifact-12149958347.zip",
+        "zip_sha256": "b996a052802086a3b8d6f5bff66de32019266f0abebc9ef0c32b772807915232",
+        "extracted_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/final-evidence"
+      }
+    ],
+    "original_manifest_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/original/manifest.json",
+    "original_manifest_sha256": "26eee6fb0646029629169eaf2e289016b2dacec53e28ca8d6537c5e7f587718b",
+    "original_acceptance": "NOT_PASSED",
+    "final_manifest_path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/final-evidence/native-candidate-output/manifest.json",
+    "final_manifest_sha256": "485c4a8fcc54b31bb415304366f9244d33ed95a9fb63a6c43f0779451a7d0dca",
+    "final_acceptance": "PASS",
+    "images": [
+      {
+        "component": "core",
+        "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+        "tar": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/original/core-8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1.tar.gz",
+        "tar_sha256": "4b7340643da2095e32af304b59b62946709dad888932cb1570fa2134d392ef41",
+        "tar_bytes": 62086181,
+        "archive_member_bytes": 153075324,
+        "oci_layer_bytes": 153055744,
+        "config_digest": "sha256:76a084ae2d253dfaf1d48fa5af2c8dfa8775a230c6e95822686fc25d5a0e965c",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:02246764463d28040bd4917ca4c6d0a9903d9977f377648ddb528e46b2e71d48",
+            "config_digest": "sha256:76a084ae2d253dfaf1d48fa5af2c8dfa8775a230c6e95822686fc25d5a0e965c"
+          }
+        ],
+        "source_label_verified": true,
+        "all_layers_verified": true
+      },
+      {
+        "component": "bridge",
+        "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+        "tar": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/original/bridge-8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1.tar.gz",
+        "tar_sha256": "e4c91eec68ee3fd9eeee62450accdf387610db0df4d04720cc92dd5034aa90c3",
+        "tar_bytes": 19128260,
+        "archive_member_bytes": 47095310,
+        "oci_layer_bytes": 47086592,
+        "config_digest": "sha256:5845bd670349d4c363c2732c248744a1de03b6329b7a34d9f1296c8150189bc0",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:b3f8836b60b2baad304bb78747fea1e70298f865a1fba9fbf122f8409bc6b11b",
+            "config_digest": "sha256:5845bd670349d4c363c2732c248744a1de03b6329b7a34d9f1296c8150189bc0"
+          }
+        ],
+        "source_label_verified": true,
+        "all_layers_verified": true
+      },
+      {
+        "component": "bff",
+        "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+        "tar": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/original/bff-8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1.tar.gz",
+        "tar_sha256": "726eaababccb16855fc1013c103b59c49029868f7b80dac8b0a622aa157da413",
+        "tar_bytes": 120296320,
+        "archive_member_bytes": 304486114,
+        "oci_layer_bytes": 304464896,
+        "config_digest": "sha256:88ad43ec7b56f4f47ef653f26d3eed6187c8dcd9f00a433bedc2c9698cde39c8",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:a15a5581e39eca3cd1dbe7d6faeb379cff23cc416a3b3539d39750ebd3e7b4cf",
+            "config_digest": "sha256:88ad43ec7b56f4f47ef653f26d3eed6187c8dcd9f00a433bedc2c9698cde39c8"
+          }
+        ],
+        "source_label_verified": true,
+        "all_layers_verified": true
+      }
+    ],
+    "docker_load": false,
+    "production_application_started": false,
+    "free_bytes": 24631791616
+  },
+  "current_production": {
+    "observed_utc": "2026-10-18T21:46:13.411865+00:00",
+    "finished_utc": "2026-10-18T21:46:19.819494+00:00",
+    "source_expected": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+    "containers": {
+      "sub2api": {
+        "id": "314e273f985c94aa79cea2de1c3cd155f20db6406556f0bd93ac2759454f80ff",
+        "image_id": "sha256:5f4aa40e4d9acc693ec17144107cfa8e00aeddfb83d33ce070f86f3052d07907",
+        "configured_image": "native-candidate-core:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "repo_digests": [
+          "native-candidate-core@sha256:5f4aa40e4d9acc693ec17144107cfa8e00aeddfb83d33ce070f86f3052d07907"
+        ],
+        "started_at": "2026-10-18T17:18:07.323057013Z",
+        "healthy": "healthy",
+        "network": "deploy_sub2api-network",
+        "mounts": [
+          {
+            "Type": "volume",
+            "Source": "/var/lib/docker/volumes/deploy_sub2api_data/_data",
+            "Destination": "/app/data",
+            "RW": true
+          }
+        ]
+      },
+      "studio-v2-bridge": {
+        "id": "90aea5fad4de4cd3c87194946b0ddd88d4e60ab8b0cb3c8283931aa48947206e",
+        "image_id": "sha256:8d107297b2f73be71c74475052ff77f150a3b62bf774749f094d5c85d8f005d5",
+        "configured_image": "native-candidate-bridge:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "repo_digests": [
+          "native-candidate-bridge@sha256:8d107297b2f73be71c74475052ff77f150a3b62bf774749f094d5c85d8f005d5"
+        ],
+        "started_at": "2026-10-18T17:18:14.065175356Z",
+        "healthy": "healthy",
+        "network": "container:314e273f985c94aa79cea2de1c3cd155f20db6406556f0bd93ac2759454f80ff",
+        "mounts": []
+      },
+      "studio-v2-bff": {
+        "id": "5ad21f308e2e842500cbd17a4a1412a44fcc8f46dae397ad71de73c782071fa4",
+        "image_id": "sha256:a3a3e3bffb8803523f65bffbf01a283ddf2660d04dd3295107b7a1bd7ae2c5a4",
+        "configured_image": "native-candidate-bff:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+        "repo_digests": [
+          "native-candidate-bff@sha256:a3a3e3bffb8803523f65bffbf01a283ddf2660d04dd3295107b7a1bd7ae2c5a4"
+        ],
+        "started_at": "2026-10-18T17:18:34.883454017Z",
+        "healthy": "healthy",
+        "network": "container:314e273f985c94aa79cea2de1c3cd155f20db6406556f0bd93ac2759454f80ff",
+        "mounts": [
+          {
+            "Type": "bind",
+            "Source": "/var/lib/ai-gateway/studio-v2/assets",
+            "Destination": "/state/assets",
+            "RW": true
+          },
+          {
+            "Type": "bind",
+            "Source": "/var/lib/ai-gateway/studio-v2/images",
+            "Destination": "/state/images",
+            "RW": true
+          },
+          {
+            "Type": "bind",
+            "Source": "/var/lib/ai-gateway/studio-v2/videos",
+            "Destination": "/state/videos",
+            "RW": true
+          }
+        ]
+      },
+      "sub2api-postgres": {
+        "id": "0518818e9e0e652a8cd951f03f1e6e7c84c0a57ce9db702fdc598de1a911b0b2",
+        "image_id": "sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd",
+        "configured_image": "postgres:18-alpine",
+        "source_sha": null,
+        "repo_digests": [
+          "postgres@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd"
+        ],
+        "started_at": "2026-09-24T06:18:20.031522595Z",
+        "healthy": "healthy",
+        "network": "deploy_sub2api-network",
+        "mounts": [
+          {
+            "Type": "volume",
+            "Source": "/var/lib/docker/volumes/12177a81d58383a56698e1a4217a41d617a8e651340d973c58014dfe73595da0/_data",
+            "Destination": "/var/lib/postgresql",
+            "RW": true
+          },
+          {
+            "Type": "volume",
+            "Source": "/var/lib/docker/volumes/deploy_postgres_data/_data",
+            "Destination": "/var/lib/postgresql/data",
+            "RW": true
+          }
+        ]
+      },
+      "sub2api-redis": {
+        "id": "53d911123133508ad70cb9e2b7fde3ab8711fd509b02605fa2c9483b2dbb3a4a",
+        "image_id": "sha256:bd999b5cfee25fb24b8320a31fddbd69f462df44c8138c66e369582937beebc0",
+        "configured_image": "redis:8-alpine",
+        "source_sha": null,
+        "repo_digests": [
+          "redis@sha256:bd999b5cfee25fb24b8320a31fddbd69f462df44c8138c66e369582937beebc0"
+        ],
+        "started_at": "2026-09-24T06:18:20.031121692Z",
+        "healthy": "healthy",
+        "network": "deploy_sub2api-network",
+        "mounts": [
+          {
+            "Type": "volume",
+            "Source": "/var/lib/docker/volumes/deploy_redis_data/_data",
+            "Destination": "/data",
+            "RW": true
+          }
+        ]
+      }
+    },
+    "compose": {
+      "files": {
+        "/home/ubuntu/services/ai-gateway/phase5-launch-20261010-final-3bb336b/compose.json": {
+          "sha256": "50163e21e3617d49efb41c0d7b14141a5de05aa7a200b001f64d45c96deb67ac",
+          "bytes": 10841
+        },
+        "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/compose.override.json": {
+          "sha256": "934460af4b3e2d69e8cd9c0869ab0229d8704eab9ddd544784185d5f4a81166d",
+          "bytes": 798
+        }
+      },
+      "working_directory": "/home/ubuntu/services/ai-gateway/phase5-launch-20261010-final-3bb336b",
+      "services": {
+        "studio-bff": {
+          "image": "native-candidate-bff:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+          "network_mode": "service:sub2api",
+          "depends_on": {
+            "studio-bridge": {
+              "condition": "service_healthy",
+              "required": true
+            },
+            "sub2api": {
+              "condition": "service_started",
+              "restart": true,
+              "required": true
+            }
+          },
+          "volumes": [
+            {
+              "type": "bind",
+              "source": "/var/lib/ai-gateway/studio-v2/assets",
+              "target": "/state/assets",
+              "bind": {
+                "create_host_path": false
+              }
+            },
+            {
+              "type": "bind",
+              "source": "/var/lib/ai-gateway/studio-v2/images",
+              "target": "/state/images",
+              "bind": {
+                "create_host_path": false
+              }
+            },
+            {
+              "type": "bind",
+              "source": "/var/lib/ai-gateway/studio-v2/videos",
+              "target": "/state/videos",
+              "bind": {
+                "create_host_path": false
+              }
+            }
+          ]
+        },
+        "studio-bridge": {
+          "image": "native-candidate-bridge:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+          "network_mode": "service:sub2api",
+          "depends_on": {
+            "sub2api": {
+              "condition": "service_healthy",
+              "required": true
+            }
+          }
+        },
+        "sub2api": {
+          "image": "native-candidate-core:b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+          "volumes": [
+            {
+              "type": "volume",
+              "source": "sub2api_data",
+              "target": "/app/data",
+              "volume": {}
+            }
+          ],
+          "ports": [
+            {
+              "mode": "ingress",
+              "host_ip": "127.0.0.1",
+              "target": 8080,
+              "published": "8080",
+              "protocol": "tcp"
+            },
+            {
+              "mode": "ingress",
+              "host_ip": "127.0.0.1",
+              "target": 8091,
+              "published": "8094",
+              "protocol": "tcp"
+            },
+            {
+              "mode": "ingress",
+              "host_ip": "127.0.0.1",
+              "target": 4173,
+              "published": "4174",
+              "protocol": "tcp"
+            }
+          ]
+        }
+      }
+    },
+    "submission_environment": {
+      "sub2api": {
+        "STUDIO_PAID_CONTROL_MODE": "managed-v1",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false",
+        "IMAGE_RECEIPT_WORKER_ENABLED": "false"
+      },
+      "studio-v2-bridge": {
+        "STUDIO_PAID_CONTROL_MODE": "managed-v1",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false"
+      },
+      "studio-v2-bff": {
+        "STUDIO_PAID_CONTROL_MODE": "managed-v1",
+        "STUDIO_IMAGE_PUBLISHED_SUBMISSION": "false",
+        "STUDIO_VIDEO_ACCOUNT_SUBMISSION": "false"
+      }
+    },
+    "paid": {
+      "image": {
+        "requested": true,
+        "effective": true,
+        "mode": "managed-v1",
+        "revision": "4210edb01c3604e0c108997515e1d0cca0a13fcf2a6f1f5fbb3bdd2378e7712f",
+        "evidence": "existing authenticated internal GET for effective + read-only settings for requested; no administrator session used"
+      },
+      "video": {
+        "requested": false,
+        "effective": false,
+        "mode": "managed-v1",
+        "revision": null,
+        "evidence": "existing authenticated internal GET for effective + read-only settings for requested; no administrator session used"
+      }
+    },
+    "core_program_sha256": "7e39ad2608ec527b871534130da64688649611d903b75d51350e2d1ed66125bc",
+    "caddy_file_sha256": "93f8d302978a6ceed1f5b9621c3ec5159309ea907f75a507500364bf41da0e23"
+  },
+  "business_protection": {
+    "before_utc": "2026-10-18T21:13:36.719786+00:00",
+    "after_utc": "2026-10-18T21:46:13.411865+00:00",
+    "protected_tables_unchanged": true,
+    "fingerprints": {
+      "account_groups": {
+        "rows": 2,
+        "sha256": "f2a4a435c2c1e3e80b4ef229e665983de575b821ee8d70cf2d47f061b40fb25a"
+      },
+      "accounts": {
+        "rows": 77,
+        "sha256": "9fde4dbe6229d874d8a1e494ac010aeee95f486b48eaf9c55f9f85ad5bf8c24e"
+      },
+      "api_keys": {
+        "rows": 4,
+        "sha256": "b9ef080bd228ee59ed2c04a4b634e4ac6ae58f1614a10813717640981d26b72b"
+      },
+      "auth_identity_channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_account_stats_pricing_rules": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_groups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_model_pricing": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_aggregation_watermark": {
+        "rows": 1,
+        "sha256": "2e35c5944998883bd172e893626fe21d68fba20a18827072925d6d72c587c26a"
+      },
+      "channel_monitor_daily_rollups": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_histories": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_request_templates": {
+        "rows": 5,
+        "sha256": "b27149d4887442b1f7f343b4c9c0c0b921e789decbd4ae2961a827c2d03afdf7"
+      },
+      "channel_monitor_v2_config": {
+        "rows": 1,
+        "sha256": "10ce7e77ba718b9b45c0c99f33cf270678008edf975b3ff84bce7e9198915087"
+      },
+      "channel_monitor_v2_error_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_error_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_latency_histograms_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_1m": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_user_metrics_rollup": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_monitor_v2_watermarks": {
+        "rows": 1,
+        "sha256": "3aff8a5b75c36e738b64b38065d7c329cedd9b75a6d1a5dbaad847560cddc861"
+      },
+      "channel_monitors": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channel_pricing_intervals": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "channels": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "groups": {
+        "rows": 31,
+        "sha256": "a5115ca2277caac85ec4b2aad6cba60653174a2065bd5ac5dd6621a485e3b14c"
+      },
+      "schema_migrations": {
+        "rows": 293,
+        "sha256": "8f2d72cd111f13d8f9ac5c037e1a3437ddca41085ad11e22d04ab43cec8bb7fa"
+      },
+      "studio_video_orders": {
+        "rows": 2,
+        "sha256": "1faced8dc9a6646fd5c84ca8f3cca9105ac8fa9934cedd8a55cbb4af3a947415"
+      },
+      "usage_billing_dedup": {
+        "rows": 26,
+        "sha256": "cec1bf18d68197c6099e6b16ddc8b09006fd408cdfaa0daab8d4cc09be3fb1ed"
+      },
+      "usage_logs": {
+        "rows": 26,
+        "sha256": "9c3140692d707e9f0b766b70479d4092dbe3160bb7ef0b1995975cf898d80716"
+      },
+      "users": {
+        "rows": 2,
+        "sha256": "84affda2ae5e2f3abed005b656d14f470c80692247258e570f890d4287b00382"
+      }
+    },
+    "exclusions": "only account updated_at/upstream_billing_probe, api_key last_used_at/updated_at and group updated_at for audit normalized hash; backup separately uses exact PG JSONB comparison",
+    "media_accounts": [
+      {
+        "account_id": 13,
+        "status": "active",
+        "record_version": 1,
+        "sales_enabled": false,
+        "mapping_md5": "264a2a732beb68ece72c89cdeda01a77",
+        "config_sha256": "e961ffa63e796d30dbd04c2c7b3e6c51873f980a33824460dbee9450843f9fff",
+        "published_revision": null,
+        "draft_revision": "mwd_2f10456ef2a32d12978460943069ca0b7ad67aa687993c7c8395b3000fc42f1a",
+        "validation_status": "FAIL",
+        "published_products": [],
+        "draft_products": [],
+        "offer_ids": []
+      },
+      {
+        "account_id": 20,
+        "status": "active",
+        "record_version": 1,
+        "sales_enabled": false,
+        "mapping_md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "config_sha256": "86d44e31ad18cc97bce9b0a7e8b9380dd9900f3b2384141974307b63cb98ccc8",
+        "published_revision": null,
+        "draft_revision": "mwd_2f10456ef2a32d12978460943069ca0b7ad67aa687993c7c8395b3000fc42f1a",
+        "validation_status": "FAIL",
+        "published_products": [],
+        "draft_products": [],
+        "offer_ids": []
+      },
+      {
+        "account_id": 44,
+        "status": "active",
+        "record_version": 5,
+        "sales_enabled": true,
+        "mapping_md5": "ff2167b772fda5ce83ae198945ff88c5",
+        "config_sha256": "c5d8a7834bab87084a0d9b378521f9b7eb281b1d2a8a42c951242b459fae8b5a",
+        "published_revision": "mwp_cd812618cca06e84bd65ea110bd92ba1e688d9e859f5cf7a84c1a3e1841270e3",
+        "draft_revision": "mwd_e5d9fd371233c85d355fcfb4d21f1089c75a7ba8f88b9eced1ed94ba54412b06",
+        "validation_status": "PASS",
+        "published_products": [
+          {
+            "product_id": "media-92a8e4ac-0ca9-4ece-bd6b-0921d2a55f97",
+            "site_model": "WAN3.0-可参考视频",
+            "upstream_model": "WAN3.0-可参考视频",
+            "media_type": "video",
+            "enabled": true,
+            "cost_version": 0,
+            "cost_rules_present": false,
+            "price_rules_sha256": "30b99da17484cd2b11b9f82081276947a3718194f619ab8efea1c36985db9a1b"
+          }
+        ],
+        "draft_products": [
+          {
+            "product_id": "media-92a8e4ac-0ca9-4ece-bd6b-0921d2a55f97",
+            "site_model": "WAN3.0-可参考视频",
+            "upstream_model": "WAN3.0-可参考视频",
+            "media_type": "video",
+            "enabled": true,
+            "cost_version": 0,
+            "cost_rules_present": false,
+            "price_rules_sha256": "30b99da17484cd2b11b9f82081276947a3718194f619ab8efea1c36985db9a1b"
+          }
+        ],
+        "offer_ids": [
+          "mw_offer_47009df5f8ec30d8b4785b9fff88a56bef52e07514a49d889b3b91016433fdc3",
+          "mw_offer_6a63fbdd3d6d1ceed5763b72aa447d462626d1e5e852a04c8e0c7914b6d876e7",
+          "mw_offer_f732b97b695dd647bf041bb40bcfe1d5c1c15d8ba9f199f1f0c889c0e606de6e"
+        ]
+      },
+      {
+        "account_id": 77,
+        "status": "active",
+        "record_version": 35,
+        "sales_enabled": true,
+        "mapping_md5": "a3ef7d6ff8b8b544f8ceb93800e05df2",
+        "config_sha256": "b7a2050f40a8e9d3cbbc8f9e9ea86ebf241d679b4162a3192134f760b06538f0",
+        "published_revision": "mwp_a2ba7043fbb0b9a9528879ba1f8d0fa32df963102bacdf803eb51e29da30f589",
+        "draft_revision": "mwd_7ceb9d8cfbf8fb9f5042de5f9f2286408bd055c6969d58956c434b0765a6fc61",
+        "validation_status": "PASS",
+        "published_products": [
+          {
+            "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+            "site_model": "gpt-image-2",
+            "upstream_model": "gpt-image-2",
+            "media_type": "image",
+            "enabled": true,
+            "cost_version": 0,
+            "cost_rules_present": false,
+            "price_rules_sha256": "a124ad397a90643d511803a12f6571c9387e0229624dad10696c14fd155eb72f"
+          }
+        ],
+        "draft_products": [
+          {
+            "product_id": "media-290f101c-aad9-40bf-a48b-b506ae80c762",
+            "site_model": "gpt-image-2",
+            "upstream_model": "gpt-image-2",
+            "media_type": "image",
+            "enabled": true,
+            "cost_version": 0,
+            "cost_rules_present": false,
+            "price_rules_sha256": "a124ad397a90643d511803a12f6571c9387e0229624dad10696c14fd155eb72f"
+          },
+          {
+            "product_id": "media-a5bdc449-b4f1-4438-8418-fe7cc3d41751",
+            "site_model": "Nano-banana-2.1",
+            "upstream_model": "Nano-banana-2.1",
+            "media_type": "image",
+            "enabled": true,
+            "cost_version": 0,
+            "cost_rules_present": false,
+            "price_rules_sha256": "acf501266792c1976231310ea74713738825428ff9440835eb2b8cda1ecb9469"
+          }
+        ],
+        "offer_ids": [
+          "mw_offer_5b8d4181c3cf70d0c256a327ac856c07b1c722ea6053d589a6355b4e6d594fc5"
+        ]
+      }
+    ],
+    "video_order_states": {
+      "CAPTURED": 1,
+      "RELEASED": 1
+    },
+    "persistent_files": {
+      "core-data": {
+        "files": 174,
+        "no_added_or_removed_files": true,
+        "business_files_unchanged": true,
+        "observation_timestamp_only_changes": [
+          {
+            "file": "upstream-change-monitor/image-task-reconciliations.json",
+            "changed_paths": [
+              "/sampled_at",
+              "/tasks/0/checked_at"
+            ]
+          },
+          {
+            "file": "upstream-change-monitor/upstream-changes-baselines.json",
+            "changed_paths": [
+              "/sources/image2pro-image-contract/last_success_at",
+              "/sources/laoli-image-markdown/last_success_at",
+              "/sources/laoli-image-openapi/last_success_at",
+              "/sources/laoli-video-markdown/last_success_at",
+              "/sources/laoli-video-openapi/last_success_at"
+            ]
+          },
+          {
+            "file": "upstream-change-monitor/upstream-changes.json",
+            "changed_paths": [
+              "/sampled_at",
+              "/sources/0/last_success_at",
+              "/sources/1/last_success_at",
+              "/sources/3/last_success_at",
+              "/sources/4/last_success_at",
+              "/sources/5/last_success_at"
+            ]
+          }
+        ]
+      },
+      "studio-data": {
+        "files": 45,
+        "no_added_or_removed_files": true,
+        "business_files_unchanged": true,
+        "observation_timestamp_only_changes": []
+      }
+    }
+  },
+  "checkpoint": {
+    "checkpoint": "/var/lib/ai-gateway/checkpoints/predeploy-8ad2eff-20261018T212207Z",
+    "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+    "started_utc": "2026-10-18T21:34:58.671609+00:00",
+    "production_action": "protected backup and isolated restore only",
+    "reused_database_restore": {
+      "report": "/var/lib/ai-gateway/checkpoints/predeploy-8ad2eff-20261018T212207Z/restore-verification-v2.json",
+      "report_sha256": "dd2ab846cbc6c15157083df8fb193178f4b1cd3db3422a43b6263ae23b7de068",
+      "postgres_dump_sha256": "ef8557244851fd1e45b41c466441b95572d4d6c9ece54d788c51e5631f15ebbb",
+      "sealed_inputs_unchanged": true
+    },
+    "database_restore": {
+      "tables": 101,
+      "rows": 44941,
+      "differing_tables": [],
+      "timezone": "UTC",
+      "network": "none",
+      "production_mounts": 0,
+      "published_ports": 0
+    },
+    "live_critical_changes": [
+      "accounts",
+      "scheduler_outbox",
+      "usage_dashboard_aggregation_watermark"
+    ],
+    "account_changed_columns": {
+      "10": [
+        "extra",
+        "updated_at"
+      ],
+      "12": [
+        "extra",
+        "updated_at"
+      ],
+      "17": [
+        "extra",
+        "updated_at"
+      ],
+      "21": [
+        "extra",
+        "updated_at"
+      ],
+      "23": [
+        "extra",
+        "updated_at"
+      ],
+      "28": [
+        "extra",
+        "updated_at"
+      ],
+      "30": [
+        "extra",
+        "updated_at"
+      ],
+      "31": [
+        "extra",
+        "updated_at"
+      ],
+      "36": [
+        "extra",
+        "updated_at"
+      ],
+      "37": [
+        "extra",
+        "updated_at"
+      ],
+      "45": [
+        "extra",
+        "updated_at"
+      ],
+      "53": [
+        "extra",
+        "updated_at"
+      ]
+    },
+    "account_changed_extra_fields": {
+      "10": [
+        "upstream_billing_probe"
+      ],
+      "12": [
+        "upstream_billing_probe"
+      ],
+      "17": [
+        "upstream_billing_probe"
+      ],
+      "21": [
+        "upstream_billing_probe"
+      ],
+      "23": [
+        "upstream_billing_probe"
+      ],
+      "28": [
+        "upstream_billing_probe"
+      ],
+      "30": [
+        "upstream_billing_probe"
+      ],
+      "31": [
+        "upstream_billing_probe"
+      ],
+      "36": [
+        "upstream_billing_probe"
+      ],
+      "37": [
+        "upstream_billing_probe"
+      ],
+      "45": [
+        "upstream_billing_probe"
+      ],
+      "53": [
+        "upstream_billing_probe"
+      ]
+    },
+    "account_business_state_unchanged": true,
+    "account_exact_comparison": {
+      "method": "PostgreSQL canonical JSONB, count+ordered MD5",
+      "excluded_paths": [
+        "updated_at",
+        "extra.upstream_billing_probe (object only)"
+      ],
+      "null_and_empty_distinct": true,
+      "numeric_values_not_decoded_to_float": true
+    },
+    "scheduler_outbox_observation": {
+      "snapshot_rows": 2,
+      "current_rows": 1,
+      "added_rows": 1,
+      "removed_rows": 2,
+      "event_types": [
+        "account_changed"
+      ]
+    },
+    "aggregation_watermark_observation": {
+      "rows": 1,
+      "only_progress_timestamps_changed": true,
+      "source_evidence": "b5b23 backend/internal/repository/dashboard_aggregation_repo.go:204-210; usage_logs and billing dedup still compared exactly"
+    },
+    "files_restore": {
+      "status": "PASS",
+      "files": 219,
+      "bytes": 140597629,
+      "all_archive_bytes_restored_exactly": true,
+      "current_primary_business_files_unchanged": true,
+      "observational_timestamp_changes": [
+        {
+          "relative_path": "upstream-change-monitor/image-task-reconciliations.json",
+          "changed_paths": [
+            "/sampled_at",
+            "/tasks/0/checked_at"
+          ],
+          "only_monotonic_observation_timestamps": true
+        },
+        {
+          "relative_path": "upstream-change-monitor/upstream-changes-baselines.json",
+          "changed_paths": [
+            "/sources/image2pro-image-contract/last_success_at",
+            "/sources/laoli-image-markdown/last_success_at",
+            "/sources/laoli-image-openapi/last_success_at",
+            "/sources/laoli-video-markdown/last_success_at",
+            "/sources/laoli-video-openapi/last_success_at"
+          ],
+          "only_monotonic_observation_timestamps": true
+        },
+        {
+          "relative_path": "upstream-change-monitor/upstream-changes.json",
+          "changed_paths": [
+            "/sampled_at",
+            "/sources/0/last_success_at",
+            "/sources/1/last_success_at",
+            "/sources/3/last_success_at",
+            "/sources/4/last_success_at",
+            "/sources/5/last_success_at"
+          ],
+          "only_monotonic_observation_timestamps": true
+        }
+      ],
+      "observations_still_archived_at_capture_time": true,
+      "excluded_from_stability_only": [
+        "logs",
+        "server-storage.json"
+      ]
+    },
+    "redis_restore": {
+      "status": "PASS",
+      "loaded": true,
+      "checksum_valid": true,
+      "network": "none",
+      "production_mounts": 0,
+      "published_ports": 0,
+      "keyspace_summary": [
+        "db0:keys=3139,expires=139,avg_ttl=1010715503,subexpiry=0"
+      ]
+    },
+    "snapshot_consistency": "PASS: exported DB snapshot restores exactly; financial/product and primary files unchanged; only separately verified background observation timestamps/cursors changed",
+    "status": "PASS",
+    "finished_utc": "2026-10-18T21:35:00.947303+00:00",
+    "free_bytes": 24344051712,
+    "checksum_validation": true,
+    "checksum_manifest_sha256": "ef3894e8bab9288039c15e23615c9d97f226b4250e0aff90101b551f160fb90b",
+    "checkpoint_bytes": 281908901,
+    "checkpoint_mode": "0o700"
+  },
+  "rollback_assets": {
+    "observed_utc": "2026-10-18T21:36:47.867734+00:00",
+    "status": "PASS",
+    "source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
+    "artifact": 12143512127,
+    "artifact_expires_utc": "2026-11-01T16:41:33Z",
+    "zip_path": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/artifact.zip",
+    "zip_sha256": "638770c4f2cee4ba8db21cf949975c52aad2650c8eef2642809bb3fa1006697b",
+    "manifest_path": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/manifest.json",
+    "manifest_sha256": "43912b83efa4b538c323a9ff2b214f6197bff59f17e3ad777b7537bf564bfefd",
+    "images": [
+      {
+        "component": "core",
+        "running_image_id": "sha256:5f4aa40e4d9acc693ec17144107cfa8e00aeddfb83d33ce070f86f3052d07907",
+        "config_digest": "sha256:8a5969fef98d4f47722add22b9fcf01c569af101c6599decea39546c7fcc711b",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:5f4aa40e4d9acc693ec17144107cfa8e00aeddfb83d33ce070f86f3052d07907",
+            "config_digest": "sha256:8a5969fef98d4f47722add22b9fcf01c569af101c6599decea39546c7fcc711b"
+          }
+        ],
+        "tar_path": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/core-b5b23a1f01721d41d94fb03bc6ac8796453dd24b.tar.gz",
+        "tar_sha256": "ef5a8db3ced7225b106fb42856a7da7ebc6f62bd65c3b882a223aa4cee44a014",
+        "rootfs_matches_archive": true
+      },
+      {
+        "component": "bridge",
+        "running_image_id": "sha256:8d107297b2f73be71c74475052ff77f150a3b62bf774749f094d5c85d8f005d5",
+        "config_digest": "sha256:7893833604886a297c48e62467c9bb9d7688259386f48a63cdf414f93e0d4776",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:8d107297b2f73be71c74475052ff77f150a3b62bf774749f094d5c85d8f005d5",
+            "config_digest": "sha256:7893833604886a297c48e62467c9bb9d7688259386f48a63cdf414f93e0d4776"
+          }
+        ],
+        "tar_path": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/bridge-b5b23a1f01721d41d94fb03bc6ac8796453dd24b.tar.gz",
+        "tar_sha256": "22e438691e457f161aa091e6d31a3c88d6caca3fce3ac40d5fa5ae10f20ceb42",
+        "rootfs_matches_archive": true
+      },
+      {
+        "component": "bff",
+        "running_image_id": "sha256:a3a3e3bffb8803523f65bffbf01a283ddf2660d04dd3295107b7a1bd7ae2c5a4",
+        "config_digest": "sha256:52de426137288cef114c72aee086dfcc34db593c0f2049879fd26f9f58f05c73",
+        "oci_manifests": [
+          {
+            "manifest_digest": "sha256:a3a3e3bffb8803523f65bffbf01a283ddf2660d04dd3295107b7a1bd7ae2c5a4",
+            "config_digest": "sha256:52de426137288cef114c72aee086dfcc34db593c0f2049879fd26f9f58f05c73"
+          }
+        ],
+        "tar_path": "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/bff-b5b23a1f01721d41d94fb03bc6ac8796453dd24b.tar.gz",
+        "tar_sha256": "2229ccdd2f278e5c6dff8ae372744a154c997e9c673ac53744be2262967d750d",
+        "rootfs_matches_archive": true
+      }
+    ],
+    "runtime_files": [
+      {
+        "component": "core",
+        "path": "/app/sub2api",
+        "sha256": "7e39ad2608ec527b871534130da64688649611d903b75d51350e2d1ed66125bc",
+        "matches_accepted_old_artifact": true
+      },
+      {
+        "component": "bridge",
+        "path": "/app/studio-bridge",
+        "sha256": "9c72ff8897fbefe35908fe8f15ed37b0471e2a65ac9ee8fb6348c65b089d2485",
+        "matches_accepted_old_artifact": true
+      },
+      {
+        "component": "bff",
+        "path": "/app/studio/bff/image-server.mjs",
+        "sha256": "a4e3e052eacc78476e5dc24d1b701370c251123f85278a1e001d51703ffce4ca",
+        "matches_accepted_old_artifact": true
+      }
+    ],
+    "app_downgrade_allowed_now": "conditional only before incompatible data, with related writers quiesced and fresh ownership/format gates",
+    "docker_load": false
+  },
+  "preparation": {
+    "proposed_compose": {
+      "path": "/var/lib/ai-gateway/candidate-transfer-8ad2eff39-20261018T211618Z/proposed-compose.override.json",
+      "sha256": "d6d69d04f37b7b572ceb814ec505ac4a6bc20ac53ee221ef6b6f80d264154c85",
+      "only_three_image_refs_and_pull_never_changed": true,
+      "applied": false,
+      "active_files": [
+        "/home/ubuntu/services/ai-gateway/phase5-launch-20261010-final-3bb336b/compose.json",
+        "/var/lib/ai-gateway/candidate-transfer-b5b23a1f0/compose.override.json"
+      ]
+    },
+    "native_inflight_observation": {
+      "regular_account_slots_raw": 0,
+      "live_account_leases_raw": 0,
+      "account_waiting": 0,
+      "read_only": true,
+      "expired_slots_not_mutated_or_cleaned": true
+    },
+    "new_cost_json_scan": {
+      "account_configs": 4,
+      "account_new_keys": 0,
+      "core_json_files": 68,
+      "new_keys_in_core_files": 0,
+      "binary_result_files": 0,
+      "unknown_files": 6,
+      "video_order_new_keys": 0
+    },
+    "non_json_classification": {
+      "observed_utc": "2026-10-18T21:46:51.876494+00:00",
+      "counts": {
+        "json_records": 68,
+        "dispatch_claim_bound_to_receipt": 5,
+        "unit_claim_bound_to_receipt": 5,
+        "empty_legacy_claim_bound_to_receipt": 1
+      },
+      "unclassified_files": [],
+      "status": "PASS"
+    },
+    "format_observation_scope": "JSON recursive scan + exact old-format claims jointly cover observed Core bindings, receipt stores and media configs; must repeat under write barrier before any future downgrade"
+  },
+  "http": {
+    "normal_routes_and_assets": {
+      "observed_utc": "2026-10-18T21:20:12.982402+00:00",
+      "public": {
+        "/": {
+          "status": 200,
+          "final_url": "https://laifufu.top/",
+          "content_type": "text/html; charset=utf-8",
+          "bytes": 769273,
+          "sha256": "7649aa8bb7cdbf1e4992e939e0bdce68189a7863fdaad564e97b42a29a86d4eb",
+          "cf_mitigated": null,
+          "cf_cache_status": "DYNAMIC",
+          "cf_ray": "a4ca95f249ba75f7-SEA"
+        },
+        "/health": {
+          "status": 200,
+          "final_url": "https://laifufu.top/health",
+          "content_type": "application/json; charset=utf-8",
+          "bytes": 15,
+          "sha256": "a29ee2b15c494311c52521766e44af56a3ad2248e7a8ab465e5206463c13d288",
+          "cf_mitigated": null,
+          "cf_cache_status": "DYNAMIC",
+          "cf_ray": "a4ca95f32c44f328-SEA"
+        },
+        "/studio/": {
+          "status": 200,
+          "final_url": "https://laifufu.top/studio/",
+          "content_type": "text/html; charset=utf-8",
+          "bytes": 6283,
+          "sha256": "6b01001d7d21996f8a2014dcad11dfa467c23b21c49616bea43b2a1ce7d7b5ea",
+          "cf_mitigated": null,
+          "cf_cache_status": "DYNAMIC",
+          "cf_ray": "a4ca95f3c8289982-SEA"
+        },
+        "/video-studio": {
+          "status": 200,
+          "final_url": "https://laifufu.top/video-studio",
+          "content_type": "text/html; charset=utf-8",
+          "bytes": 769273,
+          "sha256": "0100bc0bd20ddc8ca8410fb6adea522ac82c342b99b8a471a3bd43c1a5a03807",
+          "cf_mitigated": null,
+          "cf_cache_status": "DYNAMIC",
+          "cf_ray": "a4ca95f44a1af570-SEA"
+        }
+      },
+      "assets": [
+        {
+          "path": "/assets/index-BiOI67aw.css",
+          "sha256": "331bc3404bfee3ed8f2fb2d57247a3d272074efd0eb81d194f6cfc038a9aac48",
+          "bytes": 293040,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        },
+        {
+          "path": "/assets/index-GNG9r2zP.js",
+          "sha256": "ce29c46f29b38fd17a1d7ea5f8bd72e30499c14623e7f400487d5745633d5462",
+          "bytes": 194108,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        },
+        {
+          "path": "/assets/vendor-i18n-Sz9OaMvZ.js",
+          "sha256": "ebdb818165353880018e379b7b1bfebcade6eb5a176cd820dc47f86e624ee813",
+          "bytes": 63323,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        },
+        {
+          "path": "/assets/vendor-misc-CeAxBZ0e.js",
+          "sha256": "4e3ac5d8faa4d1b99e0b5c6194a5511d90556f5589ff413e40d726d2f77dc3c0",
+          "bytes": 279017,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        },
+        {
+          "path": "/assets/vendor-misc-DB0Q8XAf.css",
+          "sha256": "4b398481a7ce8375af4d9f58f39410c73a0b70726fe513686d3d51c10ad76cb5",
+          "bytes": 3938,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        },
+        {
+          "path": "/assets/vendor-vue-DeI_Ip_v.js",
+          "sha256": "a7ac92c485f80431e39e88eea3463c5efdf16c1a5d7d778b0f2d25e3a97b021e",
+          "bytes": 113799,
+          "origin_matches": true,
+          "status": 200,
+          "cf_cache_status": "HIT"
+        }
+      ],
+      "native_page_origin": {
+        "status": 200,
+        "final_url": "http://127.0.0.1:8080/video-studio",
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 768873,
+        "sha256": "c41800dad17d61bcfe42dac8c7eead0f208bd662c5e45b0f2f7fef5c81703a4a",
+        "cf_mitigated": null,
+        "cf_cache_status": null,
+        "cf_ray": null,
+        "public_exact_equal": false
+      },
+      "image_dispatch_observation": {
+        "tasks": 5,
+        "state_counts": {
+          "completed": 2,
+          "failed": 3
+        },
+        "unparseable_tasks": 0,
+        "claim_files": 5,
+        "claims_without_saved_response": 0,
+        "nonterminal_tasks": 0,
+        "note": "file-only observation; no recovery/dispatch invoked; recheck under cutover gate"
+      },
+      "active_caddy": {
+        "readable": true,
+        "sha256": "e50bfc87e3f0ee359f35438d3b72bdca04b2cf179e6a6eb60ad2b5b22103a196",
+        "upstreams": [
+          "127.0.0.1:4173",
+          "127.0.0.1:4174",
+          "127.0.0.1:8080",
+          "127.0.0.1:8091",
+          "127.0.0.1:8094"
+        ],
+        "config_file_sha256": "93f8d302978a6ceed1f5b9621c3ec5159309ea907f75a507500364bf41da0e23"
+      },
+      "pass": true
+    },
+    "last_readonly_http": {
+      "http://laifufu.top/video-studio": {
+        "status": 200,
+        "final_url": "https://laifufu.top/video-studio",
+        "bytes": 769273,
+        "sha256": "2cd1c47b7f2180be59d73c8cef0a6b05d63a97a13619d5b21c1b04a97d04de06",
+        "content_type": "text/html; charset=utf-8",
+        "cf_mitigated": null
+      },
+      "http://127.0.0.1:8094/health": {
+        "status": 200,
+        "final_url": "http://127.0.0.1:8094/health",
+        "bytes": 54,
+        "sha256": "0f02a0d1b3c06a77cb61af764998221103dfd62ef1319e3ce276ae3b4696add3",
+        "content_type": "application/json; charset=utf-8",
+        "cf_mitigated": null
+      },
+      "http://127.0.0.1:4174/health": {
+        "status": 200,
+        "final_url": "http://127.0.0.1:4174/health",
+        "bytes": 148,
+        "sha256": "dbccd1f550d6f3ca104fd5d95d754adce6ace92746f0e1a842b705daadad1446",
+        "content_type": "application/json",
+        "cf_mitigated": null
+      },
+      "http://127.0.0.1:8080/v1/studio/images/readiness": {
+        "status": 401,
+        "final_url": "http://127.0.0.1:8080/v1/studio/images/readiness",
+        "cf_mitigated": null
+      },
+      "https://laifufu.top/v1/studio/images/readiness": {
+        "status": 401,
+        "final_url": "https://laifufu.top/v1/studio/images/readiness",
+        "cf_mitigated": null
+      },
+      "https://laifufu.top/studio-v2/api/image/readiness": {
+        "status": 401,
+        "final_url": "https://laifufu.top/studio-v2/api/image/readiness",
+        "cf_mitigated": null
+      }
+    },
+    "narrow_html_comparison": {
+      "observed_utc": "2026-10-18T21:49:40.557795+00:00",
+      "status": "PASS",
+      "path": "/video-studio",
+      "normal_url": true,
+      "scope": "all HTML bytes after response-bound 16-byte CSP nonce and one exact pinned end-of-body RUM script plus one LF; static JS/CSS checked independently",
+      "normalized_sha256": "dce21b2671e54251d8ff8079ca8f8162d784e17a99ebc5c4eec36ac245053458",
+      "beacon_src": "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092",
+      "beacon_sri_content_verified": true,
+      "beacon_integrity_sha256": "ee5d34692196c0a96f911cd94cb5b4c38992452e06571c8151daeae019bbd650",
+      "beacon_token_sha256": "51dad60d4a093269b5b41e408ef3ecd3c46d50a826c9810f8b11d4f0be477a45",
+      "counterexamples_rejected": [
+        "changed_asset",
+        "unknown_script",
+        "duplicate_beacon",
+        "different_beacon_version",
+        "wrong_integrity",
+        "changed_beacon_token",
+        "extra_whitespace",
+        "wrong_nonce"
+      ],
+      "server_or_proxy_modified": false,
+      "official_basis": "https://developers.cloudflare.com/speed/observatory/rum-beacon/"
+    }
+  },
+  "space": {
+    "before": {
+      "root_total_bytes": 102888095744,
+      "root_free_bytes": 25165688832,
+      "memory": {
+        "MemTotal": "11956728 kB",
+        "MemAvailable": "10571876 kB",
+        "SwapTotal": "0 kB",
+        "SwapFree": "0 kB"
+      }
+    },
+    "after": {
+      "root_total_bytes": 102888095744,
+      "root_free_bytes": 24341864448,
+      "memory": {
+        "MemTotal": "11956728 kB",
+        "MemAvailable": "10607104 kB",
+        "SwapTotal": "0 kB",
+        "SwapFree": "0 kB"
+      }
+    },
+    "additional_cutover_budget_bytes": 4294967296,
+    "operating_reserve_bytes": 10737418240,
+    "required_free_at_cutover_bytes": 15032385536,
+    "pass_now": true,
+    "no_cleanup_performed": true
+  },
+  "gates": [
+    {
+      "gate": "PUB-01",
+      "before_switch": "PASS",
+      "scope": "current production normal HTTPS/HTTP redirect, actual Caddy/origin and candidate topology",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "PUB-02",
+      "before_switch": "PASS",
+      "scope": "current production normal URLs/assets, no challenge, expected anonymous authentication rejection",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "PUB-03",
+      "before_switch": "PASS",
+      "scope": "current b5 origin/public HTML with response CSP nonce and pinned RUM; JS/CSS exact",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "PUB-04",
+      "before_switch": "PASS",
+      "scope": "current b5 real running files+archive identity and normal URL resources; fixed candidate identity",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "PUB-05",
+      "before_switch": "PASS",
+      "scope": "current container health/official internal paid status and existing isolated candidate functional evidence",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "PUB-06",
+      "before_switch": "PASS",
+      "scope": "fresh checkpoint+real isolated restore, protected baselines and conditional recovery ownership",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    },
+    {
+      "gate": "ART-01",
+      "before_switch": "PASS",
+      "scope": "same actual candidate TAR/runtime-files and final accepted produced components; no new build",
+      "after_switch": "PENDING_NOT_EXECUTED"
+    }
+  ],
+  "future_authorization_required": [
+    "bounded maintenance/write barrier covering configuration writers, new Studio quote/prepare/submit and new forwarded Core requests until in-flight drain; exact proxy configuration restored afterward",
+    "fixed three-component cutover",
+    "official non-paid preflight and CAS restoration of pre-cutover image true/true only; video remains false/false"
+  ],
+  "sensitive_backup_data_in_public_evidence": false,
+  "private_evidence_root": "D:/AI-Gateway/.codex-tmp/predeploy-8ad2eff-20261019",
+  "verifier_sha256": {
+    "audit.py": "2ab5bbb85663fea16ab92a0758fcce41bee157b4b3dabdbeb3ac02f25025131d",
+    "backup-guard-test.py": "e4ec557fbd5c01dd07808fffc7df070269d47180abd10a70ed20e6602b9cb83c",
+    "backup-restore.py": "2e9964993b2a4e86203fb4a210d5d19246ecdc13238c71e9b7e0d5fd25a65174",
+    "final-preparation.py": "1fd8a148bc48c0eb6bafa11384bfffee9808d2dfdcd0a0fd67c62a0da2a5e217",
+    "final-readonly.py": "82f5511785f9bdefbd140b7737e53da6967ec13f3eb974e56816937464d814b3",
+    "finish-restore.py": "acdef2e74480879a290cd3e6f48eb72716cc13c4633886c77cb0e6647b689efb",
+    "format-completion.py": "26ce0666d9aa1174c9c3b0e7b2a229702fc1757556dbe3c84f78f69d1dd84dc6",
+    "html-audit.py": "4525aab61415cb6cefe44c3ab9211f3b7144d52843a365f4505518ac8952a5d7",
+    "html-verified.py": "093a67c2f9cb71a318583551281f27e6752c44f0dedc1518e0304662c83d196a",
+    "persistent-drift.py": "e30d382ca0da75de71b9d7840ac7762e8da3624c109a3617bddb84c2c41bc04c",
+    "restore-current.py": "596d427e7fa23063725327c09e010a1e4870b7b1351ba5453a4db37aab375ad6",
+    "rollback-assets.py": "f52b40679dc0796d15dcc00900297a721f6c6a5ad9ff4fd753bfa9a948501a2e",
+    "routes-tasks.py": "fe6a916bf5ca878e0d22a022ea77d58790d2e5c794ccc0abd40c66c941967703",
+    "run-remote.py": "980d2acc42acaa062b0e362862b73377d3feca13dd2f3618a916c2f83081168f",
+    "stage-candidate.py": "bc63afaf37a95da8cf79861faf9a93adeec934543dfeb45230f9bfdd39831af6",
+    "write-report.py": "a846a90192e8ce849af245f67076fdbf08402812a076f7dd32e3c808c8fb5988"
+  },
+  "external_supplier_requests_or_generation": false
+}
