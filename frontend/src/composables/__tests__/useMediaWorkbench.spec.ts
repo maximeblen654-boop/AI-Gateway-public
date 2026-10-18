@@ -41,6 +41,42 @@ it('keeps ambiguous writes blocked when readback cannot confirm the cost draft',
   expect(state.saveState.value).toBe('unconfirmed')
   expect(state.products.value[0]!.cost_rules).toEqual([{ match: {}, cost: null }])
 })
+it.each([400, 422])('retains a rejected cost draft (%s) and allows correction followed by an explicit save', async status => {
+  await start()
+  state.products.value[0]!.display_name = '保留当前商品名称'
+  state.products.value[0]!.cost_rules = [{ match: {}, cost: { amount: '-1', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }]
+  const diagnostic = { class: 'UI_FIXABLE', severity: 'error', code: 'INVALID_COST', scope: 'canvas-1', path: 'cost_rules.0.cost', message: '采购成本不合法', action: '修正后保存' }
+  api.saveDraft.mockRejectedValue({ status, metadata: { diagnostics: [diagnostic] } })
+  expect(await state.saveDraft()).toBe(false)
+  expect(state.saveState.value).toBe('failed')
+  expect(state.dirty.value).toBe(true)
+  expect(state.config.value!.record_version).toBe(3)
+  expect(state.products.value[0]!.display_name).toBe('保留当前商品名称')
+  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('-1')
+  expect(state.diagnostics.value).toEqual([diagnostic])
+  expect(state.saveFeedback.value).toContain('修正字段后重新保存')
+  expect(api.detail).toHaveBeenCalledTimes(1)
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+  state.products.value[0]!.cost_rules![0]!.cost!.amount = '0.25'
+  const dto = saved(); dto.media_workbench_v1!.draft.products = copy(state.products.value)
+  mockSave(dto)
+  expect(await state.saveDraft()).toBe(true)
+  expect(api.saveDraft).toHaveBeenCalledTimes(2)
+  expect(api.saveDraft.mock.calls[1]![1]).toBe(3)
+  expect(state.saveState.value).toBe('saved')
+  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('0.25')
+})
+it('keeps an acknowledged write uncertain when its readback is rejected with 400', async () => {
+  await start()
+  state.products.value[0]!.display_name = '待确认输入'
+  api.saveDraft.mockResolvedValue(saved())
+  api.detail.mockRejectedValue({ status: 400 })
+  expect(await state.saveDraft()).toBe(false)
+  expect(state.saveState.value).toBe('unconfirmed')
+  expect(state.products.value[0]!.display_name).toBe('待确认输入')
+  expect(await state.saveDraft()).toBe(false)
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+})
 it('sales rejection remains false and timeout is reconciled without duplicate mutation', async () => {
   await start(); api.sales.mockRejectedValue({ status: 422 })
   expect(await state.sales(false)).toBe(false)

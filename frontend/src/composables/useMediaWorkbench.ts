@@ -178,6 +178,7 @@ export function useMediaWorkbench() {
     const accountId = detail.value.id
     const submitted = JSON.stringify(draftInput(products.value).products)
     const previousVersion = config.value?.record_version ?? 0
+    let writeAcknowledged = false
     try {
       // A nil media configuration is initialized atomically by the first explicit
       // SaveDraft. The server infers media_types from the submitted products.
@@ -185,6 +186,7 @@ export function useMediaWorkbench() {
       const dto = removedProducts.value.length
         ? await mediaWorkbenchAPI.saveDraft(...args, removedProducts.value.map(p => p.product_id))
         : await mediaWorkbenchAPI.saveDraft(...args)
+      writeAcknowledged = true
       if (disposed) return false
       // Re-read the authoritative persisted draft; never turn a lost response into a retry.
       const confirmed = await mediaWorkbenchAPI.detail(accountId)
@@ -195,7 +197,14 @@ export function useMediaWorkbench() {
       if (c && ['PENDING', 'VALIDATING', 'RUNNING'].includes(c.validation.status)) pollValidation(dto.id, c.draft.revision, validationSequence)
       return true
     } catch (e) {
-      saveState.value = 'unconfirmed'; validationUnavailable.value = true; failure(e)
+      // Only a definite rejection of the write itself is safe to correct and
+      // resubmit. A readback failure after acknowledgement remains uncertain.
+      const rejected = !writeAcknowledged && [400, 422].includes((e as { status?: number }).status ?? 0)
+      saveState.value = rejected ? 'failed' : 'unconfirmed'; validationUnavailable.value = true; failure(e)
+      if (rejected) {
+        saveFeedback.value = '草稿未保存，输入已保留。请修正字段后重新保存。'
+        return false
+      }
       if (ambiguous(e)) {
         saveFeedback.value = '保存结果未知，正在重新读取核对；不会重发保存请求。'
         try {
