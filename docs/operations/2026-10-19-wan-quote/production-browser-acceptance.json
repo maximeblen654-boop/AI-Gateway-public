@@ -1,0 +1,567 @@
+{
+  "status": "PASS",
+  "scope": "REAL_PRODUCTION_READ_ONLY_BROWSER",
+  "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "production_origin": "https://laifufu.top",
+  "finished_utc": "2026-10-18T23:55:26.280991+00:00",
+  "viewports": [
+    [
+      1440,
+      900
+    ],
+    [
+      1366,
+      650
+    ],
+    [
+      768,
+      844
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      360,
+      844
+    ]
+  ],
+  "checks": [
+    {
+      "name": "authenticated-studio",
+      "pass": true,
+      "detail": {
+        "path": "/video-studio",
+        "studio_session_owner_verified": true,
+        "http": 200,
+        "same_owner": true,
+        "attempts": 3
+      }
+    },
+    {
+      "name": "text-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-1440",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-1366",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-768",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-390",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "text-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "edit-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "video-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "history-360",
+      "pass": true,
+      "detail": {
+        "no_overflow": true,
+        "no_slider": true
+      }
+    },
+    {
+      "name": "published-ratio-options",
+      "pass": true,
+      "detail": {
+        "options": [
+          "9:21",
+          "9:16",
+          "2:3",
+          "3:4",
+          "4:5",
+          "1:1",
+          "5:4",
+          "4:3",
+          "3:2",
+          "16:9",
+          "21:9"
+        ],
+        "catalog_match": true,
+        "output_format_visible": false
+      }
+    },
+    {
+      "name": "existing-image-detail",
+      "pass": true,
+      "detail": {
+        "available": true,
+        "dimensions": {
+          "width": 3840,
+          "height": 2160
+        },
+        "download_link": true,
+        "continue_creation": true
+      }
+    },
+    {
+      "name": "admin-readiness",
+      "pass": true,
+      "detail": {
+        "image": {
+          "requested": true,
+          "effective": true
+        },
+        "video": {
+          "requested": false,
+          "effective": false
+        }
+      }
+    },
+    {
+      "name": "admin-account-77",
+      "pass": true,
+      "detail": {
+        "published_state_visible": true,
+        "custom_ratio": true,
+        "duration_range": false,
+        "native_output": true
+      }
+    },
+    {
+      "name": "admin-account-44",
+      "pass": true,
+      "detail": {
+        "published_state_visible": true,
+        "custom_ratio": true,
+        "duration_range": true,
+        "native_output": false
+      }
+    },
+    {
+      "name": "final-studio-session",
+      "pass": true,
+      "detail": {
+        "http": 200,
+        "same_owner": true
+      }
+    }
+  ],
+  "lifecycle": [
+    "authentication_verified",
+    "single_context_created",
+    "cutover_ready_same_context",
+    "all_checks_finished",
+    "evidence_saved_before_cleanup",
+    "browser_closed_after_complete"
+  ],
+  "page_errors": [],
+  "blocked_unsafe_requests": 0,
+  "generation_post_allowed": false,
+  "recovery_get_allowed": false,
+  "expired_owner_journals": 0,
+  "one_existing_native_key_proven": true,
+  "identity_owner_initial_and_final_verified": true,
+  "network_summary": [
+    {
+      "path": "/studio-v2/api/image/catalog",
+      "http": 200,
+      "responses": 6
+    },
+    {
+      "path": "/studio-v2/api/image/readiness",
+      "http": 200,
+      "responses": 6
+    },
+    {
+      "path": "/studio-v2/api/image/tasks",
+      "http": 200,
+      "responses": 23
+    },
+    {
+      "path": "/studio-v2/api/image/tasks/{task}/results/0",
+      "http": 200,
+      "responses": 10
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "http": 200,
+      "responses": 44
+    },
+    {
+      "path": "/studio-v2/api/session",
+      "http": 401,
+      "responses": 1
+    },
+    {
+      "path": "/studio-v2/api/session/exchange",
+      "http": 200,
+      "responses": 1
+    },
+    {
+      "path": "/studio-v2/api/video/catalog",
+      "http": 200,
+      "responses": 5
+    },
+    {
+      "path": "/studio-v2/api/video/operations",
+      "http": 200,
+      "responses": 21
+    },
+    {
+      "path": "/studio-v2/api/video/readiness",
+      "http": 200,
+      "responses": 5
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "text-1440x900.png",
+      "sha256": "cd9d1dbdd3116d3c1fb1e53084db8bc7a703ed0885c41182a42d890d9e51d58c"
+    },
+    {
+      "file": "edit-1440x900.png",
+      "sha256": "8619072471be4282541ff3940759af773d13fc3c7e43672ba15f76e5476a47ac"
+    },
+    {
+      "file": "video-1440x900.png",
+      "sha256": "b42dedf7e59700bc6bcff60f9782946778b50794232d29510ed499cf43aade83"
+    },
+    {
+      "file": "history-1440x900.png",
+      "sha256": "43216149495ddf03a730b6e7d7b0582cf879de7971278f82245d17e13190e0f1"
+    },
+    {
+      "file": "text-1366x650.png",
+      "sha256": "cfab24bceb58d4a5d3b7386c0ca091729c9f72558315acd3a4d2f5d738be8998"
+    },
+    {
+      "file": "edit-1366x650.png",
+      "sha256": "35819c3e2f6ae558e134fb683d5b12a516f8a81f961c57464725bd52c51e1ffc"
+    },
+    {
+      "file": "video-1366x650.png",
+      "sha256": "cd6b1af90daa41ac76aa3daa67bcfcbf3d3b819cc04c07f4f2b0481eb371befe"
+    },
+    {
+      "file": "history-1366x650.png",
+      "sha256": "a81b9105452d47a1af502517196f81c489f2d5abcfe374ace74980429a5dee25"
+    },
+    {
+      "file": "text-768x844.png",
+      "sha256": "ad7abaf3c47d0c8a31640036824b6b1c7d691b3d1f0cc6c49c33155e57e59fcf"
+    },
+    {
+      "file": "edit-768x844.png",
+      "sha256": "79601a85ef85dea1baefbd61abf2bfeb6a75d829115109835f97f97a5187ed52"
+    },
+    {
+      "file": "video-768x844.png",
+      "sha256": "8edb55e48bd12c354dde264147663db1bef45bc16c47f37b92f6681aefeae211"
+    },
+    {
+      "file": "history-768x844.png",
+      "sha256": "53b2638adac56f854e0d3f042dde5ae7a1d68c31da4cc3be10aab871070bd797"
+    },
+    {
+      "file": "text-390x844.png",
+      "sha256": "3da2fcd9d20e29ae23616fc40bba8c895843ad749214227044cea79379314237"
+    },
+    {
+      "file": "edit-390x844.png",
+      "sha256": "42ad1b68ca35249d4e83735b2fc5897266a7ade66197b78158e8a0a8f2416bc7"
+    },
+    {
+      "file": "video-390x844.png",
+      "sha256": "749d5bcdcd5b019cfaa73f03e8e24edc808d7d79a9442827efe8f5f754a8a15e"
+    },
+    {
+      "file": "history-390x844.png",
+      "sha256": "434db9dad138a65acd06b3acbb472309ceda1879b1b206848dae601ac9298658"
+    },
+    {
+      "file": "text-360x844.png",
+      "sha256": "b773dff838f5f54f5c0104491b0eb6c3223980cf1911d06d2420498a05a0e164"
+    },
+    {
+      "file": "edit-360x844.png",
+      "sha256": "517c27b9894eb3fc1b1ae516252a6ce67282ff39f0aebbec45ee25af1a27295e"
+    },
+    {
+      "file": "video-360x844.png",
+      "sha256": "dcab1cdf6ab195c9631d4e671ce76f7fd8450169c940ab5de6ce7b3324945f62"
+    },
+    {
+      "file": "history-360x844.png",
+      "sha256": "26fd34cb6ba7c708227dbf8939b79e3fe7c166e62ad26ded84e2eb6734989411"
+    },
+    {
+      "file": "published-ratios.png",
+      "sha256": "a97ee2ea96f9ad1e8e1cce90d7d4107365f0b05a524e954c99cd16a6d2733429"
+    },
+    {
+      "file": "existing-image-detail.png",
+      "sha256": "6e0532c660672c5206b8b8ac5e9d7f07294d921f11d1a3566568a3f9bc8c952d"
+    },
+    {
+      "file": "admin-77-1440-price.png",
+      "sha256": "fa0beecae6c98fc7e082a63fe04f1c4fc18058b2b442a53691f78e8fc4ddf6ea"
+    },
+    {
+      "file": "admin-77-1440x900.png",
+      "sha256": "287a28a9870796cb6d5af053f2ad0c80ec5d94412360abe1631effaccb38631c"
+    },
+    {
+      "file": "admin-77-1366-price.png",
+      "sha256": "349145fd453ba86bc56e6a46fe4fd6787fb57492856fc7bdcf54b7377a7508bc"
+    },
+    {
+      "file": "admin-77-1366x650.png",
+      "sha256": "412b4246ce3af8af89374b7324da9f3f14093e10cc8dc23485236edf8c96ad28"
+    },
+    {
+      "file": "admin-77-768-navigation-open.png",
+      "sha256": "87f5a399722278debdcad4c298590d3fc31e4cbe3be1f0374e4a5be86a0df777"
+    },
+    {
+      "file": "admin-77-768-price.png",
+      "sha256": "5d409a0420f2eb36dfe607cc5d8edfd2d908963175e89b6363d28f727e36bf99"
+    },
+    {
+      "file": "admin-77-768x844.png",
+      "sha256": "f4dddf3851e55e99e70b295a6521e8624cfe603081d2d4065ec576f0b5846bea"
+    },
+    {
+      "file": "admin-77-390-navigation-open.png",
+      "sha256": "5eef5a8b6a43b7db33536a9efee2df8f3aee2e3a0f75d55e7fc61381d61e87fd"
+    },
+    {
+      "file": "admin-77-390-price.png",
+      "sha256": "c84e58e81ab7d1754a816c45de9775406e1c33f8dfbb99cc301a3e17a62d36ff"
+    },
+    {
+      "file": "admin-77-390x844.png",
+      "sha256": "2748de428e8268c60f9cee6ee352bd35c3c2c50a7bd592ef09b1400a1adcb965"
+    },
+    {
+      "file": "admin-77-360-navigation-open.png",
+      "sha256": "ddbe8dd8edc98af7d6d8e8a0ca8b06a682ff4da592d66c4c2f76ee8802872b99"
+    },
+    {
+      "file": "admin-77-360-price.png",
+      "sha256": "ec114a54f3483caf21ecae5b766eaa774b5b94dc20363236c790310ac6b73b68"
+    },
+    {
+      "file": "admin-77-360x844.png",
+      "sha256": "454ebb7d511ffa04391cff394695c7519d0aa11257b5986bd532005e855c1d86"
+    },
+    {
+      "file": "admin-44-1440-price.png",
+      "sha256": "d051d70163d7186dafddf6aa28d576c4a40e15d97dba12e64c2b5e184d84839c"
+    },
+    {
+      "file": "admin-44-1440x900.png",
+      "sha256": "a2f14f21d24194b1e8e10ddf51a90e37508eb22be5e674b7ab0f2f11d6e779af"
+    },
+    {
+      "file": "admin-44-1366-price.png",
+      "sha256": "b5805494ddd8493217fd0e91146ce2991be91d4e81632b515fc8a998e305a9c4"
+    },
+    {
+      "file": "admin-44-1366x650.png",
+      "sha256": "4435c1c1dfa2a2158c9a564b94d17ccacfd71f3a170cc3da5f886f5c790708c6"
+    },
+    {
+      "file": "admin-44-768-navigation-open.png",
+      "sha256": "9d7448c750b059a390fdacb0207e8928ffcf8e6d53395025a7b3c029a6340dcf"
+    },
+    {
+      "file": "admin-44-768-price.png",
+      "sha256": "7a3812061be89603bf220c071bf67b2d9c5f762794e9bb77f0ed5b28e962c716"
+    },
+    {
+      "file": "admin-44-768x844.png",
+      "sha256": "822d2b2463583b89efb289a9814bed61213d60b02591740a817ab5bdc1860143"
+    },
+    {
+      "file": "admin-44-390-navigation-open.png",
+      "sha256": "7355987dca890048fa6632346c7a7972e0f3484707535dad13f6d0b56d4bf43d"
+    },
+    {
+      "file": "admin-44-390-price.png",
+      "sha256": "3a0752724e9f2868b84e81e55f2cc2af6812b494222dc7a229b9c61293110f32"
+    },
+    {
+      "file": "admin-44-390x844.png",
+      "sha256": "3775cdedf823e55e5b6fcff1e62b8a98fcce58cf82dbb154cccf6c0af0026c60"
+    },
+    {
+      "file": "admin-44-360-navigation-open.png",
+      "sha256": "d20f9aafc76dd7dfa508350810e1d4900c6475b8d63390495338af4ab3f8473f"
+    },
+    {
+      "file": "admin-44-360-price.png",
+      "sha256": "e4fd5e9e20f55144e0d82a711f1c59a4114b15327dfbd393516f1e302808b3eb"
+    },
+    {
+      "file": "admin-44-360x844.png",
+      "sha256": "1764ed605ccd6ca8b8a370cbf154bb4bdd086d44da1223e7795bb7870cc44b36"
+    }
+  ],
+  "session_cache": {
+    "status": "PASS",
+    "actual_cross_process_cached_admin_verified": true,
+    "after_browser_process_exited": true,
+    "official_me_http": 200,
+    "new_login_requests": 0,
+    "password_saved": false,
+    "token_in_output": false,
+    "verified_utc": "2026-10-18T23:56:36.574373+00:00"
+  },
+  "cache_storage": "WINDOWS_CREDENTIAL_MANAGER_CURRENT_USER_LOCAL_MACHINE",
+  "cache_contains_password": false,
+  "cache_reuse_extends_expiration": false,
+  "server_final_status": "PRODUCTION_DEPLOYED_VERIFIED",
+  "maintenance_active": false,
+  "business_protection_match": true,
+  "app_recreated_during_final_browser_acceptance": false,
+  "local_bootstrap_tests": {
+    "status": "PASS",
+    "cases": 6,
+    "delayed_bootstrap_verified": true,
+    "wrong_owner_rejected": true,
+    "bounded_deadline": true,
+    "production_requests": 0
+  },
+  "previous_failed_attempt_preserved": true,
+  "wrapper_utf8_read_fix_verified_on_actual_completed_report": true,
+  "credentials_or_storage_state_in_public_evidence": false
+}

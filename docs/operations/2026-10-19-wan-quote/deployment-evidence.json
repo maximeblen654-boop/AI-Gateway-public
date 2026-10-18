@@ -1,6 +1,6 @@
 {
-  "status": "DEPLOYED_ACCEPTANCE_PARTIAL",
-  "observed_utc": "2026-10-18T23:34:37.076667+00:00",
+  "status": "PRODUCTION_DEPLOYED_VERIFIED",
+  "observed_utc": "2026-10-18T23:55:26.280991+00:00",
   "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
   "old_source_sha": "b5b23a1f01721d41d94fb03bc6ac8796453dd24b",
   "candidate": {
@@ -586,19 +586,22 @@
     "scope": "NATIVE_MODEL_LIST_AUTHORIZATION_ONLY_NOT_SUPPLIER_FORWARDING"
   },
   "browser": {
-    "status": "PENDING_AUTHENTICATED_RECHECK",
-    "previous_attempt": "Actual production browser; admin identity/readiness/editor loaded, but temporary identity transport and Save-step assertions failed. Not accepted.",
-    "failed_checks": [
-      "published-ratio-options",
-      "existing-image-detail",
-      "admin-account-77",
-      "admin-account-44"
-    ],
-    "fixed_fixture_tests": 27,
-    "fixed_fixture_screenshots": 48,
-    "fixture_is_not_production": true,
-    "corrected_public_identity_routes": true,
-    "credential_values_in_evidence": false
+    "status": "PASS",
+    "production_origin": "https://laifufu.top",
+    "source_sha": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+    "checks": 27,
+    "screenshots": 48,
+    "single_context": true,
+    "runtime_errors": 0,
+    "public_identity_routes": true,
+    "cached_session_reused": true,
+    "new_login_requests_in_final_run": 0,
+    "first_owner_bootstrap_attempts": 3,
+    "final_owner_verified": true,
+    "critical_pass": true,
+    "details": "production-browser-acceptance.json",
+    "credential_values_in_evidence": false,
+    "prior_failed_attempts_retained_locally": true
   },
   "backup": {
     "checkpoint": "/var/lib/ai-gateway/checkpoints/predeploy-8ad2eff-20261018T212207Z",
@@ -614,7 +617,7 @@
     "v3_result_preserved": true,
     "release_only_seal": "9ebfb86bb8951da72c0f24a7f78a0d01920734c6a0867ee4fbb314bd0fc5a5a0",
     "release_only_does_not_claim_original_browser_gate_passed": true,
-    "final_browser_seal": "6b5dc6618386a2f57517d81951b65166e60c5d05445584e5d6575508592d786b"
+    "final_browser_seal": "90ab1a2efc7587d4dd50dbbf2639361dd6068e7862588d08fa7624f715061991"
   },
-  "vps_free_bytes": 23734591488
+  "vps_free_bytes": 23718666240
 }
