@@ -1,0 +1,41 @@
+import { test, expect } from '@playwright/test'
+for (const width of [360,390,768,1366,1440]) {
+ test(`real shell editor width and navigation ${width}`, async ({page}, info) => {
+  await page.setViewportSize({width:1440,height:900})
+  await page.route('**/*', r => new URL(r.request().url()).hostname === '127.0.0.1' ? r.continue() : r.abort())
+  await page.goto('/tests/media-workbench/index.html?theme=yellow')
+  await page.getByTestId('account-search').fill('#77')
+  await page.getByTestId('supplier-77').click()
+  await page.getByTestId('model-image-native-1').click()
+  await page.setViewportSize({width,height:844})
+  const content=page.locator('.app-layout-content')
+  await page.screenshot({path:info.outputPath(`resize-${width}.png`)})
+  const margin=await content.evaluate(e=>parseFloat(getComputedStyle(e).marginLeft))
+  if(width<1024) expect(margin).toBe(0)
+  await expect.poll(async()=> (await content.boundingBox())!.width).toBeGreaterThanOrEqual(width<1024?width:width-256)
+  const editor=page.locator('.mw-editor-page')
+  expect((await editor.boundingBox())!.width).toBeGreaterThan(width<1024?width-100:650)
+  if(width<1024){
+   const side=page.locator('aside.sidebar')
+   await expect.poll(async()=> (await side.boundingBox())!.x+(await side.boundingBox())!.width).toBeLessThanOrEqual(1)
+   await page.locator('header button.lg\\:hidden').first().click()
+   await expect.poll(async()=> (await side.boundingBox())!.x).toBe(0)
+   expect((await content.boundingBox())!.width).toBe(width)
+   await page.locator('.fixed.inset-0.bg-black\\/50').click({position:{x:width-10,y:100}})
+   await expect.poll(async()=> (await side.boundingBox())!.x+(await side.boundingBox())!.width).toBeLessThanOrEqual(1)
+  }
+  for(const step of [1,2,3,4,5]) {await page.getByTestId(`wizard-step-${step}`).click();expect((await editor.boundingBox())!.width).toBeGreaterThan(width<1024?width-100:650)}
+  await page.getByTestId('wizard-step-4').click()
+  await page.getByTestId('price-0').fill('0.123')
+  expect((await page.getByTestId('price-0').boundingBox())!.width).toBeGreaterThan(100)
+  await page.getByTestId('wizard-step-5').click()
+  await page.getByTestId('save').scrollIntoViewIfNeeded()
+  await expect(page.getByTestId('save')).toBeVisible()
+  await page.getByTestId('display-name').fill('Local layout fixture')
+  await page.getByRole('button',{name:'← 返回模型列表'}).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  expect((await page.getByRole('dialog').boundingBox())!.width).toBeLessThanOrEqual(width)
+  await page.keyboard.press('Escape')
+  await page.screenshot({path:info.outputPath(`editor-${width}.png`)})
+ })
+}

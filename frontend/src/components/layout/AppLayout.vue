@@ -8,7 +8,7 @@
 
     <!-- Main Content Area -->
     <div
-      class="relative min-h-screen transition-all duration-300"
+      class="app-layout-content relative min-h-screen transition-all duration-300"
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->
@@ -50,3 +50,11 @@ onMounted(() => {
 
 defineExpose({ replayTour })
 </script>
+
+<style scoped>
+/* Crossing into mobile must remove desktop navigation space immediately. */
+@media (max-width: 1023px) {
+  .app-layout-content { transition: none; }
+}
+</style>
+
