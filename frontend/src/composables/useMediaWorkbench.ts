@@ -227,7 +227,10 @@ export function useMediaWorkbench() {
       const result = await mediaWorkbenchAPI.publish(id, config.value.record_version, config.value.draft.revision, [...productIds])
       // Accept either the editor DTO or the documented revision acknowledgement.
       // One authoritative DTO update refreshes the editor and all list counts.
-      apply('media_workbench_v1' in result && result.id === id ? result : await mediaWorkbenchAPI.detail(id), true)
+      const confirmed = 'media_workbench_v1' in result && result.id === id ? result : await mediaWorkbenchAPI.detail(id)
+      const acknowledgedRevision = 'published_revision' in result ? result.published_revision : undefined
+      if (!confirmed.media_workbench_v1?.published || (acknowledgedRevision && confirmed.media_workbench_v1.published.revision !== acknowledgedRevision)) throw { status: 0, message: '发布回执与重新读取的版本不一致。' }
+      apply(confirmed, true)
       publicationFeedback.value = `${selectedNames} 已发布 · 版本 ${config.value.published?.revision ?? '待读取'}。${config.value.sales.enabled ? 'Account 工作台销售已开启，新版本按已发布范围生效。' : '尚未开启工作台销售，请在账号操作区开启。'}`
       return true
     } catch (e) {

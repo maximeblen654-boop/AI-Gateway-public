@@ -175,8 +175,15 @@ describe('Media Workbench request lifecycle', () => {
     expect(state.publishValidation.value).toBeNull()
   })
   it('revision-only Publish acknowledgement refreshes the editor exactly once', async () => {
-    await start(); api.publish.mockResolvedValue({ record_version: 4, published_revision: 'mwp_b' }); api.detail.mockResolvedValue(saved())
+    await start(); api.publish.mockResolvedValue({ record_version: 4, published_revision: 'mwp_b' }); const dto = saved(); dto.media_workbench_v1!.published!.revision = 'mwp_b'; api.detail.mockResolvedValue(dto)
     await state.publish(['canvas-1']); expect(api.detail).toHaveBeenCalledTimes(2); expect(state.config.value!.record_version).toBe(4)
+  })
+  it('does not confirm an acknowledgement when readback still reports another Published revision', async () => {
+    await start(); api.publish.mockResolvedValue({ record_version: 4, published_revision: 'mwp_b' }); api.detail.mockResolvedValue(saved())
+    expect(await state.publish(['canvas-1'])).toBe(false)
+    expect(state.saveState.value).toBe('unconfirmed')
+    expect(state.publicationFeedback.value).toContain('仍未确认')
+    expect(api.publish).toHaveBeenCalledTimes(1)
   })
   it('slow supplier responses cannot replace the current supplier', async () => {
     await start(); let resolve!: (dto: ReturnType<typeof supplier>) => void
