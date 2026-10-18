@@ -102,3 +102,12 @@ func TestExplicitProfileCannotWidenKnownContract(t *testing.T) {
 		t.Fatal("paused model enabled by explicit profile")
 	}
 }
+
+func TestUnsupportedReferenceKindsStayClosed(t *testing.T) {
+	for _, profile := range []string{"images", "grok", "seedance"} {
+		p := Product{SiteModel: "configured-new", UpstreamModel: "configured-new", AdapterConfig: ImageConfig{Version: 1, WireProfile: profile}, Capabilities: Capabilities{References: References{Video: Range{0, 1}, TotalMax: 1}}}
+		if _, ok := VideoProfileModel(p); ok {
+			t.Fatalf("%s accepted video input", profile)
+		}
+	}
+}

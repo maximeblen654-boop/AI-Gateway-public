@@ -240,6 +240,9 @@ func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, ima
 		return Plan{}, ErrPlan
 	}
 	if m.Mode == "seedance" {
+		if videos != 0 {
+			return Plan{}, ErrPlan
+		}
 		content := []map[string]any{{"type": "text", "text": "<dry-run-prompt>"}}
 		for i := 0; i < images; i++ {
 			content = append(content, map[string]any{"type": "image_url", "image_url": map[string]string{"url": "https://example.invalid/verified-reference"}})

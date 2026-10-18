@@ -39,6 +39,9 @@ func VideoProfileModel(p Product) (videoplan.Model, bool) {
 	if p.AdapterConfig.Version != 1 || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
 		return videoplan.Model{}, false
 	}
+	if profile == "seedance" && p.Capabilities.References.Video.Max > 0 {
+		return videoplan.Model{}, false
+	}
 	if profile == "grok" && (p.Capabilities.References.Image.Max > 1 || p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0) {
 		return videoplan.Model{}, false
 	}
