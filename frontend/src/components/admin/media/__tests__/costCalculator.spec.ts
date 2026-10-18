@@ -77,3 +77,10 @@ it('video estimate is per complete item and current unsaved sale is authoritativ
   await wrapper.setProps({ product: { ...product, pricing_rules: [{ match: {}, sale_price: price('1') }] } })
   expect(wrapper.text()).toContain('0.2 CNY'); expect((wrapper.get('[data-test="cost-consumption-0"]').element as HTMLInputElement).value).toBe('8')
 })
+it('keeps a single selected calculator row while overlapping draft conditions are being edited', async () => {
+  const wrapper = mount(MediaCostCalculator, { props: { product: structuredClone(imageProduct), labels: ['条件一', '条件二'], costRules: [{ match: {}, cost: null }, { match: {}, cost: null }] } })
+  await wrapper.get('[data-test="cost-tab-1"]').trigger('click')
+  expect(wrapper.get('[data-test="cost-row-0"]').attributes('style')).toContain('display: none')
+  expect(wrapper.get('[data-test="cost-row-1"]').attributes('style') ?? '').not.toContain('display: none')
+  expect(wrapper.findAll('[role="tab"][aria-selected="true"]')).toHaveLength(1)
+})

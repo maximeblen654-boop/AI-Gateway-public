@@ -3,7 +3,7 @@
   <dialog ref="panel" class="mw-cost" data-test="cost-calculator" :aria-labelledby="titleId" :aria-modal="narrow ? 'true' : 'false'" @cancel.prevent="close" @keydown="narrow && containDialogFocus($event, panel)">
     <header class="mw-cost-header"><div><h2 :id="titleId" tabindex="-1">成本换算</h2><p>Account #{{ accountId }} · {{ product.display_name || product.upstream_model }}</p></div><button type="button" class="mw-cost-close" data-test="cost-close" aria-label="收起成本换算" @click="close">×</button></header>
     <div class="mw-cost-body">
-      <div class="mw-cost-tabs" role="tablist" aria-label="选择采购成本规格"><button v-for="(row, index) in rows" :key="row.key" type="button" role="tab" :id="`${titleId}-tab-${index}`" :aria-controls="`${titleId}-panel-${index}`" :aria-selected="selectedKey === row.key" :tabindex="selectedKey === row.key ? 0 : -1" :data-test="`cost-tab-${index}`" @click="selectedKey = row.key" @keydown="moveTab($event, index)">{{ labels[index] || '统一成本' }}</button></div>
+      <div class="mw-cost-tabs" role="tablist" aria-label="选择采购成本规格"><button v-for="(row, index) in rows" :key="row.tabKey" type="button" role="tab" :id="`${titleId}-tab-${index}`" :aria-controls="`${titleId}-panel-${index}`" :aria-selected="selectedKey === row.tabKey" :tabindex="selectedKey === row.tabKey ? 0 : -1" :data-test="`cost-tab-${index}`" @click="selectedKey = row.tabKey" @keydown="moveTab($event, index)">{{ labels[index] || '统一成本' }}</button></div>
       <p class="mw-muted">此浏览器仅记忆试算参数，不会自动成为正式成本。采用结果后，保存草稿才会由服务器持久化。</p>
       <p v-if="storageWarning" class="mw-field-error" role="status">{{ storageWarning }}</p>
       <div class="mw-cost-purchase">
@@ -12,7 +12,7 @@
       </div>
       <p class="mw-cost-rate" data-test="cost-rate">每积分成本 <strong>{{ rate ? `${rate} CNY` : '待填写有效采购参数' }}</strong></p>
       <p class="mw-muted">不同规格消耗不同，请先在采购成本表中分别配置。{{ product.media_type === 'video' ? '视频按整条计算，不再乘秒数。' : '图片按单张计算。' }}</p>
-      <div v-for="(row, index) in rows" :key="row.key" v-show="row.key === selectedKey" class="mw-cost-row" role="tabpanel" :id="`${titleId}-panel-${index}`" :aria-labelledby="`${titleId}-tab-${index}`" :data-test="`cost-row-${index}`">
+      <div v-for="(row, index) in rows" :key="row.tabKey" v-show="row.tabKey === selectedKey" class="mw-cost-row" role="tabpanel" :id="`${titleId}-panel-${index}`" :aria-labelledby="`${titleId}-tab-${index}`" :data-test="`cost-row-${index}`">
         <div class="mw-cost-row-heading"><strong>{{ labels[index] || '统一成本' }}</strong><span v-if="costRules">客户售价按独立售价表配置</span><span v-else>现有售价：{{ row.rule.sale_price ? `${row.rule.sale_price.amount} ${row.rule.sale_price.currency} / ${unit}` : '待填写' }}</span></div>
         <label class="mw-field">预计每{{ unit }}上游积分消耗<input class="input" inputmode="decimal" placeholder="待估算，允许明确填 0" :value="memory.consumption[row.key] ?? ''" :aria-invalid="!!decimalError(memory.consumption[row.key] ?? '')" :data-test="`cost-consumption-${index}`" @input="setConsumption(row.key, $event)" /><span v-if="decimalError(memory.consumption[row.key] ?? '')" class="mw-field-error">{{ decimalError(memory.consumption[row.key] ?? '') }}</span></label>
         <dl class="mw-cost-results"><div><dt>单{{ unit }}估算上游成本</dt><dd>{{ row.estimate.cost === undefined ? '待估算' : `${row.estimate.cost} CNY` }}</dd></div><div v-if="!costRules"><dt>售价扣除上游成本后</dt><dd :class="{ 'mw-cost-loss': row.estimate.belowCost }">{{ row.estimate.difference === undefined ? '待估算' : `${row.estimate.difference} CNY` }}</dd></div></dl>
@@ -20,7 +20,7 @@
         <p v-if="row.rule.sale_price && (row.rule.sale_price.currency !== 'CNY' || row.rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原售价不是 CNY 单件价格，不作差额比较，也不进行汇率换算。</p>
         <p v-if="row.estimate.cost !== undefined" class="mw-muted">仅覆盖上游成本的参考底价：{{ row.estimate.cost }} CNY / {{ unit }}。</p>
         <button type="button" class="btn btn-primary" :data-test="`cost-apply-${index}`" :disabled="disabled || !canApply(row.estimate.cost)" @click="adopt(index, row.estimate.cost)">采用此结果</button>
-        <p v-if="appliedKey === row.key" role="status" data-test="calculator-applied">已采用，尚未保存。请前往第 5 步保存草稿。</p>
+        <p v-if="appliedKey === row.tabKey" role="status" data-test="calculator-applied">已采用，尚未保存。请前往第 5 步保存草稿。</p>
         <p v-if="row.estimate.cost !== undefined && !canApply(row.estimate.cost)" class="mw-field-error">结果小于成本字段支持的最小精度，不能作为零成本采用；请直接核对并填写成本。</p>
       </div>
       <p class="mw-cost-disclaimer">未包含手续费、税费、服务器等费用。差额不是净利润。只有点击“采用此结果”才填入采购成本；保存并发布后用于新报价，客户售价独立管理。</p>
@@ -55,7 +55,7 @@ async function open(index = 0, source?: HTMLElement) {
   const row = rows.value[index]
   if (!row) return
   trigger = source ?? document.activeElement as HTMLElement
-  selectedKey.value = row.key
+  selectedKey.value = row.tabKey
   opened.value = true; emit('toggle', true)
   await nextTick()
   if (!panel.value?.open) {
@@ -92,21 +92,21 @@ watch(() => props.dirty, dirty => { if (dirty === false) appliedKey.value = '' }
 const canApply = (amount?: string) => amount !== undefined && decimalUnits(amount) !== undefined
 function adopt(index: number, amount?: string) {
   if (props.disabled || !canApply(amount)) return
-  appliedKey.value = rows.value[index]!.key
+  appliedKey.value = rows.value[index]!.tabKey
   emit('apply', index, amount!)
 }
 const rows = computed(() => (props.costRules
   ? props.costRules.map(rule => ({ match: rule.match, sale_price: null }))
-  : props.product.pricing_rules.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }]).map(rule => {
+  : props.product.pricing_rules.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }]).map((rule, index) => {
   const key = consumptionKey(props.product, rule)
-  return { key, rule, estimate: estimateCost(memory.value.purchase, memory.value.credits, memory.value.consumption[key] ?? '', rule.sale_price) }
+  return { key, tabKey: `${key}#${index}`, rule, estimate: estimateCost(memory.value.purchase, memory.value.credits, memory.value.consumption[key] ?? '', rule.sale_price) }
 }))
-watch(rows, value => { if (opened.value && !value.some(row => row.key === selectedKey.value)) close() })
+watch(rows, value => { if (opened.value && !value.some(row => row.tabKey === selectedKey.value)) close() })
 function moveTab(event: KeyboardEvent, index: number) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
   const target = event.key === 'Home' ? 0 : event.key === 'End' ? rows.value.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + rows.value.length) % rows.value.length
-  selectedKey.value = rows.value[target]!.key
+  selectedKey.value = rows.value[target]!.tabKey
   panel.value?.querySelectorAll<HTMLButtonElement>('[role=tab]')[target]?.focus()
 }
 function persist() {
