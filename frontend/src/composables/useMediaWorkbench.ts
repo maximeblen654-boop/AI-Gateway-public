@@ -18,6 +18,9 @@ export function useMediaWorkbench() {
   const conflict = ref(false)
   const validationUnavailable = ref(false)
   const saveState = ref('')
+  const saveFeedback = ref('')
+  const publicationFeedback = ref('')
+  const salesFeedback = ref('')
   const addedProductIds = ref<string[]>([])
   const removedProducts = ref<Product[]>([])
   let baseline = '[]'
@@ -88,7 +91,7 @@ export function useMediaWorkbench() {
       const dto = await mediaWorkbenchAPI.detail(id)
       if (seq !== loadSequence || disposed) return
       selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false
-      validationUnavailable.value = false; saveState.value = ''; apply(dto, true)
+      validationUnavailable.value = false; saveState.value = dto.media_workbench_v1?.draft.revision ? 'saved' : ''; saveFeedback.value = ''; publicationFeedback.value = ''; salesFeedback.value = ''; apply(dto, true)
     } catch (e) { if (seq === loadSequence) failure(e, detail.value?.id === id || !detail.value) }
     finally { if (seq === loadSequence) loading.value = false }
   }
@@ -123,7 +126,7 @@ export function useMediaWorkbench() {
     if (!permission?.allowed) return permission?.reason || '请重新读取，确认空白草稿的移除条件。'
     const c = p.capabilities
     if (c.resolutions.length || c.aspect_ratios.length || c.qualities.length || c.durations_seconds.length ||
-        c.combination_rules.length || p.pricing_rules.some(rule => rule.sale_price != null || Object.values(rule.match).some(value => Array.isArray(value) ? value.length > 0 : value != null)) || Object.values(c.references).some(value =>
+        c.combination_rules.length || p.cost_rules?.some(rule => rule.cost != null || Object.keys(rule.match).length > 0) || p.pricing_rules.some(rule => rule.sale_price != null || Object.values(rule.match).some(value => Array.isArray(value) ? value.length > 0 : value != null)) || Object.values(c.references).some(value =>
           typeof value === 'number' ? value !== 0 : value.min !== 0 || value.max !== 0)) {
       return '已有规格、参考素材要求或价格，不属于空白草稿。'
     }
@@ -166,12 +169,15 @@ export function useMediaWorkbench() {
     }, 1000)
   }
   async function saveDraft(): Promise<boolean> {
-    if (pending.value || loading.value || deleted.value || conflict.value || !detail.value) return false
+    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) return false
     if (!products.value.length && !removedProducts.value.length) {
       message.value = '请先选择图片或视频产品，再保存草稿。'
       return false
     }
-    pending.value = 'save'; saveState.value = 'saving'; clearError(); stopPolling(); validationUnavailable.value = false
+    pending.value = 'save'; saveState.value = 'saving'; saveFeedback.value = '正在保存草稿…'; clearError(); stopPolling(); validationUnavailable.value = false
+    const accountId = detail.value.id
+    const submitted = JSON.stringify(draftInput(products.value).products)
+    const previousVersion = config.value?.record_version ?? 0
     try {
       // A nil media configuration is initialized atomically by the first explicit
       // SaveDraft. The server infers media_types from the submitted products.
@@ -180,11 +186,30 @@ export function useMediaWorkbench() {
         ? await mediaWorkbenchAPI.saveDraft(...args, removedProducts.value.map(p => p.product_id))
         : await mediaWorkbenchAPI.saveDraft(...args)
       if (disposed) return false
-      apply(dto, true); saveState.value = 'saved'
-      const c = dto.media_workbench_v1
+      // Re-read the authoritative persisted draft; never turn a lost response into a retry.
+      const confirmed = await mediaWorkbenchAPI.detail(accountId)
+      if (confirmed.media_workbench_v1?.draft.revision !== dto.media_workbench_v1?.draft.revision || JSON.stringify(draftInput(confirmed.media_workbench_v1?.draft.products ?? []).products) !== JSON.stringify(draftInput(dto.media_workbench_v1?.draft.products ?? []).products)) throw { status: 0, message: '保存回执与重新读取的版本不一致。' }
+      apply(confirmed, true); saveState.value = 'saved'
+      saveFeedback.value = `草稿已保存 · ${confirmed.media_workbench_v1?.draft.revision ?? ''}。${confirmed.media_workbench_v1?.validation.status === 'FAIL' ? '暂不能发布，请处理下方缺项。' : '发布前仍由后台检查选中的商品。'}`
+      const c = confirmed.media_workbench_v1
       if (c && ['PENDING', 'VALIDATING', 'RUNNING'].includes(c.validation.status)) pollValidation(dto.id, c.draft.revision, validationSequence)
       return true
-    } catch (e) { saveState.value = 'unconfirmed'; validationUnavailable.value = true; failure(e); return false }
+    } catch (e) {
+      saveState.value = 'unconfirmed'; validationUnavailable.value = true; failure(e)
+      if (ambiguous(e)) {
+        saveFeedback.value = '保存结果未知，正在重新读取核对；不会重发保存请求。'
+        try {
+          const confirmed = await mediaWorkbenchAPI.detail(accountId)
+          if ((confirmed.media_workbench_v1?.record_version ?? 0) > previousVersion && JSON.stringify(draftInput(confirmed.media_workbench_v1?.draft.products ?? []).products) === submitted) {
+            apply(confirmed, true); saveState.value = 'saved'; validationUnavailable.value = false; clearError()
+            saveFeedback.value = `草稿已保存（已重新读取核对）· ${confirmed.media_workbench_v1?.draft.revision ?? ''}`
+            return true
+          }
+        } catch { /* Keep local input and require an explicit authoritative reload. */ }
+      }
+      saveFeedback.value = '草稿保存未确认，输入已保留。请重新读取核对实际结果后继续。'
+      return false
+    }
     finally { pending.value = '' }
   }
   async function publish(productIds: string[]): Promise<boolean> {
@@ -193,16 +218,33 @@ export function useMediaWorkbench() {
       message.value = '请明确选择本次要发布的已保存草稿商品。'
       return false
     }
-    pending.value = 'publish'; clearError(); stopPolling()
+    pending.value = 'publish'; clearError(); stopPolling(); publicationFeedback.value = '正在检查并发布选中的商品…'
     const id = detail.value.id
+    const previousRevision = config.value.published?.revision
+    const draftRevision = config.value.draft.revision
+    const selectedNames = productIds.map(id => config.value!.draft.products.find(p => p.product_id === id)?.display_name || id).join('、')
     try {
       const result = await mediaWorkbenchAPI.publish(id, config.value.record_version, config.value.draft.revision, [...productIds])
       // Accept either the editor DTO or the documented revision acknowledgement.
       // One authoritative DTO update refreshes the editor and all list counts.
       apply('media_workbench_v1' in result && result.id === id ? result : await mediaWorkbenchAPI.detail(id), true)
+      publicationFeedback.value = `${selectedNames} 已发布 · 版本 ${config.value.published?.revision ?? '待读取'}。${config.value.sales.enabled ? 'Account 工作台销售已开启，新版本按已发布范围生效。' : '尚未开启工作台销售，请在账号操作区开启。'}`
       return true
     } catch (e) {
       failure(e)
+      publicationFeedback.value = '发布未完成，请查看检查结果；原发布版本继续保留。'
+      if (ambiguous(e)) {
+        publicationFeedback.value = '发布结果未知，正在重新读取核对；不会重发发布请求。'
+        try {
+          const confirmed = await mediaWorkbenchAPI.detail(id)
+          const published = confirmed.media_workbench_v1?.published
+          if (published && published.revision !== previousRevision && published.source_draft_revision === draftRevision && productIds.every(productId => published.products?.some(p => p.product_id === productId && JSON.stringify(draftInput([p]).products) === JSON.stringify(draftInput(products.value.filter(draft => draft.product_id === productId)).products)))) {
+            apply(confirmed, true); clearError(); publicationFeedback.value = `${selectedNames} 已发布（已重新读取核对）· 版本 ${published.revision}`
+            return true
+          }
+        } catch { /* Unknown publication never triggers an automatic retry. */ }
+        publicationFeedback.value = '发布结果仍未确认，请重新读取实际版本后继续。'
+      }
       if (requiresPublishedRecovery(e)) return false
       // A definite selected-product validation rejection did not publish the
       // Draft. Keep other selections available; ambiguous writes require reload.
@@ -217,11 +259,32 @@ export function useMediaWorkbench() {
       return false
     } finally { pending.value = '' }
   }
-  async function sales(enabled: boolean) {
-    if (pending.value || loading.value || deleted.value || conflict.value || !detail.value || !config.value) return
-    pending.value = 'sales'; clearError(); stopPolling()
-    try { apply(await mediaWorkbenchAPI.sales(detail.value.id, config.value.record_version, enabled), false) }
-    catch (e) { failure(e) } finally { pending.value = '' }
+  const ambiguous = (error: unknown) => { const status = (error as { status?: number }).status ?? 0; return status === 0 || status === 408 || status >= 500 }
+  async function sales(enabled: boolean): Promise<boolean> {
+    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value || !config.value) return false
+    pending.value = 'sales'; clearError(); stopPolling(); salesFeedback.value = enabled ? '正在开启 Account 工作台销售…' : '正在暂停 Account 工作台销售…'
+    const id = detail.value.id, version = config.value.record_version
+    try {
+      const dto = await mediaWorkbenchAPI.sales(id, version, enabled)
+      if (dto.media_workbench_v1?.sales.enabled !== enabled) throw { status: 0 }
+      apply(dto, false)
+      salesFeedback.value = `Account #${id} 工作台销售已${enabled ? '开启' : '暂停'}（服务端已确认）。`
+      return true
+    } catch (e) {
+      failure(e)
+      if (ambiguous(e)) {
+        salesFeedback.value = '销售操作结果未知，正在重新读取核对；不会重发操作。'
+        try {
+          const dto = await mediaWorkbenchAPI.detail(id)
+          if ((dto.media_workbench_v1?.record_version ?? 0) > version && dto.media_workbench_v1?.sales.enabled === enabled) {
+            apply(dto, false); clearError(); salesFeedback.value = `Account #${id} 工作台销售已${enabled ? '开启' : '暂停'}（已重新读取核对）。`; return true
+          }
+        } catch { /* Keep the dialog and previous confirmed status visible. */ }
+        saveState.value = 'unconfirmed'
+      }
+      salesFeedback.value = '销售操作失败或结果未确认，请保留此窗口并重新读取实际状态。'
+      return false
+    } finally { pending.value = '' }
   }
   async function lifecycle(action: LifecycleAction, target: LifecycleTarget): Promise<boolean> {
     if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) return false
@@ -258,7 +321,7 @@ export function useMediaWorkbench() {
   function discard() { if (detail.value) apply(detail.value, true) }
   onBeforeUnmount(() => { disposed = true; loadSequence++; stopPolling() })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
-    errorStatus, diagnostics, publishValidation, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
 }

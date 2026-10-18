@@ -12,9 +12,9 @@
           <small>{{ fieldLabel(diagnostic.path) }}</small>
           <span>{{ diagnostic.class === 'NEEDS_DEVELOPMENT' ? '需要开发' : diagnostic.class === 'UI_FIXABLE' ? '可在此修改' : '检查信息' }} · {{ diagnostic.code }}</span>
           <strong>{{ diagnostic.message }}</strong><small>{{ diagnostic.action }}</small>
-          <small v-if="diagnostic.match">缺价条件：{{ matchLabel(diagnostic.match) }}</small>
-          <small v-for="(spec, specIndex) in diagnostic.specs ?? []" :key="specIndex" data-test="diagnostic-spec">缺价规格：{{ specLabel(spec) }}</small>
-          <small v-if="(diagnostic.spec_count ?? 0) > (diagnostic.specs?.length ?? 0)">共 {{ diagnostic.spec_count }} 个请求组合缺价，上方仅展示前 {{ diagnostic.specs?.length }} 个；请在所属商品的单价步骤补齐覆盖。</small>
+          <small v-if="diagnostic.match">适用条件：{{ matchLabel(diagnostic.match) }}</small>
+          <small v-for="(spec, specIndex) in diagnostic.specs ?? []" :key="specIndex" data-test="diagnostic-spec">待修正规格：{{ specLabel(spec) }}</small>
+          <small v-if="(diagnostic.spec_count ?? 0) > (diagnostic.specs?.length ?? 0)">共 {{ diagnostic.spec_count }} 个请求组合待修正，上方仅展示前 {{ diagnostic.specs?.length }} 个；请在所属商品的第 4 步补齐覆盖。</small>
         </button>
       </li>
     </ul>
@@ -38,7 +38,8 @@ function productLabel(diagnostic: Diagnostic) {
 function fieldLabel(path: string) {
   if (path.includes('edit_execution')) return '参考图编辑 · 单请求能力'
   if (path.includes('execution')) return '文生图 · 单请求能力'
-  if (path.includes('pricing_rules')) return '第 4 步 · 填写单价'
+  if (path.includes('cost_rules') || path.includes('cost_coverage')) return '第 4 步 · 采购成本 · 前往填写'
+  if (path.includes('pricing_rules')) return '第 4 步 · 客户售价 · 前往填写'
   if (path.includes('references')) return '第 2 步 · 参考素材'
   if (path.includes('size_mappings')) return '尺寸传参 · 技术维护'
   if (path.includes('capabilities')) return '第 1 步 · 可售规格'

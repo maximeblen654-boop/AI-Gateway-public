@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import MediaProductEditor from '../MediaProductEditor.vue'
 import MediaMatchEditor from '../MediaMatchEditor.vue'
+import MediaTechnicalEditor from '../MediaTechnicalEditor.vue'
 import MediaTokensField from '../MediaTokensField.vue'
 import { copy, imageProduct } from './fixtures'
 import type { Match, Product } from '@/api/admin/mediaWorkbench'
@@ -100,7 +101,7 @@ describe('media editors follow one-way props', () => {
     product.pricing_rules = ['1K', '4K'].map((resolution, i) => ({ match: { resolution: [resolution] }, sale_price: { amount: String(i + 1), currency: 'CNY', billing_mode: 'per_request' } }))
     const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const matchEditor = wrapper.findComponent(MediaMatchEditor)
+    const matchEditor = wrapper.getComponent(MediaTechnicalEditor).findComponent(MediaMatchEditor)
     matchEditor.vm.$emit('update:modelValue', { resolution: ['4K'] })
     await wrapper.vm.$nextTick()
     expect(confirm).toHaveBeenCalled()

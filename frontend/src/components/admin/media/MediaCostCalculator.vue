@@ -1,36 +1,39 @@
 <template>
-  <div class="mw-cost-entry"><button type="button" class="mw-cost-trigger" data-test="cost-open" @click="open()"><span aria-hidden="true">↗</span> 成本换算</button><span class="mw-muted">按当前售价档位估算，不改变售价</span></div>
+  <div class="mw-cost-entry"><button type="button" class="mw-cost-trigger" data-test="cost-open" @click="open()"><span aria-hidden="true">↗</span> 成本换算</button><span class="mw-muted">先计算，再采用为采购成本；仍需保存草稿</span></div>
   <dialog ref="panel" class="mw-cost" data-test="cost-calculator" :aria-labelledby="titleId" :aria-modal="narrow ? 'true' : 'false'" @cancel.prevent="close" @keydown="narrow && containDialogFocus($event, panel)">
     <header class="mw-cost-header"><div><h2 :id="titleId" tabindex="-1">成本换算</h2><p>Account #{{ accountId }} · {{ product.display_name || product.upstream_model }}</p></div><button type="button" class="mw-cost-close" data-test="cost-close" aria-label="收起成本换算" @click="close">×</button></header>
     <div class="mw-cost-body">
-      <div class="mw-cost-tabs" role="tablist" aria-label="选择售价档位"><button v-for="(row, index) in rows" :key="row.key" type="button" role="tab" :id="`${titleId}-tab-${index}`" :aria-controls="`${titleId}-panel-${index}`" :aria-selected="selectedKey === row.key" :tabindex="selectedKey === row.key ? 0 : -1" :data-test="`cost-tab-${index}`" @click="selectedKey = row.key" @keydown="moveTab($event, index)">{{ labels[index] || '统一售价' }}</button></div>
-      <p class="mw-muted">采购参数按当前管理员和 Account 记在此浏览器，不跨设备同步。积分消耗按商品及规格记忆。</p>
+      <div class="mw-cost-tabs" role="tablist" aria-label="选择采购成本规格"><button v-for="(row, index) in rows" :key="row.key" type="button" role="tab" :id="`${titleId}-tab-${index}`" :aria-controls="`${titleId}-panel-${index}`" :aria-selected="selectedKey === row.key" :tabindex="selectedKey === row.key ? 0 : -1" :data-test="`cost-tab-${index}`" @click="selectedKey = row.key" @keydown="moveTab($event, index)">{{ labels[index] || '统一成本' }}</button></div>
+      <p class="mw-muted">此浏览器仅记忆试算参数，不会自动成为正式成本。采用结果后，保存草稿才会由服务器持久化。</p>
       <p v-if="storageWarning" class="mw-field-error" role="status">{{ storageWarning }}</p>
       <div class="mw-cost-purchase">
         <label class="mw-field">上游采购金额（人民币）<input class="input" data-test="cost-purchase" inputmode="decimal" placeholder="请输入采购金额" :value="memory.purchase" :aria-invalid="!!decimalError(memory.purchase, true)" @input="setAccount('purchase', $event)" /><span v-if="decimalError(memory.purchase, true)" class="mw-field-error">{{ decimalError(memory.purchase, true) }}</span></label>
         <label class="mw-field">实得积分（含赠送）<input class="input" data-test="cost-credits" inputmode="decimal" placeholder="请输入到账总积分" :value="memory.credits" :aria-invalid="!!decimalError(memory.credits, true)" @input="setAccount('credits', $event)" /><span v-if="decimalError(memory.credits, true)" class="mw-field-error">{{ decimalError(memory.credits, true) }}</span></label>
       </div>
       <p class="mw-cost-rate" data-test="cost-rate">每积分成本 <strong>{{ rate ? `${rate} CNY` : '待填写有效采购参数' }}</strong></p>
-      <p class="mw-muted">同价档位覆盖不同上游消耗时，按最高单件消耗估算。{{ product.media_type === 'video' ? '视频按整条计算，不再乘秒数。' : '图片按单张计算。' }}</p>
+      <p class="mw-muted">不同规格消耗不同，请先在采购成本表中分别配置。{{ product.media_type === 'video' ? '视频按整条计算，不再乘秒数。' : '图片按单张计算。' }}</p>
       <div v-for="(row, index) in rows" :key="row.key" v-show="row.key === selectedKey" class="mw-cost-row" role="tabpanel" :id="`${titleId}-panel-${index}`" :aria-labelledby="`${titleId}-tab-${index}`" :data-test="`cost-row-${index}`">
-        <div class="mw-cost-row-heading"><strong>{{ labels[index] || '统一售价' }}</strong><span>现有售价：{{ row.rule.sale_price ? `${row.rule.sale_price.amount} ${row.rule.sale_price.currency} / ${unit}` : '待填写' }}</span></div>
+        <div class="mw-cost-row-heading"><strong>{{ labels[index] || '统一成本' }}</strong><span v-if="costRules">客户售价按独立售价表配置</span><span v-else>现有售价：{{ row.rule.sale_price ? `${row.rule.sale_price.amount} ${row.rule.sale_price.currency} / ${unit}` : '待填写' }}</span></div>
         <label class="mw-field">预计每{{ unit }}上游积分消耗<input class="input" inputmode="decimal" placeholder="待估算，允许明确填 0" :value="memory.consumption[row.key] ?? ''" :aria-invalid="!!decimalError(memory.consumption[row.key] ?? '')" :data-test="`cost-consumption-${index}`" @input="setConsumption(row.key, $event)" /><span v-if="decimalError(memory.consumption[row.key] ?? '')" class="mw-field-error">{{ decimalError(memory.consumption[row.key] ?? '') }}</span></label>
-        <dl class="mw-cost-results"><div><dt>单{{ unit }}估算上游成本</dt><dd>{{ row.estimate.cost === undefined ? '待估算' : `${row.estimate.cost} CNY` }}</dd></div><div><dt>售价扣除上游成本后</dt><dd :class="{ 'mw-cost-loss': row.estimate.belowCost }">{{ row.estimate.difference === undefined ? '待估算' : `${row.estimate.difference} CNY` }}</dd></div></dl>
+        <dl class="mw-cost-results"><div><dt>单{{ unit }}估算上游成本</dt><dd>{{ row.estimate.cost === undefined ? '待估算' : `${row.estimate.cost} CNY` }}</dd></div><div v-if="!costRules"><dt>售价扣除上游成本后</dt><dd :class="{ 'mw-cost-loss': row.estimate.belowCost }">{{ row.estimate.difference === undefined ? '待估算' : `${row.estimate.difference} CNY` }}</dd></div></dl>
         <p v-if="row.estimate.belowCost" class="mw-cost-loss" role="status">当前售价低于估算上游成本。</p>
         <p v-if="row.rule.sale_price && (row.rule.sale_price.currency !== 'CNY' || row.rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原售价不是 CNY 单件价格，不作差额比较，也不进行汇率换算。</p>
         <p v-if="row.estimate.cost !== undefined" class="mw-muted">仅覆盖上游成本的参考底价：{{ row.estimate.cost }} CNY / {{ unit }}。</p>
+        <button type="button" class="btn btn-primary" :data-test="`cost-apply-${index}`" :disabled="disabled || !canApply(row.estimate.cost)" @click="adopt(index, row.estimate.cost)">采用此结果</button>
+        <p v-if="appliedKey === row.key" role="status" data-test="calculator-applied">已采用，尚未保存。请前往第 5 步保存草稿。</p>
+        <p v-if="row.estimate.cost !== undefined && !canApply(row.estimate.cost)" class="mw-field-error">结果小于成本字段支持的最小精度，不能作为零成本采用；请直接核对并填写成本。</p>
       </div>
-      <p class="mw-cost-disclaimer">未包含手续费、税费、服务器等费用。差额不是净利润，不保证不亏损；估算不进入发布、客户报价或正式结算。</p>
+      <p class="mw-cost-disclaimer">未包含手续费、税费、服务器等费用。差额不是净利润。只有点击“采用此结果”才填入采购成本；保存并发布后用于新报价，客户售价独立管理。</p>
     </div>
   </dialog>
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
-import type { Product } from '@/api/admin/mediaWorkbench'
+import type { CostRule, Product } from '@/api/admin/mediaWorkbench'
 import { containDialogFocus } from './mediaDialogFocus'
-import { consumptionKey, decimalError, emptyCostMemory, estimateCost, readCostMemory, storageKey } from './costCalculator'
-const props = defineProps<{ product: Product; accountId?: number; adminId?: number; labels: string[]; active?: boolean }>()
-const emit = defineEmits<{ toggle: [open: boolean] }>()
+import { consumptionKey, decimalError, decimalUnits, emptyCostMemory, estimateCost, readCostMemory, storageKey } from './costCalculator'
+const props = defineProps<{ product: Product; accountId?: number; adminId?: number; labels: string[]; active?: boolean; costRules?: CostRule[]; disabled?: boolean; dirty?: boolean }>()
+const emit = defineEmits<{ toggle: [open: boolean]; apply: [index: number, amount: string] }>()
 const panel = ref<HTMLDialogElement>()
 const titleId = `media-cost-${useId()}`
 const selectedKey = ref('')
@@ -84,7 +87,17 @@ watch(() => props.active, active => { if (active === false) close() })
 watch([() => props.adminId, () => props.accountId, () => props.product.product_id], () => close())
 defineExpose({ open, close })
 const rate = computed(() => estimateCost(memory.value.purchase, memory.value.credits, '', null).perCredit)
-const rows = computed(() => (props.product.pricing_rules.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }]).map(rule => {
+const appliedKey = ref('')
+watch(() => props.dirty, dirty => { if (dirty === false) appliedKey.value = '' })
+const canApply = (amount?: string) => amount !== undefined && decimalUnits(amount) !== undefined
+function adopt(index: number, amount?: string) {
+  if (props.disabled || !canApply(amount)) return
+  appliedKey.value = rows.value[index]!.key
+  emit('apply', index, amount!)
+}
+const rows = computed(() => (props.costRules
+  ? props.costRules.map(rule => ({ match: rule.match, sale_price: null }))
+  : props.product.pricing_rules.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }]).map(rule => {
   const key = consumptionKey(props.product, rule)
   return { key, rule, estimate: estimateCost(memory.value.purchase, memory.value.credits, memory.value.consumption[key] ?? '', rule.sale_price) }
 }))
@@ -107,8 +120,8 @@ function persist() {
     storageWarning.value = ''
   } catch { storageWarning.value = '未能记住本次估算，请保持当前页面；正式售价编辑不受影响。' }
 }
-function setAccount(field: 'purchase' | 'credits', event: Event) { memory.value[field] = (event.target as HTMLInputElement).value; persist() }
-function setConsumption(key: string, event: Event) { memory.value.consumption[key] = (event.target as HTMLInputElement).value; persist() }
+function setAccount(field: 'purchase' | 'credits', event: Event) { memory.value[field] = (event.target as HTMLInputElement).value; appliedKey.value = ''; persist() }
+function setConsumption(key: string, event: Event) { memory.value.consumption[key] = (event.target as HTMLInputElement).value; appliedKey.value = ''; persist() }
 </script>
 <style scoped>
 .mw-cost-entry{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.mw-cost-trigger{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--mw-border);border-radius:8px;font-weight:600;font-size:13px;background:var(--mw-surface)}

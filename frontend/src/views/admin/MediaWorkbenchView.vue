@@ -72,10 +72,20 @@
             </div>
             <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
           </section>
+            <section class="mw-sales-card" data-test="sales-state">
+              <div><p class="mw-eyebrow">Account #{{ detail?.id }} · 工作台销售状态</p><strong>{{ salesLabel }}</strong><p class="mw-muted">此开关影响本 Account 的全部已发布工作台商品。</p></div>
+              <button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="busy || deleted || conflict || saveState === 'unconfirmed' || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button>
+              <span v-else class="mw-badge">首次保存后可开启</span>
+            </section>
+            <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
+          <p v-if="salesFeedback" class="mw-banner" role="status" data-test="account-sales-feedback">{{ salesFeedback }}</p>
+          <p v-if="publicationFeedback" class="mw-banner" role="status" data-test="publication-feedback">{{ publicationFeedback }}</p>
           <section class="mw-product-management" aria-label="配置与销售状态" data-test="publication-layers">
             <strong>分别核对配置与销售状态</strong>
             <p>草稿：{{ dirty ? '有未保存修改' : config ? '已保存' : '尚未建立' }} · 草稿校验：{{ draftValidationLabel }}</p>
-            <p>已发布：{{ config?.published ? '有已发布版本' : '尚未发布' }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
+            <p>已发布：{{ config?.published ? `版本 ${config.published.revision}` : '尚未发布' }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
+            <p data-test="global-paid-status">图片生成服务：{{ paidStatusLabel('image') }} · 视频生成服务：{{ paidStatusLabel('video') }}</p>
+            <p v-if="config?.sales.enabled && paidStates.video?.mode === 'managed-v1' && !paidStates.video.effective_enabled" class="mw-muted" data-test="video-service-closed">销售已开启，但视频生成服务尚未开放。</p>
             <p class="mw-muted">草稿校验通过只说明保存的草稿通过检查。商品的已发布配置、Account 销售、全局付费开关和客户原生权限仍分别生效；全局开关请返回来源与账号查看。</p>
             <p class="mw-muted" data-test="native-api-boundary">商品保存、发布、上下架与归档只管理 Studio 配置和销售状态，不修改独立 API Key 的原生权限或路由；受保护的图片任务接口仍保留原有访问限制。</p>
           </section>
@@ -109,12 +119,7 @@
               <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
             </button>
           </div>
-            <section class="mw-sales-card" data-test="sales-state">
-              <div><p class="mw-eyebrow">销售状态</p><strong>{{ salesLabel }}</strong><p class="mw-muted">发布配置与开启销售是两个独立动作；发布不会自动启用销售。</p></div>
-              <button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="busy || deleted || conflict || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button>
-              <span v-else class="mw-badge">首次保存后可开启</span>
-            </section>
-            <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
+
 
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
@@ -200,8 +205,9 @@
                 <div class="mw-save-draft">
                   <p class="mw-muted">保存本 Account 的草稿（共 {{ products.length }} 个商品），由后台检查。不会发布、启售或发起生成。</p>
                   <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
-                  <button class="btn btn-primary" data-test="save" :disabled="busy || deleted || conflict || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
+                  <button class="btn btn-primary" data-test="save" :disabled="managementDisabled || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
                   <button v-if="!dirty && config" type="button" class="btn btn-secondary mw-return-models" data-test="return-models" @click="backToModels">← 返回模型列表</button>
+                  <p v-if="saveFeedback || saveState === 'saved'" class="mw-banner" role="status" data-test="save-feedback">{{ saveFeedback || `草稿已保存 · ${config?.draft.revision}` }}</p>
                   <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果未确认，请重新读取后核对，不要重复发布。</p>
                 </div>
               </template>
@@ -257,8 +263,11 @@
       <p>下列已发布产品将一起受到 Account 级销售开关影响：</p>
       <ul class="mw-dialog-list" data-test="sales-products"><li v-for="p in config?.published?.products ?? []" :key="p.product_id">{{ productDisplayTitle(p) }} · {{ p.media_type === 'video' ? '视频' : '图片' }}</li></ul>
       <p v-if="!config?.published?.products?.length">暂无已发布产品。</p>
+      <p>Account #{{ detail?.id }} · {{ detail?.name }}。此操作只影响工作台销售；图片/视频全局付费生成服务分别控制。</p>
+      <p v-if="message || salesFeedback" role="alert" data-test="sales-dialog-feedback">{{ message }} {{ salesFeedback }}</p>
+      <button v-if="saveState === 'unconfirmed' || conflict" type="button" class="btn btn-secondary" data-test="sales-reload" :disabled="busy" @click="salesDialog = false; reloadDialog = true">重新读取实际状态</button>
       <p>{{ config?.sales.enabled ? '暂停后停止新的媒体报价和新提交；已经提交的任务和历史订单不会被修改。' : '后台会核验已发布产品的销售条件；未发布草稿不会随销售开关生效。' }}</p>
-      <template #actions><button class="btn" :class="config?.sales.enabled ? 'mw-danger' : 'btn-primary'" data-test="confirm-sales" :disabled="busy" @click="confirmSales">确认{{ config?.sales.enabled ? '暂停' : '开启' }}</button></template>
+      <template #actions><button class="btn" :class="config?.sales.enabled ? 'mw-danger' : 'btn-primary'" data-test="confirm-sales" :disabled="managementDisabled" @click="confirmSales">确认{{ config?.sales.enabled ? '暂停' : '开启' }}</button></template>
     </MediaDialog>
     <MediaDialog :show="reloadDialog" title="重新读取服务器配置？" :busy="busy" @close="reloadDialog = false">
       <p>当前未保存修改将被放弃。读取服务器最新草稿后再编辑，不会自动重试旧写入。</p>
@@ -268,6 +277,7 @@
 </template>
 
 <script setup lang="ts">
+import { mediaPaidAPI, type PaidState, type PaidMedia } from '@/api/admin/mediaPaid'
 import MediaPaidControls from '@/components/admin/media/MediaPaidControls.vue'
 import { useAuthStore } from '@/stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -281,9 +291,15 @@ import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction
 import '@/styles/media-workbench.css'
 
 const costOpen = ref(false)
+const paidStates = ref<Partial<Record<PaidMedia, PaidState>>>({})
+const paidStatusLabel = (kind: PaidMedia) => paidStates.value[kind]?.mode === 'managed-v1' ? paidStates.value[kind]?.effective_enabled ? '已开放' : '尚未开放' : '状态未确认'
+async function readPaidStatus() {
+  const results = await Promise.allSettled((['image', 'video'] as const).map(kind => mediaPaidAPI.status(kind)))
+  for (const [index, result] of results.entries()) { const kind = index === 0 ? 'image' : 'video'; if (result.status === 'fulfilled') paidStates.value[kind] = result.value; else delete paidStates.value[kind] }
+}
 const workbench = useMediaWorkbench()
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
-  diagnostics, publishValidation, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+  diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
 const step = ref('suppliers')
@@ -480,7 +496,7 @@ function changeProduct(event: Event) {
 }
 function updateProduct(value: Product) { const index = products.value.findIndex(p => p.product_id === selectedProduct.value); if (index >= 0) products.value[index] = value }
 function navigate(action: () => void | Promise<void>) { if (busy.value) return; if (dirty.value) nextNavigation.value = action; else void action() }
-async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) step.value = 'models' }
+async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) { step.value = 'models'; void readPaidStatus() } }
 async function openEditor(modelId: string) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
   modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }
@@ -513,7 +529,7 @@ async function discardAndNavigate() {
 }
 function openPublish() { publishProductIds.value = config.value?.draft.products.some(p => p.product_id === selectedProduct.value) ? [selectedProduct.value] : []; publishDialog.value = true }
 async function confirmPublish() { if (await publish(publishProductIds.value)) publishDialog.value = false }
-async function confirmSales() { if (config.value) await sales(!config.value.sales.enabled); salesDialog.value = false }
+async function confirmSales() { if (config.value && await sales(!config.value.sales.enabled)) salesDialog.value = false }
 async function reload() {
   const accountId = detail.value?.id
   if (!accountId) return
@@ -529,6 +545,7 @@ async function reload() {
     selectModel(modelId)
     if (products.value.some(item => item.product_id === productId && item.upstream_model === modelId)) selectedProduct.value = productId
   }
+  void readPaidStatus()
   step.value = previousStep === 'editor' && !selectedModel.value ? 'models' : previousStep
 }
 async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers() }
@@ -548,8 +565,10 @@ async function locate(diagnostic: Diagnostic) {
   }
   const fieldPath = productEditor.value?.showField(path, diagnostic.code) ?? path
   await nextTick()
-  const field = ['adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
-  const section = editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)
+  const costIndex = /cost_rules(?:\[|\.)(\d+)/.exec(fieldPath)?.[1]
+  const exactCost = costIndex === undefined ? undefined : editorElement.value?.querySelector<HTMLElement>(`[data-field="cost_rules.${costIndex}.cost"]`)
+  const field = ['cost_rules', 'cost_coverage', 'adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
+  const section = exactCost ?? editorElement.value?.querySelector<HTMLElement>(`[data-field="${field === 'cost_coverage' ? 'cost_rules' : field}"]`)
   section?.querySelectorAll('details').forEach(node => { node.open = true })
   let ancestor = section
   while (ancestor && ancestor !== editorElement.value) {
@@ -558,6 +577,8 @@ async function locate(diagnostic: Diagnostic) {
   }
   const target = section?.matches('input,select') ? section : section?.querySelector<HTMLElement>('input,select,button')
   target?.focus()
+  section?.classList.add('mw-field-located')
+  setTimeout(() => section?.classList.remove('mw-field-located'), 2500)
   section?.scrollIntoView?.({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
 }
 function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || pending.value) { event.preventDefault(); event.returnValue = '' } }

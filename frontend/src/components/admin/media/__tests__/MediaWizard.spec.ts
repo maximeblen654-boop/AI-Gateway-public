@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import MediaProductEditor from '../MediaProductEditor.vue'
 import MediaReferenceEditor from '../MediaReferenceEditor.vue'
 import MediaMatchEditor from '../MediaMatchEditor.vue'
+import MediaTechnicalEditor from '../MediaTechnicalEditor.vue'
 import { copy, imageProduct } from './fixtures'
 import type { Product } from '@/api/admin/mediaWorkbench'
 
@@ -114,7 +115,7 @@ describe('five-step product wizard', () => {
     await wrapper.get('[data-field="media_type"]').setValue('video')
     expect(confirm).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-field="media_type"]').element).toHaveProperty('value', 'image')
-    const match = wrapper.getComponent(MediaMatchEditor)
+    const match = wrapper.getComponent(MediaTechnicalEditor).getComponent(MediaMatchEditor)
     await match.findAll('input[type="checkbox"]')[0]!.setValue(false)
     expect(confirm).toHaveBeenCalledTimes(2)
     expect(match.findAll('input[type="checkbox"]')[0]!.element).toHaveProperty('checked', true)

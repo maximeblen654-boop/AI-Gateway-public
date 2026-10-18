@@ -53,8 +53,8 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  ]})
  const w=create();await flushPromises();const video=w.get('[data-test="paid-video"]')
  await video.findAll('button')[0].trigger('click');await flushPromises()
- expect(video.text()).toContain('Group 的 Channel 绑定')
- expect(video.text()).toContain('按次成本规则')
+ expect(video.text()).toContain('工作台采购成本未匹配')
+ expect(video.text()).toContain('第 4 步补齐后重新发布')
  expect(video.text()).toContain('视频协议或规格不兼容')
  expect(video.text()).toContain('报价检查原因未分类')
  expect(video.text()).toContain('至少一个已发布商品通过检查')
@@ -63,7 +63,7 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  expect(api.apply).not.toHaveBeenCalled()
 })
 
-it('guides an administrator to existing channel settings without changing native configuration', async () => {
+it('guides administrators to persisted workbench costs without channel coupling', async () => {
  api.check.mockResolvedValue({pass:false, group_id:31, checks:[
  {code:'quote_cost_channel_missing',pass:false,account_id:44},
  {code:'quote_cost_rule_missing',pass:false,account_id:44},
@@ -72,13 +72,11 @@ it('guides an administrator to existing channel settings without changing native
  const w=create(); await flushPromises(); const video=w.get('[data-test="paid-video"]')
  await video.findAll('button')[0].trigger('click');await flushPromises()
  const guide=video.get('[data-test="cost-guide"]')
- expect(guide.text()).toContain('Group #31')
- expect(guide.text()).toContain('同组普通 API')
- expect(guide.text()).toContain('浏览器成本估算均不等于')
- expect(guide.get('a').attributes('href')).toBe('/admin/channels')
- expect(guide.get('a').attributes('target')).toBe('_blank')
- expect(video.text()).toContain('没有匹配当前 Account')
- expect(video.text()).toContain('不接受按秒')
+ expect(guide.text()).toContain('采购成本与售价')
+ expect(guide.text()).toContain('保存草稿后检查并发布')
+ expect(guide.find('a[href="/admin/channels"]').exists()).toBe(false)
+ expect(video.text()).not.toContain('Channel')
+ expect(video.text()).toContain('CNY 单张或整条成本')
  expect(api.apply).not.toHaveBeenCalled()
  expect(w.find('[data-test="paid-image"] [data-test="cost-guide"]').exists()).toBe(false)
 })

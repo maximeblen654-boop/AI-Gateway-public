@@ -10,7 +10,9 @@ vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
   mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn() }
 }))
+vi.mock('@/api/admin/mediaPaid', () => ({ mediaPaidAPI: { status: vi.fn(async (media: string) => ({ media, mode: 'managed-v1', effective_enabled: false, requested_enabled: false })) } }))
 const api = vi.mocked(mediaWorkbenchAPI)
+function mockSave(dto: ReturnType<typeof saved>) { api.saveDraft.mockImplementation(async () => { api.detail.mockResolvedValue(dto); return dto }) }
 let wrapper: VueWrapper
 let router: ReturnType<typeof createRouter>
 
@@ -38,12 +40,39 @@ beforeEach(() => {
   vi.resetAllMocks()
   api.suppliers.mockResolvedValue([supplier(), supplier(44)])
   api.detail.mockImplementation(async id => supplier(id))
-  api.saveDraft.mockResolvedValue(saved())
+  mockSave(saved())
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 })
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
+
+it('opens missing procurement at step four and focuses the exact cost field', async () => {
+  const dto = supplier(77, 'FAIL')
+  dto.media_workbench_v1!.draft.products[0]!.cost_rules = [
+    { match: { resolution: ['1K'] }, cost: { amount: '0.1', currency: 'CNY', billing_mode: 'per_request' } },
+    { match: { resolution: ['4K'] }, cost: null }
+  ]
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_COST', scope: 'canvas-1', path: 'draft.products.0.cost_rules.1.cost', message: '4K 采购成本尚未填写', action: '前往第4步填写' }]
+  api.detail.mockResolvedValue(dto)
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
+  expect(document.activeElement).toBe(wrapper.get('[data-test="procurement-cost-1"]').element)
+  expect(wrapper.get('[data-test="procurement-cost-1"]').classes()).toContain('mw-field-located')
+})
+it('keeps failed account sales confirmation open with its scope and old server state', async () => {
+  api.sales.mockRejectedValue({ status: 422 })
+  await mountWorkbench(); await selectAccount()
+  const sales = wrapper.get('[data-test="sales"]')
+  const modelList = wrapper.get('.mw-model-list')
+  expect(!!(sales.element.compareDocumentPosition(modelList.element) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  await sales.trigger('click'); await wrapper.get('[data-test="confirm-sales"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="sales-products"]').text()).toContain('画布图片')
+  expect(wrapper.get('[data-test="sales-dialog-feedback"]').text()).toContain('失败或结果未确认')
+  expect(wrapper.get('[data-test="confirm-sales"]').element.closest('dialog')?.open).toBe(true)
+  expect(wrapper.get('[data-test="sales-state"]').text()).toContain('销售中')
+})
 
 describe('Media Workbench page flow', () => {
   it('keeps source groups collapsed by default and opens exact numeric search results', async () => {

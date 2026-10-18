@@ -10,6 +10,7 @@ vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn() }
 }))
 const api = vi.mocked(mediaWorkbenchAPI)
+function mockSave(dto: ReturnType<typeof saved>) { api.saveDraft.mockImplementation(async () => { api.detail.mockResolvedValue(dto); return dto }) }
 let state: ReturnType<typeof useMediaWorkbench>
 let wrapper: ReturnType<typeof mount>
 async function start() {
@@ -18,6 +19,38 @@ async function start() {
 }
 beforeEach(() => { vi.resetAllMocks(); api.detail.mockResolvedValue(supplier()); api.suppliers.mockResolvedValue([supplier(), supplier(44)]) })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers() })
+
+it('reconciles a save timeout by reading persisted cost without repeating the write', async () => {
+  await start()
+  const dto = saved()
+  dto.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: { amount: '0', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }]
+  state.products.value = copy(dto.media_workbench_v1!.draft.products)
+  api.saveDraft.mockRejectedValue({ status: 0 })
+  api.detail.mockResolvedValue(dto)
+  expect(await state.saveDraft()).toBe(true)
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+  expect(state.saveFeedback.value).toContain('重新读取核对')
+  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('0')
+})
+it('keeps ambiguous writes blocked when readback cannot confirm the cost draft', async () => {
+  await start(); state.products.value[0]!.cost_rules = [{ match: {}, cost: null }]
+  api.saveDraft.mockRejectedValue({ status: 503 })
+  expect(await state.saveDraft()).toBe(false)
+  expect(await state.saveDraft()).toBe(false)
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+  expect(state.saveState.value).toBe('unconfirmed')
+  expect(state.products.value[0]!.cost_rules).toEqual([{ match: {}, cost: null }])
+})
+it('sales rejection remains false and timeout is reconciled without duplicate mutation', async () => {
+  await start(); api.sales.mockRejectedValue({ status: 422 })
+  expect(await state.sales(false)).toBe(false)
+  expect(state.config.value!.sales.enabled).toBe(true)
+  const dto = saved(); dto.media_workbench_v1!.sales.enabled = false
+  api.sales.mockRejectedValue({ status: 0 }); api.detail.mockResolvedValue(dto)
+  expect(await state.sales(false)).toBe(true)
+  expect(api.sales).toHaveBeenCalledTimes(2)
+  expect(state.salesFeedback.value).toContain('重新读取核对')
+})
 describe('Media Workbench request lifecycle', () => {
   it('creates images with system quantity 1..10 and videos with one while retaining old products', async () => {
     await start()
@@ -48,15 +81,15 @@ describe('Media Workbench request lifecycle', () => {
     api.saveDraft.mockReturnValue(new Promise(r => { resolve = r }))
     const saving = state.saveDraft(); await state.saveDraft(); expect(api.saveDraft).toHaveBeenCalledTimes(1)
     expect(api.saveDraft.mock.calls[0]![2][0]!.pricing_rules[0]!.sale_price!.amount).toBe('0.12345678901234567890')
-    resolve(saved()); await saving; expect(state.saveState.value).toBe('saved')
+    api.detail.mockResolvedValue(saved()); resolve(saved()); await saving; expect(state.saveState.value).toBe('saved')
   })
   it('a saved validation FAIL remains a successfully saved Draft', async () => {
-    await start(); api.saveDraft.mockResolvedValue(saved('FAIL')); expect(await state.saveDraft()).toBe(true)
+    await start(); mockSave(saved('FAIL')); expect(await state.saveDraft()).toBe(true)
     expect(state.saveState.value).toBe('saved'); expect(state.dirty.value).toBe(false); expect(state.canPublish.value).toBe(true)
     expect(state.diagnostics.value[0]?.code).toBe('MISSING_PRICE')
   })
   it.each(['UNKNOWN', 'PENDING', 'FAIL'])('confirmed saved Draft %s allows selected server validation', async status => {
-    await start(); api.saveDraft.mockResolvedValue(saved(status)); await state.saveDraft()
+    await start(); mockSave(saved(status)); await state.saveDraft()
     expect(state.saveState.value).toBe('saved'); expect(state.products.value).toHaveLength(1); expect(state.canPublish.value).toBe(true)
     api.publish.mockResolvedValue(saved()); expect(await state.publish(['canvas-1'])).toBe(true)
     expect(api.publish).toHaveBeenCalledWith(77, 4, 'mwd_b', ['canvas-1'])
@@ -77,7 +110,7 @@ describe('Media Workbench request lifecycle', () => {
     await start(); state.products.value[0]!.display_name = '本地修改'; const dto = supplier(); dto.media_workbench_v1!.record_version = 9
     dto.media_workbench_v1!.sales.enabled = false; api.sales.mockResolvedValue(dto); await state.sales(false)
     expect(state.products.value[0]!.display_name).toBe('本地修改'); expect(state.config.value!.record_version).toBe(9)
-    api.saveDraft.mockResolvedValue(saved()); await state.saveDraft(); expect(api.saveDraft.mock.calls[0]![1]).toBe(9)
+    mockSave(saved()); await state.saveDraft(); expect(api.saveDraft.mock.calls[0]![1]).toBe(9)
   })
   it('failed sync preserves the last successful model list', async () => {
     await start(); const models = copy(state.detail.value!.models); api.sync.mockRejectedValue({ status: 503 })
@@ -101,7 +134,7 @@ describe('Media Workbench request lifecycle', () => {
     resolve(saved()); await publishing
   })
   it('legacy Published recovery rejection is a definite no-write, not a conflict or unknown save', async () => {
-    await start(); api.saveDraft.mockResolvedValue(saved()); await state.saveDraft()
+    await start(); mockSave(saved()); await state.saveDraft()
     const originalConfig = copy(state.config.value)
     const originalProducts = copy(state.products.value)
     api.publish.mockRejectedValue({ status: 409, reason: 'MEDIA_PUBLISHED_RECOVERY_REQUIRED', message: 'Historical published configuration requires controlled revalidation' })
@@ -115,7 +148,7 @@ describe('Media Workbench request lifecycle', () => {
     expect(state.config.value).toEqual(originalConfig)
     expect(state.products.value).toEqual(originalProducts)
     expect(api.publish).toHaveBeenCalledTimes(1)
-    expect(api.detail).toHaveBeenCalledTimes(1)
+    expect(api.detail).toHaveBeenCalledTimes(2)
   })
   it('ordinary publish CAS rejection still blocks publishing until reload', async () => {
     await start(); api.publish.mockRejectedValue({ status: 409, reason: 'MEDIA_WORKBENCH_STALE' })
@@ -152,11 +185,11 @@ describe('Media Workbench request lifecycle', () => {
     expect(state.detail.value!.id).toBe(44)
   })
   it('late validation A cannot overwrite saved Draft B', async () => {
-    vi.useFakeTimers(); await start(); api.saveDraft.mockResolvedValueOnce(saved('PENDING'))
+    vi.useFakeTimers(); await start(); api.saveDraft.mockImplementationOnce(async () => { const dto = saved('PENDING'); api.detail.mockResolvedValue(dto); return dto })
     await state.saveDraft(); let resolve!: (dto: ReturnType<typeof saved>) => void
     api.detail.mockReturnValueOnce(new Promise(r => { resolve = r })); await vi.advanceTimersByTimeAsync(1000)
     const b = saved('FAIL'); b.media_workbench_v1!.draft.revision = 'mwd_c'; b.media_workbench_v1!.validation.draft_revision = 'mwd_c'
-    api.saveDraft.mockResolvedValueOnce(b); await state.saveDraft(); resolve(saved('PASS')); await flushPromises()
+    api.saveDraft.mockImplementationOnce(async () => { api.detail.mockResolvedValue(b); return b }); await state.saveDraft(); resolve(saved('PASS')); await flushPromises()
     expect(state.config.value!.draft.revision).toBe('mwd_c'); expect(state.config.value!.validation.status).toBe('FAIL'); expect(state.canPublish.value).toBe(true)
   })
   it('new product defaults never infer model specs or a price', async () => {
@@ -170,7 +203,7 @@ describe('Media Workbench request lifecycle', () => {
     const dto = supplier(); api.detail.mockResolvedValue(dto); await start()
     const config = copy(dto.media_workbench_v1!.draft.products[0]!.adapter_config)
     expect(state.products.value[0]!.adapter_config).toEqual(config); expect(state.dirty.value).toBe(false)
-    api.saveDraft.mockResolvedValue(saved()); await state.saveDraft()
+    mockSave(saved()); await state.saveDraft()
     expect(api.saveDraft.mock.calls[0]![2][0]!.adapter_config).toEqual(config)
   })
   it('a failed selection of a deleted supplier does not mark the current supplier deleted', async () => {
@@ -180,7 +213,7 @@ describe('Media Workbench request lifecycle', () => {
   it('first explicit save atomically initializes a nil media configuration', async () => {
     const dto = supplier(); dto.media_workbench_v1 = null; dto.effective_state = 'NOT_INITIALIZED'; dto.effective_sales = false
     api.detail.mockResolvedValue(dto); await start(); state.selectModel('new-model'); state.addProduct('image')
-    api.saveDraft.mockResolvedValue(saved())
+    mockSave(saved())
     expect(await state.saveDraft()).toBe(true)
     expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]))
   })
@@ -209,7 +242,7 @@ describe('blank draft lifecycle', () => {
     state.undoRemoval('blank-3'); expect(state.products.value).toEqual(before); expect(state.dirty.value).toBe(false)
     state.removeProduct('blank-3')
     api.saveDraft.mockImplementation(async (_id, _version, products) => {
-      const result = copy(dto); result.media_workbench_v1!.draft.products = copy(products); return result
+      const result = copy(dto); result.media_workbench_v1!.draft.products = copy(products); api.detail.mockResolvedValue(result); return result
     })
     await state.saveDraft()
     expect(api.saveDraft).toHaveBeenCalledWith(77, 3, before.filter(p => p.product_id !== 'blank-3'), ['blank-3'])
@@ -241,7 +274,7 @@ describe('blank draft lifecycle', () => {
   })
   it('allows explicitly removing the last saved blank', async () => {
     const dto = draftManagementSupplier(); dto.media_workbench_v1!.draft.products = [dto.media_workbench_v1!.draft.products[1]!]
-    api.detail.mockResolvedValue(dto); await start(); state.removeProduct('blank-1'); api.saveDraft.mockResolvedValue(dto)
+    api.detail.mockResolvedValue(dto); await start(); state.removeProduct('blank-1'); mockSave(dto)
     await state.saveDraft(); expect(api.saveDraft).toHaveBeenCalledWith(77, 3, [], ['blank-1'])
   })
 })
