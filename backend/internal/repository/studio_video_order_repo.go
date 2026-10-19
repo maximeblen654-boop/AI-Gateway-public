@@ -292,7 +292,10 @@ func insertVideoAccountUsage(ctx context.Context, tx *sql.Tx, childID, upstreamI
 	prepared.args[26] = b.Offer.SalePrice.Amount
 	prepared.args[27] = "1"
 	prepared.args[28] = b.Accounting.AccountRateMultiplier
-	prepared.args[57] = b.Accounting.BaseAmount
+	// Retail video has unknown procurement cost; retain the prepared SQL NULL.
+	if b.Version == service.StudioVideoBindingVersion {
+		prepared.args[57] = b.Accounting.BaseAmount
+	}
 	repo := newUsageLogRepositoryWithSQL(nil, tx)
 	inserted, err := repo.createSinglePrepared(ctx, tx, log, prepared)
 	if err == nil && !inserted {
