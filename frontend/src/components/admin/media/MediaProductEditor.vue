@@ -10,7 +10,7 @@
     <div ref="stepHeading" class="mw-wizard-heading" tabindex="-1">
       <h3>{{ stepQuestions[wizardStep - 1] }}</h3>
       <p class="mw-muted">{{ stepDescriptions[wizardStep - 1] }}</p>
-      <span class="mw-draft-state">{{ dirty ? '有未保存修改' : '正在查看草稿' }} · 切换步骤不会保存或发布</span>
+      <span class="mw-draft-state">{{ dirty ? '有未保存修改' : '正在查看草稿' }} · 停止输入或切换步骤会自动保存草稿，不会正式发布</span>
     </div>
     <div v-show="wizardStep === 1" data-test="wizard-page-1">
     <section data-field="capabilities">
@@ -18,7 +18,7 @@
       <div class="mw-field-grid">
         <MediaTokensField label="分辨率" :presets="resolutionPresets" placeholder="例如：1K, 2K, 2048x2048" :model-value="product.capabilities.resolutions" @update:model-value="setCapability('resolution', $event)" />
         <MediaTokensField label="比例" aspect-ratio :presets="ratioPresets" placeholder="例如：1:1, 16:9" :model-value="product.capabilities.aspect_ratios" @update:model-value="setCapability('aspect_ratio', $event)" />
-        <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric duration-range :presets="durationPresets" placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="setCapability('duration_seconds', $event)" />
+        <MediaTokensField v-if="product.media_type === 'video'" label="时长（秒）" numeric duration-range placeholder="例如：5, 10, 15" :model-value="product.capabilities.durations_seconds" @update:model-value="setCapability('duration_seconds', $event)" />
         <div v-if="supportsNativeOutputFormat || product.capabilities.output_formats?.length" class="mw-field" data-test="native-output-formats">
           <span>生成时的原生图片格式</span>
           <div class="mw-token-presets" role="group" aria-label="已确认的上游输出格式">
@@ -62,19 +62,6 @@
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
       <MediaProcurementEditor :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
-      <h3>客户售价</h3>
-      <p class="mw-muted">图片和视频售价均须大于 0 CNY；空白可保存草稿，但不能发布。 已有价格规则继续保留，由服务端核验。</p>
-      <div class="mw-price-table" role="table" aria-label="商品单价表">
-        <div class="mw-price-table-head" role="row"><span role="columnheader">规格组合</span><span role="columnheader">单{{ unitLabel }}售价 · CNY</span><span role="columnheader">填写状态</span></div>
-        <div v-for="(rule, index) in priceRows" :key="index" class="mw-price-row" role="row">
-          <div role="cell" class="mw-price-spec"><span class="mw-row-number">{{ String(index + 1).padStart(2, '0') }}</span><div><strong>{{ pricingRuleLabel(rule) }}</strong><p class="mw-muted">{{ samePriceText }}</p></div></div>
-          <div role="cell"><label class="mw-field"><span class="mw-price-mobile-label">单{{ unitLabel }}售价 · CNY</span>
-            <input class="input" inputmode="decimal" placeholder="待填写" :aria-label="`${pricingRuleLabel(rule)} 单${unitLabel}价格（CNY）`" :value="rule.sale_price?.amount ?? ''" :data-test="`price-${index}`" :aria-invalid="!!priceError(rule)" :aria-describedby="`media-price-hint-${index}`" @input="setAmount(index, $event)" />
-          </label><p v-if="priceError(rule)" class="mw-field-error" role="alert">{{ priceError(rule) }}</p><p v-if="rule.sale_price && (rule.sale_price.currency !== 'CNY' || rule.sale_price.billing_mode !== 'per_request')" class="mw-muted">原价格 {{ rule.sale_price.currency }} / {{ rule.sale_price.billing_mode }}；重新填写才改为 CNY / {{ unitLabel }}。</p></div>
-          <div role="cell" class="mw-price-state"><span :id="`media-price-hint-${index}`" :class="{ 'mw-price-missing': rule.sale_price == null }">{{ rule.sale_price == null ? '待填写' : priceError(rule) ? '需要修正' : '已填写' }}</span><button v-if="rule.sale_price" type="button" class="mw-link" @click="edit(next => { next.pricing_rules[index]!.sale_price = null })">清空单价</button></div>
-        </div>
-      </div>
-      <p class="mw-muted" data-test="pricing-row-summary">价格行：{{ priceRows.length }}，已填写 {{ filledPricingRows }}，待填写 {{ priceRows.length - filledPricingRows }}。</p>
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
       <label class="mw-field">商品名称<input :value="product.display_name" class="input" data-test="display-name" data-field="display_name" @input="edit(next => { next.display_name = text($event) })" /></label>
@@ -128,7 +115,6 @@ function toggleOutputFormat(format: string) {
     next.capabilities.output_formats = formats.includes(format) ? formats.filter(value => value !== format) : [...formats, format]
   })
 }
-const durationPresets = ['5', '10', '15']
 const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
 const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = [
   { key: 'resolution', label: '分辨率' },
@@ -269,7 +255,6 @@ function pricingRuleLabel(rule: Product['pricing_rules'][number]): string {
   if (modeLabel) return [modeLabel, ...labels].join(' · ')
   return labels.length ? labels.join(' · ') : '统一售价（所有未按维度区分的规格）'
 }
-const filledPricingRows = computed(() => (props.product.pricing_rules ?? []).filter(rule => !!rule.sale_price?.amount).length)
 const priceRows = computed<Product['pricing_rules']>(() => props.product.pricing_rules?.length ? props.product.pricing_rules : [{ match: {}, sale_price: null }])
 const unitLabel = computed(() => props.product.media_type === 'video' ? '条' : '张')
 const previewSelection = reactive<Partial<Record<PricingDimension, string>>>({})
@@ -338,13 +323,5 @@ function priceError(rule: Product['pricing_rules'][number]): string {
   if (!rule.sale_price) return ''
   if (!/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(rule.sale_price.amount)) return '请输入有效金额，最多 8 位小数。'
   return /^0(?:\.0+)?$/.test(rule.sale_price.amount) ? '客户售价须大于 0 CNY；0 元可保留在草稿中，但不能发布或生成。' : ''
-}
-function setAmount(index: number, event: Event) {
-  edit(next => {
-    if (!next.pricing_rules?.length) next.pricing_rules = [{ match: {}, sale_price: null }]
-    const rule = next.pricing_rules[index]!
-    const amount = text(event)
-    rule.sale_price = amount === '' ? null : { amount, currency: 'CNY', billing_mode: 'per_request' }
-  })
 }
 </script>

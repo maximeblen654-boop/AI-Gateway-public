@@ -39,7 +39,7 @@ type studioImageUnitOutcome struct {
 	HTTPFailure *StudioImageHTTPFailure `json:"http_failure,omitempty"`
 }
 
-func (s *StudioImageStore) writeUnitOutcome(u StudioImageUnitReceipt, state string, data []byte, id string) error {
+func (s *StudioImageStore) writeUnitOutcome(u StudioImageUnitReceipt, state string, data []byte, id string, parent ...string) error {
 	// A finalized unit cannot be replaced by a late response. The original
 	// dispatcher owns the permanent unit claim; recovery never dispatches.
 	var old studioImageUnitOutcome
@@ -48,9 +48,17 @@ func (s *StudioImageStore) writeUnitOutcome(u StudioImageUnitReceipt, state stri
 	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	b, err := json.Marshal(studioImageUnitOutcome{ID: u.ID, PayloadHash: u.PayloadHash, UpstreamID: id, State: state, Data: data, HTTPFailure: u.HTTPFailure})
+	outcome := studioImageUnitOutcome{ID: u.ID, PayloadHash: u.PayloadHash, UpstreamID: id, State: state, Data: data, HTTPFailure: u.HTTPFailure}
+	complete := false
+	if _, count, e := studioExecutionResult(data, u.OutputCount); state == "response" && e == nil && count > 0 {
+		complete = true
+	}
+	b, err := json.Marshal(outcome)
 	if err != nil {
 		return err
+	}
+	if len(parent) > 0 {
+		return s.persistCopy(parent[0], "unit-response", u.ID, b, complete, nil)
 	}
 	return s.write(s.path("unit-response", u.ID), b, false)
 }
@@ -128,6 +136,9 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 	// The original invocation alone dispatches. Unit claims survive crashes and
 	// remain permanent, independently of result or settlement status.
 	for i, u := range units {
+		if err = r.Store.checkRetention(taskID); err != nil {
+			return receipt, err
+		}
 		if err = r.Store.write(r.Store.path("unit-claim", u.ID), []byte(u.PayloadHash), true); err != nil {
 			return receipt, ErrStudioImageUnknown
 		}
@@ -146,18 +157,23 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 				state = studioImageNoCharge502
 			}
 		}
-		if err = r.Store.writeUnitOutcome(u, state, data, id); err != nil {
+		if err = r.Store.writeUnitOutcome(u, state, data, id, taskID); err != nil {
 			return receipt, err
 		}
 		if state == "response" {
-			data, _ = r.materializeResult(ctx, q, u.ID, data)
+			data, _ = r.materializeResult(ctx, q, u.ID, data, taskID)
+			if len(data) > 0 {
+				if err = r.Store.writeUnitOutcome(u, state, data, id, taskID); err != nil {
+					return receipt, err
+				}
+			}
 		}
 		_, count, validationErr := studioExecutionResult(data, u.OutputCount)
 		if state != "response" || validationErr != nil || count != u.OutputCount {
 			// Unstarted units were never charged. Do not create replacement or
 			// compensating supplier requests after this unit's failure/ambiguity.
 			for _, rest := range units[i+1:] {
-				if err = r.Store.writeUnitOutcome(rest, "not_attempted", nil, ""); err != nil {
+				if err = r.Store.writeUnitOutcome(rest, "not_attempted", nil, "", taskID); err != nil {
 					return receipt, err
 				}
 			}
@@ -229,7 +245,7 @@ func (r *StudioImageRuntime) recoverExecution(ctx context.Context, receipt *Stud
 			u.Status, u.Error = "failed", outcome.State
 			receipt.FailedCount += u.OutputCount
 		case "response":
-			outcome.Data, err = r.materializeResult(ctx, receipt.Quote, u.ID, outcome.Data)
+			outcome.Data, err = r.materializeResult(ctx, receipt.Quote, u.ID, outcome.Data, receipt.TaskID)
 			if err != nil {
 				u.Status, u.Error = "unknown", "result_unavailable"
 				receipt.PendingCount += u.OutputCount

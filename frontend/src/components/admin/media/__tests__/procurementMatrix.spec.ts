@@ -23,7 +23,7 @@ it('legacy costs stay blank; neither sale nor remembered estimates become costs'
   await wrapper.get('[data-test="cost-apply-0"]').trigger('click'); await flushPromises()
   expect(wrapper.props('product').cost_rules).toEqual([{ match: {}, cost: price('0.1'), source: 'calculator' }])
   expect(wrapper.props('product').pricing_rules).toEqual(imageProduct.pricing_rules)
-  expect(wrapper.get('[data-test="cost-adopted"]').text()).toContain('尚未保存')
+  expect(wrapper.get('[data-test="cost-adopted"]').text()).toContain('服务器保存结果以上方确认状态为准')
 })
 it('allows explicit zero and preserves null for clearing independently of sale', async () => {
   const wrapper = editor()

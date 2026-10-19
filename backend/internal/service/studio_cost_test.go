@@ -116,7 +116,7 @@ func TestStudioVideoPublishedCostNoChannelFrozenBilling(t *testing.T) {
 	_, err = r.Recover(context.Background(), q.Binding.Owner, "av_cost")
 	require.NoError(t, err)
 	for range 2 {
-		_, err = r.Capture(context.Background(), q.Binding.Owner, "av_cost", strings.Repeat("a", 64))
+		_, err = r.Capture(context.Background(), q.Binding.Owner, "av_cost", strings.Repeat("a", 64), testStudioVideoRetention(q))
 		require.NoError(t, err)
 	}
 	require.Equal(t, 1, posts)

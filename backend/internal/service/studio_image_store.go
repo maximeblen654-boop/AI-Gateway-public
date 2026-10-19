@@ -72,32 +72,37 @@ type StudioImageUnitReceipt struct {
 }
 
 type StudioImageReceipt struct {
-	Version        string                            `json:"version"`
-	TaskID         string                            `json:"task_id"`
-	Quote          StudioImageQuote                  `json:"quote"`
-	Request        []byte                            `json:"request"`
-	PayloadHash    string                            `json:"payload_hash"`
-	RequestHash    string                            `json:"request_hash"`
-	Endpoint       string                            `json:"endpoint"`
-	UpstreamID     string                            `json:"upstream_id,omitempty"`
-	ResultHash     string                            `json:"result_hash,omitempty"`
-	Status         string                            `json:"status"`
-	BillingState   string                            `json:"billing_state"`
-	Execution      mediaworkbench.ImageExecutionPlan `json:"execution,omitempty"`
-	Units          []StudioImageUnitReceipt          `json:"units,omitempty"`
-	ExpectedCount  int                               `json:"expected_count,omitempty"`
-	DeliveredCount int                               `json:"delivered_count,omitempty"`
-	FailedCount    int                               `json:"failed_count,omitempty"`
-	PendingCount   int                               `json:"pending_count,omitempty"`
-	HTTPFailure    *StudioImageHTTPFailure           `json:"http_failure,omitempty"`
+	ResultRetention *StudioResultRetention            `json:"-"`
+	Version         string                            `json:"version"`
+	TaskID          string                            `json:"task_id"`
+	Quote           StudioImageQuote                  `json:"quote"`
+	Request         []byte                            `json:"request"`
+	PayloadHash     string                            `json:"payload_hash"`
+	RequestHash     string                            `json:"request_hash"`
+	Endpoint        string                            `json:"endpoint"`
+	UpstreamID      string                            `json:"upstream_id,omitempty"`
+	ResultHash      string                            `json:"result_hash,omitempty"`
+	Status          string                            `json:"status"`
+	BillingState    string                            `json:"billing_state"`
+	Execution       mediaworkbench.ImageExecutionPlan `json:"execution,omitempty"`
+	Units           []StudioImageUnitReceipt          `json:"units,omitempty"`
+	ExpectedCount   int                               `json:"expected_count,omitempty"`
+	DeliveredCount  int                               `json:"delivered_count,omitempty"`
+	FailedCount     int                               `json:"failed_count,omitempty"`
+	PendingCount    int                               `json:"pending_count,omitempty"`
+	HTTPFailure     *StudioImageHTTPFailure           `json:"http_failure,omitempty"`
 }
 
 // One receipt is both the authoritative task and receipt binding. The permanent
 // .sync-dispatch claim is independent of mutable status and is never removed.
 type StudioImageStore struct {
-	Root      string
-	mu        sync.Mutex
-	writeFile func(string, []byte, bool) error
+	Root         string
+	mu           sync.Mutex
+	writeFile    func(string, []byte, bool) error
+	clock        func() time.Time
+	removeFile   func(string) error
+	cleanupMu    sync.Mutex
+	cleanupAfter string
 }
 
 func (s *StudioImageStore) write(path string, b []byte, exclusive bool) error {
@@ -213,9 +218,23 @@ func studioRead(path string, v any) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	d := json.NewDecoder(io.LimitReader(f, 40<<20))
+	return studioDecodeJSON(f, v, studioJSONReadLimit(path))
+}
+
+func studioJSONReadLimit(path string) int64 {
+	name := filepath.Base(path)
+	if strings.HasPrefix(name, "unit-response-") && len(name) == len("unit-response-")+64 {
+		if _, err := hex.DecodeString(strings.TrimPrefix(name, "unit-response-")); err == nil {
+			return 64 << 20
+		}
+	}
+	return 40 << 20
+}
+
+func studioDecodeJSON(reader io.Reader, v any, limit int64) error {
+	d := json.NewDecoder(io.LimitReader(reader, limit))
 	d.DisallowUnknownFields()
-	if err = d.Decode(v); err != nil {
+	if err := d.Decode(v); err != nil {
 		return err
 	}
 	if d.Decode(new(any)) != io.EOF {
@@ -296,7 +315,10 @@ func (s *StudioImageStore) Claim(r StudioImageReceipt) (*StudioImageReceipt, boo
 	if err = s.write(path, b, true); err != nil {
 		return nil, false, err
 	}
-	if err = s.write(path+".sync-dispatch", []byte(r.Quote.BindingHash+"|"+r.PayloadHash), true); err != nil {
+	if err = s.claimRetention(&r); err != nil {
+		return nil, false, err
+	}
+	if err = s.write(path+".sync-dispatch", []byte(r.Quote.BindingHash+"|"+r.PayloadHash+"|retention:"+StudioImageRetentionPolicy), true); err != nil {
 		return nil, false, err
 	}
 	return &r, true, nil
@@ -327,15 +349,25 @@ func (s *StudioImageStore) PersistResult(r *StudioImageReceipt, data []byte) err
 	if _, err := validateStudioImageReceiptResult(r, data); err != nil {
 		return err
 	}
-	if err := s.write(s.path("result", r.TaskID), data, false); err != nil {
-		return err
-	}
 	r.ResultHash = HashUsageRequestPayload(data)
 	r.Status = "persisted"
+	if err := s.persistCopy(r.TaskID, "result", r.TaskID, data, true, r); err != nil {
+		return err
+	}
+	if _, err := s.ResultRetention(r); err != nil {
+		return err
+	}
 	return s.Save(r)
 }
 
 func (s *StudioImageStore) Result(r *StudioImageReceipt) ([]byte, error) {
+	retention, err := s.ResultRetention(r)
+	if err != nil {
+		return nil, err
+	}
+	if retention.Expired {
+		return nil, ErrStudioResultExpired
+	}
 	// Read only the hashed original under the configured private root. Root
 	// confinement also rejects a result symlink that escapes that directory.
 	root, err := os.OpenRoot(s.Root)
@@ -351,5 +383,8 @@ func (s *StudioImageStore) Result(r *StudioImageReceipt) ([]byte, error) {
 		return nil, ErrStudioImageUnknown
 	}
 	_, err = validateStudioImageReceiptResult(r, b)
+	if err == nil {
+		err = s.checkRetention(r.TaskID)
+	}
 	return b, err
 }

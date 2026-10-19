@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,7 +35,14 @@ func (t studioImageDownloadTransport) RoundTrip(req *http.Request) (*http.Respon
 	return t.core.httpUpstream.Do(req, proxy, t.account.ID, t.account.Concurrency)
 }
 
-func (r *StudioImageRuntime) materializeResult(ctx context.Context, q StudioImageQuote, id string, body []byte) ([]byte, error) {
+func (r *StudioImageRuntime) materializeResult(ctx context.Context, q StudioImageQuote, id string, body []byte, parent ...string) ([]byte, error) {
+	taskID := id
+	if len(parent) > 0 {
+		taskID = parent[0]
+	}
+	if err := r.Store.checkRetention(taskID); err != nil {
+		return nil, err
+	}
 	// Complete inline envelopes retain their original bytes and hashes.
 	if _, _, err := studioExecutionResult(body, q.Binding.Spec.Count); err == nil {
 		return body, nil
@@ -73,8 +79,6 @@ func (r *StudioImageRuntime) materializeResult(ctx context.Context, q StudioImag
 	if _, _, err = studioExecutionResult(data, q.Binding.Spec.Count); err != nil {
 		return nil, err
 	}
-	if err = r.Store.write(path, data, true); errors.Is(err, os.ErrExist) {
-		return read()
-	}
+	err = r.Store.persistCopy(taskID, "materialized", id, data, true, nil)
 	return data, err
 }

@@ -54,7 +54,10 @@ type StudioVideoReferenceIntentAsset struct {
 	Size            int     `json:"size"`
 	DurationSeconds float64 `json:"duration_seconds,omitempty"`
 }
-type StudioVideoStore struct{ Root string }
+type StudioVideoStore struct {
+	Root  string
+	clock func() time.Time
+}
 
 func (s *StudioVideoStore) path(kind, id string) string {
 	return filepath.Join(s.Root, "video-"+kind+"-"+HashUsageRequestPayload([]byte(id)))
@@ -192,6 +195,15 @@ func (s *StudioVideoStore) Claim(t StudioVideoTask) (bool, error) {
 	if e != nil {
 		return false, e
 	}
+	// Mark new-policy tasks before the task file can survive a crash. A retry
+	// must not accidentally classify a newly submitted task as historical.
+	if _, statErr := os.Lstat(s.path("task", t.ID)); os.IsNotExist(statErr) {
+		if e = s.claimRetention(t); e != nil {
+			return false, e
+		}
+	} else if statErr != nil {
+		return false, statErr
+	}
 	e = s.put("task", t.ID, t)
 	if os.IsExist(e) {
 		old, readErr := s.Task(t.ID, t.Quote.Binding.Owner)
@@ -201,9 +213,15 @@ func (s *StudioVideoStore) Claim(t StudioVideoTask) (bool, error) {
 		if studioHash(old) != studioHash(t) {
 			return false, ErrStudioVideoConflict
 		}
+		if _, e := s.ResultRetention(t.ID); e != nil {
+			return false, e
+		}
 		return false, nil
 	}
-	return e == nil, e
+	if e != nil {
+		return false, e
+	}
+	return true, nil
 }
 func (s *StudioVideoStore) DispatchClaim(id string) (bool, error) {
 	e := s.put("dispatch", id, struct {

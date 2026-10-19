@@ -100,6 +100,49 @@ describe('Reference asset input',()=>{
  })
 })
 describe('Published customer task confirmation and recovery',()=>{
+ it('clears video original loading once its metadata has loaded',async()=>{
+  const task:StudioTask={...prepared,status:'completed',resultCount:1}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.find('.studio-result-loading').exists()).toBe(true);await wrapper.get('video').trigger('loadedmetadata');expect(wrapper.find('.studio-result-loading').exists()).toBe(false)
+ })
+ it.each(['image','video'] as const)('shows the real %s deadline and keeps expired originals out of history, players, downloads and export',async kind=>{
+  const task:StudioTask={...prepared,kind,id:(kind==='image'?'img_':'op_')+'c'.repeat(kind==='image'?32:64),status:'completed',resultCount:2,billingState:'billed',settledPrice:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},resultRetention:{persistedAt:'2026-10-19T00:00:00Z',expiresAt:'2099-01-01T00:00:00Z',expired:true,policy:kind==='image'?'image_original_72h':'video_original_48h'}}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('原片已到期');expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('2099')
+  expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('任务与结算记录保留')
+  expect(wrapper.findAll('.studio-results figure')).toHaveLength(2);expect(wrapper.findAll('img,video,[data-testid="studio-download"],.image-export')).toHaveLength(0)
+  expect(wrapper.get('[data-testid="studio-status"]').text()).toContain('生成完成');expect(wrapper.get(`[data-task-id="${task.id}"]`).text()).toContain('已保存 2')
+  if(kind==='image')expect(wrapper.get('[data-testid="studio-settlement"]').text()).toContain('0.80 CNY')
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('expires loaded media on the existing clock without changing generation or financial state',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const task:StudioTask={...prepared,kind:'image',id:'img_'+'d'.repeat(32),status:'partial',resultCount:2,expectedCount:3,deliveredCount:2,failedCount:1,billingState:'billed',resultRetention:{persistedAt:'2026-10-16T00:00:01Z',expiresAt:'2026-10-19T00:00:01Z',expired:false,policy:'image_original_72h'}}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.findAll('[data-testid="studio-result-image"]')).toHaveLength(2);expect(wrapper.findAll('[data-testid="studio-download"]')).toHaveLength(2);expect(wrapper.findAll('.image-export')).toHaveLength(2)
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(wrapper.findAll('img,video,[data-testid="studio-download"],.image-export')).toHaveLength(0);expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('原片已到期')
+  expect(wrapper.get('[data-testid="studio-status"]').text()).toBe('部分完成');expect(wrapper.get('[data-testid="studio-partial-counts"]').text()).toContain('已交付 2');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['download','export'] as const)('blocks %s clicked at the deadline before the next clock tick',async action=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const task:StudioTask={...prepared,kind:'image',id:'img_'+'e'.repeat(32),status:'completed',resultCount:1,resultRetention:{persistedAt:'2026-10-16T00:00:00.500Z',expiresAt:'2026-10-19T00:00:00.500Z',expired:false,policy:'image_original_72h'}}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  const fetch=vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('must not read expired original'))
+  try{vi.setSystemTime(new Date('2026-10-19T00:00:00.500Z'));const target=wrapper.get(action==='download'?'[data-testid="studio-download"]':'.image-export button');const click=new MouseEvent('click',{bubbles:true,cancelable:true});target.element.dispatchEvent(click);await flushPromises();expect(click.defaultPrevented).toBe(true);expect(fetch).not.toHaveBeenCalled();expect(wrapper.find('[data-testid="studio-download"]').exists()).toBe(false)}finally{fetch.mockRestore()}
+ })
+ it('uses a historical seven-day image deadline without shortening it to the new policy',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-19T00:00:00Z'))
+  const task:StudioTask={...prepared,kind:'image',id:'img_'+'b'.repeat(32),status:'completed',resultCount:1,expiresAt:'2000-01-01',resultRetention:{persistedAt:'2026-10-14T00:00:00Z',expiresAt:'2026-10-21T00:00:00Z',expired:false,policy:'image_legacy_7d'}}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('历史7天保留');expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toContain('2026/10/21');expect(wrapper.find('[data-testid="studio-download"]').exists()).toBe(true);expect(wrapper.text()).not.toContain('报价已失效')
+ })
+ it.each(['missing','legacy_unknown','pending'] as const)('leaves %s retention unknown and keeps the original task identity and state',async scenario=>{
+  const task:StudioTask={...prepared,status:scenario==='pending'?'unknown':'completed',resultCount:scenario==='pending'?0:1,expiresAt:'2000-01-01',...(scenario==='legacy_unknown'?{resultRetention:{persistedAt:null,expiresAt:null,expired:false,policy:'legacy_unknown' as const}}:{})}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.get('[data-testid="studio-result-retention"]').text()).toBe('原片保留期限：服务端未提供具体到期时间。');expect(wrapper.get('[data-testid="studio-task-id"]').text()).toContain(task.id)
+  expect(wrapper.find('[data-testid="studio-download"]').exists()).toBe(scenario!=='pending');expect(wrapper.get('[data-testid="studio-status"]').text()).toContain(scenario==='pending'?'结果待确认':'生成完成');expect(api.generate).not.toHaveBeenCalled()
+ })
  it('hides only finalized failed history until the administrator explicitly shows it',async()=>{
   const failed={...prepared,id:'op_'+'f'.repeat(64),status:'failed',billingState:'not_charged'}
   const processing={...prepared,id:'op_'+'p'.repeat(64),status:'processing',billingState:'pending'}
@@ -465,4 +508,113 @@ it('reads readiness after failed catalog and retains independently fetched histo
  pending.reject(new Error('catalog unavailable'));await flushPromises()
  expect(api.request).toHaveBeenCalledWith('video','readiness');expect(wrapper.text()).toContain('目录或生成服务暂不可用')
  expect(wrapper.text()).toContain('synthetic-video');expect(api.generate).not.toHaveBeenCalled()
+})
+
+
+describe('One product entry with independent specification Offers',()=>{
+ async function chooseSpec(id:string,value:string){await wrapper.get(`[data-testid="${id}"]`).trigger('click');await wrapper.get(`#${id}-menu [data-value="${value}"]`).trigger('click');await flushPromises()}
+ it.each(['paste','drop'])('accepts the first %s image through an edit sibling while preserving the text-mode specifications',async(input)=>{
+  sessionStorage.clear();api.history.mockResolvedValue([])
+  const text={...offer,offer_id:'text-only',product_scope:'image-reference-product',spec:{...offer.spec,duration_seconds:[],resolution:['2K','4K'],aspect_ratio:['1:1','3:4'],quality:['standard','high'],output_formats:['png','webp'],count:{min:1,max:2},references:{...offer.spec.references,image:{min:0,max:0},total_max:0}}}
+  const edit={...text,offer_id:'edit-sibling',spec:{...text.spec,references:{...text.spec.references,image:{min:1,max:2},total_max:2}}}
+  api.catalog.mockResolvedValue([text,edit]);wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises()
+  await chooseSpec('studio-resolution','4K');await chooseSpec('studio-quality','high');await chooseQuantity(2)
+  await wrapper.get('[data-testid="studio-ratio-toggle"]').trigger('click');await wrapper.get('[data-ratio="3:4"]').trigger('click');await chooseSpec('studio-output-format','webp')
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('Keep this text and every specification');api.request.mockClear()
+  const file=imageFile('first-reference.png')
+  if(input==='paste')pasteAt(document.body,{items:[{kind:'file',type:'image/png',getAsFile:()=>file}]})
+  else await wrapper.get('.studio-composer').trigger('drop',{dataTransfer:{files:[file]}})
+  await flushPromises()
+  expect(wrapper.get('[data-testid="studio-mode-edit"]').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.findAll('[data-testid="studio-asset-success"]')).toHaveLength(1);expect(api.upload).toHaveBeenCalledTimes(1)
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','Keep this text and every specification')
+  expect(wrapper.get('[data-testid="studio-output-format"]').text()).toContain('WebP')
+  expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
+  api.request.mockRejectedValueOnce(new Error('inspect quote only'));await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({offer_id:'edit-sibling',spec:expect.objectContaining({images:1,resolution:'4K',aspect_ratio:'3:4',quality:'high',count:2,output_format:'webp'})}))
+ })
+ it('keeps text mode and input when same-named edit candidates belong to another product, model or specification',async()=>{
+  sessionStorage.clear();api.history.mockResolvedValue([])
+  const text={...offer,offer_id:'text-only',product_scope:'selected-image-product',spec:{...offer.spec,duration_seconds:[],references:{...offer.spec.references,image:{min:0,max:0},total_max:0}}}
+  const edit={...text,offer_id:'edit',spec:{...text.spec,references:{...text.spec.references,image:{min:1,max:2},total_max:2}}}
+  api.catalog.mockResolvedValue([text,{...edit,offer_id:'other-product',product_scope:'other-product'},{...edit,offer_id:'other-model',model:'other-model'},{...edit,offer_id:'other-spec',spec:{...edit.spec,resolution:['1080p']}}])
+  wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('Preserve rejected input');api.request.mockClear()
+  pasteAt(document.body,{items:[{kind:'file',type:'image/png',getAsFile:()=>imageFile()}]});await flushPromises()
+  expect(wrapper.get('[data-testid="studio-mode-text"]').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.get('[data-testid="studio-prompt"]').element).toHaveProperty('value','Preserve rejected input')
+  expect(wrapper.get('[data-testid="studio-resolution"]').text()).toContain('720p')
+  expect(wrapper.find('[data-testid="studio-assets"]').exists()).toBe(false);expect(api.upload).not.toHaveBeenCalled();expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
+  expect(wrapper.text()).toContain('当前规格不支持这些素材')
+ })
+ it.each([['image','image'],['video','image'],['video','video']] as const)('switches the exact %s Offer and quote price after adding a second %s reference',async(mediaKind,referenceKind)=>{
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:mediaKind,imageMode:mediaKind==='image'?'edit':'text'}));api.history.mockResolvedValue([])
+  const variants=[1,2].map(n=>({...offer,offer_id:`reference-${n}`,product_scope:`${mediaKind}-references-product`,spec:{...offer.spec,...(mediaKind==='image'?{duration_seconds:[]}:{}),references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},[referenceKind]:{min:n,max:n},total_max:n}}}))
+  api.catalog.mockResolvedValue(variants);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('Keep my selected specifications')
+  for(const n of [1,2]){
+   api.request.mockClear()
+   await pick([referenceKind==='image'?imageFile(`reference-${n}.png`):new File(['12345678'],`reference-${n}.mp4`,{type:'video/mp4'})])
+   expect(wrapper.findAll('[data-testid="studio-asset-success"]')).toHaveLength(n)
+   expect(api.request).not.toHaveBeenCalled();expect(api.generate).not.toHaveBeenCalled()
+   const raw={contract:mediaKind==='image'?'published_image_binding_v1':'account_video_v1',[mediaKind==='image'?'task_id':'operation_id']:(mediaKind==='image'?'img_':'op_')+String(n).repeat(mediaKind==='image'?32:64),status:'prepared',created_at:'2026-10-19',expires_at:'2099-01-01',offer_id:`reference-${n}`,model:offer.model,spec:{resolution:'720p',aspect_ratio:'16:9',count:1,...(mediaKind==='video'?{duration_seconds:5}:{})},sale_price:{amount:String(n),currency:'CNY',billing_mode:'per_request'},quantity:1}
+   if(mediaKind==='image')api.request.mockResolvedValueOnce({quote_token:`quote-${n}`}).mockResolvedValueOnce(raw)
+   else api.request.mockResolvedValueOnce(raw)
+   expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
+   await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+   expect(api.request).toHaveBeenCalledWith(mediaKind,'quotes',expect.objectContaining({offer_id:`reference-${n}`,...(mediaKind==='image'?{spec:expect.objectContaining({images:n,resolution:'720p',aspect_ratio:'16:9',count:1})}:{duration:5,resolution:'720p',ratio:'16:9',assets:expect.arrayContaining([expect.objectContaining({kind:referenceKind})])})}))
+   expect(wrapper.get('[data-testid="studio-price"]').text()).toContain(`${n} CNY`)
+   expect(api.generate).not.toHaveBeenCalled()
+   if(n===1){await wrapper.get('[data-testid="studio-new"]').trigger('click');if(mediaKind==='image')await wrapper.get('[data-testid="studio-mode-edit"]').trigger('click');await flushPromises()}
+  }
+ })
+ it('rejects extra inputs when only a same-named other product or a different specification permits them',async()=>{
+  api.history.mockResolvedValue([])
+  const first={...offer,product_scope:'selected-product'}
+  const other={...withImageReferences(2),offer_id:'other-product',product_scope:'other-product'}
+  const incompatible={...withImageReferences(2),offer_id:'other-resolution',product_scope:'selected-product',spec:{...withImageReferences(2).spec,resolution:['1080p']}}
+  api.catalog.mockResolvedValue([first,other,incompatible]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await pick([imageFile('first.png')]);await pick([imageFile('second.png')])
+  expect(api.upload).toHaveBeenCalledTimes(1);expect(wrapper.findAll('[data-testid="studio-asset-success"]')).toHaveLength(1)
+  expect(wrapper.get('[data-testid="studio-resolution"]').text()).toContain('720p')
+  expect(wrapper.text()).toContain('当前规格不支持这些素材');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('shows one video entry for three durations and quotes the exact Offer, price and duration',async()=>{
+  api.history.mockResolvedValue([])
+  const variants=[5,10,15].map(seconds=>({...offer,offer_id:`duration-${seconds}`,product_scope:'video-account44-product-revision',spec:{...offer.spec,duration_seconds:[seconds]}}))
+  api.catalog.mockResolvedValue(variants);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click')
+  expect(wrapper.findAll('.picker-choice')).toHaveLength(1)
+  expect(wrapper.get('.picker-choice small').text()).toContain('5 / 10 / 15 秒')
+  await wrapper.get('.picker-choice').trigger('click');await wrapper.get('[data-testid="studio-prompt"]').setValue('Synthetic video')
+  for(const seconds of [10,15,5]){
+   await chooseSpec('studio-duration',String(seconds));api.request.mockClear();api.generate.mockClear()
+   api.request.mockResolvedValueOnce({contract:'account_video_v1',operation_id:'op_'+'b'.repeat(64),status:'intent',created_at:'2026-10-19',expires_at:'2099-01-01',offer_id:`duration-${seconds}`,model:offer.model,spec:{resolution:'720p',aspect_ratio:'16:9',duration_seconds:seconds,count:1},sale_price:{amount:String(seconds),currency:'CNY',billing_mode:'per_request'},quantity:1})
+   await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+   expect(api.request).toHaveBeenCalledWith('video','quotes',expect.objectContaining({offer_id:`duration-${seconds}`,duration:seconds,resolution:'720p',ratio:'16:9'}))
+   expect(wrapper.get('[data-testid="studio-price"]').text()).toContain(`${seconds} CNY`)
+   expect(api.generate).not.toHaveBeenCalled();await wrapper.get('[data-testid="studio-new"]').trigger('click');await flushPromises()
+  }
+ })
+ it('allows changing dependent dimensions without quoting an invented intermediate combination',async()=>{
+  api.history.mockResolvedValue([])
+  api.catalog.mockResolvedValue([{...offer,offer_id:'small',product_scope:'video-p',spec:{...offer.spec,resolution:['720p'],duration_seconds:[5]}},{...offer,offer_id:'large',product_scope:'video-p',spec:{...offer.spec,resolution:['1080p'],duration_seconds:[10]}}])
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('Dependent specifications')
+  await chooseSpec('studio-resolution','1080p')
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined()
+  expect(wrapper.text()).toContain('当前规格组合不可售')
+  await chooseSpec('studio-duration','10');expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined()
+  api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect only'))
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenCalledWith('video','quotes',expect.objectContaining({offer_id:'large',duration:10,resolution:'1080p'}));expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('aggregates image Offers and switches resolution, keeping same-named other products separate',async()=>{
+  sessionStorage.clear();api.history.mockResolvedValue([])
+  const item=(id:string,res:string,scope:string)=>({...offer,offer_id:id,product_scope:scope,spec:{...offer.spec,duration_seconds:[],resolution:[res]}})
+  api.catalog.mockResolvedValue([item('2k','2K','image-product-a'),item('4k','4K','image-product-a'),item('other','4K','image-product-b')])
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click')
+  expect(wrapper.findAll('.picker-choice')).toHaveLength(2);await wrapper.get('[data-offer-id="2k"]').trigger('click')
+  await chooseSpec('studio-resolution','4K');await wrapper.get('[data-testid="studio-prompt"]').setValue('Synthetic image');api.request.mockClear();api.request.mockRejectedValueOnce(new Error('inspect quote only'))
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({offer_id:'4k',spec:expect.objectContaining({resolution:'4K'})}));expect(api.generate).not.toHaveBeenCalled()
+ })
 })

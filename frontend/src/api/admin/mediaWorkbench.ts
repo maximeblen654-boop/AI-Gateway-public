@@ -43,13 +43,14 @@ export interface NativeAdapter extends AdapterBinding { media_type: string; max_
 export type LifecycleAction = 'unlist' | 'relist' | 'archive' | 'restore' | 'hide'
 export type LifecycleTarget = { product_id: string; model_id?: never } | { model_id: string; product_id?: never }
 export interface ProductLifecycle { state: 'active' | 'unlisted' | 'archived'; revision: number; updated_at: string }
+export interface SaveReceipt { submission_id: string; base_record_version: number; draft_revision: string }
 export interface MediaConfig {
   product_lifecycle?: Record<string, ProductLifecycle>
   hidden_models?: string[]
   adapter_bindings?: Record<string, AdapterBinding>
   record_version: number; media_types: string[]
   sales: { enabled: boolean }
-  draft: { revision: string; updated_at: string; products: Product[] }
+  draft: { revision: string; updated_at: string; products: Product[]; save_receipt?: SaveReceipt }
   validation: Validation
   published: { revision: string; source_draft_revision: string; products?: Product[]; offers?: unknown[] } | null
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
@@ -123,9 +124,9 @@ export const mediaWorkbenchAPI = {
   async initialize(id: number, mediaTypes: string[]): Promise<SupplierDetail> {
     return (await apiClient.post<SupplierDetail>(`${accountPath(id)}/initialize`, { media_types: [...mediaTypes] })).data
   },
-  async saveDraft(id: number, version: number, products: Product[], removeProductIds: string[] = []): Promise<SupplierDetail> {
+  async saveDraft(id: number, version: number, products: Product[], removeProductIds: string[] = [], submissionId?: string): Promise<SupplierDetail> {
     return (await apiClient.put<SupplierDetail>(`${accountPath(id)}/draft`, {
-      expected_record_version: version, draft: { ...draftInput(products), ...(removeProductIds.length ? { remove_product_ids: [...removeProductIds] } : {}) }
+      expected_record_version: version, ...(submissionId ? { submission_id: submissionId } : {}), draft: { ...draftInput(products), ...(removeProductIds.length ? { remove_product_ids: [...removeProductIds] } : {}) }
     })).data
   },
   async publish(id: number, version: number, revision: string, productIds: string[]): Promise<SupplierDetail | PublishAcknowledgement> {

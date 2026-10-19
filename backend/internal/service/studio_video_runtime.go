@@ -55,7 +55,7 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 						mode = model.Mode
 					}
 				}
-				entry := StudioImageCatalogOffer{statusPlatform: studioPassivePlatform(a, key), InputMode: mode, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel, OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: rows[i].Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice}
+				entry := StudioImageCatalogOffer{ProductScope: studioVideoProductScope(o, rows[i].Config.Published.Revision), statusPlatform: studioPassivePlatform(a, key), InputMode: mode, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel, OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: rows[i].Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice}
 
 				for _, product := range rows[i].Config.Published.Products {
 					if product.ProductID == o.ProductID && product.AdapterConfig.Version == 1 {
@@ -70,6 +70,18 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 	}
 	attachStudioPassiveStatuses(ctx, r.Monitor, owner, key, out)
 	return out, nil
+}
+
+// The customer model entry groups specs only within one published video
+// product. Quotes continue to bind the individual, unchanged published offer.
+func studioVideoProductScope(offer mediaworkbench.Offer, revision string) string {
+	return studioHash(struct {
+		Domain            string `json:"domain"`
+		MediaType         string `json:"media_type"`
+		AccountID         int64  `json:"account_id"`
+		ProductID         string `json:"product_id"`
+		PublishedRevision string `json:"published_revision"`
+	}{"video-product", offer.MediaType, offer.AccountID, offer.ProductID, revision})
 }
 
 func NewStudioVideoRuntime(core *OpenAIGatewayService, media mediaworkbench.Repository, orders StudioVideoOrderRepository) *StudioVideoRuntime {
@@ -352,16 +364,25 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 }
 
 type StudioVideoState struct {
-	Contract    string `json:"contract"`
-	TaskID      string `json:"task_id"`
-	UpstreamID  string `json:"upstream_id,omitempty"`
-	Status      string `json:"status"`
-	RequestHash string `json:"request_hash"`
-	BindingHash string `json:"binding_hash"`
+	Contract        string                 `json:"contract"`
+	TaskID          string                 `json:"task_id"`
+	UpstreamID      string                 `json:"upstream_id,omitempty"`
+	Status          string                 `json:"status"`
+	RequestHash     string                 `json:"request_hash"`
+	BindingHash     string                 `json:"binding_hash"`
+	ResultRetention *StudioResultRetention `json:"result_retention,omitempty"`
 }
 
 func videoState(t StudioVideoTask, id, status string) StudioVideoState {
-	return StudioVideoState{StudioVideoBindingVersion, t.ID, id, status, t.Quote.Binding.RequestHash, t.Quote.BindingHash}
+	return StudioVideoState{Contract: StudioVideoBindingVersion, TaskID: t.ID, UpstreamID: id, Status: status, RequestHash: t.Quote.Binding.RequestHash, BindingHash: t.Quote.BindingHash}
+}
+
+func (r *StudioVideoRuntime) videoState(t StudioVideoTask, id, status string) StudioVideoState {
+	state := videoState(t, id, status)
+	if retention, err := r.Store.ResultRetention(t.ID); err == nil {
+		state.ResultRetention = &retention
+	}
+	return state
 }
 
 func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner, key *APIKey, token, id string) (StudioVideoState, error) {
@@ -407,34 +428,34 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	sale, _ := decimal.NewFromString(b.Offer.SalePrice.Amount)
 	_, e = r.Orders.ReserveStudioVideoOrder(ctx, &StudioVideoReserveCommand{ChildID: id, UserID: owner.UserID, APIKeyID: owner.APIKeyID, GroupID: owner.GroupID, QuoteID: b.QuoteID, CapabilityVersion: b.CapabilityVersion(), RequestHash: b.RequestHash, HoldAmount: sale.InexactFloat64(), Binding: &b})
 	if e != nil {
-		return videoState(t, "", "reserve_pending"), e
+		return r.videoState(t, "", "reserve_pending"), e
 	}
 	r.invalidateBilling(ctx, owner)
 	claimed, e := r.Store.DispatchClaim(id)
 	if e != nil {
-		return videoState(t, "", "unknown"), e
+		return r.videoState(t, "", "unknown"), e
 	}
 	if !claimed {
 		return r.Recover(ctx, owner, id)
 	}
 	body, _, e := q.Plan.Materialize()
 	if e != nil {
-		return videoState(t, "", "unknown"), e
+		return r.videoState(t, "", "unknown"), e
 	}
 	dispatchCtx := context.WithValue(ctx, videoIdempotencyContextKey{}, id)
 	dispatchCtx = context.WithValue(dispatchCtx, videoAdapterContextKey{}, q.Binding.Offer.Adapter.Kind)
 	data, _, e := r.request(dispatchCtx, a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
 	if e != nil {
-		return videoState(t, "", "unknown"), ErrStudioVideoUnknown
+		return r.videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
 	upstream := videoTaskID(data)
 	if !studioImageTaskID.MatchString(upstream) {
-		return videoState(t, "", "unknown"), ErrStudioVideoUnknown
+		return r.videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
 	if e = r.Store.Accept(id, upstream); e != nil {
-		return videoState(t, "", "unknown"), e
+		return r.videoState(t, "", "unknown"), e
 	}
-	return videoState(t, upstream, "accepted"), nil
+	return r.videoState(t, upstream, "accepted"), nil
 }
 
 func videoTaskID(body []byte) string {
@@ -455,40 +476,43 @@ func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner
 	if e != nil {
 		return StudioVideoState{}, e
 	}
+	if _, e = r.Store.ResultRetention(id); e != nil {
+		return StudioVideoState{}, e
+	}
 	order, e := r.Orders.GetStudioVideoOrder(ctx, owner.UserID, id)
 	if e != nil {
-		return videoState(t, "", "reserve_pending"), e
+		return r.videoState(t, "", "reserve_pending"), e
 	}
 	b := t.Quote.Binding
 	expected := (&StudioVideoReserveCommand{ChildID: id, Binding: &b}).Fingerprint()
 	if order.HoldFingerprint != expected || order.CapabilityVersion != b.CapabilityVersion() || order.RequestHash != b.RequestHash || order.APIKeyID != owner.APIKeyID || order.GroupID != owner.GroupID {
-		return videoState(t, "", "recovery_blocked"), ErrStudioVideoConflict
+		return r.videoState(t, "", "recovery_blocked"), ErrStudioVideoConflict
 	}
 	if order.State == StudioVideoCaptured {
-		return videoState(t, order.SupplierTaskID, "captured"), nil
+		return r.videoState(t, order.SupplierTaskID, "captured"), nil
 	}
 	if order.State == StudioVideoReleased {
-		return videoState(t, order.SupplierTaskID, "released"), nil
+		return r.videoState(t, order.SupplierTaskID, "released"), nil
 	}
 	upstream, e := r.Store.Upstream(id)
 	if os.IsNotExist(e) {
-		return videoState(t, "", "unknown"), nil
+		return r.videoState(t, "", "unknown"), nil
 	}
 	if e != nil {
-		return videoState(t, "", "unknown"), e
+		return r.videoState(t, "", "unknown"), e
 	}
 	a, release, e := r.account(ctx, t.Quote.Binding, false, false)
 	if e != nil {
-		return videoState(t, upstream, "recovery_blocked"), e
+		return r.videoState(t, upstream, "recovery_blocked"), e
 	}
 	defer release()
 	requestCtx := context.WithValue(ctx, videoAdapterContextKey{}, t.Quote.Binding.Offer.Adapter.Kind)
 	body, _, e := r.request(requestCtx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream), nil)
 	if e != nil {
-		return videoState(t, upstream, "unknown"), e
+		return r.videoState(t, upstream, "unknown"), e
 	}
 	if remote := videoTaskID(body); remote != upstream {
-		return videoState(t, upstream, "unknown"), ErrStudioVideoConflict
+		return r.videoState(t, upstream, "unknown"), ErrStudioVideoConflict
 	}
 	status := gjson.GetBytes(body, "status").String()
 	if status == "" {
@@ -497,13 +521,20 @@ func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner
 	if status != "completed" && status != "failed" && status != "queued" && status != "processing" {
 		status = "unknown"
 	}
-	return videoState(t, upstream, status), nil
+	return r.videoState(t, upstream, status), nil
 }
 
 func (r *StudioVideoRuntime) Original(ctx context.Context, owner StudioImageOwner, id string) ([]byte, string, error) {
 	t, e := r.Store.Task(id, owner)
 	if e != nil {
 		return nil, "", e
+	}
+	retention, e := r.Store.ResultRetention(id)
+	if e != nil {
+		return nil, "", e
+	}
+	if retention.Expired {
+		return nil, "", ErrStudioResultExpired
 	}
 	upstream, e := r.Store.Upstream(id)
 	if e != nil {
@@ -519,12 +550,21 @@ func (r *StudioVideoRuntime) Original(ctx context.Context, owner StudioImageOwne
 	}
 	defer release()
 	requestCtx := context.WithValue(ctx, videoAdapterContextKey{}, t.Quote.Binding.Offer.Adapter.Kind)
-	return r.request(requestCtx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream)+"/content", nil)
+	data, mime, err := r.request(requestCtx, a, http.MethodGet, "/videos/"+url.PathEscape(upstream)+"/content", nil)
+	if err != nil {
+		return nil, "", err
+	}
+	if retention, err := r.Store.ResultRetention(id); err != nil {
+		return nil, "", err
+	} else if retention.Expired {
+		return nil, "", ErrStudioResultExpired
+	}
+	return data, mime, nil
 }
 
 // Only the authenticated internal delivery adapter calls this after its durable
 // original-byte store has decoded the complete video. Browsers cannot send proof.
-func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner, id, resultHash string) (*StudioVideoOrder, error) {
+func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner, id, resultHash string, retention ...*StudioResultRetention) (*StudioVideoOrder, error) {
 	if !videoDigest(resultHash) {
 		return nil, ErrStudioVideoConflict
 	}
@@ -532,8 +572,15 @@ func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner
 	if e != nil {
 		return nil, e
 	}
+	var input *StudioResultRetention
+	if len(retention) > 0 {
+		input = retention[0]
+	}
 	upstream, e := r.Store.Upstream(id)
 	if e != nil {
+		return nil, e
+	}
+	if e = r.Store.captureRetention(t, input); e != nil {
 		return nil, e
 	}
 	b := t.Quote.Binding

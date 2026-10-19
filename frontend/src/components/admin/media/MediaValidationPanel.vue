@@ -27,8 +27,8 @@ import { computed } from 'vue'
 import type { Diagnostic, Match, Validation } from '@/api/admin/mediaWorkbench'
 const props = defineProps<{ validation?: Validation; current: boolean; unavailable: boolean; saveState: string; diagnostics: Diagnostic[]; accountId?: number; modelId: string; products?: { product_id: string; label: string }[] }>()
 const emit = defineEmits<{ locate: [diagnostic: Diagnostic]; message: [value: string] }>()
-const state = computed(() => props.saveState === 'saving' ? 'SAVING' : props.unavailable ? 'UNKNOWN' : !props.current ? 'STALE' : props.validation?.status ?? 'UNKNOWN')
-const label = computed(() => ({ SAVING: '保存中', PENDING: '草稿已保存，检查中', VALIDATING: '草稿已保存，检查中', RUNNING: '草稿已保存，检查中', PASS: '检查通过', FAIL: '检查失败，请处理以下事项', UNKNOWN: '检查暂不可用', STALE: '检查结果待更新' } as Record<string, string>)[state.value] ?? `后台状态：${state.value}`)
+const state = computed(() => props.saveState === 'saving' ? 'SAVING' : props.saveState === 'unconfirmed' ? 'UNCONFIRMED' : props.saveState === 'conflict' ? 'CONFLICT' : props.saveState === 'failed' ? 'SAVE_FAILED' : props.unavailable ? 'UNKNOWN' : !props.current ? 'STALE' : props.validation?.status ?? 'UNKNOWN')
+const label = computed(() => ({ SAVING: '保存中', UNCONFIRMED: '保存结果待核对', CONFLICT: '服务器版本冲突', SAVE_FAILED: '保存失败', PENDING: '草稿已确认保存，检查中', VALIDATING: '草稿已确认保存，检查中', RUNNING: '草稿已确认保存，检查中', PASS: '检查通过', FAIL: '检查失败，请处理以下事项', UNKNOWN: '检查暂不可用', STALE: '检查结果待更新' } as Record<string, string>)[state.value] ?? `后台状态：${state.value}`)
 const development = computed(() => props.diagnostics.filter(d => d.class === 'NEEDS_DEVELOPMENT'))
 function productLabel(diagnostic: Diagnostic) {
   const index = /products(?:\[|\.)(\d+)/.exec(diagnostic.path)?.[1]

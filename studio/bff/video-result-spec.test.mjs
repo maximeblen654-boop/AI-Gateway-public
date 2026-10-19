@@ -23,7 +23,7 @@ test('valid originals retain their bytes regardless of geometry or duration',asy
  ])await t.test(name,t=>{
   const make=fixture(t),store=make(),bytes=syntheticVideo(size,seconds);
   const saved=store.put(identity,{bytes,mimeType:'video/mp4'});
-  assert.equal(saved.version,2);
+  assert.equal(saved.version,3);
   assert.deepEqual(store.load(identity).bytes,bytes);
   assert.deepEqual(make().load(identity).bytes,bytes);
   assert.equal(make().load(identity).sha256,saved.sha256);
@@ -36,7 +36,8 @@ test('historical v1/v2 metadata and optional measurements are read without rewri
   const metaFile=path.join(make.rootDir,fs.readdirSync(make.rootDir)[0],'meta.json');
   const meta=JSON.parse(fs.readFileSync(metaFile));
   if(variant==='v1'){delete meta.media;meta.version=1;}
-  else meta.media=variant==='v2-measured'?{version:1,width:160,height:90,frames:10,durationMicros:2000000}:null;
+  else {meta.version=2;meta.media=variant==='v2-measured'?{version:1,width:160,height:90,frames:10,durationMicros:2000000}:null;}
+  delete meta.expiresAt;
   const old=JSON.stringify(meta);fs.writeFileSync(metaFile,old);
   assert.deepEqual(make().load(identity).bytes,bytes);assert.equal(make().load(identity).sha256,saved.sha256);
   assert.equal(fs.readFileSync(metaFile,'utf8'),old);

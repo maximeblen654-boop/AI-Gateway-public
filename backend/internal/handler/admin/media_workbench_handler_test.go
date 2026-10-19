@@ -96,6 +96,91 @@ func TestMediaWorkbenchHTTP(t *testing.T) {
 	}
 }
 
+func TestMediaDraftSubmissionReceiptHTTPContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mediaHandlerRepo{a: mediaworkbench.Account{ID: 7, Type: "apikey", Status: "active", Schedulable: true}}
+	h := NewMediaWorkbenchHandler(mediaworkbench.NewService(repo))
+	router := gin.New()
+	router.PUT("/accounts/:id/draft", h.SaveDraft)
+	router.GET("/accounts/:id", h.Detail)
+	const submission = "550e8400-e29b-41d4-a716-446655440000"
+	body := `{"expected_record_version":0,"submission_id":"` + submission + `","draft":{"products":[{"product_id":"p","media_type":"image","upstream_model":"m"}]}}`
+	call := func(method, requestBody string, expectedStatus int) *httptest.ResponseRecorder {
+		t.Helper()
+		path := "/accounts/7"
+		if method == http.MethodPut {
+			path += "/draft"
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(method, path, strings.NewReader(requestBody)))
+		if w.Code != expectedStatus {
+			t.Fatalf("%s: %d %s", method, w.Code, w.Body.String())
+		}
+		return w
+	}
+	for _, method := range []string{http.MethodPut, http.MethodGet} {
+		w := call(method, body, http.StatusOK)
+		var envelope struct {
+			Data mediaworkbench.Detail `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		c := envelope.Data.Config
+		if c == nil || c.Draft.SaveReceipt == nil || *c.Draft.SaveReceipt != (mediaworkbench.SaveReceipt{SubmissionID: submission, BaseRecordVersion: 0, DraftRevision: c.Draft.Revision}) || c.Validation.Status != "FAIL" {
+			t.Fatalf("PUT/GET did not return its saved incomplete draft receipt: %s", w.Body.String())
+		}
+	}
+	before, _ := json.Marshal(repo.a.Config)
+	w := call(http.MethodPut, body, http.StatusConflict)
+	after, _ := json.Marshal(repo.a.Config)
+	if !strings.Contains(w.Body.String(), "STALE_MEDIA_CONFIG") || !bytes.Equal(before, after) {
+		t.Fatal("repeated old CAS changed the record or did not return a conflict")
+	}
+	for _, rejected := range []string{
+		`{"expected_record_version":2,"submission_id":"not-a-uuid","draft":{}}`,
+		`{"expected_record_version":2,"submission_id":"550e8400e29b41d4a716446655440000","draft":{}}`,
+		`{"expected_record_version":2,"draft":{"submission_id":"` + submission + `"}}`,
+		`{"expected_record_version":2,"draft":{"save_receipt":{"submission_id":"` + submission + `"}}}`,
+	} {
+		w = call(http.MethodPut, rejected, http.StatusBadRequest)
+		after, _ = json.Marshal(repo.a.Config)
+		if !strings.Contains(w.Body.String(), "INVALID_MEDIA_CONFIG") || !bytes.Equal(before, after) {
+			t.Fatal("invalid submission or forged receipt was persisted")
+		}
+	}
+}
+
+type mediaHandlerReplacedDraftRepo struct{ *mediaHandlerRepo }
+
+func (r *mediaHandlerReplacedDraftRepo) CompareAndSwap(ctx context.Context, id, expected int64, c *mediaworkbench.Config) error {
+	if err := r.mediaHandlerRepo.CompareAndSwap(ctx, id, expected, c); err != nil {
+		return err
+	}
+	current, err := r.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	version := current.Config.RecordVersion
+	current.Config.RecordVersion++
+	current.Config.Draft.SaveReceipt.SubmissionID = "550e8400-e29b-41d4-a716-446655440001"
+	return r.mediaHandlerRepo.CompareAndSwap(ctx, id, version, current.Config)
+}
+
+func TestMediaDraftReplacedReceiptReturnsHTTPConflict(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &mediaHandlerReplacedDraftRepo{mediaHandlerRepo: &mediaHandlerRepo{a: mediaworkbench.Account{ID: 7, Type: "apikey", Status: "active", Schedulable: true}}}
+	h := NewMediaWorkbenchHandler(mediaworkbench.NewService(repo))
+	router := gin.New()
+	router.PUT("/accounts/:id/draft", h.SaveDraft)
+	body := `{"expected_record_version":0,"submission_id":"550e8400-e29b-41d4-a716-446655440000","draft":{"products":[{"product_id":"p","media_type":"image","upstream_model":"m"}]}}`
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodPut, "/accounts/7/draft", strings.NewReader(body)))
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "STALE_MEDIA_CONFIG") || !strings.Contains(w.Body.String(), `"save_stage":"confirmation"`) || strings.Contains(w.Body.String(), `"products"`) {
+		t.Fatalf("replacement was returned as success or leaked draft contents: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestMediaPublishHTTPContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &mediaHandlerRepo{a: mediaworkbench.Account{ID: 7, Type: "apikey", Platform: "openai", Status: "active", Schedulable: true, RuntimeReady: true, Catalog: &mediaworkbench.Catalog{Models: []string{"gpt-image-2"}, SyncedAt: "2026-10-05T00:00:00Z"}}}

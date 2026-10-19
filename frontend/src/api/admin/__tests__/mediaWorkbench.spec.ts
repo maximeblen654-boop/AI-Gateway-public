@@ -8,6 +8,10 @@ vi.mock('../accounts', () => ({ syncUpstreamModels: vi.fn() }))
 const client = vi.mocked(apiClient)
 beforeEach(() => { vi.resetAllMocks(); client.get.mockResolvedValue({ data: supplier() }); client.put.mockResolvedValue({ data: supplier() }); client.post.mockResolvedValue({ data: supplier() }) })
 describe('strict Media Workbench API boundary', () => {
+  it('binds the submission UUID to the exact CAS without admitting server receipt fields into the write body', async () => {
+    await mediaWorkbenchAPI.saveDraft(77, 3, [imageProduct], [], '99999999-9999-4999-8999-999999999999')
+    expect(client.put).toHaveBeenCalledWith('/admin/media-workbench/accounts/77/draft', { expected_record_version: 3, submission_id: '99999999-9999-4999-8999-999999999999', draft: { products: [imageProduct] } })
+  })
   it('strips unknown and server-owned response fields at every editable level', async () => {
     const p = copy(imageProduct)
     Object.assign(p, { revision: 'server-only', unknown: 'future', credentials: { api_key: 'SYNTHETIC-DO-NOT-SEND' } })

@@ -51,14 +51,27 @@ const initial: SupplierDetail = {
   }
 }
 if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: null, source: 'manual' }]
-const persisted = sessionStorage.getItem(key)
-const dto: SupplierDetail = persisted ? JSON.parse(persisted) : initial
-type Fault = 'fail' | 'invalid' | 'timeout-committed' | 'timeout-rejected' | 'conflict' | 'delay'
+if (scenario === 'recovery-blank-removal') {
+  const empty=initial.media_workbench_v1!.draft.products.find(p=>p.product_id===blank.product_id)!
+  empty.capabilities={resolutions:[],aspect_ratios:[],qualities:[],durations_seconds:[],count:{min:1,max:1},references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},total_max:0},combination_rules:[]}
+  initial.product_removal={[empty.product_id]:{allowed:true,reason:''}}
+}
+// New recovery cases share only the synthetic server record across pages. This
+// test storage is not the application's local recovery implementation.
+const serverStorage = scenario.startsWith('recovery-') ? localStorage : sessionStorage
+const persisted = serverStorage.getItem(key)
+let dto: SupplierDetail = persisted ? JSON.parse(persisted) : initial
+type Fault = 'fail' | 'invalid' | 'timeout-committed' | 'timeout-rejected' | 'timeout-deferred' | 'conflict' | 'delay'
 type Call = { method: string; url: string; input: unknown }
 const calls: Call[] = []
 const faults = new Map<string, Fault>()
 let release: (() => void) | undefined
-const persist = () => sessionStorage.setItem(key, JSON.stringify(dto))
+let lateCommit: (() => boolean) | undefined
+const persist = () => serverStorage.setItem(key, JSON.stringify(dto))
+const readServer = () => {
+  const current = serverStorage.getItem(key)
+  if (current) dto = JSON.parse(current)
+}
 function diagnostics(products: Product[]): Diagnostic[] {
   return products.flatMap(product => {
     const index = dto.media_workbench_v1!.draft.products.findIndex(p => p.product_id === product.product_id)
@@ -74,13 +87,28 @@ function validate() {
   c.validation = { ...c.validation, draft_revision: c.draft.revision, status: 'FAIL', publish_ready: false, diagnostics: diagnostics(c.draft.products) }
   if (!c.validation.diagnostics.length) { c.validation.status = 'PASS'; c.validation.publish_ready = true }
 }
+function saveDraftFixture(input: { expected_record_version: number; submission_id?: string; draft: { products: Product[] } }): boolean {
+  readServer()
+  const c = dto.media_workbench_v1!
+  if (input.expected_record_version !== c.record_version) return false
+  const baseVersion = c.record_version
+  c.draft.products = copy(input.draft.products)
+  c.record_version++; c.draft.revision = `fixture-draft-${c.record_version}`
+  c.draft.save_receipt = input.submission_id ? {
+    submission_id: input.submission_id, base_record_version: baseVersion, draft_revision: c.draft.revision
+  } : undefined
+  validate(); persist(); return true
+}
 validate()
+persist()
 Object.assign(window, { procurementFixture: {
-  calls, snapshot: () => copy(dto), failNext: (operation: string, fault: Fault) => faults.set(operation, fault),
-  release: () => { release?.(); release = undefined }
+  calls, snapshot: () => { readServer(); return copy(dto) }, failNext: (operation: string, fault: Fault) => faults.set(operation, fault),
+  release: () => { release?.(); release = undefined },
+  releaseLate: () => { const commit = lateCommit; lateCommit = undefined; return commit?.() ?? false }
 } })
 
 apiClient.defaults.adapter = async config => {
+  readServer()
   const url = config.url || '', method = config.method || 'get'
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
   calls.push({ method, url, input: copy(input ?? null) })
@@ -90,24 +118,30 @@ apiClient.defaults.adapter = async config => {
   const reject = (status: number, message: string, data?: unknown) => {
     throw { isAxiosError: true, config, response: { status, data: { code: 'ISOLATED_FIXTURE', message, ...(data ? { data } : {}) } } }
   }
-  if (fault === 'delay') await new Promise<void>(resolve => { release = resolve })
+  if (fault === 'delay') {
+    await new Promise<void>(resolve => { release = resolve })
+    readServer()
+  }
   if (fault === 'fail') reject(operation === 'sales' ? 422 : 503, 'Isolated write failure')
   if (fault === 'invalid') reject(400, 'Isolated definitive input rejection before write')
   if (fault === 'conflict') {
     dto.media_workbench_v1!.record_version++
     dto.media_workbench_v1!.draft.revision = `fixture-draft-${dto.media_workbench_v1!.record_version}`
+    delete dto.media_workbench_v1!.draft.save_receipt
     persist(); reject(409, 'Isolated concurrent update')
   }
   if (fault === 'timeout-rejected') throw { isAxiosError: true, config, code: 'ECONNABORTED', message: 'Isolated transport timeout' }
+  if (fault === 'timeout-deferred') {
+    lateCommit = () => saveDraftFixture(input)
+    throw { isAxiosError: true, config, code: 'ECONNABORTED', message: 'Isolated timeout with a request still in transit' }
+  }
   let data: unknown = {}
   if (url === '/admin/media-workbench/suppliers') data = [copy(dto)]
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
     const c = dto.media_workbench_v1!
     if (method !== 'get' && input?.expected_record_version !== c.record_version) reject(409, 'Isolated compare-and-swap conflict')
     if (operation === 'draft' && method === 'put') {
-      c.draft.products = copy(input.draft.products)
-      c.record_version++; c.draft.revision = `fixture-draft-${c.record_version}`
-      validate(); persist()
+      if (!saveDraftFixture(input)) reject(409, 'Isolated compare-and-swap conflict')
     } else if (operation === 'publish' && method === 'post') {
       const selected = c.draft.products.filter(p => input.product_ids.includes(p.product_id))
       const issues = diagnostics(selected)

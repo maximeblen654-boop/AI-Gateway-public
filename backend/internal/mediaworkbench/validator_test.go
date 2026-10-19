@@ -507,7 +507,9 @@ func TestOldValidationCannotOverwriteNewerDraft(t *testing.T) {
 	c.Validation = Validation{Status: "UNKNOWN", DraftRevision: c.Draft.Revision}
 	must(t, base.CompareAndSwap(ctx, 7, 2, c))
 	close(r.resume)
-	must(t, <-finished)
+	if err := <-finished; !errors.Is(err, ErrStale) {
+		t.Fatalf("replaced draft must not confirm the old save: %v", err)
+	}
 	d, err = s.Detail(ctx, 7)
 	must(t, err)
 	if len(d.Config.Draft.Products) != 0 || d.Config.Validation.Status != "UNKNOWN" || d.Config.Validation.DraftRevision != d.Config.Draft.Revision {

@@ -173,11 +173,11 @@ credentials/
 # Private audit and operator material (ignore rules do not remove Git history).
 /.evidence/
 /.local-project-control/
+/.codex-tmp/
 
 
 # Private operation records and local test output
 /PROJECT*.md
-/AGENTS.md
 /SOURCE_FOR_PUBLIC.json
 /CLEAN_SNAPSHOT_HANDOFF.md
 /docs/AI_GATEWAY_HANDOFF_*.md

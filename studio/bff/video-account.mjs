@@ -20,7 +20,7 @@ export function createAccountVideoClient({baseUrl,serviceToken,fetchImpl=fetch})
     const response=await fetchImpl(new URL(`/api/v1/internal/studio/video/${operation}`,root),{method,redirect:'error',signal:AbortSignal.timeout(960000),
       headers:{'Content-Type':'application/json','X-Studio-Service-Token':serviceToken,'X-Studio-Session-Proof':session.sessionProof,'X-Studio-Binding-Contract':VIDEO_CONTRACT,...(keyRef?{'X-Studio-Key-Ref':String(keyRef)}:{})},
       body});
-    if(!response.ok) fail('Video bridge unavailable; recover the original task');
+    if(!response.ok) {if(response.status===410)throw Object.assign(new Error('video_result_expired'),{code:'video_result_expired'});fail('Video bridge unavailable; recover the original task');}
     const chunks=[];let size=0;
     for await (const chunk of response.body) {size+=chunk.length;if(size>140_000_000)fail('Video response too large');chunks.push(chunk)}
     const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -87,7 +87,12 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     return view(op);
   }
   function get(session,id){const op=journal.getForOwner(owner(session),id),old=legacy?.get?.(session,id);if(op&&old)fail('Conflicting journal roots');if(!op&&!old)fail('Operation not found');return op||old;}
-  function view(op){const b=op.children[0]?.account?.binding;return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',created_at:op.createdAt,
+  function retention(op){
+    const c=op.children[0],b=c?.account?.binding;if(!b||!c.taskId||typeof resultStore.metadata!=='function')return undefined;
+    const meta=resultStore.metadata({mode:'account_video_v1',ownerId:op.ownerId,childId:c.childId,taskId:c.taskId,accountId:b.offer.account_id,bindingHash:c.account.binding_hash,requestHash:c.bodySha256});
+    return meta?{persisted_at:meta.storedAt||null,expires_at:meta.expiresAt||null,expired:meta.expired,policy:meta.policy}:undefined;
+  }
+  function view(op){const b=op.children[0]?.account?.binding,promise=retention(op);return {operation_id:op.operationId,contract:op.version===2?VIDEO_CONTRACT:'legacy_slot',created_at:op.createdAt,...(promise?{result_retention:promise}:{}),
     ...(b?{status:op.children[0].status,offer_id:b.offer.offer_id,model:b.offer.upstream_model,spec:b.spec,sale_price:b.offer.sale_price,unit_price:b.offer.sale_price,total_price:b.offer.sale_price,quantity:b.spec.count,expires_at:b.expires_at}:{}),
     children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
   function child(session,id){const op=get(session,id);if(op.version!==2)fail('Legacy task requires original recovery');return op.children[0];}
@@ -115,14 +120,14 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const c=child(session,id),uid=owner(session);
     const ledger={
       async getSettlement(){const s=await current(session,c);return {ownerId:uid,childId:c.childId,status:s.status==='captured'?'captured':s.status==='released'?'released':'held'};},
-      async capture({evidence}){if(!digest(evidence.resultHash)||evidence.bindingHash!==c.account.binding_hash)fail('Durable result proof required');return settled(session,c,'capture',{result_hash:evidence.resultHash});},
+      async capture({evidence}){if(!digest(evidence.resultHash)||evidence.bindingHash!==c.account.binding_hash)fail('Durable result proof required');return settled(session,c,'capture',{result_hash:evidence.resultHash,...(evidence.resultRetention?{result_retention:evidence.resultRetention}:{})});},
       async release(){return settled(session,c,'release',{});},
     };
     const supplier={
       async getTask(){const s=await current(session,c);return {task_id:s.upstream_id,status:s.status==='captured'?'completed':s.status};},
       async downloadOriginal(){const p=(await call(session,'GET',`tasks/${c.childId}/result`,undefined,c.account.key_ref)).payload;
         if(!p||typeof p.bytes_base64!=='string'||!['video/mp4','video/webm'].includes(p.mime_type))fail('Original missing');
-        const bytes=Buffer.from(p.bytes_base64,'base64');return {status:200,response:new Response(bytes,{headers:{'Content-Type':p.mime_type,'Content-Length':String(bytes.length),'X-Video-Quality':'original'}})};},
+        const bytes=Buffer.from(p.bytes_base64,'base64');return {status:200,result_retention:p.result_retention,response:new Response(bytes,{headers:{'Content-Type':p.mime_type,'Content-Length':String(bytes.length),'X-Video-Quality':'original'}})};},
     };
     return createVideoDelivery({journal,ledger,supplier,resultStore,coordinator:{inspectTask:()=>current(session,c),reconcileChild:()=>ledger.release()}});
   }
@@ -144,7 +149,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const s=await current(session,c);
     if(s.upstream_id&&['dispatching','accepted'].includes(c.status))journal.markAccepted(owner(session),id,0,s.upstream_id);
     if(['completed','captured','failed'].includes(s.status)){await delivery(session,id).operation.reconcileChild(owner(session),id,0);s.status=s.status==='failed'?'released':'captured';}
-    return {...view(get(session,id)),status:s.status};
+    const value=view(get(session,id));return {...value,status:s.status,...(!value.result_retention&&s.result_retention?{result_retention:s.result_retention}:{})};
   }
   async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};if(options?.index)fail('Invalid child index');return delivery(session,id).openOriginal(owner(session),id,0,options);}
   function history(session){const current=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];if(old.some(op=>current.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');return [...current,...old].map(view);}

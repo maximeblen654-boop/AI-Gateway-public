@@ -15,14 +15,14 @@ test('partial keeps original and settled amounts separate across history refresh
 test('unknown only queries its identity; closed service never starts',async({page})=>{await page.goto(`${route}?scenario=unknown`);await expect(page.getByTestId('studio-status')).toHaveText('结果待确认');await expect(page.getByTestId('studio-new')).toBeEnabled();await page.getByTestId('studio-refresh').click();expect(await posts(page)).toHaveLength(0);await page.getByTestId('studio-new').click();await expect(page.getByTestId('studio-prompt')).toBeVisible();await page.getByTestId('studio-mode-edit').click();await expect(page.getByTestId('studio-attachment')).toBeVisible();await page.goto(`${route}?scenario=closed`);await page.getByTestId('studio-mode-text').click();await page.getByTestId('studio-prompt').fill('test');await page.getByTestId('studio-quote').click();await expect(page.getByTestId('studio-confirm-generate')).toBeDisabled();expect(await posts(page)).toHaveLength(0)})
 for (const width of [1440,390]) test(`failed history toggle ${width}px`,async({page},info)=>{
  await page.setViewportSize({width,height:900});await page.goto(`${route}?scenario=failed&theme=light`)
- await expect(page.getByText('图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。')).toBeVisible()
+ await expect(page.getByText('新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。')).toBeVisible()
  await expect(page.getByTestId('studio-failed-toggle')).toHaveText('显示失败任务（1）')
  await expect(page.locator('[data-task-id]:visible')).toHaveCount(1)
  await page.screenshot({path:info.outputPath(`failed-hidden-${width}.png`),fullPage:true})
  await page.getByTestId('studio-failed-toggle').click();await expect(page.getByTestId('studio-failed-toggle')).toHaveText('隐藏失败任务（1）')
  await expect(page.locator('[data-task-id]:visible')).toHaveCount(2)
  await page.screenshot({path:info.outputPath(`failed-shown-${width}.png`),fullPage:true})
- await page.getByTestId('studio-mode-video').click();await expect(page.getByText('图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。')).toHaveCount(0)
+ await page.getByTestId('studio-mode-video').click();await expect(page.getByText('新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。')).toBeVisible()
 })
 
 async function expectInViewport(page: Page, selector: string, height: number){const box=await page.locator(selector).boundingBox();expect(box).not.toBeNull();expect(box!.y).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(height+1)}

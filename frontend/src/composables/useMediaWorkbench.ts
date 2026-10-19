@@ -1,8 +1,9 @@
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
+import { draftFingerprint, persistedFingerprint, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
-export function useMediaWorkbench() {
+export function useMediaWorkbench(adminId: () => number | undefined = () => undefined) {
   const suppliers = ref<SupplierDetail[]>([])
   const detail = ref<SupplierDetail | null>(null)
   const products = ref<Product[]>([])
@@ -17,24 +18,173 @@ export function useMediaWorkbench() {
   const deleted = ref(false)
   const conflict = ref(false)
   const validationUnavailable = ref(false)
-  const saveState = ref('')
+  const saveState = ref<'unsaved' | 'saving' | 'saved' | 'failed' | 'unconfirmed' | 'conflict'>('unsaved')
+  const recovery = ref<DraftRecovery | null>(null)
+  const recoveryEntries = ref<RecoveryEntry[]>([])
+  const selectedRecoveryKey = ref('')
+  const unresolvedProductConflicts = ref<string[]>([])
+  const editorId = crypto.randomUUID()
+  const ownedRecoveries = new Map<string, RecoveryEntry>()
+  const adoptedRecoveries = new Map<string, RecoveryEntry>()
+  const recoveryWarning = ref('')
+  const serverSnapshot = ref<SupplierDetail | null>(null)
+  const online = ref(typeof navigator === 'undefined' || navigator.onLine)
   const saveFeedback = ref('')
   const publicationFeedback = ref('')
   const salesFeedback = ref('')
   const addedProductIds = ref<string[]>([])
   const removedProducts = ref<Product[]>([])
-  let baseline = '[]'
+  const baseline = ref('[]')
+  let applying = false
+  let autoSaveTimer: ReturnType<typeof setTimeout> | undefined
+  let queuedSave = false
+  let rejectedInput = ''
+  type Submission = { id: string; base: number; products: Product[]; removed: string[]; recoveryKeys: Map<string, string>; recoveryCopies: Map<string, string | null> }
+  let lastSubmission: Submission | undefined
+  const retryCheck = ref<{ accountId: number; submissionId: string; base: number; revision: string } | null>(null)
   let loadSequence = 0
   let validationSequence = 0
   let pollTimer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   const config = computed(() => detail.value?.media_workbench_v1)
-  const dirty = computed(() => JSON.stringify(draftInput(products.value).products) !== baseline)
+  const dirty = computed(() => draftFingerprint(products.value) !== baseline.value)
+  const canRetryUnconfirmedSave = computed(() => saveState.value === 'unconfirmed' && !!retryCheck.value && online.value && !pending.value && !loading.value && !deleted.value && !conflict.value)
   const product = computed(() => products.value.find(p => p.product_id === selectedProduct.value))
   const validationCurrent = computed(() => !!config.value && config.value.validation.draft_revision === config.value.draft.revision)
   const canPublish = computed(() => !pending.value && !loading.value && !dirty.value && !deleted.value && !conflict.value && saveState.value !== 'unconfirmed' &&
     !!config.value && Number.isInteger(config.value.record_version) && config.value.record_version >= 0 && !!config.value.draft.revision && !!config.value.draft.products.length)
   const diagnostics = computed(() => errorDiagnostics.value.length ? errorDiagnostics.value : validationCurrent.value ? config.value?.validation.diagnostics ?? [] : [])
+  const recoveryConflict = computed(() => !!recovery.value && (unresolvedProductConflicts.value.includes(recovery.value.product.product_id) || recovery.value.base_record_version !== (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.record_version || recovery.value.base_draft_revision !== ((serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.revision ?? '')))
+  const recoveryDiff = computed(() => recovery.value ? recoveryDifferences(recovery.value.product, (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.products.find(p => p.product_id === recovery.value!.identity.product_id)) : [])
+
+  const productRecoveries = computed(() => recoveryEntries.value.filter(entry => entry.value.product.product_id === selectedProduct.value))
+  const unsubmittedRecoveries = computed(() => recoveryEntries.value.filter(entry => !entry.value.removed_product && entry.value.identity.upstream_model === selectedModel.value &&
+    !products.value.some(p => p.product_id === entry.value.product.product_id) && (entry.value.new_product === true ||
+      entry.value.base_record_version === (config.value?.record_version ?? 0) && entry.value.base_draft_revision === (config.value?.draft.revision ?? '') &&
+      /^media-[a-f0-9-]{36}$/i.test(entry.value.product.product_id) && !config.value?.published?.products?.some(p => p.product_id === entry.value.product.product_id))))
+  function identity(p: Product): RecoveryIdentity | undefined {
+    if (!detail.value) return
+    const owned = ownedRecoveries.get(p.product_id)?.value.identity
+    if (owned?.account_id === detail.value.id && owned.admin_id === adminId()) return owned
+    const original = config.value?.draft.products.find(item => item.product_id === p.product_id) ?? p
+    const value = { admin_id: adminId() ?? 0, account_id: detail.value.id, product_id: p.product_id, site_model: original.site_model, upstream_model: original.upstream_model }
+    return recoveryKey(value) ? value : undefined
+  }
+  function refreshRecoveryEntries() {
+    if (!detail.value || !Number.isSafeInteger(adminId()) || (adminId() ?? 0) <= 0) { recoveryEntries.value = []; return }
+    const result = listDraftRecoveries(localStorage, adminId()!, detail.value.id)
+    recoveryEntries.value = result.entries
+    if (result.invalid) recoveryWarning.value = '部分浏览器恢复副本不可用或已损坏，未自动恢复任何内容。'
+  }
+  function persistRecovery() {
+    if (applying) return
+    // Removal is an edit even when no selected Product remains. Keep each
+    // tombstone in this page's existing independently owned recovery slot.
+    for (const removed of removedProducts.value) if (!persistProductRecovery(removed, true)) return
+    if (product.value) persistProductRecovery(product.value)
+  }
+  function persistProductRecovery(p: Product, removed = false): boolean {
+    const submitted = lastSubmission?.products.find(item => item.product_id === p.product_id) ??
+      (removed && lastSubmission?.removed.includes(p.product_id) ? p : undefined)
+    const changedAfterSubmission = !!submitted && draftFingerprint([submitted]) !== draftFingerprint([p])
+    if (!removed) {
+      if (!dirty.value && !changedAfterSubmission) return true
+      const original = config.value?.draft.products.find(item => item.product_id === p.product_id)
+      if (original && draftFingerprint([original]) === draftFingerprint([p]) && !changedAfterSubmission) return true
+    }
+    const bound = identity(p)
+    if (!bound) { recoveryWarning.value = '当前管理员或商品身份尚未确认，浏览器恢复副本不可用；请保留此页。'; return false }
+    try {
+      const previous = ownedRecoveries.get(p.product_id)
+      refreshRecoveryEntries()
+      // The page owns a stable editor key. A foreign rewrite of even that key
+      // must never be silently overwritten; preserve both as separate copies.
+      let writeEditor = previous?.value.editor_id ?? editorId
+      let writeKey = recoveryCopyKey(bound, writeEditor)!
+      if (localStorage.getItem(writeKey) !== null && localStorage.getItem(writeKey) !== previous?.raw) {
+        writeEditor = crypto.randomUUID(); writeKey = recoveryCopyKey(bound, writeEditor)!
+      }
+      if (!localStorage.getItem(writeKey) && recoveryEntries.value.length >= MAX_ACCOUNT_RECOVERIES) {
+        recoveryWarning.value = '此 Account 的浏览器恢复副本已达 32 份上限；请核对并明确丢弃旧副本。当前新输入仅保留在本页。'; return false
+      }
+      const unresolvedBase = unresolvedProductConflicts.value.includes(p.product_id)
+        ? previous?.value ?? (recovery.value?.product.product_id === p.product_id ? recovery.value : undefined) : undefined
+      const value: DraftRecovery = { version: 1, identity: bound, editor_id: writeEditor,
+        new_product: addedProductIds.value.includes(p.product_id), ...(removed ? { removed_product: true } : {}), base_record_version: unresolvedBase?.base_record_version ?? config.value?.record_version ?? 0,
+        base_draft_revision: unresolvedBase?.base_draft_revision ?? config.value?.draft.revision ?? '', updated_at: Date.now(), copy_id: crypto.randomUUID(), product: p,
+        ...(lastSubmission && submitted ? { pending_submission: { submission_id: lastSubmission.id, base_record_version: lastSubmission.base, product: submitted } } : recovery.value?.product.product_id === p.product_id && recovery.value.pending_submission && saveState.value === 'unconfirmed' ? { pending_submission: recovery.value.pending_submission } : {}) }
+      const raw = encodeDraftRecovery(value)
+      localStorage.setItem(writeKey, raw)
+      const entry = { key: writeKey, raw, value: readDraftRecovery(raw, bound)! }
+      ownedRecoveries.set(p.product_id, entry)
+      selectedRecoveryKey.value = writeKey; recovery.value = entry.value; recoveryWarning.value = ''
+      refreshRecoveryEntries()
+      return true
+    } catch { recoveryWarning.value = '浏览器恢复副本写入失败（可能空间不足或存储被禁用）。当前输入仍在本页，请保留此页。'; return false }
+  }
+  function discoverRecovery() {
+    recovery.value = null
+    try {
+      refreshRecoveryEntries()
+      if (!product.value) {
+        const preview = recoveryEntries.value.find(entry => entry.key === selectedRecoveryKey.value && entry.value.identity.upstream_model === selectedModel.value)
+        if (preview) recovery.value = preview.value
+        return
+      }
+      const choices = productRecoveries.value
+      const owned = ownedRecoveries.get(product.value.product_id)
+      const entry = choices.find(e => e.key === selectedRecoveryKey.value) ?? choices.find(e => e.key === owned?.key) ?? choices[0]
+      if (entry) { recovery.value = entry.value; selectedRecoveryKey.value = entry.key }
+    } catch { recoveryWarning.value = '浏览器恢复副本不可用或已损坏，未自动恢复任何内容。' }
+  }
+  function chooseRecovery(key: string) {
+    const entry = recoveryEntries.value.find(item => item.key === key)
+    if (!entry) return
+    const p = products.value.find(item => item.product_id === entry.value.product.product_id)
+    // Selecting a copy is a preview, not an edit that rewrites its tombstone.
+    applying = true
+    selectedModel.value = entry.value.identity.upstream_model
+    selectedProduct.value = p?.product_id ?? ''
+    applying = false
+    selectedRecoveryKey.value = key; recovery.value = entry.value
+  }
+  function clearRecovery(key: string, expected: string | undefined, expectedCopy: string | null | undefined): boolean {
+    if (!expectedCopy) return false
+    try {
+      if (localStorage.getItem(key) !== expectedCopy) return false
+      if (expected !== undefined && draftFingerprint([JSON.parse(expectedCopy).product]) !== expected) return false
+      localStorage.removeItem(key)
+      for (const [id, entry] of ownedRecoveries) if (entry.key === key && entry.raw === expectedCopy) ownedRecoveries.delete(id)
+      for (const [id, entry] of adoptedRecoveries) if (entry.key === key && entry.raw === expectedCopy) adoptedRecoveries.delete(id)
+      if (selectedRecoveryKey.value === key) { recovery.value = null; selectedRecoveryKey.value = '' }
+      refreshRecoveryEntries(); return true
+    } catch { recoveryWarning.value = '浏览器恢复副本未能清除，请在下次打开时核对版本后处理。'; return false }
+  }
+  function currentOwnedRecovery(): RecoveryEntry | undefined {
+    const entry = ownedRecoveries.get(selectedProduct.value)
+    return entry && entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId() ? entry : undefined
+  }
+  function scheduleSave() {
+    clearTimeout(autoSaveTimer)
+    if (applying || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return
+    autoSaveTimer = setTimeout(() => { void flushAutoSave() }, 1500)
+  }
+  async function flushAutoSave() {
+    clearTimeout(autoSaveTimer)
+    if (!dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return false
+    // A step/blur event is not an explicit retry of an unchanged rejected input.
+    if (rejectedInput === draftFingerprint(products.value)) return false
+    if (pending.value || loading.value) { queuedSave = true; return false }
+    return saveDraft()
+  }
+  watch(products, () => {
+    if (applying) return
+    if (saveState.value !== 'unconfirmed' && !conflict.value && pending.value !== 'save') saveState.value = 'unsaved'
+    if (pending.value !== 'save') saveFeedback.value = ''
+    persistRecovery(); scheduleSave()
+  }, { deep: true, flush: 'sync' })
+  watch(selectedProduct, () => { discoverRecovery(); if (dirty.value) persistRecovery() }, { flush: 'sync' })
+  watch(adminId, discoverRecovery)
 
   function stopPolling() { validationSequence++; clearTimeout(pollTimer) }
   function apply(dto: SupplierDetail, replaceDraft: boolean) {
@@ -43,14 +193,17 @@ export function useMediaWorkbench() {
     if (index >= 0) suppliers.value[index] = dto
     else suppliers.value.push(dto)
     if (replaceDraft) {
+      applying = true
       products.value = clone(draftInput(dto.media_workbench_v1?.draft.products ?? []).products)
-      baseline = JSON.stringify(products.value)
+      baseline.value = draftFingerprint(products.value)
       addedProductIds.value = []; removedProducts.value = []
+      applying = false
     }
     if (selectedModel.value && !dto.models.some(model => model.model_id === selectedModel.value)) selectedModel.value = ''
     if (!products.value.some(p => p.product_id === selectedProduct.value && p.upstream_model === selectedModel.value)) {
       selectedProduct.value = products.value.find(p => p.upstream_model === selectedModel.value)?.product_id ?? ''
     }
+    if (replaceDraft) discoverRecovery()
   }
   function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null }
   function requiresPublishedRecovery(error: unknown) {
@@ -65,13 +218,13 @@ export function useMediaWorkbench() {
       message.value = '历史已发布配置需先受控校验恢复；没有发布本次草稿。'
       return
     }
-    if (e.status === 409) { conflict.value = true; stopPolling() }
+    if (e.status === 409) { conflict.value = true; saveState.value = 'conflict'; stopPolling() }
     if ((e.status === 404 || e.status === 410) && affectsCurrentAccount) { deleted.value = true; stopPolling() }
     message.value = ({
       400: '输入不合法，请按后台提示修改字段。', 401: '登录已失效，请重新登录。',
       403: '当前账户没有媒体管理权限。', 404: '账户不存在或已删除。当前草稿保留为只读。',
       410: '账户已删除。当前草稿保留为只读。',
-      409: '配置已被其他页面修改。请重新读取后再编辑，当前修改尚未覆盖服务器。',
+      409: '配置已被其他页面修改。请核对服务器与本地差异，当前输入已保留。',
       422: '后台未允许此操作。草稿保留，请查看检查结果。',
       503: '后台服务暂不可用。当前修改保留，操作结果需重新读取确认。'
     } as Record<number, string>)[e.status ?? 0] ?? '请求未完成，当前修改保留。请重新读取以确认服务器状态。'
@@ -83,15 +236,19 @@ export function useMediaWorkbench() {
     try { suppliers.value = await mediaWorkbenchAPI.suppliers() } catch (e) { failure(e) }
     finally { loading.value = false }
   }
-  async function selectSupplier(id: number) {
+  async function selectSupplier(id: number, discardConfirmed = false) {
     if (pending.value) return
+    if (!discardConfirmed && detail.value?.id === id && (dirty.value || saveState.value === 'unconfirmed' || conflict.value)) { await checkServer(); return }
+    if (!discardConfirmed) persistRecovery()
+    clearTimeout(autoSaveTimer)
     const seq = ++loadSequence
     stopPolling(); loading.value = true; clearError()
     try {
       const dto = await mediaWorkbenchAPI.detail(id)
       if (seq !== loadSequence || disposed) return
-      selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false
-      validationUnavailable.value = false; saveState.value = dto.media_workbench_v1?.draft.revision ? 'saved' : ''; saveFeedback.value = ''; publicationFeedback.value = ''; salesFeedback.value = ''; apply(dto, true)
+      selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false; unresolvedProductConflicts.value = []
+      lastSubmission = undefined; retryCheck.value = null; rejectedInput = ''; serverSnapshot.value = null
+      validationUnavailable.value = false; saveState.value = dto.media_workbench_v1?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''; publicationFeedback.value = ''; salesFeedback.value = ''; apply(dto, true)
     } catch (e) { if (seq === loadSequence) failure(e, detail.value?.id === id || !detail.value) }
     finally { if (seq === loadSequence) loading.value = false }
   }
@@ -100,7 +257,7 @@ export function useMediaWorkbench() {
     selectedProduct.value = products.value.find(p => p.upstream_model === id)?.product_id ?? ''
   }
   function addProduct(mediaType: string, independent = false) {
-    if (!selectedModel.value || pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed') return
+    if (!selectedModel.value || pending.value || loading.value || deleted.value || conflict.value) return
     const existing = products.value.filter(p => p.upstream_model === selectedModel.value && p.media_type === mediaType)
     const unfinished = existing.find(p => addedProductIds.value.includes(p.product_id))
     if (unfinished || (!independent && existing.length)) {
@@ -118,11 +275,11 @@ export function useMediaWorkbench() {
     addedProductIds.value.push(id)
     selectedProduct.value = id
   }
-  function removalReason(p: Product): string {
-    if (config.value?.product_lifecycle?.[p.product_id]?.state === 'archived') return '已归档商品保留配置，请先恢复后再管理。'
+  function removalReason(p: Product, source = detail.value): string {
+    if (source?.media_workbench_v1?.product_lifecycle?.[p.product_id]?.state === 'archived') return '已归档商品保留配置，请先恢复后再管理。'
     if (saveState.value === 'unconfirmed') return '保存结果未确认，请重新读取后再管理商品。'
     if (addedProductIds.value.includes(p.product_id)) return ''
-    const permission = detail.value?.product_removal?.[p.product_id]
+    const permission = source?.product_removal?.[p.product_id]
     if (!permission?.allowed) return permission?.reason || '请重新读取，确认空白草稿的移除条件。'
     const c = p.capabilities
     if (c.resolutions.length || c.aspect_ratios.length || c.qualities.length || c.durations_seconds.length ||
@@ -136,7 +293,12 @@ export function useMediaWorkbench() {
     if (pending.value || loading.value || deleted.value || conflict.value) return
     const p = products.value.find(item => item.product_id === id)
     if (!p || removalReason(p)) return
-    if (addedProductIds.value.includes(id)) addedProductIds.value = addedProductIds.value.filter(item => item !== id)
+    if (addedProductIds.value.includes(id)) {
+      addedProductIds.value = addedProductIds.value.filter(item => item !== id)
+      const owned = ownedRecoveries.get(id), adopted = adoptedRecoveries.get(id)
+      if (owned) clearRecovery(owned.key, undefined, owned.raw)
+      if (adopted) clearRecovery(adopted.key, undefined, adopted.raw)
+    }
     else removedProducts.value.push(clone(p))
     products.value = products.value.filter(item => item.product_id !== id)
     if (selectedProduct.value === id) selectedProduct.value = products.value.find(item => item.upstream_model === selectedModel.value)?.product_id ?? ''
@@ -145,11 +307,18 @@ export function useMediaWorkbench() {
     if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed') return
     const p = removedProducts.value.find(item => item.product_id === id)
     if (!p) return
+    removedProducts.value = removedProducts.value.filter(item => item.product_id !== id)
+    clearRemovalRecoveries(id)
     products.value.push(p)
     const order = (config.value?.draft.products ?? []).map(item => item.product_id)
     products.value.sort((a, b) => (order.indexOf(a.product_id) < 0 ? Infinity : order.indexOf(a.product_id)) - (order.indexOf(b.product_id) < 0 ? Infinity : order.indexOf(b.product_id)))
-    removedProducts.value = removedProducts.value.filter(item => item.product_id !== id)
     selectedModel.value = p.upstream_model; selectedProduct.value = id
+  }
+  function clearRemovalRecoveries(id?: string) {
+    for (const entry of [...ownedRecoveries.values(), ...adoptedRecoveries.values()]) {
+      if (entry.value.removed_product && (id === undefined || entry.value.identity.product_id === id) &&
+          entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId()) clearRecovery(entry.key, undefined, entry.raw)
+    }
   }
   function pollValidation(id: number, revision: string, seq: number, attempt = 0) {
     pollTimer = setTimeout(async () => {
@@ -158,7 +327,7 @@ export function useMediaWorkbench() {
         const dto = await mediaWorkbenchAPI.detail(id)
         if (seq !== validationSequence || disposed || detail.value?.id !== id || config.value?.draft.revision !== revision) return
         if (dto.media_workbench_v1?.draft.revision !== revision) {
-          conflict.value = true; message.value = '草稿已被其他页面修改，请重新读取。'; return
+          conflict.value = true; saveState.value = 'conflict'; message.value = '草稿已被其他页面修改，请核对服务器状态。'; return
         }
         apply(dto, false)
         if (['PENDING', 'VALIDATING', 'RUNNING'].includes(dto.media_workbench_v1.validation.status)) {
@@ -168,59 +337,283 @@ export function useMediaWorkbench() {
       } catch (e) { validationUnavailable.value = true; failure(e) }
     }, 1000)
   }
-  async function saveDraft(): Promise<boolean> {
-    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) return false
-    if (!products.value.length && !removedProducts.value.length) {
-      message.value = '请先选择图片或视频产品，再保存草稿。'
-      return false
+  function diagnostic(stage: string, submission: Submission, dto?: SupplierDetail, error?: unknown) {
+    // Deliberately omit request/response bodies, business values and credentials.
+    console.warn('[media-workbench-save]', { submission_id: submission.id, base_record_version: submission.base,
+      response_record_version: dto?.media_workbench_v1?.record_version, http_status: (error as { status?: number })?.status ?? 0, stage })
+  }
+  function receiptMatches(dto: SupplierDetail, submission: Submission): boolean {
+    const c = dto.media_workbench_v1, receipt = c?.draft.save_receipt
+    return dto.id === detail.value?.id && !!receipt && receipt.submission_id === submission.id && receipt.base_record_version === submission.base &&
+      receipt.draft_revision === c!.draft.revision && c!.record_version > submission.base &&
+      persistedFingerprint(submission.products, dto) === draftFingerprint(c!.draft.products)
+  }
+  function confirmSave(dto: SupplierDetail, submission: Submission, reconciled = false): boolean {
+    if (!receiptMatches(dto, submission) || disposed) return false
+    retryCheck.value = null
+    rejectedInput = ''
+    const unchanged = draftFingerprint(products.value) === draftFingerprint(submission.products)
+    const local = clone(products.value)
+    apply(dto, unchanged)
+    baseline.value = draftFingerprint(dto.media_workbench_v1!.draft.products)
+    if (!unchanged) {
+      applying = true; products.value = local; applying = false
+      // The confirmed write is the new CAS baseline. Keep subsequent edits.
+      saveState.value = 'unsaved'; saveFeedback.value = '上一版输入已确认保存，较新的修改正在等待同步。'
+      addedProductIds.value = addedProductIds.value.filter(id => !submission.products.some(p => p.product_id === id))
+      removedProducts.value = removedProducts.value.filter(p => !submission.removed.includes(p.product_id))
+    } else {
+      saveState.value = 'saved'
+      saveFeedback.value = `草稿已确认保存${reconciled ? '（已重新读取核对）' : ''} · ${dto.media_workbench_v1!.draft.revision}。${dto.media_workbench_v1!.validation.status === 'FAIL' ? '暂不能发布，请处理下方缺项。' : '发布前仍由后台检查选中的商品。'}`
     }
+    for (const p of submission.products) {
+      const key = submission.recoveryKeys.get(p.product_id)
+      if (key) clearRecovery(key, draftFingerprint([p]), submission.recoveryCopies.get(p.product_id) ?? null)
+      const adopted = adoptedRecoveries.get(p.product_id)
+      if (adopted) clearRecovery(adopted.key, draftFingerprint([p]), adopted.raw)
+    }
+    for (const id of submission.removed) {
+      const key = submission.recoveryKeys.get(id)
+      if (key) clearRecovery(key, undefined, submission.recoveryCopies.get(id))
+      const adopted = adoptedRecoveries.get(id)
+      if (adopted?.value.removed_product) clearRecovery(adopted.key, undefined, adopted.raw)
+    }
+    lastSubmission = undefined; if (recovery.value) delete recovery.value.pending_submission
+    serverSnapshot.value = null; conflict.value = unresolvedProductConflicts.value.length > 0; validationUnavailable.value = false; clearError()
+    if (!unchanged) { persistRecovery(); queuedSave = true }
+    else discoverRecovery()
+    const c = dto.media_workbench_v1!
+    if (['PENDING', 'VALIDATING', 'RUNNING'].includes(c.validation.status)) pollValidation(dto.id, c.draft.revision, validationSequence)
+    return true
+  }
+  async function saveDraft(): Promise<boolean> {
+    clearTimeout(autoSaveTimer)
+    if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) { if (pending.value === 'save' && dirty.value) queuedSave = true; return false }
+    if (!online.value) { persistRecovery(); saveState.value = 'unsaved'; saveFeedback.value = '当前离线，输入已保留在本地；联网后先核对服务器版本。'; return false }
+    if (!products.value.length && !removedProducts.value.length) {
+      message.value = '请先选择图片或视频产品，再保存草稿。'; return false
+    }
+    retryCheck.value = null
+    const submission: Submission = { id: crypto.randomUUID(), base: config.value?.record_version ?? 0,
+      products: clone(draftInput(products.value).products), removed: removedProducts.value.map(p => p.product_id), recoveryKeys: new Map(), recoveryCopies: new Map() }
+    for (const p of submission.products) {
+      const original = config.value?.draft.products.find(item => item.product_id === p.product_id)
+      if (original && draftFingerprint([original]) === draftFingerprint([p])) continue
+      const owned = ownedRecoveries.get(p.product_id); if (owned) submission.recoveryKeys.set(p.product_id, owned.key)
+    }
+    lastSubmission = submission; queuedSave = false; persistRecovery()
+    for (const p of submission.products) { const owned = ownedRecoveries.get(p.product_id); if (owned && submission.recoveryKeys.has(p.product_id)) submission.recoveryKeys.set(p.product_id, owned.key) }
+    for (const id of submission.removed) { const owned = ownedRecoveries.get(id); if (owned?.value.removed_product) submission.recoveryKeys.set(id, owned.key) }
+    try { for (const [id, key] of submission.recoveryKeys) submission.recoveryCopies.set(id, localStorage.getItem(key)) } catch { /* The visible storage warning is set by persistRecovery. */ }
     pending.value = 'save'; saveState.value = 'saving'; saveFeedback.value = '正在保存草稿…'; clearError(); stopPolling(); validationUnavailable.value = false
     const accountId = detail.value.id
-    const submitted = JSON.stringify(draftInput(products.value).products)
-    const previousVersion = config.value?.record_version ?? 0
     let writeAcknowledged = false
+    let response: SupplierDetail | undefined
     try {
-      // A nil media configuration is initialized atomically by the first explicit
-      // SaveDraft. The server infers media_types from the submitted products.
-      const args = [detail.value.id, config.value?.record_version ?? 0, products.value] as const
-      const dto = removedProducts.value.length
-        ? await mediaWorkbenchAPI.saveDraft(...args, removedProducts.value.map(p => p.product_id))
-        : await mediaWorkbenchAPI.saveDraft(...args)
+      response = await mediaWorkbenchAPI.saveDraft(accountId, submission.base, submission.products, submission.removed, submission.id)
       writeAcknowledged = true
       if (disposed) return false
-      // Re-read the authoritative persisted draft; never turn a lost response into a retry.
       const confirmed = await mediaWorkbenchAPI.detail(accountId)
-      if (confirmed.media_workbench_v1?.draft.revision !== dto.media_workbench_v1?.draft.revision || JSON.stringify(draftInput(confirmed.media_workbench_v1?.draft.products ?? []).products) !== JSON.stringify(draftInput(dto.media_workbench_v1?.draft.products ?? []).products)) throw { status: 0, message: '保存回执与重新读取的版本不一致。' }
-      apply(confirmed, true); saveState.value = 'saved'
-      saveFeedback.value = `草稿已保存 · ${confirmed.media_workbench_v1?.draft.revision ?? ''}。${confirmed.media_workbench_v1?.validation.status === 'FAIL' ? '暂不能发布，请处理下方缺项。' : '发布前仍由后台检查选中的商品。'}`
-      const c = confirmed.media_workbench_v1
-      if (c && ['PENDING', 'VALIDATING', 'RUNNING'].includes(c.validation.status)) pollValidation(dto.id, c.draft.revision, validationSequence)
-      return true
+      serverSnapshot.value = confirmed
+      if (!receiptMatches(response, submission) || !receiptMatches(confirmed, submission) || response.media_workbench_v1!.draft.revision !== confirmed.media_workbench_v1!.draft.revision) {
+        diagnostic('receipt_mismatch', submission, confirmed)
+        const foreign = confirmed.media_workbench_v1?.draft.save_receipt
+        if (foreign && foreign.submission_id !== submission.id && (confirmed.media_workbench_v1?.record_version ?? 0) > submission.base) {
+          conflict.value = true; saveState.value = 'conflict'; message.value = '服务器已保存其他页面的版本，当前输入与恢复副本已保留。'
+        } else saveState.value = 'unconfirmed'
+        saveFeedback.value = '保存回执、服务器版本或提交内容不一致，尚未确认保存。请核对服务器状态。'
+        persistRecovery(); return false
+      }
+      return confirmSave(confirmed, submission)
     } catch (e) {
-      // Only a definite rejection of the write itself is safe to correct and
-      // resubmit. A readback failure after acknowledgement remains uncertain.
-      const rejected = !writeAcknowledged && [400, 422].includes((e as { status?: number }).status ?? 0)
-      saveState.value = rejected ? 'failed' : 'unconfirmed'; validationUnavailable.value = true; failure(e)
+      diagnostic(writeAcknowledged ? 'readback_failed' : 'write_failed', submission, response, e)
+      const status = (e as { status?: number }).status ?? 0
+      const rejected = !writeAcknowledged && status >= 400 && status < 500 && status !== 408 && status !== 409
+      failure(e); validationUnavailable.value = true
+      if (status === 409) {
+        saveState.value = 'conflict'; saveFeedback.value = '服务器版本冲突，输入与恢复副本已保留；请核对差异。'; persistRecovery(); return false
+      }
+      saveState.value = rejected ? 'failed' : 'unconfirmed'
       if (rejected) {
-        saveFeedback.value = '草稿未保存，输入已保留。请修正字段后重新保存。'
-        return false
+        rejectedInput = draftFingerprint(submission.products)
+        lastSubmission = undefined; persistRecovery(); saveFeedback.value = '草稿未保存，输入已保留。请修正字段后重新保存。'; return false
       }
       if (ambiguous(e)) {
-        saveFeedback.value = '保存结果未知，正在重新读取核对；不会重发保存请求。'
+        saveFeedback.value = '保存结果未知，正在读取核对；不会重发保存请求。'
         try {
           const confirmed = await mediaWorkbenchAPI.detail(accountId)
-          if ((confirmed.media_workbench_v1?.record_version ?? 0) > previousVersion && JSON.stringify(draftInput(confirmed.media_workbench_v1?.draft.products ?? []).products) === submitted) {
-            apply(confirmed, true); saveState.value = 'saved'; validationUnavailable.value = false; clearError()
-            saveFeedback.value = `草稿已保存（已重新读取核对）· ${confirmed.media_workbench_v1?.draft.revision ?? ''}`
-            return true
+          serverSnapshot.value = confirmed
+          if ((!response || receiptMatches(response, submission)) && confirmSave(confirmed, submission, true)) return true
+          if (confirmed.media_workbench_v1?.draft.save_receipt && confirmed.media_workbench_v1.draft.save_receipt.submission_id !== submission.id && confirmed.media_workbench_v1.record_version > submission.base) {
+            conflict.value = true; saveState.value = 'conflict'
           }
-        } catch { /* Keep local input and require an explicit authoritative reload. */ }
+          diagnostic('reconcile_mismatch', submission, confirmed)
+        } catch (readError) { diagnostic('reconcile_failed', submission, undefined, readError) }
       }
-      saveFeedback.value = '草稿保存未确认，输入已保留。请重新读取核对实际结果后继续。'
-      return false
+      saveFeedback.value = '草稿保存未确认，当前与后续输入保留在本地；核对确认前暂停自动写入。'
+      persistRecovery(); return false
+    } finally {
+      pending.value = ''
+      if (queuedSave && dirty.value && !disposed && saveState.value !== 'unconfirmed' && !conflict.value) scheduleSave()
     }
-    finally { pending.value = '' }
   }
+  async function checkServer(): Promise<boolean> {
+    if (pending.value || loading.value || !detail.value) return false
+    retryCheck.value = null
+    const id = detail.value.id
+    pending.value = 'check'; stopPolling()
+    try {
+      const dto = await mediaWorkbenchAPI.detail(id)
+      if (disposed || detail.value?.id !== id) return false
+      serverSnapshot.value = dto
+      if (lastSubmission && confirmSave(dto, lastSubmission, true)) return true
+      const c = dto.media_workbench_v1, current = config.value
+      if ((c?.record_version ?? 0) !== (current?.record_version ?? 0) || (c?.draft.revision ?? '') !== (current?.draft.revision ?? '')) {
+        const unresolved = new Set(unresolvedProductConflicts.value)
+        for (const p of products.value) {
+          const base = current?.draft.products.find(item => item.product_id === p.product_id)
+          const server = c?.draft.products.find(item => item.product_id === p.product_id)
+          if (draftFingerprint([p]) !== draftFingerprint(base ? [base] : []) && draftFingerprint(server ? [server] : []) !== draftFingerprint(base ? [base] : [])) unresolved.add(p.product_id)
+        }
+        for (const p of removedProducts.value) {
+          const base = current?.draft.products.find(item => item.product_id === p.product_id)
+          const server = c?.draft.products.find(item => item.product_id === p.product_id)
+          if (draftFingerprint(server ? [server] : []) !== draftFingerprint(base ? [base] : []) || server && removalReason(server, dto)) unresolved.add(p.product_id)
+        }
+        unresolvedProductConflicts.value = [...unresolved]
+        conflict.value = true; saveState.value = 'conflict'
+        message.value = '服务器版本已变化，当前输入未被替换。请比较差异后选择恢复本地内容或明确放弃修改。'
+        return false
+      }
+      if (unresolvedProductConflicts.value.length) { conflict.value = true; saveState.value = 'conflict'; message.value = '仍有其他商品的版本冲突未处理，请逐商品核对；当前输入保持不变。'; return false }
+      if (saveState.value === 'unconfirmed') {
+        const uncertain = lastSubmission ? { submission_id: lastSubmission.id, base_record_version: lastSubmission.base } : recovery.value?.pending_submission
+        // An unchanged GET does not prove that an earlier request cannot arrive
+        // later. It only arms an explicit new CAS attempt, never an auto retry.
+        if (uncertain && dto.id === id && uncertain.base_record_version === (c?.record_version ?? 0) &&
+          draftFingerprint(c?.draft.products ?? []) === draftFingerprint(current?.draft.products ?? [])) {
+          retryCheck.value = { accountId: id, submissionId: uncertain.submission_id, base: uncertain.base_record_version, revision: c?.draft.revision ?? '' }
+          message.value = '服务器仍为发送前版本，尚未确认原请求。可主动重新核对并保存当前最新草稿；将使用新的提交 ID 和版本校验，迟到请求只允许一个版本写入。'
+        } else message.value = '服务器尚无匹配本次提交的保存回执，结果仍待核对；当前输入保留，暂不重发。'
+        return false
+      }
+      apply(dto, false); message.value = '服务器版本核对一致，当前输入保留。'
+      return true
+    } catch (e) { if (lastSubmission) diagnostic('check_failed', lastSubmission, undefined, e); failure(e); return false }
+    finally { pending.value = ''; if (queuedSave && dirty.value && saveState.value !== 'unconfirmed' && !conflict.value) scheduleSave() }
+  }
+  async function retryUnconfirmedSave(): Promise<boolean> {
+    if (!canRetryUnconfirmedSave.value) return false
+    // Re-read on the human action, even if the prior check was only moments ago.
+    // A late original save is either confirmed here or competes with the fresh
+    // submission under the same server-side CAS; it cannot overwrite its winner.
+    if (await checkServer()) return dirty.value ? saveDraft() : true
+    const checked = retryCheck.value
+    if (!canRetryUnconfirmedSave.value || !checked || checked.accountId !== detail.value?.id ||
+      checked.base !== (config.value?.record_version ?? 0) || checked.revision !== (config.value?.draft.revision ?? '')) return false
+    retryCheck.value = null
+    saveState.value = 'unsaved'
+    return saveDraft()
+  }
+  async function reloadFromServer(): Promise<boolean> {
+    if (!detail.value || pending.value || loading.value) return false
+    const abandoned = currentOwnedRecovery()
+    const id = detail.value.id
+    await selectSupplier(id, true)
+    if (detail.value?.id !== id || message.value) return false
+    if (abandoned) clearRecovery(abandoned.key, undefined, abandoned.raw)
+    clearRemovalRecoveries()
+    discoverRecovery(); return true
+  }
+  function discardRecovery() {
+    const entry = recoveryEntries.value.find(item => item.key === selectedRecoveryKey.value)
+    if (entry && recovery.value?.copy_id === entry.value.copy_id) clearRecovery(entry.key, undefined, entry.raw)
+    discoverRecovery()
+  }
+  async function restoreRecovery(acceptConflict = false): Promise<boolean> {
+    if (!recovery.value || !detail.value || pending.value || loading.value || (recoveryConflict.value && !acceptConflict)) return false
+    const value = clone(recovery.value)
+    const source = recoveryEntries.value.find(entry => entry.key === selectedRecoveryKey.value && entry.value.copy_id === value.copy_id)
+    const latest = serverSnapshot.value ?? detail.value
+    const remainingConflicts = new Set(unresolvedProductConflicts.value)
+    const serverProducts = latest.media_workbench_v1?.draft.products ?? []
+    const serverProduct = serverProducts.find(p => p.product_id === value.product.product_id)
+    if (!value.removed_product && removedProducts.value.some(p => p.product_id === value.product.product_id)) {
+      message.value = '此商品已有待移除操作，请先明确撤销移除，再恢复商品编辑。'; return false
+    }
+    if (value.removed_product) {
+      const matchesIdentity = value.identity.admin_id === adminId() && value.identity.account_id === detail.value.id && latest.id === detail.value.id &&
+        serverProduct?.site_model === value.identity.site_model && serverProduct.upstream_model === value.identity.upstream_model &&
+        value.product.site_model === value.identity.site_model && value.product.upstream_model === value.identity.upstream_model
+      if (!matchesIdentity || !serverProduct || removalReason(serverProduct, latest) || removalReason(value.product, latest)) {
+        message.value = '此待移除副本的商品身份或空白移除条件已变化，未恢复移除操作。请核对服务器状态。'; return false
+      }
+      try {
+        if (!source || localStorage.getItem(source.key) !== source.raw) { discoverRecovery(); message.value = '此恢复副本已被其他页面更新，请重新核对后选择。'; return false }
+      } catch { recoveryWarning.value = '浏览器恢复副本不可用，未恢复移除操作。'; return false }
+    }
+    const sameBase = value.base_record_version === (latest.media_workbench_v1?.record_version ?? 0) && value.base_draft_revision === (latest.media_workbench_v1?.draft.revision ?? '')
+    const newProduct = !serverProduct && (value.new_product === true || sameBase && /^media-[a-f0-9-]{36}$/i.test(value.product.product_id) && !latest.media_workbench_v1?.published?.products?.some(p => p.product_id === value.product.product_id))
+    if (!serverProduct && !newProduct) { message.value = '服务器已无此商品，无法自动恢复。副本保留，请先核对商品身份。'; return false }
+    if (recoveryConflict.value) {
+      const previousBase = clone(config.value?.draft.products ?? [])
+      const otherEdits = clone(products.value.filter(p => p.product_id !== value.product.product_id && draftFingerprint([p]) !== draftFingerprint(previousBase.filter(base => base.product_id === p.product_id))))
+      const removals = clone(removedProducts.value)
+      const added = [...addedProductIds.value]
+      apply(latest, true)
+      applying = true
+      for (const p of otherEdits) {
+        const server = products.value.find(item => item.product_id === p.product_id)
+        const base = previousBase.find(item => item.product_id === p.product_id)
+        if (draftFingerprint(server ? [server] : []) !== draftFingerprint(base ? [base] : [])) remainingConflicts.add(p.product_id)
+        const at = products.value.findIndex(item => item.product_id === p.product_id)
+        if (at >= 0) products.value[at] = p; else products.value.push(p)
+      }
+      for (const p of removals) {
+        const server = products.value.find(item => item.product_id === p.product_id)
+        const base = previousBase.find(item => item.product_id === p.product_id)
+        if (server && (draftFingerprint([server]) !== draftFingerprint(base ? [base] : []) || removalReason(server, latest))) { remainingConflicts.add(p.product_id); continue }
+        products.value = products.value.filter(item => item.product_id !== p.product_id)
+      }
+      addedProductIds.value = added; removedProducts.value = removals
+      applying = false
+    }
+    const pendingReceipt = value.pending_submission
+    const receipt = latest.media_workbench_v1?.draft.save_receipt
+    const knownPending = pendingReceipt && receipt?.submission_id === pendingReceipt.submission_id && receipt.base_record_version === pendingReceipt.base_record_version && receipt.draft_revision === latest.media_workbench_v1?.draft.revision && serverProduct && persistedFingerprint([pendingReceipt.product], latest) === draftFingerprint([serverProduct])
+    // Only this explicit product choice resolves its conflict. A second restore
+    // of the same product cannot erase another product's unresolved conflict.
+    remainingConflicts.delete(value.product.product_id)
+    unresolvedProductConflicts.value = [...remainingConflicts]
+    conflict.value = remainingConflicts.size > 0
+    saveState.value = conflict.value ? 'conflict' : pendingReceipt && !knownPending && !acceptConflict ? 'unconfirmed' : 'unsaved'
+    applying = true
+    const index = products.value.findIndex(p => p.product_id === value.product.product_id)
+    if (value.removed_product) {
+      products.value = products.value.filter(p => p.product_id !== value.product.product_id)
+      removedProducts.value = [...removedProducts.value.filter(p => p.product_id !== value.product.product_id), clone(value.product)]
+    } else if (index >= 0) products.value[index] = clone(value.product)
+    else products.value.push(clone(value.product))
+    if (newProduct && !addedProductIds.value.includes(value.product.product_id)) addedProductIds.value.push(value.product.product_id)
+    applying = false
+    selectedModel.value = value.product.upstream_model; selectedProduct.value = value.product.product_id
+    if (source) adoptedRecoveries.set(value.product.product_id, source)
+    if (knownPending || acceptConflict) { lastSubmission = undefined; delete value.pending_submission }
+    recovery.value = value; saveFeedback.value = saveState.value === 'unconfirmed' ? '已恢复本地输入；上次发送结果仍待核对，自动写入已暂停。' : '已恢复本地输入，等待自动保存。'
+    if (remainingConflicts.size) {
+      const names = [...remainingConflicts].map(id => products.value.find(p => p.product_id === id)?.display_name || id)
+      message.value = `其他商品也存在版本冲突：${names.join('、')}。其本地输入已保留，请切换商品逐一核对恢复副本；确认前暂停自动写入。`
+      saveFeedback.value = '已恢复本地此商品；其他商品仍有冲突，自动写入已暂停。'
+    }
+    persistRecovery(); scheduleSave(); return true
+  }
+  async function becameOnline() {
+    online.value = true
+    if (await checkServer()) { queuedSave = true; void flushAutoSave() }
+  }
+  function becameOffline() { online.value = false; retryCheck.value = null; clearTimeout(autoSaveTimer); persistRecovery(); if (dirty.value) saveFeedback.value = '当前离线，输入已保留在本地；联网后先核对服务器版本。' }
+  function storageChanged(event: StorageEvent) { if (event.key?.startsWith('ai-gateway:media-draft:v1:')) discoverRecovery() }
+  if (typeof window !== 'undefined') { window.addEventListener('online', becameOnline); window.addEventListener('offline', becameOffline); window.addEventListener('storage', storageChanged) }
   async function publish(productIds: string[]): Promise<boolean> {
     if (!canPublish.value || !detail.value || !config.value) return false
     if (!productIds.length || new Set(productIds).size !== productIds.length || productIds.some(id => !config.value!.draft.products.some(p => p.product_id === id))) {
@@ -323,17 +716,24 @@ export function useMediaWorkbench() {
       await mediaWorkbenchAPI.sync(id)
       const dto = await mediaWorkbenchAPI.detail(id)
       if (dto.media_workbench_v1?.draft.revision !== config.value?.draft.revision) {
-        conflict.value = true; message.value = '同步成功，但草稿版本已变化，请重新读取。'
+        conflict.value = true; saveState.value = 'conflict'; message.value = '同步成功，但草稿版本已变化，请核对服务器状态。'
       } else { apply(dto, false); validationUnavailable.value = true }
     } catch (e) {
       failure(e)
       if (![404, 410, 401, 403].includes(errorStatus.value)) message.value = '本次同步失败，仍使用上次成功目录。 ' + message.value
     } finally { pending.value = '' }
   }
-  function discard() { if (detail.value) apply(detail.value, true) }
-  onBeforeUnmount(() => { disposed = true; loadSequence++; stopPolling() })
+  function discard() {
+    if (!detail.value) return
+    const abandoned = currentOwnedRecovery()
+    if (abandoned) clearRecovery(abandoned.key, undefined, abandoned.raw)
+    clearRemovalRecoveries()
+    clearTimeout(autoSaveTimer); apply(detail.value, true); saveState.value = conflict.value ? 'conflict' : config.value?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''
+  }
+  onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
     errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    recovery, recoveryWarning, recoveryConflict, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
 }

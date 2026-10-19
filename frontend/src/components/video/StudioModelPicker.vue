@@ -2,13 +2,13 @@
   <div id="studio-offer" ref="root" tabindex="-1" data-testid="studio-offer-select" class="studio-offer-picker" aria-label="选择当前可用模型" @keydown="navigate">
     <p class="picker-heading">选择模型<span>近期记录</span></p>
     <ul class="picker-list">
-      <li v-for="offer in offers" :key="offer.offer_id" :class="{ selected: modelValue === offer.offer_id }">
-        <button type="button" class="picker-choice" :data-offer-id="offer.offer_id" :aria-pressed="modelValue === offer.offer_id" :disabled="disabled" @click="emit('select', offer.offer_id)">
-          <span class="picker-name">{{ offer.display_name || offer.upstream_model }}</span>
-          <small>{{ summary(offer) }}</small>
+      <li v-for="group in groups" :key="group.key" :class="{ selected: group.offers.some(item => item.offer_id === modelValue) }">
+        <button type="button" class="picker-choice" :data-offer-id="group.selected.offer_id" :aria-pressed="modelValue === group.selected.offer_id" :disabled="disabled" @click="emit('select', group.selected.offer_id)">
+          <span class="picker-name">{{ group.selected.display_name || group.selected.upstream_model }}</span>
+          <small>{{ summary(group.offers) }}</small>
         </button>
-        <button type="button" class="picker-status" :class="status(offer).tone" :aria-label="`${offer.display_name || offer.upstream_model}：${status(offer).label}，查看统计详情`" :aria-expanded="detailId === offer.offer_id" aria-controls="studio-model-observation" @mouseenter="detailId = offer.offer_id" @focus="detailId = offer.offer_id" @click="detailId = offer.offer_id">
-          <span class="status-mark" aria-hidden="true">{{ status(offer).tone === 'neutral' ? '—' : '·' }}</span>{{ status(offer).label }}
+        <button type="button" class="picker-status" :class="status(group.selected).tone" :aria-label="`${group.selected.display_name || group.selected.upstream_model}：${status(group.selected).label}，查看统计详情`" :aria-expanded="detailId === group.selected.offer_id" aria-controls="studio-model-observation" @mouseenter="detailId = group.selected.offer_id" @focus="detailId = group.selected.offer_id" @click="detailId = group.selected.offer_id">
+          <span class="status-mark" aria-hidden="true">{{ status(group.selected).tone === 'neutral' ? '—' : '·' }}</span>{{ status(group.selected).label }}
         </button>
       </li>
     </ul>
@@ -28,12 +28,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { StudioOffer } from '@/api/studioMedia'
+import { groupProductOffers } from './studioProductOffers'
 const props = defineProps<{ offers: StudioOffer[]; modelValue: string; disabled?: boolean }>()
 const emit = defineEmits<{ select: [id: string] }>()
 const root = ref<HTMLElement>(), detailId = ref(''), now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => { timer = setInterval(() => { now.value = Date.now() }, 30000) })
 onUnmounted(() => clearInterval(timer))
+const groups = computed(() => groupProductOffers(props.offers, props.modelValue))
 const detail = computed(() => props.offers.find(o => o.offer_id === detailId.value))
 const validTime = (value?: string) => !!value && Number.isFinite(Date.parse(value))
 const time = (value?: string) => validTime(value) ? new Date(value!).toLocaleString('zh-CN', { hour12: false }) : ''
@@ -47,9 +49,11 @@ function status(offer: StudioOffer) {
   const percentage = (s.error_rate * 100).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
   return { label: `错误 ${percentage}%`, message: `已记录请求错误率 ${percentage}%。沿用原生监控的错误分类与排除规则；不等同于作品交付失败率。`, tone: s.error_rate > 0 ? 'observed-errors' : 'observed' }
 }
-function summary(o: StudioOffer) {
-  const resolutions = o.spec.resolution || [], ratios = o.spec.aspect_ratio || []
-  return [resolutions.join(' / '), ratios.length ? `${ratios.length} 种比例` : ''].filter(Boolean).join(' · ') || '查看可售规格'
+function summary(offers: StudioOffer[]) {
+  const resolutions = [...new Set(offers.flatMap(offer => offer.spec.resolution || []))]
+  const durations = [...new Set(offers.flatMap(offer => offer.spec.duration_seconds || []))].sort((a,b) => a-b)
+  const ratios = new Set(offers.flatMap(offer => offer.spec.aspect_ratio || []))
+  return [resolutions.join(' / '), durations.length ? `${durations.join(' / ')} 秒` : '', ratios.size ? `${ratios.size} 种比例` : ''].filter(Boolean).join(' · ') || '查看可售规格'
 }
 function navigate(event: KeyboardEvent) {
   if (!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return

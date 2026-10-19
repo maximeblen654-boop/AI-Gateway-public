@@ -118,7 +118,7 @@ function syncDirectory(dir) {
 }
 
 
-export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, maxStoreBytes = 512 * 1024 * 1024, now = Date.now, exclusiveWriter = false, ffmpegPath = 'ffmpeg', ffprobePath = 'ffprobe' } = {}) {
+export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, maxStoreBytes = 512 * 1024 * 1024, now = Date.now, exclusiveWriter = false, ffmpegPath = 'ffmpeg', ffprobePath = 'ffprobe', removeFile = fs.unlinkSync } = {}) {
   if (typeof rootDir !== 'string' || !path.isAbsolute(rootDir)) throw new TypeError('Private result root is required');
   rootDir = path.resolve(rootDir);
   if (typeof exclusiveWriter !== 'boolean') throw new TypeError('Invalid exclusive writer assertion');
@@ -286,17 +286,23 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
       return { file, stat, meta: existing || legacyMeta(file, stat), migrate: !existing };
     });
     for (const entry of entries) if (entry.migrate) persistMeta(entry.file, entry.meta);
-    let bytes = 0, deleted = 0, deletedBytes = 0;
+    let bytes = 0, deleted = 0, deletedBytes = 0, failed = 0, retried = 0;
     for (const { file, stat, meta } of entries) {
       if (now() >= meta.expiresAt) {
-        fs.unlinkSync(file); syncDirectory(path.dirname(file));
-        const metaFile = metaPath(file);
-        if (statIfExists(metaFile)) { fs.unlinkSync(metaFile); syncDirectory(path.dirname(metaFile)); }
-        deleted++; deletedBytes += stat.size;
+        if (meta.cleanup_failed_at) retried++;
+        try {
+          // Keep the original immutable deadline/hash as a small tombstone:
+          // deleting it would let a later Core recovery create a new window.
+          removeFile(file); deleted++; deletedBytes += stat.size;
+          syncDirectory(path.dirname(file));
+        } catch {
+          failed++; if(statIfExists(file))bytes += stat.size;
+          persistMeta(file, { ...meta, cleanup_attempts: (meta.cleanup_attempts || 0) + 1, cleanup_failed_at: new Date(now()).toISOString() });
+        }
       }
       else bytes += stat.size;
     }
-    return { bytes, deleted, deletedBytes };
+    return { bytes, deleted, deletedBytes, failed, retried };
   }
   function locked(fn) {
     directory(rootDir); fs.mkdirSync(lock, { mode: 0o700 });
@@ -314,7 +320,9 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     }
     return files;
   }
-  function hasTaskData(ownerId, taskId) { return taskFiles(ownerId, taskId).length > 0; }
+  function hasTaskData(ownerId, taskId) {
+    return taskFiles(ownerId, taskId).some(file => statIfExists(file) || now() < loadMeta(file).expiresAt);
+  }
   function hasResult(ownerId, taskId, index) {
     try {
       const file = locate(ownerId, taskId, index);
@@ -330,7 +338,9 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
       for (const file of files) {
         const stat = statIfExists(file), meta = metaPath(file), metaStat = statIfExists(meta);
         if (stat?.isFile()) { deletedBytes += stat.size; fs.unlinkSync(file); syncDirectory(path.dirname(file)); }
-        if (metaStat?.isFile()) { fs.unlinkSync(meta); syncDirectory(path.dirname(meta)); }
+        // A fixed expiry proof is not an ordinary display record. Preserve it
+        // after history cleanup so restored journals cannot renew the result.
+        if (metaStat?.isFile() && !loadMeta(file)) throw new Error('Invalid image retention metadata');
       }
       return { deleted: files.length, deletedBytes };
     });
@@ -341,7 +351,7 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     let expiresAt;
     if (options.expiresAt !== undefined) {
       expiresAt = typeof options.expiresAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(options.expiresAt) ? Date.parse(options.expiresAt) : NaN;
-      if (!Number.isFinite(expiresAt) || expiresAt > now() + 72 * 3600000) throw Object.assign(new Error('Invalid image retention deadline'), { code: 'image_result_retention_invalid' });
+      if (!Number.isFinite(expiresAt) || expiresAt > now() + (options.legacy === true ? 7 * 86400000 : 72 * 3600000)) throw Object.assign(new Error('Invalid image retention deadline'), { code: 'image_result_retention_invalid' });
       if (expiresAt <= now()) throw Object.assign(new Error('Image result expired'), { code: 'image_result_expired' });
     }
     if (typeof b64 !== 'string' || b64.length > 4 * Math.ceil(MAX_IMAGE_BYTES / 3) || b64.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(b64)) throw new TypeError('Invalid image base64');
@@ -363,15 +373,17 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
       } else {
         if (bytes + data.length > maxStoreBytes) throw new Error('Image result store capacity exceeded');
         if (!meta) {
+          const persistedAt = now();
           meta = { ...(format.output_format === 'png' ? { version: 1 } : { version: 2, ...format }),
-            expiresAt: expiresAt ?? now() + retentionMs, bytes: data.length, sha256: hash(data) };
+            persistedAt, expiresAt: expiresAt ?? persistedAt + retentionMs, bytes: data.length, sha256: hash(data) };
           // Persist the immutable promise before the image. Interrupted writes can
           // retry only identical content and cannot renew the download window.
           persistMeta(file, meta);
         }
         atomicWrite(file, data);
       }
-      return { url: `/studio/api/image/tasks/${taskId}/results/${index}`, ...format };
+      return { url: `/studio/api/image/tasks/${taskId}/results/${index}`, ...format,
+        expires_at: new Date(meta.expiresAt).toISOString(), ...(meta.persistedAt === undefined ? {} : { persisted_at: new Date(meta.persistedAt).toISOString() }) };
     });
   }
   async function saveResult(ownerId, taskId, index, item, options = {}) {
@@ -386,7 +398,8 @@ export function createImageResultStore({ rootDir, retentionMs = 72 * 3600000, ma
     const meta = loadMeta(file) || (stat ? legacyMeta(file, stat) : null);
     if (!meta) { const error = new Error('Image result missing'); error.code = 'ENOENT'; throw error; }
     return { ...(meta.version === 1 ? IMAGE_FORMATS.png : IMAGE_FORMATS[meta.output_format]),
-      bytes: meta.bytes, etag: `"${meta.sha256}"`, expires_at: new Date(meta.expiresAt).toISOString(), expired: now() >= meta.expiresAt, missing: !stat };
+      bytes: meta.bytes, etag: `"${meta.sha256}"`, expires_at: new Date(meta.expiresAt).toISOString(), expired: now() >= meta.expiresAt, missing: !stat,
+      ...(meta.persistedAt === undefined ? {} : { persisted_at: new Date(meta.persistedAt).toISOString() }) };
   }
   function read(ownerId, taskId, index) {
     const info = metadata(ownerId, taskId, index);

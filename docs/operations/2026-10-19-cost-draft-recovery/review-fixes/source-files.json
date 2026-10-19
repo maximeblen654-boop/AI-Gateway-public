@@ -1,0 +1,215 @@
+{
+  "status": "SOURCE_FIXES_UNCOMMITTED_NOT_DEPLOYED_P0_DEPLOYMENT_BLOCKED",
+  "base_commit": "33c819064ef95666f6b512ebaed1e2d7a09e34d6",
+  "prior_review_file_set_sha256": "cdf5a46398e6ccfb9cedd4986297243d2c41cc3ded58e3411ec890a49e95b81f",
+  "file_set_sha256": "cc2abdf495c93ef4d66a93b33e7e500a3cc09aa40504373e47217b28f25c67c7",
+  "hash_formula": "sha256(LF-joined sorted sha256 + two spaces + relative path; no trailing LF)",
+  "files": [
+    {
+      "path": "backend/internal/handler/admin/media_workbench_handler.go",
+      "bytes": 5334,
+      "sha256": "8b546ffa95d7c6f08aaed41fd5308f49e567bde51d5a6fd279730f5c6f027cb7"
+    },
+    {
+      "path": "backend/internal/handler/admin/media_workbench_handler_test.go",
+      "bytes": 17973,
+      "sha256": "488f0da6f280d3da3a0d81cb14c84c597fa2766f29b905e063cf05963b192c08"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/media.go",
+      "bytes": 25896,
+      "sha256": "4a732aabc97a290165395b8d3e3371a82c75ef3de2a045b3ed168bfb4eef3dcb"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/save_receipt_test.go",
+      "bytes": 9729,
+      "sha256": "4913b0e5e2afae8fe5ddc12c835e9d3b22489306f27f3ba886eef21dd9d9287c"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/validator_test.go",
+      "bytes": 25381,
+      "sha256": "f34567db717fd6de67b485625738d01f3292eaa72e49d1745662e1b791fd6bd6"
+    },
+    {
+      "path": "backend/internal/service/studio_video_catalog_scope_test.go",
+      "bytes": 4586,
+      "sha256": "540c35ae515be43e0c3b0e4b59e60832dbe2fe9c5ad3b04df2a02252b8bd2388"
+    },
+    {
+      "path": "backend/internal/service/studio_video_runtime.go",
+      "bytes": 30688,
+      "sha256": "de0996943afbb5055bd7cbd734a9106d9cd66185c1ae44a608b90e4d1da27d63"
+    },
+    {
+      "path": "frontend/src/api/admin/__tests__/mediaWorkbench.spec.ts",
+      "bytes": 7561,
+      "sha256": "124dd7bbf1a59e7f008f23866bc7d6f302c3bd38ff0e2bc7a101d1dfee16ed98"
+    },
+    {
+      "path": "frontend/src/api/admin/mediaWorkbench.ts",
+      "bytes": 10323,
+      "sha256": "75ea37d5af83ab818cedec17c444d06b87b5b09b387ab5affe47266940dca83a"
+    },
+    {
+      "path": "frontend/src/components/admin/media/MediaCostCalculator.vue",
+      "bytes": 18091,
+      "sha256": "f96ef7b74dd9579ea217129d38e4a622cf65a29ddc862ac7fb24ab72ef46a1a2"
+    },
+    {
+      "path": "frontend/src/components/admin/media/MediaProcurementEditor.vue",
+      "bytes": 21774,
+      "sha256": "8faf5a25e98e9a881bdbe5e731089f6684d58fcfb2cf1923b922ec6c4b694f25"
+    },
+    {
+      "path": "frontend/src/components/admin/media/MediaProductEditor.vue",
+      "bytes": 30407,
+      "sha256": "5e554b80526ee21c631ec960d0a83353b26f7f5fe8a544d59be9a5a6acc97df5"
+    },
+    {
+      "path": "frontend/src/components/admin/media/MediaValidationPanel.vue",
+      "bytes": 6213,
+      "sha256": "87b853df6d4c5b9864ff9ebb00f60a258a5120a81ea0ca7b0d8f540895f7f74c"
+    },
+    {
+      "path": "frontend/src/components/admin/media/__tests__/MediaUnifiedCalculator.spec.ts",
+      "bytes": 8319,
+      "sha256": "6aeed549cbd4cf105777d97a7866362755c2a568021cad3441cdaf4b1494a0ff"
+    },
+    {
+      "path": "frontend/src/components/admin/media/__tests__/costMemoryStorage.spec.ts",
+      "bytes": 8105,
+      "sha256": "a09dc06019c6efa4c83d22b1b26ca03b15013c8fb1a6bfb50e2650ecf4fe3253"
+    },
+    {
+      "path": "frontend/src/components/admin/media/__tests__/costSpecRows.spec.ts",
+      "bytes": 7732,
+      "sha256": "b7d0d1737abfdc1b6a3fbe48ea9130a471c4c0553e44fe0e409d99c2be648367"
+    },
+    {
+      "path": "frontend/src/components/admin/media/__tests__/procurementMatrix.spec.ts",
+      "bytes": 6349,
+      "sha256": "028d713fc551d50116e0eaaa2d115edac4611aaac3adeca4938bbbb441972dcd"
+    },
+    {
+      "path": "frontend/src/components/admin/media/costCalculator.ts",
+      "bytes": 4790,
+      "sha256": "1dd97467b5038768f0f319a7919e9296bb5745c7f811ae1f141d5e5537998109"
+    },
+    {
+      "path": "frontend/src/components/admin/media/costMemoryStorage.ts",
+      "bytes": 3763,
+      "sha256": "272715536d2fccfefd71a3cb6cb752682484a96221e3858381f16a12f407876c"
+    },
+    {
+      "path": "frontend/src/components/admin/media/costSpecRows.ts",
+      "bytes": 8415,
+      "sha256": "2cd193ad3100381be6ba475f67c4cfc75a1538d717377610442a69c2f31c92fd"
+    },
+    {
+      "path": "frontend/src/components/video/StudioMediaPanel.vue",
+      "bytes": 56667,
+      "sha256": "e019f554e39c659d745f7cf4a699d38e0ca60f6cf88d21c131664d9a728df389"
+    },
+    {
+      "path": "frontend/src/components/video/StudioModelPicker.vue",
+      "bytes": 8836,
+      "sha256": "3082abd32ee10cb7b8592f775c4fbf4165a2e9fcdf1ff11362729fc85d165ee8"
+    },
+    {
+      "path": "frontend/src/components/video/__tests__/StudioMediaPanel.spec.ts",
+      "bytes": 71635,
+      "sha256": "030ea6a20f605b195b1ed652417b24b6e77eb0eb81244c0ad59f746cdf12cfd6"
+    },
+    {
+      "path": "frontend/src/components/video/__tests__/studioProductOffers.spec.ts",
+      "bytes": 5896,
+      "sha256": "58444cd6aa821a53e4f422bedf95d3c9ab2ccdde4a7fa8e909ffbf2ff73010a6"
+    },
+    {
+      "path": "frontend/src/components/video/studioProductOffers.ts",
+      "bytes": 5336,
+      "sha256": "3a3a7be4d7ab6b808e02435bda6e1af2087e8a1a74bcd9b1671e4e5359aad0fc"
+    },
+    {
+      "path": "frontend/src/composables/__tests__/draftRecovery.spec.ts",
+      "bytes": 6558,
+      "sha256": "b998c96242f954ad558b4f4fcda804a0c662a59879176c98157cf866d5e18729"
+    },
+    {
+      "path": "frontend/src/composables/__tests__/useMediaWorkbench.spec.ts",
+      "bytes": 59021,
+      "sha256": "9d30f840476f7818d3526178e536f52d66f4b3a51f12a9694c8b22d5b4febb56"
+    },
+    {
+      "path": "frontend/src/composables/draftRecovery.ts",
+      "bytes": 12723,
+      "sha256": "c596788df900c3e0423e35064c6a059869f587417e74215a85d00dfb38afd31d"
+    },
+    {
+      "path": "frontend/src/composables/useMediaWorkbench.ts",
+      "bytes": 50751,
+      "sha256": "e8178c4d0ae025b3997d07101ebae50df3ef1b2175b4d9f3cf4215905b991492"
+    },
+    {
+      "path": "frontend/src/views/admin/MediaWorkbenchView.vue",
+      "bytes": 67374,
+      "sha256": "a3396043e57e158da51724c450d4ce369fd8e6aebda63587faaca361675b6fd2"
+    },
+    {
+      "path": "frontend/src/views/admin/__tests__/MediaWorkbenchView.spec.ts",
+      "bytes": 51396,
+      "sha256": "4a3a761d6b02cce9e630fb3a828146beace5c3cbfdbbbacb6b4e7f925e960189"
+    },
+    {
+      "path": "frontend/tests/studio-workspace/main.ts",
+      "bytes": 11928,
+      "sha256": "74edb5528e21ba4a281772df72b4edb3d4b5713aec63ae93779e800744dbb4bd"
+    },
+    {
+      "path": "frontend/tests/studio-workspace/product-offers.spec.ts",
+      "bytes": 5261,
+      "sha256": "c3865bd7fa1e9674c8005d9561ccb10a18650181f507b4ef24631db1fd8bc4e7"
+    },
+    {
+      "path": "frontend/tests/workbench-procurement/draft-recovery.spec.ts",
+      "bytes": 14793,
+      "sha256": "3c98aa82acf0f60e11b7a476b9490974c95165519dc3c93c08d3351cd91d3a5b"
+    },
+    {
+      "path": "frontend/tests/workbench-procurement/main.ts",
+      "bytes": 13125,
+      "sha256": "10a0e5025e2aeff61d688ddb368e740bb2af643d806157f1deed0763ee640dab"
+    },
+    {
+      "path": "frontend/tests/workbench-procurement/unified-calculator.spec.ts",
+      "bytes": 2923,
+      "sha256": "15d7e30fe0b1c73215f481fce41c49bec32d38a8373aed9db1b494cdcf5ee4c7"
+    },
+    {
+      "path": "frontend/tests/workbench-procurement/workbench-procurement.spec.ts",
+      "bytes": 15155,
+      "sha256": "5b7be882dcc137083f79ce6b7307e3e950bf640059be77f5eb748ce5b5ee6c24"
+    },
+    {
+      "path": "studio/bff/video-account.test.mjs",
+      "bytes": 18562,
+      "sha256": "cc018cc3efae245b415091c6845f48a2808a7957afd2f52696df2ba59b0dcdb0"
+    }
+  ],
+  "changed_since_first_review": [
+    "backend/internal/mediaworkbench/save_receipt_test.go",
+    "frontend/src/components/admin/media/MediaProductEditor.vue",
+    "frontend/src/components/video/StudioMediaPanel.vue",
+    "frontend/src/components/video/__tests__/StudioMediaPanel.spec.ts",
+    "frontend/src/components/video/__tests__/studioProductOffers.spec.ts",
+    "frontend/src/components/video/studioProductOffers.ts",
+    "frontend/src/composables/__tests__/useMediaWorkbench.spec.ts",
+    "frontend/src/composables/useMediaWorkbench.ts",
+    "frontend/src/views/admin/MediaWorkbenchView.vue",
+    "frontend/src/views/admin/__tests__/MediaWorkbenchView.spec.ts",
+    "frontend/tests/studio-workspace/main.ts",
+    "frontend/tests/studio-workspace/product-offers.spec.ts",
+    "frontend/tests/workbench-procurement/draft-recovery.spec.ts",
+    "frontend/tests/workbench-procurement/main.ts"
+  ]
+}

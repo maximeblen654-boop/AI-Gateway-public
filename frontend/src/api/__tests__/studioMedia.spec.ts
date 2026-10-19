@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const client=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}))
 vi.mock('../client',()=>({apiClient:client,buildGatewayUrl:(v:string)=>v}))
-import { ensureStudioSession, studioRequest, studioTaskView, studioResultUrl, studioErrorMessage, StudioError } from '../studioMedia'
+import { ensureStudioSession, studioRequest, studioTaskView, studioResultUrl, studioResultExpired, studioErrorMessage, StudioError } from '../studioMedia'
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear()})
 afterEach(()=>vi.unstubAllGlobals())
+it('an authoritative media expiry is not described as a connection or generation failure',()=>{
+ for(const code of ['image_result_expired','video_result_expired'])expect(studioErrorMessage(new StudioError(code,410))).toBe('原片已到期，无法继续预览或下载；原任务与结算记录保留，不会重新生成。')
+})
 it('switching website accounts replaces an earlier Studio session through a real ticket exchange',async()=>{
  client.get.mockResolvedValue({data:{id:2}});client.post.mockResolvedValue({data:{ticket:'synthetic-ticket'}})
  const fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:1}))).mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2})));vi.stubGlobal('fetch',fetch)
@@ -12,6 +15,32 @@ it('switching website accounts replaces an earlier Studio session through a real
 it('result URLs come from validated task identity, never a supplier URL in the response',()=>{
  const v={contract:'published_image_binding_v1',task_id:'img_'+'a'.repeat(32),status:'completed',spec:{count:1},sale_price:{amount:'1.25',currency:'CNY',billing_mode:'per_request'},results:[{url:'https://untrusted.invalid'}]}
  const task=studioTaskView('image',v);expect(studioResultUrl(task)).toBe(`/studio-v2/api/image/tasks/${v.task_id}/results/0`);expect(()=>studioTaskView('image',{...v,task_id:'https://untrusted.invalid'})).toThrow();expect(()=>studioTaskView('image',{...v,sale_price:{amount:'NaN'}})).toThrow()
+})
+const retentionTask = (kind: 'image' | 'video') => ({contract:kind === 'image'?'published_image_binding_v1':'account_video_v1',[kind === 'image'?'task_id':'operation_id']:(kind === 'image'?'img_':'op_')+'a'.repeat(kind === 'image'?32:64),status:'completed',spec:{count:1},sale_price:{amount:'1.25',currency:'CNY',billing_mode:'per_request'},results:[{}],expires_at:'2000-01-01T00:00:00Z',billing_state:'billed'})
+it.each([
+ ['image','image_original_72h'],['image','image_legacy_7d'],['video','video_original_48h'],['video','legacy_unknown']
+] as const)('preserves explicit %s original retention policy %s independently from quote expiry',(kind,policy)=>{
+ const result_retention={persisted_at:'2026-10-19T00:00:00Z',expires_at:policy==='legacy_unknown'?null:'2099-01-01T00:00:00Z',expired:false,policy}
+ const task=studioTaskView(kind,{...retentionTask(kind),result_retention})
+ expect(task.resultRetention).toEqual({persistedAt:result_retention.persisted_at,expiresAt:result_retention.expires_at,expired:false,policy})
+ expect(task.expiresAt).toBe('2000-01-01T00:00:00Z');expect(studioResultExpired(task)).toBe(false);expect(studioResultUrl(task)).toContain('/studio-v2/api/')
+})
+it.each(['image','video'] as const)('missing %s retention leaves the original deadline unknown without deriving it from creation or quote',kind=>{
+ const task=studioTaskView(kind,{...retentionTask(kind),created_at:'2000-01-01T00:00:00Z'})
+ expect(task.resultRetention).toBeUndefined();expect(studioResultExpired(task)).toBe(false);expect(studioResultUrl(task)).toContain('/studio-v2/api/')
+})
+it('blocks at the exact original deadline and respects the server expired flag without changing task or billing status',()=>{
+ const expires_at='2026-10-22T00:00:00Z',deadline=Date.parse(expires_at)
+ const task=studioTaskView('image',{...retentionTask('image'),result_retention:{persisted_at:'2026-10-19T00:00:00Z',expires_at,expired:false,policy:'image_original_72h'}})
+ expect(studioResultExpired(task,deadline-1)).toBe(false);expect(studioResultUrl(task,0,deadline-1)).toContain('/results/0')
+ expect(studioResultExpired(task,deadline)).toBe(true);expect(()=>studioResultUrl(task,0,deadline)).toThrow('result_expired')
+ const serverExpired={...task,resultRetention:{...task.resultRetention!,expiresAt:'2099-01-01T00:00:00Z',expired:true}}
+ expect(()=>studioResultUrl(serverExpired)).toThrow('result_expired');expect(serverExpired).toMatchObject({status:'completed',resultCount:1,billingState:'billed'})
+})
+it('accepts an explicitly unknown legacy deadline and rejects malformed retention data',()=>{
+ const result_retention={persisted_at:null,expires_at:null,expired:false,policy:'legacy_unknown'}
+ expect(studioTaskView('video',{...retentionTask('video'),result_retention}).resultRetention?.expiresAt).toBeNull()
+ for(const changed of [{expires_at:'not-a-date'},{persisted_at:123},{expired:'false'},{policy:'guess_from_quote'}])expect(()=>studioTaskView('video',{...retentionTask('video'),result_retention:{...result_retention,...changed}})).toThrow('studio_contract')
 })
 it('upstream error details are not displayed',()=>{
  expect(studioErrorMessage(new StudioError('synthetic-secret-response',503))).not.toContain('synthetic-secret-response');expect(studioErrorMessage(new StudioError('image_quote_expired',409))).toContain('报价已失效')

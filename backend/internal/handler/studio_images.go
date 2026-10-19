@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -193,6 +192,14 @@ func markStudioImageTerminalOpsFailure(c *gin.Context, r *service.StudioImageRec
 
 func studioReceiptResponse(c *gin.Context, r *service.StudioImageReceipt) {
 	response := gin.H{"contract": mediaworkbench.ImageBindingVersion, "task_id": r.TaskID, "status": r.Status, "billing_state": r.BillingState, "receipt_version": r.Version, "result_available": r.ResultHash != "", "execution": r.Execution}
+	retention := r.ResultRetention
+	if retention == nil {
+		retention = &service.StudioResultRetention{Policy: service.StudioLegacyRetentionPolicy}
+	}
+	response["result_retention"] = retention
+	if retention.Expired {
+		response["result_available"] = false
+	}
 	// v2 receipts predate per-unit accounting.  Do not serialize zero-valued
 	// v3 counters for them: an old completed receipt must retain its frozen
 	// total semantics at the BFF boundary.
@@ -216,7 +223,7 @@ func (h *OpenAIGatewayHandler) StudioImageReceipt(c *gin.Context) {
 		return
 	}
 	r, err := h.studioImage.Recover(c.Request.Context(), c.Param("task_id"), owner)
-	if r != nil && errors.Is(err, service.ErrStudioImageUnknown) {
+	if r != nil && (errors.Is(err, service.ErrStudioImageUnknown) || errors.Is(err, service.ErrStudioResultExpired) || (r.ResultRetention != nil && r.ResultRetention.Expired)) {
 		studioReceiptResponse(c, r)
 		return
 	}
@@ -238,10 +245,20 @@ func (h *OpenAIGatewayHandler) StudioImageResult(c *gin.Context) {
 	}
 	b, err := h.studioImage.Store.Result(r)
 	if err != nil {
+		if errors.Is(err, service.ErrStudioResultExpired) {
+			c.JSON(http.StatusGone, gin.H{"error": "result_expired", "result_retention": r.ResultRetention})
+			return
+		}
 		studioError(c, err)
 		return
 	}
-	c.Data(http.StatusOK, "application/json", bytes.Clone(b))
+	var response map[string]json.RawMessage
+	if json.Unmarshal(b, &response) != nil {
+		studioError(c, service.ErrStudioImageUnknown)
+		return
+	}
+	response["result_retention"], _ = json.Marshal(r.ResultRetention)
+	c.JSON(http.StatusOK, response)
 }
 func (h *OpenAIGatewayHandler) StudioImageReadiness(c *gin.Context) {
 	if _, _, ok := h.studioOwner(c, false); !ok {

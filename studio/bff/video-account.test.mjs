@@ -12,6 +12,15 @@ import {createOperationJournal} from './operation-journal.js';
 
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const session={ownerId:1,sessionProof:'fixture'};
+
+test('catalog forwards product scope and independent Offer specifications without coalescing identities',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'video-catalog-scope-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const offers=[5,10,15].map(duration=>({offer_id:`offer-${duration}`,product_scope:'a'.repeat(64),model:'synthetic-video',spec:{duration_seconds:[duration]},price:{amount:String(duration),currency:'CNY',billing_mode:'per_request'}}));
+ let reads=0;
+ const runtime=createAccountVideoRuntime({rootDir:root,call:async(s,method,operation)=>{assert.equal(s.ownerId,1);assert.equal(method,'GET');assert.equal(operation,'catalog');reads++;return {payload:{offers}}},resultStore:{}});
+ assert.deepEqual(await runtime.catalog(session),{offers});assert.equal(reads,1);
+ await assert.rejects(runtime.catalog({ownerId:0}));assert.equal(reads,1);
+});
 test('browser can read an unsubmitted video quote after restart without asking Core for a nonexistent task',async t=>{
  const f=fixture(t),r=f.make();const op=await r.prepare(session,{clientKey:'browser-quote',offerId:'offer1',request:request()});
  const restored=await f.make().recover(session,op.operation_id);

@@ -18,17 +18,17 @@
         <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="displayHistory.length">{{ displayHistory.length }}</span></h2>
         <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="failedHistoryCount" class="studio-failed-toggle" :aria-pressed="showFailed" data-testid="studio-failed-toggle" @click="showFailed = !showFailed">{{ showFailed ? '隐藏失败任务' : '显示失败任务' }}（{{ failedHistoryCount }}）</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="openHistory">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter"><span>历史类型</span><select :disabled="busy || historyLoading" v-model="historyFilter" data-testid="studio-kind" @change="loadHistory"><option value="all">全部（图片 + 视频）</option><option value="image">仅图片</option><option value="video">仅视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
       </div>
-      <p v-if="historyMode ? historyFilter !== 'video' : kind === 'image'" class="studio-retention-note">图片及普通历史通常保留72小时，请及时下载；未决任务与既有保留承诺按实际状态处理。</p>
+      <p class="studio-retention-note">新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
           <span class="studio-work-preview">
-            <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-backdrop" :src="studioResultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
-            <img v-if="task.kind === 'image' && hasResults(task)" class="studio-work-preview-image" :src="studioResultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
-            <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
+            <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-backdrop" :src="resultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
+            <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-image" :src="resultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
+            <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ resultExpired(task) ? '原片已到期' : hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
           </span>
           <span class="studio-work-title"><strong>{{ taskModel(task) }}</strong><time>{{ taskDate(task) }}</time></span>
           <span class="studio-work-meta">{{ specText(task) }}</span>
-          <span class="studio-work-state">{{ statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template></span>
+          <span class="studio-work-state">{{ statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></span>
         </button>
       </div>
       <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
@@ -40,6 +40,7 @@
         <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</span></div>
         <div class="studio-price-line"><p data-testid="studio-price">冻结报价 <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
         <p v-if="active.status === 'prepared'" class="studio-quote-expiry">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
+        <p v-else class="studio-retention-note" data-testid="studio-result-retention" role="status">{{ retentionText(active) }}<template v-if="resultExpired(active)">任务与结算记录保留。</template></p>
         <p v-if="active.status === 'partial'" class="studio-partial" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
         <div v-if="waiting" class="studio-waiting" data-testid="studio-waiting" :class="{ 'is-uncertain': uncertain && !submitting[active.id] }">
           <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
@@ -52,11 +53,14 @@
         <div v-if="hasResults(active)" class="studio-results" data-testid="studio-results">
           <figure v-for="i in active.resultCount" :key="`${active.id}-${i}`">
             <div class="studio-result-stage" :class="{ 'is-image': active.kind === 'image' }">
-              <span v-if="loadingResults[`${active.id}-${i}`]" class="studio-result-loading" role="status">正在加载已保存原片…</span>
-              <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="studioResultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
-              <video :key="`video-${resultRead}-${i}`" v-else :src="studioResultUrl(active,i-1)" controls preload="metadata" data-testid="studio-result-video" @loadedmetadata="unavailableResults[`${active.id}-${i}`] = false" @error="unavailableResults[`${active.id}-${i}`] = true" />
+              <span v-if="resultExpired(active)" class="studio-result-unavailable" role="status">原片已到期</span>
+              <template v-else>
+                <span v-if="loadingResults[`${active.id}-${i}`]" class="studio-result-loading" role="status">正在加载已保存原片…</span>
+                <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="resultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
+                <video :key="`video-${resultRead}-${i}`" v-else :src="resultUrl(active,i-1)" controls preload="metadata" data-testid="studio-result-video" @loadedmetadata="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
+              </template>
             </div>
-            <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="studioResultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download"><Icon name="download" /><span>下载原片</span></a></figcaption><StudioImageExport v-if="active.kind === 'image' && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="studioResultUrl(active,i-1)" :filename="`${active.id}-${i}`" />
+            <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="resultExpired(active)" role="status" class="studio-result-unavailable">原片已到期</span><span v-else-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="resultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download" @click="guardDownload($event,active)"><Icon name="download" /><span>下载原片</span></a></figcaption><StudioImageExport v-if="active.kind === 'image' && readableResults(active) && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="resultUrl(active,i-1)" :filename="`${active.id}-${i}`" @click.capture="guardDownload($event,active)" />
           </figure>
         </div>
         <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '继续创作' }}</button></div>
@@ -79,16 +83,16 @@
             <div class="studio-composer-bottom"><div class="studio-specs">
               <button v-if="showUploader" type="button" class="studio-attachment" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" :title="accept ? '添加素材，也可拖入或粘贴图片' : '当前模型不支持参考素材'" @click="fileInput?.click()"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 13 6.5-6.5a2.8 2.8 0 0 1 4 4L10 19a4.3 4.3 0 0 1-6-6l9-9a1.4 1.4 0 0 1 2 2L6 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
               <div v-if="ratioOptions.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in ratioOptions" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="choosePublishedRatio(r); closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
-              <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="offer.spec.resolution" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="resolution = String($event)" @update:open="openControl = $event ? 'resolution' : null" />
-              <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="offer.spec.quality" :disabled="busy" :open="openControl === 'quality'" @update:model-value="quality = String($event)" @update:open="openControl = $event ? 'quality' : null" />
+              <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="resolutionOptions" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="choosePublishedSpec('resolution', String($event))" @update:open="openControl = $event ? 'resolution' : null" />
+              <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="qualityOptions" :disabled="busy" :open="openControl === 'quality'" @update:model-value="choosePublishedSpec('quality', String($event))" @update:open="openControl = $event ? 'quality' : null" />
               <StudioSpecPicker v-if="kind === 'image' && outputFormats.length" id="studio-output-format" label="输出格式" :model-value="outputFormat" :options="['auto', ...outputFormats]" :option-labels="outputFormatLabels" :disabled="busy" :open="openControl === 'format'" @update:model-value="outputFormat = $event as StudioOutputFormat|'auto'" @update:open="openControl = $event ? 'format' : null" />
-              <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="count = Number($event)" @update:open="openControl = $event ? 'count' : null" />
-              <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="offer?.spec.duration_seconds || []" :disabled="busy" :open="openControl === 'duration'" @update:model-value="duration = Number($event)" @update:open="openControl = $event ? 'duration' : null" />
+              <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="choosePublishedSpec('count', Number($event))" @update:open="openControl = $event ? 'count' : null" />
+              <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="durationOptions" :disabled="busy" :open="openControl === 'duration'" @update:model-value="choosePublishedSpec('duration_seconds', Number($event))" @update:open="openControl = $event ? 'duration' : null" />
               <span class="studio-range">{{ kind === 'video' ? '每次 1 条视频' : countOptions.length ? `可选 ${countOptions[0]}–${countOptions[countOptions.length-1]} 张` : '' }}</span>
             </div><button v-if="!active" class="studio-button studio-primary studio-quote" :disabled="busy || catalogLoading || selectionUnavailable || !offer || incompatible || invalidCount || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '开始生成' }}<Icon name="arrowUp" /></button></div>
           </fieldset>
         </div>
-        <div class="studio-input-feedback"><p v-if="!visibleOffers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限{{ kind === 'image' && imageMode === 'edit' ? '，或不支持参考图' : '' }}。</p><p v-if="kind === 'image' && offer && invalidCount && !active" id="studio-count-error" role="alert" data-testid="studio-count-error">{{ countOptions.length ? `请选择商品允许的生成数量（${countOptions[0]}～${countOptions[countOptions.length-1]} 张）。` : '当前商品没有有效的数量范围，请选择其他商品或刷新目录。' }}</p><p v-if="offer && incompatible && !active" :role="kind === 'image' && imageMode === 'edit' && !assets.length ? undefined : 'alert'">{{ kind === 'image' && imageMode === 'edit' && !assets.length ? '点击回形针添加参考图，也可直接拖入或粘贴。' : '当前模型不支持这些素材类型或数量，请调整素材。' }}</p><p v-if="offer?.input_mode === 'references' && assets.length && !active">获取报价时会将引用素材上传到所选供应商，确认生成前不会创建生成任务。</p></div>
+        <div class="studio-input-feedback"><p v-if="!visibleOffers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限{{ kind === 'image' && imageMode === 'edit' ? '，或不支持参考图' : '' }}。</p><p v-if="kind === 'image' && offer && invalidCount && !active" id="studio-count-error" role="alert" data-testid="studio-count-error">{{ countOptions.length ? `请选择商品允许的生成数量（${countOptions[0]}～${countOptions[countOptions.length-1]} 张）。` : '当前商品没有有效的数量范围，请选择其他商品或刷新目录。' }}</p><p v-if="offer && incompatible && !active" :role="kind === 'image' && imageMode === 'edit' && !assets.length ? undefined : 'alert'">{{ kind === 'image' && imageMode === 'edit' && !assets.length ? '点击回形针添加参考图，也可直接拖入或粘贴。' : unmatchedSpec ? '当前规格组合不可售，请调整参数或参考素材。' : '当前模型不支持这些素材类型或数量，请调整素材。' }}</p><p v-if="offer?.input_mode === 'references' && assets.length && !active">获取报价时会将引用素材上传到所选供应商，确认生成前不会创建生成任务。</p></div>
         <p class="studio-composer-hint">确认本次价格后生成 · {{ kind === 'video' ? '视频每次生成一条' : '结果自动保存到任务历史' }}</p>
       </section>
     </div>
@@ -106,7 +110,7 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
+import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
@@ -114,6 +118,7 @@ import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
 import { ratioOfferOptions } from './studioRatioOptions'
 import StudioModelPicker from './StudioModelPicker.vue'
+import { productDimensionValues, productReferenceOffers, resolveProductOffer, supportsProductReferences, type OfferDimension } from './studioProductOffers'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import '@/styles/studio-workspace.css'
 const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref('')
@@ -136,10 +141,11 @@ function revealTask(){void nextTick(()=>taskDetail.value?.scrollIntoView?.({bloc
 const composerRoot=ref<HTMLElement|null>(null), promptInput=ref<HTMLTextAreaElement|null>(null), modelTrigger=ref<HTMLButtonElement|null>(null), ratioTrigger=ref<HTMLButtonElement|null>(null)
 const modeLabel=computed(()=>kind.value==='video' ? '视频创作' : imageMode.value==='edit' ? '图生图' : '文生图')
 const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || (imageMode.value==='edit' ? o.spec.references.image.max>0 && o.spec.references.total_max>0 : o.spec.references.image.min===0)))
+const referenceOffers=computed(()=>kind.value==='image'?offers.value.filter(o=>o.spec.references.image.max>0&&o.spec.references.total_max>0):visibleOffers.value)
 const offer=computed(()=>visibleOffers.value.find(o=>o.offer_id===offerId.value))
 const outputFormatLabels:Record<string,string>={auto:'由模型决定',png:'PNG',jpeg:'JPEG',webp:'WebP'}
 const outputFormats=computed(()=>kind.value==='image' ? (offer.value?.spec.output_formats||[]).filter(value=>['png','jpeg','webp'].includes(value)) : [])
-watch(outputFormats,formats=>{if(outputFormat.value!=='auto'&&!formats.includes(outputFormat.value)){outputFormat.value='auto';intent=undefined}},{flush:'sync'})
+watch(outputFormats,formats=>{if(offer.value&&outputFormat.value!=='auto'&&!formats.includes(outputFormat.value)){outputFormat.value='auto';intent=undefined}},{flush:'sync'})
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
 const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
@@ -148,6 +154,16 @@ const filteredHistory=computed(()=>showFailed.value ? historyScope.value : histo
 const displayHistory=computed(()=>historyMode.value?filteredHistory.value:filteredHistory.value.slice(0,3))
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
+const resultExpired=(task:StudioTask)=>studioResultExpired(task,clock.value)
+const readableResults=(task:StudioTask)=>hasResults(task) && !resultExpired(task)
+const resultUrl=(task:StudioTask,index=0)=>studioResultUrl(task,index,clock.value)
+function retentionText(task:StudioTask){
+ const retention=task.resultRetention, deadline=retention?.expiresAt
+ const promise=retention?.policy==='image_legacy_7d'?'（历史7天保留）':''
+ if(deadline)return `原片${resultExpired(task)?'已到期':'到期时间'}${promise}：${new Date(deadline).toLocaleString('zh-CN',{hour12:false})}。`
+ return resultExpired(task)?'原片已到期；服务端未提供具体到期时间。':'原片保留期限：服务端未提供具体到期时间。'
+}
+function guardDownload(event:MouseEvent,task:StudioTask){if(studioResultExpired(task)){event.preventDefault();event.stopImmediatePropagation();clock.value=Date.now()}}
 const needsRecovery=(task:StudioTask)=>['unknown','queued','processing','billing_pending','reserve_pending','recovery_blocked'].includes(task.status)
 const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
@@ -170,19 +186,36 @@ async function changeMode(mode:'text'|'edit'|'video'){
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
  remember();focusPrompt()
 }
-const countOptions=computed(()=>{
- const range=offer.value?.spec.count
- if(!range || !Number.isInteger(range.min) || !Number.isInteger(range.max) || range.min<1 || range.max>10 || range.min>range.max)return []
- return Array.from({length:range.max-range.min+1},(_,i)=>range.min+i)
-})
+const countOptions=computed(()=>specOptions('count').map(Number))
 const invalidCount=computed(()=>kind.value==='image' && !countOptions.value.includes(count.value))
-const accept=computed(()=>['image','video','audio'].filter(k=>offer.value?.spec.references[k as StudioAssetReceipt['kind']].max).map(k=>`${k}/*`).join(','))
+const accept=computed(()=>{const compatible=offer.value?productReferenceOffers(offer.value,referenceOffers.value,selectedSpec.value):[];return (['image','video','audio'] as const).filter(type=>compatible.some(o=>o.spec.references[type].max>0)).map(type=>`${type}/*`).join(',')})
 const assets=computed(()=>uploads.value.flatMap(item=>item.receipt ? [item.receipt] : []))
 const publishedRatioOffers=computed(()=>ratioOfferOptions(offer.value,visibleOffers.value,{resolution:resolution.value,quality:quality.value,count:count.value,images:assets.value.filter(item=>item.kind==='image').length,videos:assets.value.filter(item=>item.kind==='video').length,audio:assets.value.filter(item=>item.kind==='audio').length,...(outputFormat.value!=='auto'?{output_format:outputFormat.value}:{})}))
-const ratioOptions=computed(()=>kind.value==='image'?[...publishedRatioOffers.value.keys()]:offer.value?.spec.aspect_ratio||[])
-function choosePublishedRatio(value:string){if(busy.value||catalogLoading.value||active.value)return;if(kind.value==='video'){if(ratioOptions.value.includes(value)){ratio.value=value;intent=undefined}return;}const target=publishedRatioOffers.value.get(value);if(!target)return;offerId.value=target.offer_id;ratio.value=value;intent=undefined}
+const selectedSpec=computed(()=>({resolution:resolution.value,aspect_ratio:ratio.value,quality:quality.value,duration_seconds:kind.value==='video'?duration.value:0,count:kind.value==='image'?count.value:1,images:assets.value.filter(item=>item.kind==='image').length,videos:assets.value.filter(item=>item.kind==='video').length,audio:assets.value.filter(item=>item.kind==='audio').length,...(outputFormat.value!=='auto'?{output_format:outputFormat.value}:{})}))
+function specOptions(dimension:OfferDimension){return productDimensionValues(offer.value,visibleOffers.value,dimension)}
+const resolutionOptions=computed(()=>specOptions('resolution').map(String))
+const qualityOptions=computed(()=>specOptions('quality').map(String))
+const durationOptions=computed(()=>specOptions('duration_seconds').map(Number).sort((a,b)=>a-b))
+const ratioOptions=computed(()=>kind.value==='image'?[...publishedRatioOffers.value.keys()]:specOptions('aspect_ratio').map(String))
+function choosePublishedSpec(dimension:OfferDimension,value:string|number){
+ if(busy.value||catalogLoading.value||active.value)return
+ if(!specOptions(dimension).includes(value)){if(dimension==='count'){count.value=Number(value);intent=undefined}return}
+ if(dimension==='resolution')resolution.value=String(value)
+ else if(dimension==='quality')quality.value=String(value)
+ else if(dimension==='duration_seconds')duration.value=Number(value)
+ else if(dimension==='count')count.value=Number(value)
+ else ratio.value=String(value)
+ const target=offer.value&&resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)
+ if(target)offerId.value=target.offer_id
+ intent=undefined
+}
+function choosePublishedRatio(value:string){if(busy.value||catalogLoading.value||active.value)return;if(kind.value==='video'){choosePublishedSpec('aspect_ratio',value);return;}const target=publishedRatioOffers.value.get(value);if(!target)return;offerId.value=target.offer_id;ratio.value=value;intent=undefined}
+// Reference/count changes can select another price rule, but never change user specifications.
+function syncSelectedOffer(){if(!offer.value||active.value||busy.value||catalogLoading.value)return;const target=resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value);if(target&&target.offer_id!==offerId.value){offerId.value=target.offer_id;intent=undefined}}
+watch(selectedSpec,syncSelectedOffer)
 
-const incompatible=computed(()=>!offer.value || kind.value==='image' && (imageMode.value==='edit' ? !assets.value.some(a=>a.kind==='image') : assets.value.length>0) || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
+const unmatchedSpec=computed(()=>!!offer.value?.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value))
+const incompatible=computed(()=>!offer.value || unmatchedSpec.value || kind.value==='image' && (imageMode.value==='edit' ? !assets.value.some(a=>a.kind==='image') : assets.value.length>0) || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
 const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
 let generation=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
@@ -299,7 +332,6 @@ function assetError(error:unknown){
  return error instanceof StudioError && error.code==='asset_type_mismatch' ? '素材类型不受支持。' : studioErrorMessage(error)
 }
 function assetPreview(file:File){return file.type.startsWith('image/') && typeof URL.createObjectURL==='function' ? URL.createObjectURL(file) : undefined}
-function activeUploadCount(kind:StudioAssetReceipt['kind']){return uploads.value.filter(item=>item.kind===kind && item.status!=='failure').length}
 function revokePreview(item:StudioAssetUpload){if(item.previewUrl&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(item.previewUrl)}
 function removeAsset(item:StudioAssetUpload){if(active.value)return;item.controller?.abort();revokePreview(item);uploads.value=uploads.value.filter(candidate=>candidate.id!==item.id)}
 function clearAssets(){if(active.value)return;uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)});uploads.value=[];notice.value='';error.value='';intent=undefined}
@@ -307,8 +339,6 @@ function addUpload(file:File):StudioAssetUpload{
  const kind=assetKind(file), item:StudioAssetUpload={id:crypto.randomUUID(),file,kind:kind||'image',status:'failure',previewUrl:assetPreview(file)}
  if(!offer.value){item.error='请先选择模型。';uploads.value.push(item);return item}
  if(!kind){item.error='素材类型不受支持。';uploads.value.push(item);return item}
- const rule=offer.value.spec.references[kind]
- if(!rule.max || activeUploadCount(kind)>=rule.max || uploads.value.filter(candidate=>candidate.status!=='failure').length>=offer.value.spec.references.total_max){item.error='已达到该模型的素材数量上限。';uploads.value.push(item);return item}
  item.status='pending';uploads.value.push(item);return item
 }
 function currentUpload(item:StudioAssetUpload){return uploads.value.find(candidate=>candidate.id===item.id)}
@@ -317,20 +347,26 @@ async function uploadOne(item:StudioAssetUpload){const current=currentUpload(ite
  }catch(e){if(!mounted||currentUpload(item)!==current||controller.signal.aborted||e instanceof DOMException&&e.name==='AbortError')return;current.status='failure';current.error=assetError(e);error.value=current.error;notice.value=''}}
 async function enqueueFiles(files:File[]){
  if(!files.length||busy.value||active.value)return
- const refs=offer.value?.spec.references
+ const current=offer.value
+ if(!current){error.value='请先选择模型。';return}
  const existing=uploads.value.filter(item=>item.status!=='failure')
- if(refs && (existing.length+files.length>refs.total_max || (['image','video','audio'] as const).some(type=>existing.filter(item=>item.kind===type).length+files.filter(file=>assetKind(file)===type).length>refs[type].max))){error.value='已达到该模型的素材数量上限，请减少本次选择的素材。';return}
- if(kind.value==='image'&&refs?.image.max){imageMode.value='edit'}
+ const projectedCount=(type:StudioAssetReceipt['kind'])=>existing.filter(item=>item.kind===type).length+files.filter(file=>assetKind(file)===type).length
+ const selection={...selectedSpec.value,images:projectedCount('image'),videos:projectedCount('video'),audio:projectedCount('audio')}
+ const editing=kind.value==='image'&&files.some(file=>assetKind(file)==='image'),pool=editing?referenceOffers.value:visibleOffers.value
+ const compatible=productReferenceOffers(current,pool,selection).filter(candidate=>supportsProductReferences(candidate,[candidate],selection))
+ const target=resolveProductOffer(current,pool,selection)||compatible.find(candidate=>candidate.offer_id===current.offer_id)||(compatible.length===1?compatible[0]:undefined)
+ if(!target){error.value='已达到该模型的素材数量上限或当前规格不支持这些素材，请调整本次选择。';return}
  busy.value=true;error.value='';notice.value='素材上传中…'
+ if(editing){offerId.value=target.offer_id;imageMode.value='edit';intent=undefined}
  const pending=files.map(addUpload).filter(item=>item.status==='pending')
  let cursor=0
  try{await Promise.all(Array.from({length:Math.min(3,pending.length)},async()=>{while(cursor<pending.length && mounted){const item=pending[cursor++]!;await uploadOne(item)}}))}
- finally{if(mounted){busy.value=false;if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}
+ finally{if(mounted){busy.value=false;syncSelectedOffer();if(!uploads.value.some(item=>item.status==='pending'))notice.value=uploads.value.some(item=>item.status==='success')?'素材已私有保存，顺序如上。':'';}}
 }
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
-async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value||incompatible.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
+async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value)return;syncSelectedOffer();if(offer.value.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)||incompatible.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
  const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={...(kind.value==='image'&&outputFormat.value!=='auto'&&outputFormats.value.includes(outputFormat.value)?{output_format:outputFormat.value}:{}),resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
  if(kind.value==='video'){

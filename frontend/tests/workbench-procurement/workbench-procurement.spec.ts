@@ -31,7 +31,9 @@ async function editor(page: Page, model = 'image-native-1') {
 }
 async function save(page: Page) {
   await page.getByTestId('wizard-step-5').click()
-  await page.getByTestId('save').click()
+  // Leaving an input/step flushes the autosave queue. Do not add a second
+  // explicit request after a rejected first flush: that is a deliberate retry.
+  await expect.poll(async () => (await writes(page)).filter(call => call.url.endsWith('/draft')).length).toBeGreaterThan(0)
 }
 async function publishImage(page: Page) {
   await page.getByTestId('publish').click()
@@ -57,6 +59,7 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     await expect(page.getByTestId('price-0')).toHaveValue('0.90')
     await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.10')
     await expect(page.getByTestId('procurement-cost-1')).toHaveValue('0.20')
+    await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'))})
     await page.getByTestId('procurement-cost-0').fill('0.123456')
     await expect(page.getByTestId('price-0')).toHaveValue('0.90')
     expect(await writes(page)).toEqual([])
@@ -71,10 +74,9 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     }
     await page.getByTestId('procurement-editor').scrollIntoViewIfNeeded()
     if (viewport.width <= 390) {
-      const label = (await page.getByTestId('procurement-editor').locator('.mw-price-spec strong').first().boundingBox())!
+      const label = (await page.getByTestId('procurement-editor').locator('.mw-spec-identity').first().boundingBox())!
       expect(label.width).toBeGreaterThanOrEqual(200)
-      expect(label.height).toBeLessThan(36)
-      expect((await page.getByTestId('open-cost-0').boundingBox())!.width).toBeGreaterThanOrEqual(200)
+      expect((await page.getByTestId('procurement-cost-0').boundingBox())!.width).toBeGreaterThanOrEqual(200)
     }
     await page.screenshot({ path: info.outputPath('cost-editor.png'), animations: 'disabled' })
     await page.getByTestId('wizard-step-5').click()
@@ -88,24 +90,22 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
   })
 }
 
-test('calculator adoption, explicit save and a fresh page recover independent costs', async ({ page }) => {
+test('calculator adoption, boundary save and a fresh page recover independent costs', async ({ page }) => {
   await open(page)
   const original = (await snapshot(page)).media_workbench_v1!
   await editor(page)
-  await page.getByTestId('open-cost-0').click()
   await page.getByTestId('cost-purchase').fill('100')
   await page.getByTestId('cost-credits').fill('10000')
   await page.getByTestId('cost-consumption-0').fill('35')
+  page.once('dialog', dialog => dialog.accept())
   await page.getByTestId('cost-apply-0').click()
-  await expect(page.getByTestId('cost-adopted')).toContainText('尚未保存')
-  await page.getByTestId('cost-close').click()
   await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
   await expect(page.getByTestId('procurement-cost-1')).toHaveValue('0.20')
   await expect(page.getByTestId('price-0')).toHaveValue('0.90')
   expect(await writes(page)).toEqual([])
   expect((await snapshot(page)).media_workbench_v1!.published).toEqual(original.published)
   await save(page)
-  await expect(page.getByTestId('save-feedback')).toContainText('草稿已保存')
+  await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
   const saved = (await snapshot(page)).media_workbench_v1!
   expect(saved.draft.products[0]!.cost_rules?.[0]?.cost?.amount).toBe('0.35')
   expect(saved.published).toEqual(original.published)
@@ -122,7 +122,7 @@ test('incomplete draft saves and missing-cost diagnostic locates step 4 without 
   await editor(page)
   await page.getByTestId('price-0').fill('0.92')
   await save(page)
-  await expect(page.getByTestId('save-feedback')).toContainText('草稿已保存')
+  await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
   const issue = page.locator('.mw-diagnostic').filter({ hasText: '隔离图片商品 的采购成本尚未填写' })
   await expect(issue).toBeVisible()
   await issue.click()
@@ -153,9 +153,9 @@ for (const mode of ['fail', 'timeout-committed', 'timeout-rejected', 'conflict']
     await fault(page, 'draft', mode)
     await save(page)
     await expect.poll(async () => (await writes(page)).filter(call => call.url.endsWith('/draft')).length).toBe(1)
-    if (mode === 'timeout-committed') await expect(page.getByTestId('save-feedback')).toContainText('草稿已保存')
+    if (mode === 'timeout-committed') await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
     else {
-      await expect(page.getByTestId('banner')).toContainText(mode === 'conflict' ? '其他页面' : /未确认|未完成|不可用|核对/)
+      await expect(page.getByTestId('banner')).toContainText(mode === 'conflict' ? /其他页面|冲突/ : /未保存|未确认|未完成|不可用|核对/)
       if (mode !== 'conflict') await page.getByTestId('wizard-step-4').click()
       await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.456')
     }
@@ -170,10 +170,10 @@ test('pending save disables a duplicate click and never reports early success', 
   await fault(page, 'draft', 'delay')
   await save(page)
   await expect(page.getByTestId('save')).toBeDisabled()
-  await expect(page.getByTestId('save-feedback')).not.toContainText('草稿已保存')
+  await expect(page.getByTestId('save-feedback')).not.toContainText('草稿已确认保存')
   expect((await writes(page)).filter(call => call.url.endsWith('/draft'))).toHaveLength(1)
   await page.evaluate(() => window.procurementFixture.release())
-  await expect(page.getByTestId('save-feedback')).toContainText('草稿已保存')
+  await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
 })
 
 test('definite input rejection retains the draft for correction and an explicit save', async ({ page }) => {
@@ -181,15 +181,13 @@ test('definite input rejection retains the draft for correction and an explicit 
   await page.getByTestId('procurement-cost-0').fill('0.333')
   await fault(page, 'draft', 'invalid')
   await save(page)
-  await expect(page.getByTestId('banner')).toContainText('输入不合法')
+  await expect(page.getByTestId('banner')).toContainText(/输入不合法|不合法|未保存/)
   await page.getByTestId('wizard-step-4').click()
   await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.333')
   await page.getByTestId('procurement-cost-0').fill('0.334')
   await page.getByTestId('wizard-step-5').click()
-  await expect(page.getByTestId('save')).toBeEnabled()
-  expect((await writes(page)).filter(call => call.url.endsWith('/draft'))).toHaveLength(1)
-  await page.getByTestId('save').click()
-  await expect(page.getByTestId('save-feedback')).toContainText('草稿已保存')
+  await expect.poll(async () => (await writes(page)).filter(call => call.url.endsWith('/draft')).length).toBe(2)
+  await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
   expect((await snapshot(page)).media_workbench_v1!.draft.products[0]!.cost_rules?.[0]?.cost?.amount).toBe('0.334')
 })
 

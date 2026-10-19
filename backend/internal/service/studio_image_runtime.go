@@ -262,7 +262,8 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	if err = r.Store.Save(persisted); err != nil {
 		return persisted, err
 	}
-	if err = r.Store.write(r.Store.path("upstream", taskID), data, false); err != nil {
+	_, count, validationErr := studioExecutionResult(data, q.Binding.Spec.Count)
+	if err = r.Store.persistCopy(taskID, "upstream", taskID, data, validationErr == nil && count > 0, nil); err != nil {
 		return persisted, err
 	}
 	data, err = r.materializeResult(ctx, q, taskID, data)
@@ -280,8 +281,21 @@ func (r *StudioImageRuntime) Recover(ctx context.Context, taskID string, owner S
 	if err != nil {
 		return nil, err
 	}
+	retention, err := r.Store.ResultRetention(receipt)
+	if err != nil {
+		return receipt, err
+	}
 	if receipt.Status == "failed" && receipt.BillingState == "not_charged" {
 		return receipt, nil
+	}
+	if retention.Expired {
+		if receipt.BillingState == "billed" {
+			return receipt, nil
+		}
+		if err := r.Store.restoreResultProof(receipt); err != nil {
+			return receipt, err
+		}
+		return r.settle(ctx, receipt)
 	}
 	if receipt.Version == StudioImageMultiReceiptVersion {
 		return r.recoverExecution(ctx, receipt)
@@ -312,7 +326,12 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 		return receipt, nil
 	}
 	if _, err := r.Store.Result(receipt); err != nil {
-		return receipt, err
+		if !errors.Is(err, ErrStudioResultExpired) {
+			return receipt, err
+		}
+		if err = r.Store.restoreResultProof(receipt); err != nil {
+			return receipt, err
+		}
 	}
 	receipt.BillingState = "billing_unknown"
 	if err := r.Store.Save(receipt); err != nil {

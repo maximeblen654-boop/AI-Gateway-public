@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test'
+
+for (const view of [{width:1440,height:900,mode:'light'},{width:1366,height:650,mode:'dark'},{width:390,height:844,mode:'light'},{width:360,height:800,mode:'dark'}]) test(`unified per-spec costing ${view.width} ${view.mode}`,async({page},info)=>{
+  await page.setViewportSize(view)
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort())
+  page.on('dialog',dialog=>dialog.accept())
+  await page.goto(`/tests/workbench-procurement/index.html?scenario=recovery-unified&mode=${view.mode}`)
+  await page.getByTestId('account-search').fill('#44');await page.getByTestId('supplier-44').click()
+  await page.getByTestId('model-WAN3.0-可参考视频').click();await page.getByTestId('wizard-step-4').click()
+  await expect(page.getByTestId('unified-spec-table')).toBeVisible()
+  await expect(page.getByTestId('spec-row-0')).toContainText('5 秒')
+  await page.getByTestId('cost-purchase').fill('100')
+  await page.getByTestId('cost-credits').fill('10000')
+  await page.getByTestId('cost-consumption-0').fill('35')
+  await expect(page.getByTestId('converted-cost-0')).toContainText('0.35 CNY')
+  await page.getByTestId('cost-apply-0').click()
+  await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
+  await expect(page.getByTestId('procurement-cost-1')).toHaveValue('0.6')
+  await page.getByTestId('price-0').fill('1.25')
+  await expect(page.getByTestId('spec-profit-0')).toContainText('0.9 CNY')
+  await expect(page.getByTestId('spec-profit-0')).toContainText('72%')
+  await expect.poll(async()=>page.evaluate(()=>{
+    const p=window.procurementFixture.snapshot().media_workbench_v1!.draft.products.find(p=>p.product_id==='procurement-wan')!
+    return {cost:p.cost_rules?.[0]?.cost?.amount,price:p.pricing_rules[0]?.sale_price?.amount,otherCost:p.cost_rules?.[1]?.cost?.amount,otherPrice:p.pricing_rules[1]?.sale_price?.amount}
+  })).toEqual({cost:'0.35',price:'1.25',otherCost:'0.6',otherPrice:'2'})
+  await expect(page.getByTestId('autosave-status')).toContainText('已确认保存')
+  await page.getByTestId('spec-row-0').scrollIntoViewIfNeeded()
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+  await page.screenshot({path:info.outputPath(`unified-costs-${view.width}-${view.mode}.png`),animations:'disabled'})
+  await page.reload()
+  await page.getByTestId('account-search').fill('#44');await page.getByTestId('supplier-44').click()
+  await page.getByTestId('model-WAN3.0-可参考视频').click();await page.getByTestId('wizard-step-4').click()
+  await expect(page.getByTestId('cost-consumption-0')).toHaveValue('35')
+  await expect(page.getByTestId('price-0')).toHaveValue('1.25')
+  const calls=await page.evaluate(()=>window.procurementFixture.calls)
+  expect(calls.filter(c=>c.method!=='get'&&!c.url.endsWith('/draft'))).toHaveLength(0)
+})

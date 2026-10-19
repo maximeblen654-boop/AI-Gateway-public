@@ -135,8 +135,9 @@ func (h *MediaWorkbenchHandler) SaveDraft(c *gin.Context) {
 		return
 	}
 	var in struct {
-		Expected *int64                     `json:"expected_record_version"`
-		Draft    *mediaworkbench.DraftInput `json:"draft"`
+		Expected     *int64                     `json:"expected_record_version"`
+		Draft        *mediaworkbench.DraftInput `json:"draft"`
+		SubmissionID string                     `json:"submission_id,omitempty"`
 	}
 	if !decodeMediaInput(c, &in) {
 		return
@@ -145,6 +146,7 @@ func (h *MediaWorkbenchHandler) SaveDraft(c *gin.Context) {
 		response.ErrorFrom(c, mediaworkbench.ErrInvalid)
 		return
 	}
+	in.Draft.SubmissionID = in.SubmissionID
 	v, err := h.service.SaveDraft(c.Request.Context(), id, *in.Expected, *in.Draft)
 	if !response.ErrorFrom(c, err) {
 		response.Success(c, v)

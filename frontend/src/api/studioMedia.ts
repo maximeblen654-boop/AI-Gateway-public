@@ -18,6 +18,12 @@ export interface StudioOffer {
 }
 export type StudioSpecMatch = Partial<StudioOffer['spec']>
 export interface StudioPrice { amount: string; currency: string; billing_mode: string }
+export interface StudioResultRetention {
+  persistedAt: string | null
+  expiresAt: string | null
+  expired: boolean
+  policy: 'image_original_72h' | 'image_legacy_7d' | 'video_original_48h' | 'legacy_unknown'
+}
 export interface StudioTask {
   id: string; kind: StudioKind; status: string; createdAt: string; expiresAt: string
   offerId: string; model: string; spec: Record<string, unknown>; price: StudioPrice; resultCount: number
@@ -25,6 +31,7 @@ export interface StudioTask {
   expectedCount?: number; deliveredCount?: number; failedCount?: number; pendingCount?: number
   billingState?: string; settledPrice?: StudioPrice; failureCode?: string
   execution?: Record<string, unknown>
+  resultRetention?: StudioResultRetention
 }
 export class StudioError extends Error {
   constructor(public code: string, public status = 0) { super(code) }
@@ -38,6 +45,18 @@ export function studioPrice(value: unknown): StudioPrice {
   if (typeof p.amount !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(p.amount) ||
     typeof p.currency !== 'string' || !/^[A-Z]{3}$/.test(p.currency) || p.billing_mode !== 'per_request') throw new StudioError('studio_contract')
   return { amount: p.amount, currency: p.currency, billing_mode: p.billing_mode }
+}
+function resultRetention(value: unknown): StudioResultRetention | undefined {
+  if (value === undefined) return undefined
+  const v = record(value)
+  const timestamp = (value: unknown): value is string | null => value === null || typeof value === 'string' && Number.isFinite(Date.parse(value))
+  if (!timestamp(v.persisted_at) || !timestamp(v.expires_at) || typeof v.expired !== 'boolean' ||
+    !['image_original_72h', 'image_legacy_7d', 'video_original_48h', 'legacy_unknown'].includes(String(v.policy))) throw new StudioError('studio_contract')
+  return { persistedAt: v.persisted_at, expiresAt: v.expires_at, expired: v.expired, policy: v.policy as StudioResultRetention['policy'] }
+}
+export function studioResultExpired(task: StudioTask, now = Date.now()): boolean {
+  const retention = task.resultRetention
+  return retention?.expired === true || !!retention?.expiresAt && now >= Date.parse(retention.expiresAt)
 }
 export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
   const v = record(value), id = kind === 'image' ? v.task_id : v.operation_id
@@ -68,6 +87,7 @@ export function studioTaskView(kind: StudioKind, value: unknown): StudioTask {
     failureCode: v.failure_code === "upstream_http_502_no_delivery" ? v.failure_code : undefined,
     expectedCount, deliveredCount, failedCount, pendingCount, billingState: typeof v.billing_state === 'string' ? v.billing_state : undefined, settledPrice,
     execution: v.execution && typeof v.execution === 'object' ? v.execution as Record<string, unknown> : undefined,
+    resultRetention: resultRetention(v.result_retention),
     resultCount: !['completed','partial'].includes(status) ? 0 : kind === 'video' ? 1 : Array.isArray(v.results) ? v.results.length : deliveredCount }
 }
 async function json(url: string, init?: RequestInit): Promise<unknown> {
@@ -139,7 +159,8 @@ export async function studioTask(task: StudioTask): Promise<StudioTask> {
 export async function studioGenerate(task: StudioTask): Promise<StudioTask> {
   return studioTaskView(task.kind, await studioRequest(task.kind, 'tasks', task.kind === 'image' ? { task_id: task.id } : { operation_id: task.id }))
 }
-export function studioResultUrl(task: StudioTask, index = 0): string {
+export function studioResultUrl(task: StudioTask, index = 0, now = Date.now()): string {
+  if (studioResultExpired(task, now)) throw new StudioError('result_expired')
   if (!['completed','partial'].includes(task.status) || !Number.isInteger(index) || index < 0 || index >= task.resultCount) throw new StudioError('result_unavailable')
   return buildGatewayUrl(`/studio-v2/api/${task.kind}/${task.kind === 'image' ? `tasks/${task.id}/results/${index}` : `operations/${task.id}/original`}`)
 }
@@ -150,6 +171,7 @@ export function studioErrorMessage(error: unknown): string {
     if (error.status === 401 || error.code.includes('session') || error.code.includes('ticket')) return '登录或工作台会话已失效，请重新登录后查询原任务。'
     if (error.code.includes('paid_gate_off')) return '当前生成服务未开放；已保存的任务仍可查询。'
     if (error.code.endsWith('quote_expired')) return '报价已失效。未提交的任务需重新获取报价并确认。'
+    if (['image_result_expired','video_result_expired'].includes(error.code)) return '原片已到期，无法继续预览或下载；原任务与结算记录保留，不会重新生成。'
     if (error.code.includes('preparation')) return '素材准备记录缺失或不匹配，请核对原素材和规格；已提交任务只查询恢复。'
     if (error.code.includes('asset') || error.code.includes('media_request')) return '素材类型、大小、归属或内容校验未通过，请检查素材。'
     if (error.code === 'unsupported_model') return '模型未配置、已暂停或当前规格不可用，请刷新目录。'

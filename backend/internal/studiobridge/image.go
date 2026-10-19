@@ -211,6 +211,20 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode == http.StatusGone {
+		var expired struct {
+			Retention service.StudioResultRetention `json:"result_retention"`
+		}
+		if json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&expired) != nil || !expired.Retention.Expired {
+			writeError(w, 502, "invalid result expiry")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusGone)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "result_expired", "result_retention": expired.Retention})
+		return
+	}
 	if b.video && r.Method == http.MethodGet && strings.HasSuffix(operation, "/result") {
 		data, e := io.ReadAll(io.LimitReader(response.Body, 100_000_001))
 		mime := response.Header.Get("Content-Type")
@@ -219,7 +233,14 @@ func (b *ImageBridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		writeSuccess(w, map[string]any{"contract": contract, "key_ref": key.ID, "payload": map[string]string{"mime_type": mime, "bytes_base64": base64.StdEncoding.EncodeToString(data)}})
+		var retention *service.StudioResultRetention
+		if raw := response.Header.Get("X-Studio-Result-Retention"); raw != "" {
+			if json.Unmarshal([]byte(raw), &retention) != nil {
+				writeError(w, 502, "invalid result retention")
+				return
+			}
+		}
+		writeSuccess(w, map[string]any{"contract": contract, "key_ref": key.ID, "payload": map[string]any{"mime_type": mime, "bytes_base64": base64.StdEncoding.EncodeToString(data), "result_retention": retention}})
 		return
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, (32<<20)+1))

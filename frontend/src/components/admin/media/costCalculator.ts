@@ -13,12 +13,20 @@ export function decimalError(value: string, positive = false): string {
   if (!value) return ''
   return decimalUnits(value, positive) === undefined ? `请填写${positive ? '大于 0' : '不小于 0'}的数字，最多 12 位整数、8 位小数。` : ''
 }
-function ratioText(numerator: bigint, denominator: bigint): string {
+export function ratioText(numerator: bigint, denominator: bigint): string {
   const sign = numerator < 0n ? '−' : ''
   const magnitude = numerator < 0n ? -numerator : numerator
   const rounded = (magnitude * scale + denominator / 2n) / denominator
   if (magnitude && !rounded) return `${sign}<0.00000001`
   return sign + multiplyDecimalText(`${rounded / scale}.${(rounded % scale).toString().padStart(8, '0')}`, 1)
+}
+/** Amounts stay in fixed point until the final display rounding. */
+export function grossProfit(cost: PricingRule['sale_price'], price: PricingRule['sale_price']) {
+  const amount = (value: PricingRule['sale_price']) => value?.currency === 'CNY' && value.billing_mode === 'per_request' ? decimalUnits(value.amount) : undefined
+  const procurement = amount(cost), sale = price && /^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(price.amount) ? amount(price) : undefined
+  if (procurement === undefined || sale === undefined) return {}
+  const difference = sale - procurement
+  return { profit: ratioText(difference, scale), margin: sale > 0n ? ratioText(difference * 100n, sale) : undefined, belowCost: difference < 0n }
 }
 export function estimateCost(purchase: string, credits: string, consumption: string, price: PricingRule['sale_price']) {
   const p = decimalUnits(purchase, true), c = decimalUnits(credits, true), n = decimalUnits(consumption)

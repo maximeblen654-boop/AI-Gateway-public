@@ -23,7 +23,8 @@
 
       <div v-if="message" class="mw-banner" role="status" data-test="banner">
         <span>{{ message }}</span>
-        <button v-if="detail && !deleted" class="btn btn-secondary" data-test="reload" :disabled="busy" @click="reloadDialog = true">重新读取</button>
+        <button v-if="detail && !deleted" class="btn btn-secondary" data-test="reload" :disabled="busy" @click="checkServer">核对服务器状态</button>
+        <button v-if="detail && !deleted" class="btn btn-secondary" data-test="discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
         <button v-else-if="deleted" class="btn btn-secondary" :disabled="busy" @click="navigate(returnToSuppliers)">返回账号列表</button>
         <button v-else-if="!detail" class="btn btn-secondary" :disabled="busy" @click="loadSuppliers">重试读取</button>
       </div>
@@ -122,7 +123,7 @@
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
 
-        <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page">
+        <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page" @focusout="flushOnFocusOut" @click.capture="flushStep">
           <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
           <div v-if="detail" class="mw-page-heading mw-account-context mw-product-context">
             <div><p class="mw-eyebrow">配置商品 · {{ product?.media_type === 'video' ? '视频' : '图片' }}</p><h2>{{ product?.display_name || selectedModel || '选择商品类型' }}</h2><p class="mw-muted">Account #{{ detail.id }} · {{ detail.name }}</p></div>
@@ -146,6 +147,11 @@
               <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-products" :disabled="busy || dirty" /><span>显示已归档商品</span></label>
             </section>
             <p v-if="selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING'" class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
+            <section v-if="unsubmittedRecoveries.length" class="mw-banner" data-test="unsubmitted-recoveries" aria-label="尚未提交的新商品恢复副本">
+              <h3>发现尚未提交服务器的新商品</h3>
+              <p>以下商品仅有浏览器恢复副本。查看后可明确恢复原商品身份、规格和价格；不会自动发布。</p>
+              <ul><li v-for="entry in unsubmittedRecoveries" :key="entry.key"><span>{{ entry.value.product.display_name }} · {{ entry.value.product.media_type === 'video' ? '视频' : '图片' }} · {{ new Date(entry.value.updated_at).toLocaleString() }}</span><button type="button" class="btn btn-secondary" data-test="recover-unsubmitted" :data-product-id="entry.value.product.product_id" :disabled="busy" @click="chooseRecovery(entry.key)">查看并恢复此副本</button></li></ul>
+            </section>
             <p v-if="!product && lifecycleModelProducts.length" class="mw-muted">当前没有可编辑的商品。已归档商品可勾选“显示已归档商品”后查看；仅有已发布版本的商品可在下方管理。</p>
             <div v-if="!product && !lifecycleModelProducts.length" class="mw-start-product mw-banner">
               <h3>先选择产品类型</h3><p>第一次保存时，后台会根据这里提交的产品类型自动初始化此 Account 的媒体配置。</p>
@@ -195,18 +201,33 @@
               <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
               <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveDraft">保存草稿与移除操作</button>
             </section>
-            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy || deleted || conflict || lifecycleState(product) === 'archived'" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <section v-if="product || recovery" aria-live="polite" class="mw-save-draft" data-test="autosave-status">
+              <p>{{ saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
+              <p v-if="recoveryWarning" role="alert" class="mw-field-error" data-test="recovery-warning">{{ recoveryWarning }}</p>
+              <div v-if="recovery" class="mw-banner" data-test="draft-recovery">
+                <label v-if="productRecoveries.length > 1">此商品有 {{ productRecoveries.length }} 份独立恢复副本<select class="input" data-test="recovery-copy-select" :value="selectedRecoveryKey" :disabled="busy" @change="chooseRecovery(($event.target as HTMLSelectElement).value)"><option v-for="entry in productRecoveries" :key="entry.key" :value="entry.key">{{ new Date(entry.value.updated_at).toLocaleString() }} · {{ entry.value.product.display_name }} · 页面 {{ entry.value.editor_id?.slice(-8) || '旧副本' }}</option></select></label>
+                <p>发现此商品的本地恢复副本，基准服务器版本 {{ recovery.base_record_version }}。{{ recoveryConflict ? '服务器已更新，请先核对字段差异再选择。' : recovery.pending_submission ? '上次保存结果待核对；恢复后保留本地输入并暂停自动写入，请核对服务器后继续。' : '恢复后将自动保存草稿，不会正式发布。' }}</p>
+                <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看本地与服务器字段差异（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.field || '商品' }}</strong><p style="overflow-wrap:anywhere">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere">服务器：{{ diff.server }}</p></li></ul></details>
+                <label v-if="recoveryConflict"><input v-model="acceptRecoveryConflict" type="checkbox" data-test="confirm-recovery-conflict" />我已核对差异，恢复本地此商品并以服务器最新版本为基准</label>
+                <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreRecovery(acceptRecoveryConflict)">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
+                <button type="button" class="btn btn-secondary" data-test="discard-recovery" :disabled="busy" @click="discardRecoveryDialog = true">丢弃恢复副本</button>
+              </div>
+              <button type="button" class="btn btn-secondary" data-test="check-server" :disabled="busy" @click="checkServer">核对服务器状态</button>
+              <button v-if="canRetryUnconfirmedSave" type="button" class="btn btn-secondary" data-test="retry-unconfirmed-save" @click="retryUnconfirmedSave">重新核对并保存当前草稿</button>
+              <button type="button" class="btn btn-secondary" data-test="editor-discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
+            </section>
+            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
               <template #save>
                 <div class="mw-save-draft">
-                  <p class="mw-muted">保存本 Account 的草稿（共 {{ products.length }} 个商品），由后台检查。不会发布、启售或发起生成。</p>
+                  <p class="mw-muted">停止输入约 1.5 秒后自动保存本 Account 草稿（共 {{ products.length }} 个商品）。本地恢复副本即时更新；服务器确认对应版本后才显示已确认保存。不会发布、启售或发起生成。</p>
                   <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
                   <button class="btn btn-primary" data-test="save" :disabled="managementDisabled || !products.length" @click="saveDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
                   <button v-if="!dirty && config" type="button" class="btn btn-secondary mw-return-models" data-test="return-models" @click="backToModels">← 返回模型列表</button>
-                  <p v-if="saveFeedback || saveState === 'saved'" class="mw-banner" role="status" data-test="save-feedback">{{ saveFeedback || `草稿已保存 · ${config?.draft.revision}` }}</p>
-                  <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果未确认，请重新读取后核对，不要重复发布。</p>
+                  <p v-if="saveFeedback || saveState === 'saved'" class="mw-banner" role="status" data-test="save-feedback">{{ saveFeedback || `草稿已确认保存 · ${config?.draft.revision}` }}</p>
+                  <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果待核对，后续编辑仍保留本地副本；核对确认前暂停自动写入。</p>
                 </div>
               </template>
             </MediaProductEditor>
@@ -269,7 +290,11 @@
     </MediaDialog>
     <MediaDialog :show="reloadDialog" title="重新读取服务器配置？" :busy="busy" @close="reloadDialog = false">
       <p>当前未保存修改将被放弃。读取服务器最新草稿后再编辑，不会自动重试旧写入。</p>
-      <template #actions><button class="btn btn-primary" data-test="confirm-reload" :disabled="busy" @click="reload">重新读取</button></template>
+      <template #actions><button class="btn btn-primary" data-test="confirm-reload" :disabled="busy" @click="reload">确认放弃修改并重新加载</button></template>
+    </MediaDialog>
+    <MediaDialog :show="discardRecoveryDialog" title="丢弃此商品的恢复副本？" :busy="busy" @close="discardRecoveryDialog = false">
+      <p>仅删除此商品的浏览器恢复副本；当前表单和服务器配置保持原状。</p>
+      <template #actions><button class="btn btn-secondary" data-test="confirm-discard-recovery" :disabled="busy" @click="discardRecovery(); discardRecoveryDialog = false">确认丢弃恢复副本</button></template>
     </MediaDialog>
   </AppLayout>
 </template>
@@ -295,10 +320,12 @@ async function readPaidStatus() {
   const results = await Promise.allSettled((['image', 'video'] as const).map(kind => mediaPaidAPI.status(kind)))
   for (const [index, result] of results.entries()) { const kind = index === 0 ? 'image' : 'video'; if (result.status === 'fulfilled') paidStates.value[kind] = result.value; else delete paidStates.value[kind] }
 }
-const workbench = useMediaWorkbench()
+const auth = useAuthStore()
+const workbench = useMediaWorkbench(() => auth.user?.id)
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
   diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
+  recovery, recoveryWarning, recoveryConflict, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
 const step = ref('suppliers')
 const search = ref('')
@@ -307,7 +334,6 @@ const showArchived = ref(false)
 const lifecycleRequest = ref<{ action: LifecycleAction; target: LifecycleTarget } | null>(null)
 const editorElement = ref<HTMLElement>()
 const modelPage = ref<HTMLElement>()
-const auth = useAuthStore()
 const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
 const modelsScrollPosition = ref({ top: 0, left: 0 })
@@ -315,6 +341,10 @@ const publishDialog = ref(false)
 const publishProductIds = ref<string[]>([])
 const salesDialog = ref(false)
 const reloadDialog = ref(false)
+const discardRecoveryDialog = ref(false)
+const acceptRecoveryConflict = ref(false)
+watch(recovery, () => { acceptRecoveryConflict.value = false })
+const saveStateLabel = computed(() => ({ unsaved: '未保存，等待自动同步', saving: '保存中，后续输入继续保留', saved: '已确认保存', failed: '保存失败，请修正后重试', unconfirmed: '保存结果待核对，自动写入已暂停', conflict: '存在服务器版本冲突，当前输入保留' })[saveState.value])
 const newProductType = ref('')
 const removeProductId = ref('')
 const removalTarget = computed(() => products.value.find(p => p.product_id === removeProductId.value))
@@ -491,9 +521,12 @@ function changeProduct(event: Event) {
   const target = event.target as HTMLSelectElement
   const id = target.value
   target.value = selectedProduct.value
-  navigate(() => { selectedProduct.value = id })
+  if (conflict.value) selectedProduct.value = id
+  else navigate(() => { selectedProduct.value = id })
 }
 function updateProduct(value: Product) { const index = products.value.findIndex(p => p.product_id === selectedProduct.value); if (index >= 0) products.value[index] = value }
+function flushOnFocusOut(event: FocusEvent) { if (!event.relatedTarget || !editorElement.value?.contains(event.relatedTarget as Node)) void flushAutoSave() }
+function flushStep(event: MouseEvent) { const button = (event.target as HTMLElement).closest('button'); if (/^wizard-(?:step-|next$|back$)/.test(button?.dataset.test ?? '')) void flushAutoSave() }
 function navigate(action: () => void | Promise<void>) { if (busy.value) return; if (dirty.value) nextNavigation.value = action; else void action() }
 async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) { step.value = 'models'; void readPaidStatus(); await nextTick(); modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }) } }
 async function openEditor(modelId: string) {
@@ -510,6 +543,7 @@ async function backToModels() {
 }
 async function saveAndNavigate() {
   if (!await saveDraft()) return
+  if (dirty.value) return
   const action = nextNavigation.value
   const resolveRoute = routeResolve
   routeResolve = undefined
@@ -535,7 +569,7 @@ async function reload() {
   const previousStep = step.value
   const modelId = selectedModel.value
   const productId = selectedProduct.value
-  await selectSupplier(accountId)
+  if (!await reloadFromServer()) return
   reloadDialog.value = false
   if (detail.value?.id !== accountId || message.value) return
   const modelExists = detail.value.models.some(model => model.model_id === modelId) ||

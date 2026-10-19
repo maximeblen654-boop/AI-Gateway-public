@@ -1,0 +1,294 @@
+{
+  "created_utc": "2026-10-19T03:49:32.716038+00:00",
+  "scope": "source_schema_probe_only_not_application_db_http_or_rollback_artifact_validation",
+  "old_git_ref": "8ad2eff39ff5bf6bfd07563041556f4a4c42d9a1",
+  "working_tree_head": "33c819064ef95666f6b512ebaed1e2d7a09e34d6",
+  "go_version": "go version go1.27.0 windows/amd64",
+  "sources": [
+    {
+      "path": "backend/internal/mediaworkbench/media.go",
+      "old_git_blob": "e8ca39fa683bd24aa0c8c15b09424ddb0d930ddc",
+      "old_raw_sha256": "da9f07d59adaf720dee8a020bf8a51b1e0c68e0bc5da7fd36cd3c7a148a54ea9",
+      "old_normalized_sha256": "da9f07d59adaf720dee8a020bf8a51b1e0c68e0bc5da7fd36cd3c7a148a54ea9",
+      "current_raw_sha256": "4a732aabc97a290165395b8d3e3371a82c75ef3de2a045b3ed168bfb4eef3dcb",
+      "current_normalized_sha256": "4a732aabc97a290165395b8d3e3371a82c75ef3de2a045b3ed168bfb4eef3dcb"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/adapter.go",
+      "old_git_blob": "ef1288fc454d037058f4debfb4b696beeeda1791",
+      "old_raw_sha256": "23b6faf6c65b96229cc379c09768064ed519732b2b6e7704dd6797641ae6d1bb",
+      "old_normalized_sha256": "23b6faf6c65b96229cc379c09768064ed519732b2b6e7704dd6797641ae6d1bb",
+      "current_raw_sha256": "23b6faf6c65b96229cc379c09768064ed519732b2b6e7704dd6797641ae6d1bb",
+      "current_normalized_sha256": "23b6faf6c65b96229cc379c09768064ed519732b2b6e7704dd6797641ae6d1bb"
+    },
+    {
+      "path": "backend/internal/mediaworkbench/lifecycle.go",
+      "old_git_blob": "6e4c9bae489fc2f6a0afc5b5e30078af7773760c",
+      "old_raw_sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4",
+      "old_normalized_sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4",
+      "current_raw_sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4",
+      "current_normalized_sha256": "7ed0f5c1c0108e986017bc8c523267eed52b110de07f835c700b8911605a76c4"
+    },
+    {
+      "path": "backend/internal/imageplan/json.go",
+      "old_git_blob": "dd29a9fea5e4c9755179171232e2774c8177c1a7",
+      "old_raw_sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b",
+      "old_normalized_sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b",
+      "current_raw_sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b",
+      "current_normalized_sha256": "69797655653360f4750de360a039752c265cedcf1a55dde68786e58d91c5576b"
+    },
+    {
+      "path": "backend/internal/handler/admin/media_workbench_handler.go",
+      "old_git_blob": "b417238dcde95593ce36deed8da847733740a0c7",
+      "old_raw_sha256": "901f4b4c5d4fe6edaa32870e8ad760efc483908f2d909db0b47af96f8343234c",
+      "old_normalized_sha256": "901f4b4c5d4fe6edaa32870e8ad760efc483908f2d909db0b47af96f8343234c",
+      "current_raw_sha256": "8b546ffa95d7c6f08aaed41fd5308f49e567bde51d5a6fd279730f5c6f027cb7",
+      "current_normalized_sha256": "8b546ffa95d7c6f08aaed41fd5308f49e567bde51d5a6fd279730f5c6f027cb7"
+    },
+    {
+      "path": "backend/internal/repository/media_config_repo.go",
+      "old_git_blob": "449fd382286271f2a05eb54fd865f16dac3247b3",
+      "old_raw_sha256": "2ab8f22056a62468c0af7e1e3ddcf8aa7141b59fdb68cf26be3d19e0f385f4b2",
+      "old_normalized_sha256": "2ab8f22056a62468c0af7e1e3ddcf8aa7141b59fdb68cf26be3d19e0f385f4b2",
+      "current_raw_sha256": "2ab8f22056a62468c0af7e1e3ddcf8aa7141b59fdb68cf26be3d19e0f385f4b2",
+      "current_normalized_sha256": "2ab8f22056a62468c0af7e1e3ddcf8aa7141b59fdb68cf26be3d19e0f385f4b2"
+    }
+  ],
+  "runs": [
+    {
+      "mode": "old",
+      "exit_code": 0,
+      "production_repository_strict_decoder_asserted": true,
+      "production_handler_strict_decoder_asserted": true,
+      "copied_data_types": [
+        "AdapterBinding",
+        "Capabilities",
+        "CatalogDependency",
+        "CombinationRule",
+        "Config",
+        "CostRule",
+        "Dependencies",
+        "Diagnostic",
+        "Draft",
+        "DraftInput",
+        "ImageConfig",
+        "ImageExecutionConfig",
+        "ImageExecutionMode",
+        "Match",
+        "Offer",
+        "Preview",
+        "Price",
+        "PricingRule",
+        "Procurement",
+        "ProcurementEntry",
+        "Product",
+        "ProductLifecycle",
+        "Published",
+        "Range",
+        "References",
+        "Sales",
+        "SizeMapping",
+        "Spec",
+        "Validation"
+      ],
+      "copied_imageplan_types": [
+        "AssetSlot",
+        "Plan"
+      ],
+      "copied_type_declarations_sha256": "a2fa9a4b38777562b5305eaf5478e77393627f0a45f28947a46389c49775e5fc",
+      "copied_request_declaration_sha256": "4a73e79ccaceec1b3ea9f453b8e405974325c3467648c8959ad87b5141c4ad0f",
+      "copied_makeDraft_sha256": "30172f280ef53a93e8bcfd1b36b002901614272e5259082a39737402967b739f",
+      "generated_main_sha256": "75b427c9ddef8a2f5ff8bfcca253f4c118eded6d4f704859ce556eba645ebb65",
+      "generated_imageplan_sha256": "08e070f3785ae20dd9d06afc70010ed8bb932b3f13106cefe92a820d961dfcc2",
+      "result": {
+        "cases": [
+          {
+            "name": "persisted_legacy_config",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "persisted_receipt_config",
+            "expected": "unknown field \"save_receipt\"",
+            "observed": "json: unknown field \"save_receipt\"",
+            "pass": true
+          },
+          {
+            "name": "persisted_null_receipt_config",
+            "expected": "unknown field \"save_receipt\"",
+            "observed": "json: unknown field \"save_receipt\"",
+            "pass": true
+          },
+          {
+            "name": "persisted_unrelated_unknown_field",
+            "expected": "unknown field \"unknown_extension\"",
+            "observed": "json: unknown field \"unknown_extension\"",
+            "pass": true
+          },
+          {
+            "name": "http_legacy_request",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "http_receipt_request",
+            "expected": "unknown field \"submission_id\"",
+            "observed": "json: unknown field \"submission_id\"",
+            "pass": true
+          },
+          {
+            "name": "http_forged_nested_receipt",
+            "expected": "unknown field \"save_receipt\"",
+            "observed": "json: unknown field \"save_receipt\"",
+            "pass": true
+          },
+          {
+            "name": "http_trailing_json",
+            "expected": "trailing JSON",
+            "observed": "trailing JSON",
+            "pass": true
+          },
+          {
+            "name": "loose_decode_then_typed_marshal",
+            "expected": "drops receipt",
+            "observed": "drops receipt",
+            "pass": true
+          },
+          {
+            "name": "legacy_makeDraft_starts_without_receipt",
+            "expected": "no receipt on replacement draft",
+            "observed": "{\"revision\":\"mwd_2c75686ecff86e026259d46f859d7adef41a96a4a6b2ce4b93ed4fe31f95708c\",\"based_on_published_revision\":\"\",\"updated_at\":\"2026-10-19T00:00:01Z\",\"products\":[{\"product_id\":\"fixture-product\",\"media_type\":\"image\",\"site_model\":\"fixture-site\",\"display_name\":\"fixture\",\"upstream_model\":\"fixture-upstream\",\"enabled\":false,\"capabilities\":{\"resolutions\":null,\"aspect_ratios\":null,\"qualities\":null,\"durations_seconds\":null,\"count\":{\"min\":0,\"max\":0},\"references\":{\"image\":{\"min\":0,\"max\":0},\"video\":{\"min\":0,\"max\":0},\"audio\":{\"min\":0,\"max\":0},\"total_max\":0},\"combination_rules\":null},\"pricing_rules\":[],\"adapter_config\":{\"size_mappings\":[]}}]}",
+            "pass": true
+          }
+        ],
+        "fixture_sha256": "c523960ad97389c798188ce04dccbd2275ec6608808d2b3da98fbb8c2af22dac",
+        "mode": "old",
+        "pass": true
+      }
+    },
+    {
+      "mode": "current",
+      "exit_code": 0,
+      "production_repository_strict_decoder_asserted": true,
+      "production_handler_strict_decoder_asserted": true,
+      "copied_data_types": [
+        "AdapterBinding",
+        "Capabilities",
+        "CatalogDependency",
+        "CombinationRule",
+        "Config",
+        "CostRule",
+        "Dependencies",
+        "Diagnostic",
+        "Draft",
+        "DraftInput",
+        "ImageConfig",
+        "ImageExecutionConfig",
+        "ImageExecutionMode",
+        "Match",
+        "Offer",
+        "Preview",
+        "Price",
+        "PricingRule",
+        "Procurement",
+        "ProcurementEntry",
+        "Product",
+        "ProductLifecycle",
+        "Published",
+        "Range",
+        "References",
+        "Sales",
+        "SaveReceipt",
+        "SizeMapping",
+        "Spec",
+        "Validation"
+      ],
+      "copied_imageplan_types": [
+        "AssetSlot",
+        "Plan"
+      ],
+      "copied_type_declarations_sha256": "937a9758ec59f8b9f0e7c844879b7c6e21614a97a92e4a156c9cd313e774fdb7",
+      "copied_request_declaration_sha256": "b2b9a4bdb78daf647c6b7033b69d9bcf4fdf756afd315596191a51eb1ef8bc1c",
+      "copied_makeDraft_sha256": "30172f280ef53a93e8bcfd1b36b002901614272e5259082a39737402967b739f",
+      "generated_main_sha256": "b7ebecab1730a38459b1c95c521f2ce30a306d494c4b0aeacaf5db1e687ff5fe",
+      "generated_imageplan_sha256": "08e070f3785ae20dd9d06afc70010ed8bb932b3f13106cefe92a820d961dfcc2",
+      "result": {
+        "cases": [
+          {
+            "name": "persisted_legacy_config",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "persisted_receipt_config",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "persisted_null_receipt_config",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "persisted_unrelated_unknown_field",
+            "expected": "unknown field \"unknown_extension\"",
+            "observed": "json: unknown field \"unknown_extension\"",
+            "pass": true
+          },
+          {
+            "name": "http_legacy_request",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "http_receipt_request",
+            "expected": "success",
+            "observed": "success",
+            "pass": true
+          },
+          {
+            "name": "http_forged_nested_receipt",
+            "expected": "unknown field \"save_receipt\"",
+            "observed": "json: unknown field \"save_receipt\"",
+            "pass": true
+          },
+          {
+            "name": "http_trailing_json",
+            "expected": "trailing JSON",
+            "observed": "trailing JSON",
+            "pass": true
+          },
+          {
+            "name": "loose_decode_then_typed_marshal",
+            "expected": "preserves receipt",
+            "observed": "preserves receipt",
+            "pass": true
+          },
+          {
+            "name": "typed_non_draft_roundtrip",
+            "expected": "draft and receipt unchanged",
+            "observed": "{\"revision\":\"mwd_fixture\",\"based_on_published_revision\":\"\",\"updated_at\":\"2026-10-19T00:00:00Z\",\"products\":[{\"product_id\":\"fixture-product\",\"media_type\":\"image\",\"site_model\":\"fixture-site\",\"display_name\":\"fixture\",\"upstream_model\":\"fixture-upstream\",\"enabled\":false,\"capabilities\":{\"resolutions\":null,\"aspect_ratios\":null,\"qualities\":null,\"durations_seconds\":null,\"count\":{\"min\":0,\"max\":0},\"references\":{\"image\":{\"min\":0,\"max\":0},\"video\":{\"min\":0,\"max\":0},\"audio\":{\"min\":0,\"max\":0},\"total_max\":0},\"combination_rules\":null},\"pricing_rules\":[],\"adapter_config\":{\"size_mappings\":[]}}],\"save_receipt\":{\"submission_id\":\"550e8400-e29b-41d4-a716-446655440000\",\"base_record_version\":7,\"draft_revision\":\"mwd_fixture\"}}",
+            "pass": true
+          },
+          {
+            "name": "legacy_makeDraft_starts_without_receipt",
+            "expected": "no receipt on replacement draft",
+            "observed": "{\"revision\":\"mwd_2c75686ecff86e026259d46f859d7adef41a96a4a6b2ce4b93ed4fe31f95708c\",\"based_on_published_revision\":\"\",\"updated_at\":\"2026-10-19T00:00:01Z\",\"products\":[{\"product_id\":\"fixture-product\",\"media_type\":\"image\",\"site_model\":\"fixture-site\",\"display_name\":\"fixture\",\"upstream_model\":\"fixture-upstream\",\"enabled\":false,\"capabilities\":{\"resolutions\":null,\"aspect_ratios\":null,\"qualities\":null,\"durations_seconds\":null,\"count\":{\"min\":0,\"max\":0},\"references\":{\"image\":{\"min\":0,\"max\":0},\"video\":{\"min\":0,\"max\":0},\"audio\":{\"min\":0,\"max\":0},\"total_max\":0},\"combination_rules\":null},\"pricing_rules\":[],\"adapter_config\":{\"size_mappings\":[]}}]}",
+            "pass": true
+          }
+        ],
+        "fixture_sha256": "c523960ad97389c798188ce04dccbd2275ec6608808d2b3da98fbb8c2af22dac",
+        "mode": "current",
+        "pass": true
+      }
+    }
+  ],
+  "scratch_removed": true,
+  "pass": true
+}

@@ -43,6 +43,7 @@ export function createPublishedImageClient({ baseUrl, serviceToken, fetchImpl = 
       redirect:'error', signal:AbortSignal.timeout(960000),
     });
     if (!response.ok) {
+      if(response.status===410)throw Object.assign(new Error('Image result expired'),{code:'image_result_expired'});
       const error = new Error('Image bridge unavailable; receipt GET recovery only');
       error.layer = 'bridge'; error.upstreamStatus = response.status;
       try {
@@ -116,6 +117,8 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     // Final local state is sufficient for history viewing. Fall through only
     // when a saved result is missing and recovery can still repair it.
     if(storedFinal)return view(task);
+    const localRetention=retention(task);
+    if(task.billing_state==='billed' && ['completed','partial'].includes(task.status) && localRetention?.expired)return view(task);
     const receipt=(await call(session,'GET',`tasks/${taskID}`,undefined,task.keyRef)).payload;
     if(receipt?.contract!==IMAGE_BINDING_CONTRACT || receipt.task_id!==taskID)throw new Error('Receipt identity mismatch');
     if(!['unknown','persisted','completed','partial','failed'].includes(receipt.status) || !['pending','billing_unknown','billed','not_charged'].includes(receipt.billing_state))throw new Error('Receipt state mismatch');
@@ -138,11 +141,20 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     task.failure_code = receipt.failure_code === "upstream_http_502_no_delivery" ? receipt.failure_code : undefined;
     const settled = receipt.settled_price === undefined ? undefined : receipt.settled_price;
     if(settled !== undefined && (receipt.billing_state!=='billed' || !settled || typeof settled !== 'object' || typeof settled.amount !== 'string' || !/^(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/.test(settled.amount) || settled.currency!=='CNY' || settled.billing_mode!=='per_request')) throw new Error('Receipt settlement mismatch');
-    if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && receipt.result_available) {
+    const promise=receipt.result_retention;
+    if(promise!==undefined) {
+      if(!promise || !['image_original_72h','image_legacy_7d','legacy_unknown'].includes(promise.policy) ||
+        promise.expires_at!==null&&!Number.isFinite(Date.parse(promise.expires_at)) || typeof promise.expired!=='boolean')throw new Error('Invalid image retention receipt');
+      task.result_retention={policy:promise.policy,persisted_at:promise.persisted_at,expires_at:promise.expires_at,expired:promise.expired};
+    }
+    if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && promise?.expired) {
+      task.status=receipt.status;task.billing_state=receipt.billing_state;task.settled_price=settled;task.delivered_count=delivered;task.failed_count=failed;task.pending_count=pending;write(location('task',identity),task);
+    } else if((receipt.status==='completed'||receipt.status==='partial') && receipt.billing_state==='billed' && receipt.result_available) {
       const payload=(await call(session,'GET',`tasks/${taskID}/result`,undefined,task.keyRef)).payload;
       if(!Array.isArray(payload?.data) || payload.data.length!==delivered)throw new Error('Result count mismatch');
       const saved=[];
-      for(let i=0;i<payload.data.length;i++)saved.push(await results.saveResult(task.owner,taskID,i,payload.data[i]));
+      const deadline=promise?.expires_at;
+      for(let i=0;i<payload.data.length;i++)saved.push(await results.saveResult(task.owner,taskID,i,payload.data[i],deadline?{expiresAt:deadline,legacy:promise.policy==='image_legacy_7d'}:{}));
       task.results=saved;task.status=receipt.status;task.billing_state=receipt.billing_state;task.settled_price=settled;task.delivered_count=delivered;task.failed_count=failed;task.pending_count=pending;write(location('task',identity),task);
     } else if(task.status!=='completed') {
       // A concurrent recovery may have completed while this GET was in flight.
@@ -167,8 +179,24 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
     }
     return recover(session,task.task_id);
   }
-  function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
+  function retention(task) {
+    const promises=(task.results||[]).flatMap((result,index)=>{let meta;try{meta=results.metadata(task.owner,task.task_id,index);}catch{/* The journal's committed deadline still prevents renewal. */}return [...(meta?[meta]:[]),...(result.expires_at?[result]:[])];});
+    if(task.result_retention?.policy==='image_original_72h'&&task.result_retention.expires_at)promises.push(task.result_retention);
+    const first=promises.filter(p=>Number.isFinite(Date.parse(p.expires_at))).sort((a,b)=>Date.parse(a.expires_at)-Date.parse(b.expires_at))[0];
+    const value=first?{policy:task.result_retention?.policy||'image_original_72h',persisted_at:first.persisted_at||null,expires_at:first.expires_at,expired:first.expired}:task.result_retention;
+    return value?{...value,expired:value.expired||!!value.expires_at&&now()>=Date.parse(value.expires_at)}:undefined;
+  }
+  function view(task) {const q=task.quote;return {contract:task.contract,task_id:task.task_id,created_at:task.created_at,status:task.status,...(retention(task)?{result_retention:retention(task)}:{}),results:task.results?.map((result,index)=>({...result,url:`/studio-v2/api/image/tasks/${task.task_id}/results/${index}`})),
     offer_id:q.offer_id,sale_price:q.total_price||q.sale_price,...(q.unit_price && q.total_price ? {unit_price:q.unit_price,total_price:q.total_price,quantity:q.quantity} : {}),spec:q.spec,expires_at:q.expires_at,expected_count:q.spec.count,delivered_count:task.delivered_count??(task.status==='completed'?q.spec.count:0),failed_count:task.failed_count||0,pending_count:task.pending_count||0,billing_state:task.billing_state,settled_price:task.settled_price,failure_code:task.failure_code,execution:q.execution};}
+  function historyExpired(task) {
+    const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
+    const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
+    if(!settled&&!failed)return false;
+    // Use the existing original promise, including legacy PNGs. Creation time
+    // remains the ordinary-history fallback only when no deadline is known.
+    const expires=settled?Date.parse(retention(task)?.expires_at||''):NaN;
+    return now()>=(Number.isFinite(expires)?expires:Date.parse(task.created_at||'')+retentionMs);
+  }
   function history(session) {
     const id=owner(session),items=[];
     for(const file of fs.readdirSync(rootDir)) {
@@ -176,12 +204,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
       const entry=path.join(rootDir,file);if(!fs.lstatSync(entry).isFile())throw new Error('Unsafe journal entry');
       const task=JSON.parse(fs.readFileSync(entry,'utf8'));
       if(task.owner!==id)continue;
-      const created=Date.parse(task.created_at||'');
-      const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
-      const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
-      // The UI history is a 72-hour view for finalized tasks. Unknown,
-      // pending and billing-uncertain tasks stay visible for recovery.
-      if(Number.isFinite(created) && now()-created>=retentionMs && (settled||failed))continue;
+      if(historyExpired(task))continue;
       const verified=get(session,task.task_id).task;
       items.push(view(verified));
     }
@@ -210,9 +233,7 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
         if(task.owner!==id)continue;
         result.scanned++;
         const created=Date.parse(task.created_at||'');
-        const settled=(task.status==='completed'||task.status==='partial')&&task.billing_state==='billed';
-        const failed=(task.status==='failed'||task.status==='released')&&task.billing_state==='not_charged';
-        if(!Number.isFinite(created)||created>before||(!settled&&!failed)||results?.hasTaskData?.(id,task.task_id)) { result.skipped++; continue; }
+        if(!Number.isFinite(created)||created>before||!historyExpired(task)||results?.hasTaskData?.(id,task.task_id)) { result.skipped++; continue; }
         // Re-read the authoritative receipt before removal. A stale local
         // journal must never make a late settlement or recovery disappear.
         let receipt;
@@ -232,6 +253,6 @@ export function createImageTaskRuntime({ rootDir, call, results, assetResolver, 
       return result;
     } finally { fs.closeSync(fd); if(fs.existsSync(lock))fs.unlinkSync(lock); }
   }
-  function result(session,taskID,index) {const {task}=get(session,taskID);if(!['completed','partial'].includes(task.status)||!Number.isInteger(index)||index<0||index>= (task.results?.length||task.delivered_count||0))throw new Error('Image result unavailable');return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
+  function result(session,taskID,index) {const {task}=get(session,taskID);if(!['completed','partial'].includes(task.status)||!Number.isInteger(index)||index<0||index>= (task.results?.length||task.delivered_count||0))throw new Error('Image result unavailable');if(retention(task)?.expired)throw Object.assign(new Error('Image result expired'),{code:'image_result_expired'});return {data:results.read(task.owner,taskID,index),info:results.metadata(task.owner,taskID,index)};}
   return {catalog,readiness,quote,prepare,dispatch,recover,result,history,cleanupExpired,view};
 }

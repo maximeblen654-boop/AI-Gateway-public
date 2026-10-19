@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"time"
 
@@ -54,17 +55,32 @@ type Sales struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 type Draft struct {
-	Revision                 string    `json:"revision"`
-	BasedOnPublishedRevision string    `json:"based_on_published_revision"`
-	UpdatedAt                time.Time `json:"updated_at"`
-	Products                 []Product `json:"products"`
+	Revision                 string       `json:"revision"`
+	BasedOnPublishedRevision string       `json:"based_on_published_revision"`
+	UpdatedAt                time.Time    `json:"updated_at"`
+	Products                 []Product    `json:"products"`
+	SaveReceipt              *SaveReceipt `json:"save_receipt,omitempty"`
+}
+
+// SaveReceipt identifies the write that persisted this draft. It deliberately
+// contains no business fields, credentials or validation results.
+type SaveReceipt struct {
+	SubmissionID      string `json:"submission_id"`
+	BaseRecordVersion int64  `json:"base_record_version"`
+	DraftRevision     string `json:"draft_revision"`
 }
 
 // DraftInput deliberately excludes server-owned revisions and timestamps.
 type DraftInput struct {
 	Products         []Product `json:"products"`
 	RemoveProductIDs []string  `json:"remove_product_ids,omitempty"`
+	// The HTTP handler supplies request context separately from editable draft
+	// fields. A caller cannot submit a forged save_receipt inside draft.
+	SubmissionID string `json:"-"`
 }
+
+var submissionIDPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
 type Product struct {
 	ProductID string `json:"product_id"`
 	MediaType string `json:"media_type"`
@@ -447,6 +463,9 @@ func makeDraft(input DraftInput, basedOn string, now time.Time) Draft {
 	return Draft{Revision: fmt.Sprintf("mwd_%x", sha256.Sum256(data)), BasedOnPublishedRevision: basedOn, UpdatedAt: now, Products: input.Products}
 }
 func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input DraftInput) (*Detail, error) {
+	if input.SubmissionID != "" && (len(input.SubmissionID) != 36 || !submissionIDPattern.MatchString(input.SubmissionID)) {
+		return nil, ErrInvalid
+	}
 	var a *Account
 	var err error
 	if expected == 0 {
@@ -508,6 +527,9 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		inheritNativeProduct(a, &input.Products[i])
 	}
 	c.Draft = makeDraft(input, basedOn, now)
+	if input.SubmissionID != "" {
+		c.Draft.SaveReceipt = &SaveReceipt{SubmissionID: input.SubmissionID, BaseRecordVersion: expected, DraftRevision: c.Draft.Revision}
+	}
 	c.AdapterBindings = bindingsFor(a, c.MediaTypes)
 	c.AdapterBinding = nil
 	c.Validation = Validation{DraftRevision: c.Draft.Revision, Status: "UNKNOWN", CheckedAt: now, Diagnostics: []Diagnostic{{Class: "UNKNOWN", Severity: "error", Code: "VALIDATION_PENDING", Message: "Draft saved; local validation pending"}}, Previews: []Preview{}}
@@ -515,7 +537,7 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 	if err = s.repo.CompareAndSwap(ctx, id, expected, c); err != nil {
 		return nil, err
 	}
-	return s.validateSaved(ctx, id, c.Draft.Revision, a)
+	return s.validateSaved(ctx, id, a)
 }
 func (s *Service) SetSales(ctx context.Context, id, expected int64, enabled bool) (*Detail, error) {
 	a, err := s.mutable(ctx, id, expected)
@@ -542,7 +564,7 @@ func (s *Service) SetSales(ctx context.Context, id, expected int64, enabled bool
 	return describe(a), nil
 }
 
-func (s *Service) validateSaved(ctx context.Context, id int64, revision string, saved *Account) (*Detail, error) {
+func (s *Service) validateSaved(ctx context.Context, id int64, saved *Account) (*Detail, error) {
 	for attempt := 0; attempt < 3; attempt++ {
 		a, err := s.repo.Get(ctx, id)
 		if errors.Is(err, ErrNotFound) {
@@ -551,8 +573,8 @@ func (s *Service) validateSaved(ctx context.Context, id int64, revision string, 
 		if err != nil {
 			return unknownSaved(saved), nil
 		}
-		if a.Config.Draft.Revision != revision {
-			return describe(a), nil
+		if !sameSavedDraft(saved, a) {
+			return nil, saveConfirmationConflict(saved, a)
 		}
 		expected := a.Config.RecordVersion
 		v, _ := Validate(a, a.Config.Draft, time.Now().UTC())
@@ -570,7 +592,47 @@ func (s *Service) validateSaved(ctx context.Context, id int64, revision string, 
 		}
 		return describe(a), nil
 	}
-	return s.Detail(ctx, id)
+	// Retrying local validation never retries the submitted draft write. Even
+	// after the retry limit, another writer's latest draft is not our receipt.
+	a, err := s.repo.Get(ctx, id)
+	if errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+	if err != nil {
+		return unknownSaved(saved), nil
+	}
+	if !sameSavedDraft(saved, a) {
+		return nil, saveConfirmationConflict(saved, a)
+	}
+	return describe(a), nil
+}
+
+func sameSavedDraft(saved, current *Account) bool {
+	if current == nil || current.Config == nil {
+		return false
+	}
+	want, got := saved.Config.Draft, current.Config.Draft
+	// UpdatedAt also distinguishes otherwise identical writes from old clients
+	// that do not yet send submission_id. Validation preserves this timestamp.
+	if want.Revision != got.Revision || !want.UpdatedAt.Equal(got.UpdatedAt) {
+		return false
+	}
+	if want.SaveReceipt == nil || got.SaveReceipt == nil {
+		return want.SaveReceipt == nil && got.SaveReceipt == nil
+	}
+	return *want.SaveReceipt == *got.SaveReceipt
+}
+
+func saveConfirmationConflict(saved, current *Account) error {
+	metadata := map[string]string{"save_stage": "confirmation", "saved_record_version": fmt.Sprint(saved.Config.RecordVersion)}
+	if receipt := saved.Config.Draft.SaveReceipt; receipt != nil {
+		metadata["submission_id"] = receipt.SubmissionID
+		metadata["base_record_version"] = fmt.Sprint(receipt.BaseRecordVersion)
+	}
+	if current != nil && current.Config != nil {
+		metadata["response_record_version"] = fmt.Sprint(current.Config.RecordVersion)
+	}
+	return ErrStale.WithMetadata(metadata)
 }
 
 func unknownSaved(a *Account) *Detail {

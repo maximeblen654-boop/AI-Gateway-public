@@ -33,7 +33,8 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     return {child,identity};
   }
   async function original(identity) {
-    const cached = resultStore.load(identity);
+    const proof=resultStore.metadata?.(identity);
+    const cached = proof?.missing&&!proof.expired ? null : resultStore.load(identity);
     if (cached) return cached;
     const opened = await supplier.downloadOriginal(identity.mode === 'account_video_v1'
       ? {identity,taskId:identity.taskId,method:'GET'}
@@ -62,7 +63,11 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
         chunks.push(Buffer.from(value));
       }
       if (received !== length) fail('original_length_mismatch');
-      return resultStore.put(identity, { bytes: Buffer.concat(chunks, received), mimeType });
+      const retention=opened.result_retention;
+      if(retention&&!['video_original_48h','legacy_unknown'].includes(retention.policy))fail('original_receipt_mismatch');
+      return resultStore.put(identity, { bytes: Buffer.concat(chunks, received), mimeType,
+        ...(retention?.expires_at?{expiresAt:retention.expires_at,...(retention.persisted_at?{persistedAt:retention.persisted_at}:{})}:{}),
+        ...(!retention||retention.policy==='legacy_unknown'?{legacy:true}:{}) });
     } catch (error) {
       await reader.cancel().catch(() => {});
       throw error;
@@ -79,13 +84,16 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
       if (!settled || settled.ownerId !== ownerId || settled.childId !== child.childId) fail('settlement_receipt_mismatch');
       if (settled.status === 'released') fail('download_not_ready');
       if (settled.status === 'captured') {
-        // Recover the same original and verify its identity/hash without
-        // repeating capture or changing a historical monetary fact.
-        if (child.account) await original(identity);
+        // A history/status read must not re-download a captured original.
+        // An explicit authorized download can repair a missing live copy;
+        // expired metadata remains a gate and is never a new generation.
         return settled;
       }
       if (settled.status !== 'held') fail('settlement_receipt_mismatch');
-      let stored = resultStore.load(identity);
+      const proof=resultStore.metadata?.(identity);
+      // The immutable decoded-result proof remains valid for the original
+      // financial recovery even when its customer download window has ended.
+      let stored = proof&&(proof.expired||proof.missing) ? proof : resultStore.load(identity);
       if (!stored) {
         const task = await supplier.getTask(child.account ? {identity,taskId:child.taskId} : {keySlotId:child.keySlotId,taskId:child.taskId});
         if ((task?.task_id ?? task?.id) !== child.taskId ||
@@ -101,7 +109,8 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
       return ledger.capture({ ownerId, childId: child.childId,
         evidence: { ownerId, childId: child.childId, requestHash: child.bodySha256,
           status: 'completed', supplierTaskId: child.taskId, reason: '',
-          ...(child.account ? {resultHash:stored.sha256,bindingHash:child.account.binding_hash} : {}) } });
+          ...(child.account ? {resultHash:stored.sha256,bindingHash:child.account.binding_hash,
+            resultRetention:{persisted_at:stored.storedAt,expires_at:stored.expiresAt||null,expired:stored.expired===true,policy:stored.policy||'legacy_unknown'}} : {}) } });
     });
   }
   async function openOriginal(ownerId, operationId, index, { method = 'GET', range } = {}) {
@@ -113,7 +122,8 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     if (!settled || settled.ownerId !== ownerId || settled.childId !== child.childId || settled.status !== 'captured') fail('download_not_ready');
     // Older captured orders may import their original once, without a new
     // generation or another capture. All subsequent reads use the private copy.
-    let stored = resultStore.load(identity);
+    const proof=resultStore.metadata?.(identity);
+    let stored = proof?.missing&&!proof.expired ? null : resultStore.load(identity);
     if (!stored) {
       stored = await once(`original:${ownerId}:${operationId}:${index}`, async () => {
         const task = await supplier.getTask(child.account ? {identity,taskId:child.taskId} : {keySlotId:child.keySlotId,taskId:child.taskId});
@@ -123,7 +133,8 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
       });
     }
     let status = 200, bytes = stored.bytes;
-    const headers = { 'Content-Type': stored.mimeType, 'X-Video-Quality': 'original' };
+    const headers = { 'Content-Type': stored.mimeType, 'X-Video-Quality': 'original', 'Cache-Control':'private, no-store',
+      ...(stored.expiresAt?{'X-Studio-Result-Expires-At':stored.expiresAt}:{}) };
     if (range !== undefined) {
       const [, rawStart, rawEnd] = /^bytes=(\d+)-(\d*)$/.exec(range);
       const start = Number(rawStart), requestedEnd = rawEnd ? Number(rawEnd) : stored.size - 1;
@@ -138,7 +149,7 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
   }
   async function inspectTask(ownerId, operationId, index) {
     const { child, identity } = context(ownerId, operationId, index);
-    if (child.status === 'accepted' && resultStore.load(identity)) {
+    if (child.status === 'accepted' && (resultStore.metadata?.(identity) || resultStore.load(identity))) {
       return { childId: child.childId, taskId: child.taskId, status: 'completed', progress: 100,
         billingAction: 'reconcile_authoritative_ledger' };
     }

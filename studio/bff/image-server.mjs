@@ -104,12 +104,25 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         if(match[2]===undefined) {reply(200,await tasks.recover(session,match[1]));return;}
         const result=tasks.result(session,match[1],Number(match[2]));
         const etag=result.info.etag;
-        if (etag && req.headers['if-none-match'] === etag) { res.writeHead(304,{'Cache-Control':'private, max-age=60, must-revalidate','ETag':etag,'Vary':'If-None-Match'}); res.end(); return; }
-        res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':'private, max-age=60, must-revalidate','ETag':etag,'Vary':'If-None-Match','X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
+        const cache=`private, max-age=${Math.max(0,Math.min(60,Math.floor((Date.parse(result.info.expires_at)-Date.now())/1000)))}, must-revalidate`;
+        if (etag && req.headers['if-none-match'] === etag) { res.writeHead(304,{'Cache-Control':cache,'ETag':etag,'Vary':'If-None-Match'}); res.end(); return; }
+        res.writeHead(200,{'Content-Type':result.info.mime_type,'Content-Length':result.data.length,'Cache-Control':cache,'ETag':etag,'Vary':'If-None-Match','X-Studio-Result-Expires-At':result.info.expires_at,'X-Content-Type-Options':'nosniff','Content-Disposition':`attachment; filename="${match[1]}-${match[2]}.${result.info.extension}"`});res.end(result.data);return;
       }
       reply(404,{error:'image_route_not_found'});
-    } catch(error) {if(!res.headersSent)reply(409,{error:error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',...(error?.stage ? {diagnostic_stage:error.stage} : {}),recovery:'GET original task only'});else res.end();}
+    } catch(error) {if(!res.headersSent){const expired=error?.code==='image_result_expired'||error?.message==='Image result expired';reply(expired?410:409,{error:expired?'image_result_expired':error?.message==='image_quote_expired'?'image_quote_expired':'image_binding_unavailable',...(error?.stage ? {diagnostic_stage:error.stage} : {}),recovery:'GET original task only'});}else res.end();}
   };
+}
+
+export function startResultCleanup(stores,{schedule=setInterval,cancel=clearInterval,report=(kind,stats)=>console.info('studio original cleanup',JSON.stringify({kind,...stats}))}={}) {
+  const retryKinds=new Set();
+  const run=()=>stores.map(([kind,store])=>{
+    let stats;try{stats=store.cleanup();}catch{stats={failed:1,error:'result_cleanup_failed'};}
+    stats={...stats,retry_after_failure:retryKinds.has(kind)};
+    if(stats.failed)retryKinds.add(kind);else retryKinds.delete(kind);
+    report(kind,stats);return {kind,...stats};
+  });
+  run();const timer=schedule(run,6*3600000);timer.unref?.();
+  return {run,close:()=>cancel(timer)};
 }
 
 export function buildImageServer(env=process.env, {legacyVideo}={}) {
@@ -128,21 +141,21 @@ export function buildImageServer(env=process.env, {legacyVideo}={}) {
   // expired image bytes (legacy PNG deadlines remain seven days); task journals
   // and financial evidence are intentionally handled by the owner-scoped
   // maintenance API instead of a broad startup sweep.
-  const cleanupImageResults=()=>{try{return resultStore.cleanup();}catch{return undefined;}};
-  cleanupImageResults();
-  const cleanupTimer=setInterval(cleanupImageResults,6*3600000);cleanupTimer.unref?.();
+  const stores=[['image',resultStore]];
+  const maintain=server=>{const maintenance=startResultCleanup(stores);server.once('close',maintenance.close);return server;};
   const tasks=createImageTaskRuntime({rootDir:path.join(root,'journal'),call:createPublishedImageClient(common),results:resultStore,assetResolver:imageAssetResolver});
   const imageHandler=createImageHandler({sessions,tasks,assetIntake,paidEnabled:env.STUDIO_IMAGE_PUBLISHED_SUBMISSION==='true',managedPaid:env.STUDIO_PAID_CONTROL_MODE==='managed-v1'});
-  if(!env.STUDIO_VIDEO_DATA_ROOT)return http.createServer((req,res)=>new URL(req.url,'http://localhost').pathname==='/internal/studio/paid-control'?paidControlHandler(env)(req,res):imageHandler(req,res));
+  if(!env.STUDIO_VIDEO_DATA_ROOT)return maintain(http.createServer((req,res)=>new URL(req.url,'http://localhost').pathname==='/internal/studio/paid-control'?paidControlHandler(env)(req,res):imageHandler(req,res)));
   if(!path.isAbsolute(env.STUDIO_VIDEO_DATA_ROOT))throw new Error('Private video root required');
-  const videoTasks=createAccountVideoRuntime({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'journal'),call:createAccountVideoClient(common),resultStore:createVideoResultStore({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'results')})});
+  const videoResultStore=createVideoResultStore({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'results')});stores.push(['video',videoResultStore]);
+  const videoTasks=createAccountVideoRuntime({rootDir:path.join(env.STUDIO_VIDEO_DATA_ROOT,'journal'),call:createAccountVideoClient(common),resultStore:videoResultStore});
   const resolveAssets=createVideoAssetResolver({intake:assetIntake,tasks:videoTasks});
   const videoHandler=createVideoHandler({sessions,tasks:videoTasks,resolveAssets,paidEnabled:env.STUDIO_VIDEO_ACCOUNT_SUBMISSION==='true',managedPaid:env.STUDIO_PAID_CONTROL_MODE==='managed-v1'});
   const control=paidControlHandler(env);
-  return http.createServer((req,res)=>{
+  return maintain(http.createServer((req,res)=>{
     if(req.url==='/internal/studio/paid-control')return control(req,res);
     return req.url.startsWith('/studio-v2/api/video/')?videoHandler(req,res):imageHandler(req,res);
-  });
+  }));
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const server=buildImageServer();server.listen(Number(process.env.STUDIO_IMAGE_BFF_PORT||8092),process.env.STUDIO_IMAGE_BFF_HOST||'127.0.0.1');

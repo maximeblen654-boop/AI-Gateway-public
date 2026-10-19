@@ -3,8 +3,10 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaWorkbenchView from '../MediaWorkbenchView.vue'
+import { useAuthStore } from '@/stores/auth'
+import { encodeDraftRecovery, recoveryCopyKey, type DraftRecovery } from '@/composables/draftRecovery'
 import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
-import { supplier, saved } from '@/components/admin/media/__tests__/fixtures'
+import { supplier, saved, copy } from '@/components/admin/media/__tests__/fixtures'
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
@@ -12,7 +14,14 @@ vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
 }))
 vi.mock('@/api/admin/mediaPaid', () => ({ mediaPaidAPI: { status: vi.fn(async (media: string) => ({ media, mode: 'managed-v1', effective_enabled: false, requested_enabled: false })) } }))
 const api = vi.mocked(mediaWorkbenchAPI)
-function mockSave(dto: ReturnType<typeof saved>) { api.saveDraft.mockImplementation(async () => { api.detail.mockResolvedValue(dto); return dto }) }
+function acknowledgement(dto: ReturnType<typeof saved>, version: number, products: Parameters<typeof mediaWorkbenchAPI.saveDraft>[2], submissionId?: string) {
+  dto = copy(dto)
+  dto.media_workbench_v1!.record_version = Math.max(dto.media_workbench_v1!.record_version, version + 1)
+  dto.media_workbench_v1!.draft.products = copy(products)
+  dto.media_workbench_v1!.draft.save_receipt = { submission_id: submissionId!, base_record_version: version, draft_revision: dto.media_workbench_v1!.draft.revision }
+  return dto
+}
+function mockSave(dto: ReturnType<typeof saved>) { api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => { const result = acknowledgement(dto, version, products, submissionId); api.detail.mockResolvedValue(result); return result }) }
 let wrapper: VueWrapper
 let router: ReturnType<typeof createRouter>
 
@@ -37,7 +46,7 @@ async function openEditor(id = 77, model = 'image-native-1') {
   await flushPromises()
 }
 beforeEach(() => {
-  vi.resetAllMocks()
+  vi.resetAllMocks(); localStorage.clear(); vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   api.suppliers.mockResolvedValue([supplier(), supplier(44)])
   api.detail.mockImplementation(async id => supplier(id))
   mockSave(saved())
@@ -125,12 +134,12 @@ describe('Media Workbench page flow', () => {
     const nil = supplier(); nil.media_workbench_v1 = null; nil.effective_state = 'NOT_INITIALIZED'; nil.effective_sales = false
     api.detail.mockResolvedValue(nil)
     const response = saved(); response.media_workbench_v1!.draft.products[0]!.upstream_model = 'new-model'; response.media_workbench_v1!.draft.products[0]!.site_model = 'new-model'
-    api.saveDraft.mockResolvedValue(response)
+    mockSave(response)
     await mountWorkbench(); await selectAccount(); await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="add-product-image"]').trigger('click'); await flushPromises()
     await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
     expect(api.initialize).not.toHaveBeenCalled()
-    expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]))
+    expect(api.saveDraft).toHaveBeenCalledWith(77, 0, expect.arrayContaining([expect.objectContaining({ media_type: 'image', upstream_model: 'new-model' })]), [], expect.any(String))
   })
 
   it('shows separate save, publish, and sales actions with an explicit product publication scope', async () => {
@@ -146,7 +155,7 @@ describe('Media Workbench page flow', () => {
     expect(dialog.text()).toContain('不会自动开启销售')
   })
 
-  it('appends image and video drafts before the first save without discarding or initializing early', async () => {
+  it('appends image and video drafts until a wizard boundary flush without discarding or initializing early', async () => {
     const nil = supplier(); nil.media_workbench_v1 = null; nil.effective_state = 'NOT_INITIALIZED'; nil.effective_sales = false
     api.detail.mockResolvedValue(nil)
     await mountWorkbench(); await selectAccount()
@@ -161,12 +170,12 @@ describe('Media Workbench page flow', () => {
     expect(api.saveDraft).not.toHaveBeenCalled()
     await wrapper.get('[data-test="display-name"]').setValue('视频草稿')
     await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
-    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    await flushPromises()
     expect(api.saveDraft).toHaveBeenCalledTimes(1)
     expect(api.saveDraft).toHaveBeenCalledWith(77, 0, [
       expect.objectContaining({ media_type: 'image', display_name: '保留的图片草稿', capabilities: expect.objectContaining({ count: { min: 1, max: 10 } }) }),
       expect.objectContaining({ media_type: 'video', display_name: '视频草稿', capabilities: expect.objectContaining({ count: { min: 1, max: 1 } }) })
-    ])
+    ], [], expect.any(String))
   })
 
   it('lists only published products when confirming an account-wide sales change', async () => {
@@ -204,7 +213,7 @@ describe('Media Workbench page flow', () => {
     await wrapper.get('[data-test="display-name"]').setValue('本地修改')
     api.saveDraft.mockRejectedValue({ status: 409 })
     await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
-    await wrapper.get('[data-test="reload"]').trigger('click')
+    await wrapper.get('[data-test="discard-reload"]').trigger('click')
     await wrapper.get('[data-test="confirm-reload"]').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="editor-page"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="selected-model-summary"]').text()).toContain('image-native-1')
@@ -224,7 +233,7 @@ describe('Media Workbench page flow', () => {
     response.media_workbench_v1.record_version = 4
     response.media_workbench_v1.draft.revision = 'mwd_b'
     response.media_workbench_v1.validation.draft_revision = 'mwd_b'
-    api.saveDraft.mockResolvedValue(response)
+    mockSave(response)
 
     await openEditor()
     const trace: Array<{ step: string; productCount: number; ids: string[]; selected: string }> = []
@@ -623,4 +632,90 @@ describe('Per-product readiness and explicit publication',()=>{
   expect(wrapper.get('[data-test="native-api-boundary"]').text()).toContain('不修改独立 API Key 的原生权限或路由')
   expect(wrapper.get('[data-test="native-api-boundary"]').text()).toContain('受保护的图片任务接口')
  })
+})
+
+
+describe('draft recovery choices and read-only server check', () => {
+  async function identifyAdmin() { const auth = useAuthStore(); auth.user = { id: 1 } as NonNullable<typeof auth.user>; await flushPromises() }
+  it('offers refresh-surviving copies without applying them and discards only the selected copy', async () => {
+    await openEditor(); await identifyAdmin(); await wrapper.get('[data-test="display-name"]').setValue('未保存的本地名称')
+    wrapper.unmount(); await openEditor(); await identifyAdmin()
+    expect(wrapper.get('[data-test="draft-recovery"]').text()).toContain('本地恢复副本')
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('画布图片')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="restore-recovery"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('未保存的本地名称')
+    await wrapper.get('[data-test="discard-recovery"]').trigger('click'); await flushPromises()
+    expect(wrapper.find('[data-test="draft-recovery"]').exists()).toBe(true)
+    await wrapper.get('[data-test="confirm-discard-recovery"]').trigger('click'); await flushPromises()
+    expect(wrapper.find('[data-test="draft-recovery"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="recovery-copy-select"]').exists()).toBe(false)
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('未保存的本地名称')
+  })
+  it('lists an offline new product after refresh and restores its original identity only after an explicit choice', async () => {
+    await openEditor(77, 'new-model'); await identifyAdmin(); window.dispatchEvent(new Event('offline'))
+    await wrapper.get('[data-test="add-product-video"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="display-name"]').setValue('离线新视频商品')
+    const key = Object.keys(localStorage).find(k => k.startsWith('ai-gateway:media-draft:'))!
+    const original = JSON.parse(localStorage.getItem(key)!) as DraftRecovery
+    wrapper.unmount(); await openEditor(77, 'new-model'); await identifyAdmin()
+    expect(wrapper.get('[data-test="unsubmitted-recoveries"]').text()).toContain('离线新视频商品')
+    expect(wrapper.find('[data-test="display-name"]').exists()).toBe(false)
+    await wrapper.get('[data-test="recover-unsubmitted"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="draft-recovery"]').text()).toContain('本地恢复副本')
+    expect(wrapper.find('[data-test="display-name"]').exists()).toBe(false)
+    await wrapper.get('[data-test="restore-recovery"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('离线新视频商品')
+    const savedCopies = Object.keys(localStorage).filter(k => k.startsWith('ai-gateway:media-draft:')).map(k => JSON.parse(localStorage.getItem(k)!) as DraftRecovery)
+    expect(savedCopies.every(c => c.product.product_id === original.product.product_id)).toBe(true)
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  })
+  it('lets the administrator choose another page copy without overwriting current input until explicit restore', async () => {
+    await openEditor(); await identifyAdmin(); await wrapper.get('[data-test="display-name"]').setValue('本页 A')
+    const key = Object.keys(localStorage).find(k => k.startsWith('ai-gateway:media-draft:'))!
+    const other = JSON.parse(localStorage.getItem(key)!) as DraftRecovery
+    other.editor_id = crypto.randomUUID(); other.copy_id = crypto.randomUUID(); other.product.display_name = '其他页 B'
+    const otherKey = recoveryCopyKey(other.identity, other.editor_id)!
+    localStorage.setItem(otherKey, encodeDraftRecovery(other)); window.dispatchEvent(new StorageEvent('storage', { key: otherKey })); await flushPromises()
+    expect(wrapper.get('[data-test="recovery-copy-select"]').findAll('option')).toHaveLength(2)
+    await wrapper.get('[data-test="recovery-copy-select"]').setValue(otherKey); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('本页 A')
+    await wrapper.get('[data-test="restore-recovery"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('其他页 B')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+  it('checks without replacing input, shows conflicting fields and requires a confirmed discard to reload', async () => {
+    await openEditor(); await identifyAdmin(); await wrapper.get('[data-test="display-name"]').setValue('本地 A')
+    const latest = saved(); latest.media_workbench_v1!.draft.products[0]!.display_name = '服务器 B'; api.detail.mockResolvedValue(latest)
+    await wrapper.get('[data-test="check-server"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('本地 A')
+    expect(wrapper.get('[data-test="recovery-differences"]').text()).toContain('服务器 B')
+    expect((wrapper.get('[data-test="restore-recovery"]').element as HTMLButtonElement).disabled).toBe(true)
+    await wrapper.get('[data-test="editor-discard-reload"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('本地 A')
+    await wrapper.get('[data-test="confirm-reload"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('服务器 B')
+    expect(wrapper.find('[data-test="draft-recovery"]').exists()).toBe(false); expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+  it('offers a human CAS retry only after checking an unchanged server and saves the latest input', async () => {
+    await openEditor(); await identifyAdmin()
+    expect(wrapper.text()).toContain('切换步骤会自动保存草稿，不会正式发布')
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
+    api.saveDraft.mockRejectedValueOnce({ status: 0 })
+    await wrapper.get('[data-test="display-name"]').setValue('sent A')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('待核对')
+    expect(wrapper.find('[data-test="retry-unconfirmed-save"]').exists()).toBe(false)
+    await wrapper.get('[data-test="display-name"]').setValue('latest B')
+    await wrapper.get('[data-test="check-server"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="retry-unconfirmed-save"]').text()).toContain('当前草稿')
+    mockSave(saved())
+    await wrapper.get('[data-test="retry-unconfirmed-save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft).toHaveBeenCalledTimes(2)
+    expect(api.saveDraft.mock.calls[1]![2][0]!.display_name).toBe('latest B')
+    expect(api.saveDraft.mock.calls[1]![4]).not.toBe(api.saveDraft.mock.calls[0]![4])
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('已确认保存')
+    expect(wrapper.find('[data-test="retry-unconfirmed-save"]').exists()).toBe(false)
+    expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
 })

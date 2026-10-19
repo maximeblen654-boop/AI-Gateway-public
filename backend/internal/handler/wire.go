@@ -163,6 +163,7 @@ func ProvideOpenAIGatewayHandler(
 	h.studioImage.PaidControl = h.studioPaidControl
 	h.studioVideo.PaidControl = h.studioPaidControl
 	gatewayService.StartImageReceiptWorker(context.Background(), apiKeyService)
+	service.StartStudioMediaRetentionMaintenance(context.Background(), gatewayService, h.studioImage.Store)
 	return h
 }
 

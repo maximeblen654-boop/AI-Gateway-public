@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 
@@ -160,11 +161,20 @@ func (h *OpenAIGatewayHandler) StudioVideoResult(c *gin.Context) {
 	}
 	body, mime, e := h.studioVideo.Original(c.Request.Context(), owner, c.Param("task_id"))
 	if e != nil {
+		if errors.Is(e, service.ErrStudioResultExpired) {
+			retention, _ := h.studioVideo.Store.ResultRetention(c.Param("task_id"))
+			c.JSON(http.StatusGone, gin.H{"error": "result_expired", "result_retention": retention})
+			return
+		}
 		videoError(c, e)
 		return
 	}
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Video-Quality", "original")
+	if retention, e := h.studioVideo.Store.ResultRetention(c.Param("task_id")); e == nil {
+		data, _ := json.Marshal(retention)
+		c.Header("X-Studio-Result-Retention", string(data))
+	}
 	c.Data(200, mime, body)
 }
 func (h *OpenAIGatewayHandler) StudioVideoCapture(c *gin.Context) {
@@ -173,18 +183,20 @@ func (h *OpenAIGatewayHandler) StudioVideoCapture(c *gin.Context) {
 		return
 	}
 	var input struct {
-		ResultHash string `json:"result_hash"`
+		ResultHash      string                         `json:"result_hash"`
+		ResultRetention *service.StudioResultRetention `json:"result_retention"`
 	}
 	if e := studioDecode(c, &input); e != nil {
 		videoError(c, e)
 		return
 	}
-	order, e := h.studioVideo.Capture(c.Request.Context(), owner, c.Param("task_id"), input.ResultHash)
+	order, e := h.studioVideo.Capture(c.Request.Context(), owner, c.Param("task_id"), input.ResultHash, input.ResultRetention)
 	if e != nil {
 		videoError(c, e)
 		return
 	}
-	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "task_id": order.ChildID, "status": "captured"})
+	retention, _ := h.studioVideo.Store.ResultRetention(order.ChildID)
+	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "task_id": order.ChildID, "status": "captured", "result_retention": retention})
 }
 func (h *OpenAIGatewayHandler) StudioVideoRelease(c *gin.Context) {
 	owner, _, ok := h.videoOwner(c)
