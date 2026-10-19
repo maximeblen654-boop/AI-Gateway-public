@@ -50,6 +50,7 @@ async function setAccountSchedulable(core, token, accountID, schedulable) {
 
 async function setAccountQuota(core, token, account, quotaLimit) {
   const path = '/admin/accounts/' + account.id
+  account = await core(token, path) // Never restore quota_used from an earlier fixture snapshot.
   await core(token, path, 'PUT', { extra: { ...account.extra, quota_limit: quotaLimit } })
   const readback = await core(token, path)
   assert.equal(readback.id, account.id, 'Quota readback returned another Account')
@@ -59,9 +60,10 @@ async function setAccountQuota(core, token, account, quotaLimit) {
 }
 
 async function clearAccountQuota(core, token, account) {
+  const path = '/admin/accounts/' + account.id
+  account = await core(token, path)
   const extra = { ...account.extra }
   delete extra.quota_limit
-  const path = '/admin/accounts/' + account.id
   await core(token, path, 'PUT', { extra })
   const readback = await core(token, path)
   assert.equal(readback.id, account.id)
@@ -167,9 +169,9 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const config = detail.media_workbench_v1
     return core(admin, configPath() + '/publish', 'POST', { expected_record_version: config.record_version, expected_draft_revision: config.draft.revision, product_ids })
   }
-  async function refreshPaidGrants() {
+  async function refreshPaidGrants(kinds = ['image', 'video']) {
     const before = stats()
-    for (const kind of ['image', 'video']) {
+    for (const kind of kinds) {
       const path = '/admin/media-workbench/paid-controls/' + kind
       const checked = await core(admin, path + '/check', 'POST', {})
       assert.equal(checked.pass, true, JSON.stringify(checked))
@@ -180,7 +182,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     }
     assert.equal(stats().image_posts, before.image_posts, 'Paid preflight generated an image')
     assert.equal(stats().video_posts, before.video_posts, 'Paid preflight generated a video')
-    report.checks.push('Official isolated preflight refreshed both paid grants for the newly published offers without generation')
+    report.checks.push(`Official isolated preflight refreshed ${kinds.join('/')} grants for current published offers and Account limits without generation`)
   }
   async function offer(user, kind, productID) {
     const result = ok(await media(user, kind, 'catalog'))
@@ -235,7 +237,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
       assert.equal(money(usage.total_cost), money(expectedSale))
       report.video_unknown_cost = usage
     }
-    assert.equal(money(after.account_quota) - money(before.account_quota), money(expectedQuota))
+    assert.equal(money(after.account_quota) - money(before.account_quota), money(expectedQuota), `${kind} Account quota delta differs from its frozen accounting contract`)
     assert.equal(supplierAfter[kind + '_posts'] - supplierBefore[kind + '_posts'], 1)
     const calls = supplierAfter.requests.filter(request => request.method === 'POST' && request.body.prompt === prompt)
     assert.equal(calls.length, 1)
@@ -330,6 +332,10 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert(deniedCatalog.status >= 400 || !deniedCatalog.body.offers?.some(item => item.product_id === image.product_id))
     report.checks.push('Customer cannot bind the unauthorized exclusive API Group; a separate customer without its own Studio Key cannot obtain the Studio offer (public Group binding policy unchanged)')
     const imgOffer = await offer(user, 'image', image.product_id), wanOffer = await offer(user, 'video', wan.product_id)
+    // Image quotes freeze monetary-quota eligibility. Enable only after video
+    // preflight, and clear before video quotes; preserve accrued native usage.
+    await setAccountQuota(core, admin, account, 100)
+    await refreshPaidGrants(['image'])
     const beforeAlias = await prepare(user, 'image', imgOffer, 0, 'SYNTHETIC procurement pre-alias', 2)
     const native = await core(admin, '/admin/accounts/' + account.id)
     const mapped = { ...native.credentials, model_mapping: { ...native.credentials.model_mapping, 'gpt-image-2': 'wrong-api-image-only', 'WAN3.0-可参考视频': 'wrong-api-video-only' } }
@@ -359,6 +365,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.equal((await offer(user, 'image', image.product_id)).offer_id, imgOffer.offer_id)
     assert.equal((await offer(user, 'video', wan.product_id)).offer_id, wanOffer.offer_id)
     await execute(user, 'image', beforeAlias, '1.8', '0.3', 'SYNTHETIC procurement pre-alias')
+    await clearAccountQuota(core, admin, account)
+    await refreshPaidGrants()
     for (const refs of [0, 1]) {
       const prompt = 'SYNTHETIC procurement WAN refs=' + refs
       const prepared = await prepare(user, 'video', wanOffer, refs, prompt)
@@ -371,6 +379,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }], cost_rules: [{ match: {}, cost: price('0'), source: 'manual' }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }] }, incomplete])
     await publish(saved, [image.product_id, wan.product_id])
     await refreshPaidGrants()
+    await setAccountQuota(core, admin, account, 100)
+    await refreshPaidGrants(['image'])
     const zeroOffer = await offer(user, 'image', image.product_id)
     const zeroPrompt = 'SYNTHETIC procurement explicit zero'
     await execute(user, 'image', await prepare(user, 'image', zeroOffer, 0, zeroPrompt), '1.1', '0', zeroPrompt)
@@ -396,6 +406,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assertZeroBalanceRejection(poorBefore, poorAfter, postsBefore, stats().image_posts, poorResult)
     report.balance_gate = { fixture_balance: poorBefore.balance, native_policy: 'nonpositive balance rejected; no projected-sale-price assumption', http_status: poorResult.status, task_status: poorResult.body.status, diagnostic_stage: poorResult.body.diagnostic_stage, supplier_posts: 0, usage_delta: poorAfter.usage - poorBefore.usage, balance_unchanged: true }
     await media(user, 'image', 'tasks'); await media(user, 'video', 'operations')
+    await clearAccountQuota(core, admin, account)
+    await refreshPaidGrants()
     const beforeBlocked = stats().video_posts
     report.native_controls = { schedulable_disabled: (await setAccountSchedulable(core, admin, account.id, false)).schedulable }
     const blocked = await media(user, 'video', 'quotes', { client_key: randomUUID(), offer_id: (await offer(user, 'video', wan.product_id).catch(() => wanOffer)).offer_id, model: wan.site_model, prompt: 'SYNTHETIC blocked', duration: 5, resolution: '720p', ratio: '16:9', assets: [] })

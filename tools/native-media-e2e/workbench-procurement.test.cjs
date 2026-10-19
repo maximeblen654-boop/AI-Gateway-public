@@ -60,12 +60,14 @@ test('Account quota updates preserve extra and native usage, with GET confirmati
     }
     await setAccountQuota(core, 'admin-token', account, quotaLimit)
     assert.deepEqual(calls, [
+      { token: 'admin-token', path: '/admin/accounts/44', method: 'GET', body: undefined },
       { token: 'admin-token', path: '/admin/accounts/44', method: 'PUT', body: { extra: { ...account.extra, quota_limit: quotaLimit } } },
       { token: 'admin-token', path: '/admin/accounts/44', method: 'GET', body: undefined }
     ])
   }
   await assert.rejects(setAccountQuota(async () => account, 'admin-token', account, 0.00000001), /not persisted/)
-  await assert.rejects(setAccountQuota(async () => ({ id: 44, extra: { quota_limit: 0.00000001, quota_used: 0 } }), 'admin-token', account, 0.00000001), /rewrote native usage/)
+  let reads = 0
+  await assert.rejects(setAccountQuota(async () => ++reads === 1 ? account : ({ id: 44, extra: { quota_limit: 0.00000001, quota_used: 0 } }), 'admin-token', account, 0.00000001), /rewrote native usage/)
 })
 
 test('native Key status updates and restoration require matching owned-Key GET state', async () => {
@@ -133,8 +135,70 @@ test('removing only the isolated monetary limit preserves native usage and other
   const readback = { id: 44, extra: { quota_used: 0.3, fixture_extra: true } }
   const core = async (_token, path, method = 'GET', body) => { calls.push({ path, method, body }); return readback }
   await clearAccountQuota(core, 'admin', account)
-  assert.deepEqual(calls[0], { path: '/admin/accounts/44', method: 'PUT', body: { extra: readback.extra } })
+  assert.deepEqual(calls[1], { path: '/admin/accounts/44', method: 'PUT', body: { extra: readback.extra } })
   assert.equal(account.extra.quota_limit, 100, 'Input snapshot must not be mutated')
   await assert.rejects(clearAccountQuota(async () => account, 'admin', account), /monetary Account limit/)
-  await assert.rejects(clearAccountQuota(async () => ({ id: 44, extra: { quota_used: 0 } }), 'admin', account), /rewrote native usage/)
+  let reads = 0
+  await assert.rejects(clearAccountQuota(async () => ++reads === 1 ? account : ({ id: 44, extra: { quota_used: 0 } }), 'admin', account), /rewrote native usage/)
+})
+
+
+test('shared fixture quota phases preserve image accounting and do not rewrite usage from stale snapshots', async () => {
+  const stale = { id: 44, extra: {} }
+  let current = structuredClone(stale)
+  const core = async (_token, _path, method = 'GET', body) => {
+    if (method === 'PUT') current.extra = structuredClone(body.extra)
+    return structuredClone(current)
+  }
+  const videoAllowed = () => !Number(current.extra.quota_limit)
+  assert.equal(videoAllowed(), true, 'Initial video preflight must see no amount limit')
+  await setAccountQuota(core, 'admin', stale, 100)
+  assert.equal(videoAllowed(), false, 'Video must not run during image quota phase')
+  // Synthetic stand-in for the real image ledger: the cloud acceptance retains
+  // its exact +0.3 assertion; this unit checks only fixture transition safety.
+  current.extra.quota_used = 0.3
+  await clearAccountQuota(core, 'admin', stale)
+  assert.equal(videoAllowed(), true)
+  assert.equal(current.extra.quota_used, 0.3)
+  await setAccountQuota(core, 'admin', stale, 100)
+  assert.equal(current.extra.quota_used, 0.3, 'Second image phase must retain prior consumption')
+  await clearAccountQuota(core, 'admin', stale)
+  assert.equal(videoAllowed(), true)
+  await setAccountQuota(core, 'admin', stale, 0.00000001)
+  assert.equal(videoAllowed(), false)
+  await setAccountQuota(core, 'admin', stale, 100)
+  assert.equal(videoAllowed(), false)
+  await clearAccountQuota(core, 'admin', stale)
+  assert.deepEqual(current.extra, { quota_used: 0.3 })
+})
+
+
+test('candidate image/video phases refresh grants for the active quota contract before execution', () => {
+  const source = require('node:fs').readFileSync(require.resolve('./workbench-procurement.cjs'), 'utf8')
+  const checkpoints = [
+    "await refreshPaidGrants()",
+    "await setAccountQuota(core, admin, account, 100)",
+    "await refreshPaidGrants(['image'])",
+    "const beforeAlias = await prepare",
+    "await execute(user, 'image', beforeAlias, '1.8', '0.3'",
+    "await clearAccountQuota(core, admin, account)",
+    "await refreshPaidGrants()",
+    "for (const refs of [0, 1])",
+    "await failVideo(user, wanOffer)",
+    "await refreshPaidGrants()",
+    "await setAccountQuota(core, admin, account, 100)",
+    "await refreshPaidGrants(['image'])",
+    "const zeroOffer = await offer",
+    "await clearAccountQuota(core, admin, account)",
+    "await refreshPaidGrants()",
+    "const beforeBlocked = stats().video_posts",
+  ]
+  let position = source.indexOf('const imgOffer')
+  // Initial preflight precedes customer setup; remaining checks bind exact order.
+  assert(source.indexOf(checkpoints.shift(), source.indexOf('module.exports =')) < position)
+  for (const checkpoint of checkpoints) {
+    const next = source.indexOf(checkpoint, position)
+    assert(next >= position, 'Missing ordered fixture stage: ' + checkpoint)
+    position = next + checkpoint.length
+  }
 })
