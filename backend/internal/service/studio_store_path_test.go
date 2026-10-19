@@ -21,6 +21,14 @@ func TestStudioStorePathsHashUntrustedIdentity(t *testing.T) {
 		t.Run(id, func(t *testing.T) {
 			paths := []string{
 				image.path("result", id),
+				image.path("upstream", id),
+				image.path("materialized", id),
+				image.path("unit-response", id),
+				image.path("task", id),
+				image.path("retention", id),
+				image.path("task", id) + ".sync-dispatch",
+				video.path("task", id) + ".retention-policy",
+				video.path("retention", id),
 				image.path("retention", id) + ".lock",
 				video.path("retention", id) + ".lock",
 				video.path("reference-lock", id),

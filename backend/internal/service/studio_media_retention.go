@@ -194,7 +194,7 @@ func (s *StudioImageStore) imageRetentionLocked(id string) (studioRetentionRecor
 	var first time.Time
 	consider := func(kind, copyID string, expected int, outcome bool) {
 		path := s.path(kind, copyID)
-		info, e := os.Lstat(path)
+		info, e := os.Lstat(path) // #nosec G703 -- Private configured root plus SHA-256 identity; closure callers supply only fixed media kinds.
 		if e != nil || !info.Mode().IsRegular() {
 			return
 		}
@@ -206,7 +206,7 @@ func (s *StudioImageStore) imageRetentionLocked(id string) (studioRetentionRecor
 			}
 			data = v.Data
 		} else {
-			data, e = os.ReadFile(path)
+			data, e = os.ReadFile(path) // #nosec G703 -- Same hashed copy path; kind is a fixed closure-call constant, not request input.
 			if e != nil {
 				return
 			}
@@ -238,7 +238,7 @@ func (s *StudioImageStore) imageRetentionLocked(id string) (studioRetentionRecor
 
 func (s *StudioImageStore) imageRetentionMarker(r *StudioImageReceipt) (bool, error) {
 	path := s.path("task", r.TaskID) + ".sync-dispatch"
-	info, err := os.Lstat(path)
+	info, err := os.Lstat(path) // #nosec G703 -- Task ID is SHA-256 encoded beneath the private root; marker suffix is constant.
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -248,7 +248,7 @@ func (s *StudioImageStore) imageRetentionMarker(r *StudioImageReceipt) (bool, er
 	if !info.Mode().IsRegular() || info.Size() > 512 {
 		return false, ErrStudioImageConflict
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G703 -- Same private hashed task path with a fixed retention/dispatch marker suffix.
 	if err != nil {
 		return false, err
 	}
@@ -378,7 +378,7 @@ func (s *StudioImageStore) CleanupExpired(limit int) StudioRetentionCleanupRepor
 	if limit > 256 {
 		limit = 256
 	}
-	entries, err := os.ReadDir(s.Root)
+	entries, err := os.ReadDir(s.Root) // #nosec G703 -- Root is server deployment configuration, never a request field.
 	if os.IsNotExist(err) {
 		return report
 	}
@@ -440,7 +440,7 @@ func (s *StudioImageStore) CleanupExpired(limit int) StudioRetentionCleanupRepor
 			}
 			remove := func(kind, id string) {
 				path := s.path(kind, id)
-				info, e := os.Lstat(path)
+				info, e := os.Lstat(path) // #nosec G703 -- Private configured root plus SHA-256 identity; closure callers supply only fixed media kinds.
 				if os.IsNotExist(e) {
 					return
 				}
@@ -452,7 +452,7 @@ func (s *StudioImageStore) CleanupExpired(limit int) StudioRetentionCleanupRepor
 				if s.removeFile != nil {
 					removeFile = s.removeFile
 				}
-				if e = removeFile(path); e != nil {
+				if e = removeFile(path); e != nil { // #nosec G703 -- Fixed media kind plus SHA-256 identity under the private root; non-regular entries are rejected above.
 					report.Failures++
 					return
 				}
@@ -464,7 +464,7 @@ func (s *StudioImageStore) CleanupExpired(limit int) StudioRetentionCleanupRepor
 			}
 			for _, u := range r.Units {
 				path := s.path("unit-response", u.ID)
-				beforeInfo, statErr := os.Lstat(path)
+				beforeInfo, statErr := os.Lstat(path) // #nosec G703 -- Fixed unit-response prefix plus SHA-256 unit ID beneath the private root.
 				var out studioImageUnitOutcome
 				if e := studioRead(path, &out); os.IsNotExist(e) {
 					if data, e := s.readOriginalCopy("materialized", u.ID); e == nil {
@@ -524,7 +524,7 @@ func (s *StudioImageStore) CleanupExpired(limit int) StudioRetentionCleanupRepor
 					continue
 				}
 				report.Deleted++
-				if afterInfo, e := os.Lstat(path); e == nil {
+				if afterInfo, e := os.Lstat(path); e == nil { // #nosec G703 -- Same hashed unit-response path used for the protected rewrite above.
 					report.Bytes += beforeInfo.Size() - afterInfo.Size()
 				} else {
 					report.Failures++
@@ -629,7 +629,7 @@ func (s *StudioVideoStore) claimRetention(t StudioVideoTask) error {
 	marker := s.path("task", t.ID) + ".retention-policy"
 	want := studioRetentionVersion + "|" + StudioVideoRetentionPolicy + "|" + t.Quote.BindingHash
 	if err = studioWrite(marker, []byte(want), true); os.IsExist(err) {
-		if data, e := os.ReadFile(marker); e != nil {
+		if data, e := os.ReadFile(marker); e != nil { // #nosec G703 -- Video task ID is hashed under the private root; retention-policy suffix is constant.
 			return e
 		} else if string(data) != want {
 			return ErrStudioVideoConflict
@@ -656,7 +656,7 @@ func (s *StudioVideoStore) claimRetention(t StudioVideoTask) error {
 
 func (s *StudioVideoStore) videoRetentionMarker(t StudioVideoTask) (bool, error) {
 	path := s.path("task", t.ID) + ".retention-policy"
-	info, err := os.Lstat(path)
+	info, err := os.Lstat(path) // #nosec G703 -- Task ID is SHA-256 encoded beneath the private root; marker suffix is constant.
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -666,7 +666,7 @@ func (s *StudioVideoStore) videoRetentionMarker(t StudioVideoTask) (bool, error)
 	if !info.Mode().IsRegular() || info.Size() > 512 {
 		return false, ErrStudioVideoConflict
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G703 -- Same private hashed task path with a fixed retention/dispatch marker suffix.
 	if err != nil {
 		return false, err
 	}
