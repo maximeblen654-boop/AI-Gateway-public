@@ -51,6 +51,10 @@ const initial: SupplierDetail = {
   }
 }
 if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: null, source: 'manual' }]
+if (scenario.startsWith('reference-input')) {
+  const refs = initial.media_workbench_v1!.draft.products[0]!.capabilities.references
+  refs.image.max = refs.total_max = scenario.endsWith('loss') ? 12 : 1
+}
 if (scenario === 'recovery-blank-removal') {
   const empty=initial.media_workbench_v1!.draft.products.find(p=>p.product_id===blank.product_id)!
   empty.capabilities={resolutions:[],aspect_ratios:[],qualities:[],durations_seconds:[],count:{min:1,max:1},references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},total_max:0},combination_rules:[]}

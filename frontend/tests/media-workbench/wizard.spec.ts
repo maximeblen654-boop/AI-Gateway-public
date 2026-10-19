@@ -32,6 +32,7 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await expect(page.getByTestId('text-only')).toBeVisible()
     await page.getByTestId('reference-image-mode').selectOption('optional')
     await page.getByTestId('reference-image-max').fill('4')
+    await page.getByTestId('reference-image-max').press('Enter')
     await expect(page.getByTestId('reference-total-summary')).toContainText('4 张')
     await capture(page, info, '02-references')
     await page.getByTestId('wizard-next').click()
@@ -96,6 +97,7 @@ test('reference legacy zero, immediate safety limit and unsaved leave prompt', a
   await page.getByTestId('wizard-next').click(); await page.getByTestId('wizard-back').click()
   await expect(page.getByTestId('legacy-reference-zero')).toBeVisible()
   await page.getByTestId('reference-image-max').fill('100')
+  await page.getByTestId('reference-image-max').press('Enter')
   await expect(page.getByTestId('reference-error')).toContainText('0～16')
   await capture(page, info, 'reference-safety-error')
   await page.getByTestId('reference-image-max').fill('16')
@@ -105,7 +107,9 @@ test('reference legacy zero, immediate safety limit and unsaved leave prompt', a
   await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('reference-image-mode')).toHaveValue('required')
-  expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
+  for (const call of (await calls(page)).filter(call => call.method !== 'get')) {
+    expect(call.method).toBe('put'); expect(call.url).toMatch(/\/draft$/)
+  }
 })
 
 test('denied combination gives five rows; missing, zero and conflicting prices remain explicit', async ({ page }, info) => {

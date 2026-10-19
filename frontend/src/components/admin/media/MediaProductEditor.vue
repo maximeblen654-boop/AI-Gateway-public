@@ -5,7 +5,7 @@
     </details>
   <fieldset ref="wizardElement" :disabled="disabled" class="mw-product-fields mw-wizard" :style="{ '--mw-step-index': wizardStep - 1 }">
     <nav class="mw-wizard-steps" aria-label="当前模型配置步骤">
-      <button v-for="(label, index) in stepLabels" :key="label" type="button" :data-test="`wizard-step-${index + 1}`" :aria-current="wizardStep === index + 1 ? 'step' : undefined" @click="goToStep(index + 1)"><span>{{ index + 1 }}</span><strong>{{ label }}</strong></button>
+      <button v-for="(label, index) in stepLabels" :key="label" type="button" :data-test="`wizard-step-${index + 1}`" :aria-current="wizardStep === index + 1 ? 'step' : undefined" @pointerdown="wizardStep === 2 && $event.preventDefault()" @click="goToStep(index + 1)"><span>{{ index + 1 }}</span><strong>{{ label }}</strong></button>
     </nav>
     <div ref="stepHeading" class="mw-wizard-heading" tabindex="-1">
       <h3>{{ stepQuestions[wizardStep - 1] }}</h3>
@@ -88,7 +88,7 @@
       <slot name="review" />
       <slot name="save" />
     </section>
-    <div class="mw-wizard-footer"><button v-if="wizardStep > 1" type="button" class="btn btn-secondary" data-test="wizard-back" @click="goToStep(wizardStep - 1)">← 上一步</button><span v-else class="mw-muted">仅编辑当前草稿</span><button v-if="wizardStep < 5" type="button" class="btn btn-primary" data-test="wizard-next" @click="goToStep(wizardStep + 1)">下一步：{{ stepLabels[wizardStep] }} →</button><span v-else class="mw-muted">保存不自动发布或启售。</span></div>
+    <div class="mw-wizard-footer"><button v-if="wizardStep > 1" type="button" class="btn btn-secondary" data-test="wizard-back" @pointerdown="wizardStep === 2 && $event.preventDefault()" @click="goToStep(wizardStep - 1)">← 上一步</button><span v-else class="mw-muted">仅编辑当前草稿</span><button v-if="wizardStep < 5" type="button" class="btn btn-primary" data-test="wizard-next" @pointerdown="wizardStep === 2 && $event.preventDefault()" @click="goToStep(wizardStep + 1)">下一步：{{ stepLabels[wizardStep] }} →</button><span v-else class="mw-muted">保存不自动发布或启售。</span></div>
   </fieldset>
   <MediaTechnicalEditor :product="product" :media-types="mediaTypes" :disabled="disabled" :binding="binding" :native-adapter="nativeAdapter" @update:product="updateTechnical" />
 </template>
@@ -130,7 +130,18 @@ const wizardStep = ref(1)
 const stepHeading = ref<HTMLElement>()
 const wizardElement = ref<HTMLElement>()
 const referenceEditor = ref<InstanceType<typeof MediaReferenceEditor>>()
-async function goToStep(step: number) { wizardStep.value = step; await nextTick(); stepHeading.value?.focus({ preventScroll: true }); wizardElement.value?.scrollIntoView?.({ block: 'start' }) }
+async function goToStep(step: number) {
+  // Commit before moving focus: blur can otherwise move the clicked button
+  // when the parent's recovery/autosave status changes the page height.
+  if (wizardStep.value === 2 && step !== 2 && referenceEditor.value) {
+    const committed = referenceEditor.value.commitPending()
+    if (committed !== true && !await committed) return
+  }
+  wizardStep.value = step
+  await nextTick()
+  stepHeading.value?.focus({ preventScroll: true })
+  wizardElement.value?.scrollIntoView?.({ block: 'start' })
+}
 function showField(path: string, code?: string) {
   // Some Core capability diagnostics cover a whole section, not an exact field.
   if (path.endsWith('capabilities') && (code === 'VIDEO_REFERENCES_UNSUPPORTED' || code === 'INVALID_REFERENCE_LIMIT' && referenceEditor.value?.error)) path += '.references'

@@ -28,12 +28,20 @@ for (const width of [1440, 390]) {
     await page.getByTestId('reference-video-max').fill('2')
     await expect(page.getByTestId('reference-error')).toHaveCount(0)
     await page.getByTestId('reference-image-max').fill('31')
+    await page.getByTestId('reference-image-max').press('Enter')
     await expect(page.getByTestId('reference-error')).toContainText('0～30')
     await page.getByTestId('reference-image-max').fill('30')
+    await page.getByTestId('reference-image-max').press('Enter')
     await page.getByTestId('reference-editor').scrollIntoViewIfNeeded()
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
     await page.screenshot({ path: info.outputPath('reference-limit-viewport.png'), animations: 'disabled' })
-    const writes = await page.evaluate(() => (window as unknown as { mediaFixture: { calls: Array<{method:string}> } }).mediaFixture.calls.filter(call => call.method !== 'get'))
-    expect(writes).toEqual([])
+    const writes = await page.evaluate(() => (window as unknown as { mediaFixture: { calls: Array<{method:string;url:string;input:{draft:{products:Array<{capabilities:{references:{image:{max:number};total_max:number}}}>}}}> } }).mediaFixture.calls.filter(call => call.method !== 'get'))
+    // Accepted edits may autosave. Invalid 31 must never reach a draft request;
+    // neither publication nor sales/generation requests are allowed here.
+    for (const call of writes) {
+      expect(call.method).toBe('put'); expect(call.url).toMatch(/\/draft$/)
+      expect(call.input.draft.products[0]!.capabilities.references.image.max).toBeLessThanOrEqual(30)
+      expect(call.input.draft.products[0]!.capabilities.references.total_max).toBeLessThanOrEqual(30)
+    }
   })
 }

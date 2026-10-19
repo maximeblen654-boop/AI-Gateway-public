@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
 import MediaProductEditor from '../MediaProductEditor.vue'
 import MediaReferenceEditor from '../MediaReferenceEditor.vue'
@@ -184,6 +184,7 @@ describe('reference limits', () => {
     await wrapper.get('[data-test="reference-image-max"]').setValue(100)
     expect(wrapper.get('[data-test="reference-error"]').text()).toContain('0～16')
     await wrapper.get('[data-test="reference-image-max"]').setValue(16)
+    await flushPromises()
     expect(wrapper.find('[data-test="reference-error"]').exists()).toBe(false)
     expect(wrapper.props('modelValue').total_max).toBe(16)
     await wrapper.get('[data-test="reference-image-mode"]').setValue('none')
