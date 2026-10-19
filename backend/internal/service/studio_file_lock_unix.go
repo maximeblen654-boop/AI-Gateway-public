@@ -10,7 +10,7 @@ import (
 // Kernel locks release on process exit; an interrupted upload can resume using
 // its durable intent rather than guessing whether a stale lock file is live.
 func studioFileLock(name string) (func(), error) {
-	f, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600)
+	f, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600) // #nosec G703 -- All callers use a server-configured private root and SHA-256 IDs; only fixed prefixes/suffixes are appended.
 	if err != nil {
 		return nil, err
 	}

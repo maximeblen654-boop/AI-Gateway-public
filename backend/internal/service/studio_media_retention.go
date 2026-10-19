@@ -170,8 +170,8 @@ func (s *StudioImageStore) imageRetentionLocked(id string) (studioRetentionRecor
 			return rec, ErrStudioImageConflict
 		}
 		rec = studioRetentionRecord{Version: studioRetentionVersion, TaskID: id, BindingHash: receipt.Quote.BindingHash, PayloadHash: receipt.PayloadHash, Retention: StudioResultRetention{Policy: StudioLegacyRetentionPolicy}}
-		data, e := os.ReadFile(s.path("result", id))
-		info, statErr := os.Lstat(s.path("result", id))
+		data, e := os.ReadFile(s.path("result", id)) // #nosec G703 -- path hashes id with SHA-256 under the server-configured private root; result is a fixed prefix.
+		info, statErr := os.Lstat(s.path("result", id)) // #nosec G703 -- Same hashed result path; caller-controlled id is never a filesystem component.
 		if e != nil || statErr != nil || !info.Mode().IsRegular() || receipt.ResultHash == "" || HashUsageRequestPayload(data) != receipt.ResultHash {
 			return rec, nil
 		}

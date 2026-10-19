@@ -87,21 +87,30 @@ func TestReferencePreparationConcurrentAndExpiredRecovery(t *testing.T) {
 	require.Equal(t, 1, u.calls)
 }
 
-func TestReferenceRejectsUnknownCostAndFalseCountsBeforeUpload(t *testing.T) {
-	for _, scenario := range []string{"cost", "counts"} {
+// Monetary-limit refusal is covered for total/daily/weekly limits by
+// TestVideoRetailRejectsAllMonetaryAccountLimits, including upload=0.
+func TestReferenceAllowsUnknownCostWithoutQuotaAndRejectsFalseCounts(t *testing.T) {
+	for _, scenario := range []string{"unknown_cost_without_quota", "false_counts"} {
 		t.Run(scenario, func(t *testing.T) {
 			r, _, q, key, _, _ := videoRuntimeFixture(t)
 			b := []byte("fixture-image-bytes")
 			asset := StudioVideoReferenceAsset{AssetRef: "asset-invalid", Kind: "image", MimeType: "image/png", Size: len(b), SHA256: fmt.Sprintf("%x", sha256.Sum256(b)), BytesBase64: base64.StdEncoding.EncodeToString(b)}
 			u := &localReferenceUploader{}
 			r.SetReferenceUploader(u)
-			if scenario == "cost" {
+			if scenario == "unknown_cost_without_quota" {
 				q.Binding.Spec.Images = 1
 				studioCostMediaFixture(t, r.Media).a.Config.Published.Products[0].CostRules = nil
 			}
-			_, e := r.PrepareReferenceAssets(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, []StudioVideoReferenceAsset{asset})
-			require.Error(t, e)
-			require.Zero(t, u.calls)
+			prepared, e := r.PrepareReferenceAssets(context.Background(), q.Binding.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, []StudioVideoReferenceAsset{asset})
+			if scenario == "unknown_cost_without_quota" {
+				require.NoError(t, e)
+				require.NotEmpty(t, prepared.PreparationID)
+				require.Len(t, prepared.Receipts, 1)
+				require.Equal(t, 1, u.calls)
+			} else {
+				require.Error(t, e)
+				require.Zero(t, u.calls)
+			}
 		})
 	}
 }
