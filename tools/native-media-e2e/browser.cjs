@@ -72,11 +72,33 @@ const report = { cases: [], http: [] }
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-prices-desktop.png`, fullPage: true })
     await w('wizard-next').click()
-    await w('display-name').fill(name)
-    const saved = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith(`/accounts/${accountId}/draft`))
-    await w('save').click()
-    const response = await saved; const detail = (await response.json()).data
-    assert.equal(response.status(), 200)
+    // Capture every concurrent save, then bind the final server receipt to its
+    // exact request. A URL-only first-response waiter can select an older autosave.
+    const saveResponses = []
+    const collectSave = r => { if (r.request().method() === 'PUT' && r.url().endsWith(`/accounts/${accountId}/draft`)) saveResponses.push(r) }
+    page.on('response', collectSave)
+    let response, detail, readback
+    try {
+      await w('display-name').fill(name)
+      await w('save').click()
+      await expect(w('autosave-status').locator(':scope > p').first()).toHaveText('已确认保存')
+      readback = await page.evaluate(async accountId => {
+        const reply = await fetch(`/api/v1/admin/media-workbench/accounts/${accountId}`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') } })
+        if (!reply.ok) throw Error('Final draft readback rejected')
+        return reply.json()
+      }, accountId)
+      assert.equal(readback.code, 0, 'Final draft readback must return official success')
+      const receipt = readback.data.media_workbench_v1.draft.save_receipt
+      assert(receipt?.submission_id, 'Final readback has no save receipt')
+      response = saveResponses.find(r => r.request().postDataJSON().submission_id === receipt.submission_id)
+      assert(response, 'No observed PUT matches final server receipt; refusing stale-save evidence')
+      assert.equal(response.status(), 200, 'Final acknowledged PUT failed')
+      detail = (await response.json()).data
+      const request = response.request().postDataJSON()
+      assert(request.draft.products.some(p => p.site_model === model && p.display_name === name), 'Acknowledged submission omitted final model/name edit')
+      assert.equal(readback.data.media_workbench_v1.record_version, detail.media_workbench_v1.record_version, 'Final GET and receipt-associated PUT versions differ')
+      assert.deepEqual(readback.data.media_workbench_v1.draft, detail.media_workbench_v1.draft, 'Final GET and receipt-associated PUT drafts differ')
+    } finally { page.off('response', collectSave) }
     report.validation = detail.media_workbench_v1.validation
     assert.equal(report.validation.publish_ready, true, JSON.stringify(report.validation.diagnostics))
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
@@ -92,14 +114,6 @@ const report = { cases: [], http: [] }
       // successful validation snapshot (+1). This isolated ready path has no other writer.
       assert.equal(savedConfig.record_version, submitted.expected_record_version + 2, 'Core must confirm draft and successful validation CAS commits')
       assert.deepEqual(savedConfig.draft.save_receipt, { submission_id: submitted.submission_id, base_record_version: submitted.expected_record_version, draft_revision: savedConfig.draft.revision }, 'Save receipt must confirm this exact submission')
-      const readback = await page.evaluate(async accountId => {
-        const reply = await fetch(`/api/v1/admin/media-workbench/accounts/${accountId}`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') } })
-        if (!reply.ok) throw Error('Draft readback rejected')
-        return reply.json()
-      }, accountId)
-      assert.equal(readback.code, 0)
-      assert.equal(readback.data.media_workbench_v1.record_version, savedConfig.record_version)
-      assert.deepEqual(readback.data.media_workbench_v1.draft, savedConfig.draft, 'Authoritative readback must match the acknowledged draft')
       const calculatorRequests = []
       const recordCalculatorWrite = request => { if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith('/api/v1/admin/media-workbench/')) calculatorRequests.push({ method: request.method(), path: new URL(request.url()).pathname }) }
       page.on('request', recordCalculatorWrite)

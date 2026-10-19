@@ -32,3 +32,33 @@ for (const width of [1440, 1366, 390]) test(`candidate confirmed save and indepe
   expect(await page.evaluate(() => window.mediaFixture.calls.filter(x => x.method !== 'get'))).toEqual(saved.calls)
   expect(await page.evaluate(() => window.mediaFixture.snapshot())).toEqual(saved.snapshot)
 })
+
+test('late old autosave cannot supply the final edited draft evidence', async ({ page }) => {
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
+  await page.goto('/tests/media-workbench/index.html?scenario=DRAFT_MANAGEMENT_VIDEO_LIMITS&theme=blue&mode=light')
+  const w = id => page.locator(`[data-test="${id}"]`)
+  await w('account-search').fill('#77'); await w('supplier-77').click(); await w('model-video-model').click()
+  await w('wizard-step-5').click()
+  await page.evaluate(() => window.mediaFixture.setDraftOutcome('hold'))
+  await w('display-name').fill('Synthetic old pending name')
+  await expect(w('autosave-status').locator(':scope > p').first()).toHaveText('保存中，后续输入继续保留')
+  await w('display-name').fill('Synthetic final edited name')
+  const before = await page.evaluate(() => window.mediaFixture.calls.filter(x => x.method === 'put'))
+  const oldId = before.at(-1).input.submission_id
+  // The actual Save button waits while the original request is in flight.
+  const manual = w('save').click()
+  await page.evaluate(() => window.mediaFixture.releaseDraft())
+  await manual
+  await expect(w('autosave-status').locator(':scope > p').first()).toHaveText('已确认保存')
+  const result = await page.evaluate(() => ({ snapshot: window.mediaFixture.snapshot(), calls: window.mediaFixture.calls.filter(x => x.method === 'put') }))
+  const config = result.snapshot.media_workbench_v1
+  const chosen = result.calls.find(x => x.input.submission_id === config.draft.save_receipt.submission_id)
+  expect(chosen).toBeTruthy()
+  expect(chosen.input.submission_id).not.toBe(oldId)
+  expect(chosen.input.draft.products.some(p => p.display_name === 'Synthetic final edited name')).toBe(true)
+  expect(config.draft.products).toEqual(chosen.input.draft.products)
+  expect(config.record_version).toBe(chosen.input.expected_record_version + 1) // fixture-only increment
+  expect(config.draft.save_receipt.base_record_version).toBe(chosen.input.expected_record_version)
+  expect(config.draft.save_receipt.draft_revision).toBe(config.draft.revision)
+  expect(result.calls[0].input.submission_id).not.toBe(config.draft.save_receipt.submission_id)
+})
