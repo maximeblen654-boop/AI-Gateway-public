@@ -197,7 +197,7 @@ func (r *staleValidationReceiptRepo) CompareAndSwapChecked(ctx context.Context, 
 		}
 		a.Config.Draft.SaveReceipt.SubmissionID = nextSubmissionID
 		a.Config.RecordVersion++
-		if err := r.memoryRepo.CompareAndSwap(ctx, id, expected, a.Config); err != nil {
+		if err := r.CompareAndSwap(ctx, id, expected, a.Config); err != nil {
 			return err
 		}
 	}

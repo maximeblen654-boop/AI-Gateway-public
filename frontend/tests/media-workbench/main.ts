@@ -28,7 +28,13 @@ if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
 }
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
-Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
+let nextDraftOutcome: 'reject' | 'hold' | undefined
+let releaseDraft: (() => void) | undefined
+Object.assign(window, { mediaFixture: {
+  calls: fixtureCalls, snapshot: () => copy(dto),
+  setDraftOutcome: (outcome: 'reject' | 'hold') => { nextDraftOutcome = outcome },
+  releaseDraft: () => { releaseDraft?.(); releaseDraft = undefined }
+} })
 if (scenario.startsWith('WIZARD') && !savedFixture) {
   const product = dto.media_workbench_v1!.draft.products[0]!
   dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
@@ -81,6 +87,11 @@ apiClient.defaults.adapter = async config => {
       throw { isAxiosError: true, config, response: { status, data: { code: 'FIXTURE_ERROR', message: 'Deterministic fixture' } } }
     }
     if (url.endsWith('/draft')) {
+      // Control one response without disabling autosave or changing application state.
+      const outcome = nextDraftOutcome
+      nextDraftOutcome = undefined
+      if (outcome === 'reject') throw { isAxiosError: true, config, response: { status: 422, data: { code: 'FIXTURE_DRAFT_REJECTED', message: 'Deterministic draft rejection' } } }
+      if (outcome === 'hold') await new Promise<void>(resolve => { releaseDraft = resolve })
       const current = account.media_workbench_v1!
       if (input.expected_record_version !== current.record_version) {
         throw { isAxiosError: true, config, response: { status: 409, data: { code: 'RECORD_VERSION_CONFLICT', message: 'Fixture CAS conflict' } } }

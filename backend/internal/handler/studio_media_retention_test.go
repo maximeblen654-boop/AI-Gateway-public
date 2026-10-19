@@ -23,5 +23,7 @@ func TestStudioReceiptExpiredResultRemainsFinanciallyReadable(t *testing.T) {
 	require.Equal(t, 200, out.Code)
 	require.Equal(t, "billed", body["billing_state"])
 	require.Equal(t, false, body["result_available"])
-	require.Equal(t, true, body["result_retention"].(map[string]any)["expired"])
+	retention, ok := body["result_retention"].(map[string]any)
+	require.True(t, ok, "expected result_retention object")
+	require.Equal(t, true, retention["expired"])
 }

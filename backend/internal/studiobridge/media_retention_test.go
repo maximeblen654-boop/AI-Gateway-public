@@ -51,7 +51,10 @@ func TestMediaRetentionBridgeVideoOriginalAndExpiry(t *testing.T) {
 				require.NotContains(t, out.Body.String(), "bytes_base64")
 			} else {
 				require.Equal(t, http.StatusOK, out.Code)
-				payload := body["data"].(map[string]any)["payload"].(map[string]any)
+				data, ok := body["data"].(map[string]any)
+				require.True(t, ok, "expected data object")
+				payload, ok := data["payload"].(map[string]any)
+				require.True(t, ok, "expected payload object")
 				require.Equal(t, retention, payload["result_retention"])
 				require.NotEmpty(t, payload["bytes_base64"])
 			}

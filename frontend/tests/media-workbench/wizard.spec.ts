@@ -2,6 +2,10 @@ import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import type { Product, SupplierDetail } from '../../src/api/admin/mediaWorkbench'
 
 type DraftCall = { method: string; url: string; input: { submission_id: string; expected_record_version: number; draft: { products: Product[] } } }
+type DraftControl = { setDraftOutcome: (outcome: 'reject' | 'hold') => void; releaseDraft: () => void }
+
+const setDraftOutcome = (page: Page, outcome: 'reject' | 'hold') => page.evaluate(value => (window as unknown as { mediaFixture: DraftControl }).mediaFixture.setDraftOutcome(value), outcome)
+const releaseDraft = (page: Page) => page.evaluate(() => (window as unknown as { mediaFixture: DraftControl }).mediaFixture.releaseDraft())
 
 async function openWizard(page: Page, scenario = 'WIZARD', mode = 'light') {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
@@ -149,26 +153,81 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
   })
 }
 
-test('reference legacy zero, immediate safety limit and unsaved leave prompt', async ({ page }, info) => {
+test('reference legacy zero, immediate safety limit and confirmed autosave leave', async ({ page }, info) => {
   await openWizard(page, 'WIZARD_ZERO')
+  const initial = await snapshot(page)
   await page.getByTestId('wizard-step-2').click()
   await expect(page.getByTestId('legacy-reference-zero')).toBeVisible()
   await page.getByTestId('wizard-next').click(); await page.getByTestId('wizard-back').click()
   await expect(page.getByTestId('legacy-reference-zero')).toBeVisible()
+  expect((await snapshot(page)).media_workbench_v1!.draft.products[0]!.capabilities.references.total_max).toBe(0)
+  expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
   await page.getByTestId('reference-image-max').fill('100')
   await page.getByTestId('reference-image-max').press('Enter')
   await expect(page.getByTestId('reference-error')).toContainText('0～16')
+  expect((await snapshot(page)).media_workbench_v1!.draft.products[0]!.capabilities.references.image.max).toBe(4)
+  expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
   await capture(page, info, 'reference-safety-error')
   await page.getByTestId('reference-image-max').fill('16')
   await page.getByTestId('reference-image-mode').selectOption('required')
   await expect(page.getByTestId('reference-error')).toHaveCount(0)
+  const writes = await confirmedDraft(page, initial)
+  const saved = (await snapshot(page)).media_workbench_v1!
+  expect(saved.draft.products[0]!.capabilities.references).toMatchObject({ image: { min: 1, max: 16 }, total_max: 16 })
+  // Editing specs creates an empty shared-price input; it must not invent a price.
+  expect(saved.draft.products[0]!.pricing_rules).toEqual([{ match: {}, sale_price: null }])
+  await capture(page, info, 'reference-confirmed-before-leave')
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
+  await expect(page.getByTestId('model-image-native-1')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '有未保存修改' })).toHaveCount(0)
+  expect((await calls(page)).filter(call => call.method !== 'get')).toEqual(writes)
+})
+
+test('reference rejected autosave retains dirty leave protection and recovery', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openWizard(page, 'WIZARD_ZERO')
+  const initial = await snapshot(page)
+  await page.getByTestId('wizard-step-2').click()
+  await setDraftOutcome(page, 'reject')
+  await page.getByTestId('reference-image-max').fill('16')
+  await page.getByTestId('reference-image-max').press('Enter')
+  await expect(page.getByTestId('autosave-status')).toContainText('保存失败，请修正后重试')
+  await expect(page.getByTestId('autosave-status')).not.toContainText('已确认保存')
+  await expect(page.getByTestId('draft-recovery')).toBeVisible()
   await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
   await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
+  await capture(page, info, 'reference-rejected-leave-protection-mobile')
   await page.keyboard.press('Escape')
-  await expect(page.getByTestId('reference-image-mode')).toHaveValue('required')
-  for (const call of (await calls(page)).filter(call => call.method !== 'get')) {
-    expect(call.method).toBe('put'); expect(call.url).toMatch(/\/draft$/)
-  }
+  await expect(page.getByTestId('reference-image-max')).toHaveValue('16')
+  await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  expect(await snapshot(page)).toEqual(initial)
+  const writes = (await calls(page)).filter(call => call.method !== 'get')
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toMatchObject({ method: 'put', url: '/admin/media-workbench/accounts/77/draft', input: { expected_record_version: initial.media_workbench_v1!.record_version } })
+  expect(writes[0]!.input.draft.products[0]!.capabilities.references).toMatchObject({ image: { min: 0, max: 16 }, total_max: 16 })
+})
+
+test('reference pending autosave blocks leaving until its exact receipt is confirmed', async ({ page }, info) => {
+  await openWizard(page, 'WIZARD_ZERO')
+  const initial = await snapshot(page)
+  await page.getByTestId('wizard-step-2').click()
+  await setDraftOutcome(page, 'hold')
+  await page.getByTestId('reference-image-max').fill('16')
+  await page.getByTestId('reference-image-max').press('Enter')
+  await expect(page.getByTestId('autosave-status')).toContainText('保存中，后续输入继续保留')
+  await expect(page.getByRole('button', { name: '← 返回模型列表', exact: true }).first()).toBeDisabled()
+  await expect(page.getByTestId('editor-page')).toBeVisible()
+  await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  expect(await snapshot(page)).toEqual(initial)
+  await capture(page, info, 'reference-pending-leave-protection')
+  await releaseDraft(page)
+  const writes = await confirmedDraft(page, initial)
+  expect(writes).toHaveLength(1)
+  expect(writes[0]!.input.draft.products[0]!.capabilities.references).toMatchObject({ image: { min: 0, max: 16 }, total_max: 16 })
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
+  await expect(page.getByTestId('model-image-native-1')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '有未保存修改' })).toHaveCount(0)
+  expect((await calls(page)).filter(call => call.method !== 'get')).toEqual(writes)
 })
 
 test('denied combination gives five rows; missing, zero and conflicting prices remain explicit', async ({ page }, info) => {
@@ -222,11 +281,18 @@ test('a missing save receipt remains unconfirmed and preserves the local recover
   expect(writes).toHaveLength(1)
   expect(writes[0]!.input.expected_record_version).toBe(3)
   expect(writes[0]!.input.submission_id).toEqual(expect.any(String))
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
+  await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('wizard-page-5')).toBeVisible()
   await page.getByTestId('check-server').click()
   // The server advanced without a matching receipt: checking must escalate to conflict.
   await expect(page.getByTestId('autosave-status')).toContainText('存在服务器版本冲突，当前输入保留')
   await expect(page.getByTestId('autosave-status')).not.toContainText('已确认保存')
   await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
+  await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
+  await page.keyboard.press('Escape')
   expect((await calls(page)).filter(call => call.method !== 'get')).toEqual(writes)
   await capture(page, info, 'missing-receipt-protection')
 })
