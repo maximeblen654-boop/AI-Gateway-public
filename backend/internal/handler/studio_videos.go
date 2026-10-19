@@ -22,6 +22,10 @@ func (h *OpenAIGatewayHandler) videoOwner(c *gin.Context) (service.StudioImageOw
 	return service.StudioImageOwner{UserID: subject.UserID, APIKeyID: key.ID, GroupID: *key.GroupID}, key, true
 }
 func videoError(c *gin.Context, e error) {
+	if service.QuoteFailureStage(e) == "account_quota_requires_cost" {
+		c.JSON(http.StatusConflict, gin.H{"error": "video_account_quota_requires_cost"})
+		return
+	}
 	c.JSON(http.StatusConflict, gin.H{"error": "video_binding_unavailable"})
 }
 

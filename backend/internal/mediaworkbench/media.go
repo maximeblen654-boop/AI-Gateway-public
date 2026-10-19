@@ -523,7 +523,7 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 	}
 	now := time.Now().UTC()
 	for i := range input.Products {
-		input.Products[i].CostVersion = 1
+		normalizeProductCost(&input.Products[i])
 		inheritNativeProduct(a, &input.Products[i])
 	}
 	c.Draft = makeDraft(input, basedOn, now)
@@ -663,7 +663,7 @@ func (s *Service) Publish(ctx context.Context, id, expected int64, revision stri
 	publication := a.Config.Draft
 	publication.Products = append([]Product(nil), publication.Products...)
 	for i := range publication.Products {
-		publication.Products[i].CostVersion = 1
+		normalizeProductCost(&publication.Products[i])
 	}
 	v, offers := Validate(a, publication, now)
 	a.Config.Validation = v

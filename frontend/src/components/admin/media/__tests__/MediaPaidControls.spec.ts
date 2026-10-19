@@ -53,8 +53,8 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  ]})
  const w=create();await flushPromises();const video=w.get('[data-test="paid-video"]')
  await video.findAll('button')[0].trigger('click');await flushPromises()
- expect(video.text()).toContain('工作台采购成本未匹配')
- expect(video.text()).toContain('第 4 步补齐后重新发布')
+ expect(video.text()).toContain('视频商品不再配置采购成本')
+ expect(video.find('[data-test="cost-guide"]').exists()).toBe(false)
  expect(video.text()).toContain('视频协议或规格不兼容')
  expect(video.text()).toContain('报价检查原因未分类')
  expect(video.text()).toContain('至少一个已发布商品通过检查')
@@ -69,7 +69,7 @@ it('guides administrators to persisted workbench costs without channel coupling'
  {code:'quote_cost_rule_missing',pass:false,account_id:44},
  {code:'quote_cost_contract',pass:false,account_id:44}
  ]})
- const w=create(); await flushPromises(); const video=w.get('[data-test="paid-video"]')
+ const w=create(); await flushPromises(); const video=w.get('[data-test="paid-image"]')
  await video.findAll('button')[0].trigger('click');await flushPromises()
  const guide=video.get('[data-test="cost-guide"]')
  expect(guide.text()).toContain('采购成本与售价')
@@ -78,5 +78,15 @@ it('guides administrators to persisted workbench costs without channel coupling'
  expect(video.text()).not.toContain('Channel')
  expect(video.text()).toContain('CNY 单张或整条成本')
  expect(api.apply).not.toHaveBeenCalled()
- expect(w.find('[data-test="paid-image"] [data-test="cost-guide"]').exists()).toBe(false)
+ expect(w.find('[data-test="paid-video"] [data-test="cost-guide"]').exists()).toBe(false)
+})
+
+it('explains the video amount-quota restriction without offering procurement or changing settings', async () => {
+ api.check.mockResolvedValue({ pass:false, checks:[{ code:'quote_account_quota_requires_cost', pass:false, account_id:44 }] })
+ const w=create(); await flushPromises(); const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click'); await flushPromises()
+ expect(video.text()).toContain('此 Account 设置了金额额度')
+ expect(video.text()).toContain('不会自动修改配置')
+ expect(video.find('[data-test="cost-guide"]').exists()).toBe(false)
+ expect(api.apply).not.toHaveBeenCalled()
 })

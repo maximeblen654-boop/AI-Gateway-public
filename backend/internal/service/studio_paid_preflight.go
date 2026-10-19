@@ -178,7 +178,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			// API pricing/mapping changes cannot invalidate a v1 Studio grant.
 			mappedModel := offer.UpstreamModel
 			var costIdentity any
-			if offer.CostVersion == 0 {
+			if offer.MediaType != "video" && offer.CostVersion == 0 {
 				if !legacyChannelRead {
 					legacyChannelRead = true
 					if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {

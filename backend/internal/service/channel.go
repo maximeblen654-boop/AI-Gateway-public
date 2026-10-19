@@ -30,7 +30,7 @@ func (m BillingMode) IsValid() bool {
 // IsValidUsageFilter 检查 BillingMode 是否可用于使用记录筛选。
 func (m BillingMode) IsValidUsageFilter() bool {
 	switch m {
-	case BillingModeToken, BillingModePerRequest, BillingModeImage, BillingModeVideo, "":
+	case BillingModeToken, BillingModePerRequest, BillingModeImage, BillingModeVideo, StudioVideoRetailUsageMode, "":
 		return true
 	}
 	return false

@@ -227,7 +227,7 @@
               </div>
             </div>
             <div v-if="showAccountBilling && row.account_rate_multiplier != null" class="mt-0.5 text-[11px] text-orange-500 dark:text-orange-400">
-              A ${{ accountBilled(row).toFixed(6) }}
+              A {{ accountBilledCost(row) == null ? '—' : '$' + accountBilledCost(row)!.toFixed(6) }}
             </div>
           </div>
         </template>
@@ -519,11 +519,7 @@
             <div class="flex items-center justify-between gap-6">
               <span class="text-gray-400">{{ t('usage.accountBilled') }}</span>
               <span class="font-semibold text-green-400">
-                ${{ accountBilled({
-                  total_cost: tooltipData?.total_cost,
-                  account_stats_cost: tooltipData?.account_stats_cost,
-                  account_rate_multiplier: tooltipData?.account_rate_multiplier,
-                }).toFixed(8) }}
+                {{ accountBilledCost(tooltipData ?? {}) == null ? '—' : '$' + accountBilledCost(tooltipData ?? {})!.toFixed(8) }}
               </span>
             </div>
           </template>
@@ -554,6 +550,7 @@ import {
 } from '@/utils/latencyHealth'
 import {
   BILLING_MODE_TOKEN,
+  accountBilledCost,
   getBillingModeLabel,
   getBillingModeBadgeClass,
   isImageUsage,
@@ -573,14 +570,6 @@ import {
   textInputTokens,
   hasImageInputCost,
 } from '@/utils/imageUsage'
-
-/** Compute the account-billed cost for display: (account_stats_cost ?? total_cost) * rate_multiplier */
-function accountBilled(row: { total_cost?: number | null; account_stats_cost?: number | null; account_rate_multiplier?: number | null }): number {
-  const base = row.account_stats_cost != null ? row.account_stats_cost : (row.total_cost ?? 0)
-  const result = base * (row.account_rate_multiplier ?? 1)
-  return Number.isNaN(result) ? 0 : result
-}
-
 
 import DataTable from '@/components/common/DataTable.vue'
 import EmptyState from '@/components/common/EmptyState.vue'

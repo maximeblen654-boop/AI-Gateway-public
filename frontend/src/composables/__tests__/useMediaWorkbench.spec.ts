@@ -28,6 +28,25 @@ async function start() {
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); vi.spyOn(console, 'warn').mockImplementation(() => undefined); api.detail.mockResolvedValue(supplier()); api.suppliers.mockResolvedValue([supplier(), supplier(44)]) })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers(); vi.restoreAllMocks() })
 
+it('confirms the new video receipt after legacy procurement fields are removed, retaining sale values', async () => {
+  const source = supplier(); const video = source.media_workbench_v1!.draft.products[0]!
+  video.media_type = 'video'; video.cost_rules = [{ match: {}, cost: { amount: '1.2', currency: 'CNY', billing_mode: 'per_request' } }]
+  api.detail.mockResolvedValue(source)
+  await start()
+  state.products.value[0]!.display_name = '无采购成本视频'
+  api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => {
+    expect(products[0]!.cost_rules).toBeUndefined()
+    const response = acknowledgement(saved(), version, products, submissionId)
+    delete response.media_workbench_v1!.draft.products[0]!.cost_rules
+    api.detail.mockResolvedValue(response)
+    return response
+  })
+  expect(await state.saveDraft()).toBe(true)
+  expect(state.saveState.value).toBe('saved')
+  expect(state.dirty.value).toBe(false)
+  expect(state.products.value[0]!.pricing_rules).toEqual(video.pricing_rules)
+})
+
 it('reconciles a save timeout by reading persisted cost without repeating the write', async () => {
   await start()
   const dto = saved()
@@ -943,7 +962,7 @@ describe('reviewed per-page ownership and per-product conflicts', () => {
     other.mounted.unmount()
     expect(copies().some(entry => entry.value.product.display_name === 'other page A')).toBe(true)
   })
-  it('discovers an offline unsubmitted product after refresh and restores its original identity and independent cost and sale', async () => {
+  it('discovers an offline unsubmitted video and restores identity and sale without retired procurement', async () => {
     const first = await page(); first.value.selectModel('new-model'); window.dispatchEvent(new Event('offline'))
     first.value.addProduct('video')
     const id = first.value.product.value!.product_id
@@ -959,7 +978,7 @@ describe('reviewed per-page ownership and per-product conflicts', () => {
     expect(await next.value.restoreRecovery()).toBe(true)
     expect(next.value.product.value!.product_id).toBe(id); expect(next.value.addedProductIds.value).toContain(id)
     expect(next.value.product.value!.display_name).toBe('离线新增视频'); expect(next.value.product.value!.capabilities.durations_seconds).toEqual([6, 12])
-    expect(next.value.product.value!.cost_rules![0]!.cost!.amount).toBe('0.37'); expect(next.value.product.value!.pricing_rules[0]!.sale_price!.amount).toBe('0.8')
+    expect(next.value.product.value!.cost_rules).toBeUndefined(); expect(next.value.product.value!.pricing_rules[0]!.sale_price!.amount).toBe('0.8')
     expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
   })
   it('warns at the bounded Account copy limit and never evicts another editor recovery to make space', async () => {

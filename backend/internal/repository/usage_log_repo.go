@@ -83,8 +83,8 @@ func appendUsageLogBillingModeWhereConditionWithAlias(conditions []string, args 
 	switch service.BillingMode(mode) {
 	case service.BillingModeImage:
 		conditions = append(conditions, fmt.Sprintf("(%s = %s OR ((%s IS NULL OR %s = '') AND COALESCE(%s, 0) > 0))", column("billing_mode"), placeholder, column("billing_mode"), column("billing_mode"), column("image_count")))
-	case service.BillingModeVideo:
-		conditions = append(conditions, fmt.Sprintf("%s = %s", column("billing_mode"), placeholder))
+	case service.BillingModeVideo, service.BillingModePerRequest:
+		conditions = append(conditions, fmt.Sprintf("(%s = %s OR %s = 'studio_video_retail')", column("billing_mode"), placeholder, column("billing_mode")))
 	case service.BillingModeToken:
 		conditions = append(conditions, fmt.Sprintf("(%s = %s OR ((%s IS NULL OR %s = '') AND COALESCE(%s, 0) <= 0))", column("billing_mode"), placeholder, column("billing_mode"), column("billing_mode"), column("image_count")))
 	default:

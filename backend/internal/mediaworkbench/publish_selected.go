@@ -33,7 +33,7 @@ func (s *Service) PublishSelected(ctx context.Context, id, expected int64, revis
 			}
 			// Explicit publication adopts the current cost contract, including
 			// saved drafts created before its introduction.
-			p.CostVersion = 1
+			normalizeProductCost(&p)
 			products = append(products, p)
 		}
 	}

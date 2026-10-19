@@ -2,6 +2,22 @@ package mediaworkbench
 
 import "fmt"
 
+// VideoRetailVersion is the server-owned sale-only video contract. It never
+// means legacy Channel pricing and is not an administrator-selectable mode.
+const VideoRetailVersion = 2
+
+func normalizeProductCost(p *Product) {
+	p.CostVersion = 1
+	if p.MediaType == "video" {
+		p.CostVersion = VideoRetailVersion
+		p.CostRules = nil
+	}
+}
+
+func requiresPublishedCost(p Product) bool {
+	return p.CostVersion >= 1 && p.MediaType != "video"
+}
+
 // Cost rules use the same bounded domain as sale prices but are independently
 // matched. Amount is the cost of one delivered image/video, including for video
 // duration-specific rules: runtime never multiplies by duration.

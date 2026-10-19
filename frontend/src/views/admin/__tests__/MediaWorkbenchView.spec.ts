@@ -368,6 +368,7 @@ describe('Media Workbench page flow', () => {
     const dto = supplier(77, 'FAIL')
     const first = dto.media_workbench_v1!.draft.products[0]!
     first.media_type = mediaType
+    if (mediaType === 'video') { first.capabilities.durations_seconds = [5]; first.capabilities.count = { min: 1, max: 1 } }
     first.display_name = '已配置商品'
     const blank = JSON.parse(JSON.stringify(first))
     blank.product_id = 'media-blank-private'
@@ -388,10 +389,11 @@ describe('Media Workbench page flow', () => {
     await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="product-select"]').element).toHaveProperty('value', blank.product_id)
     expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
-    expect(wrapper.get('[data-test="price-0"]').element).toHaveProperty('value', '')
+    const priceSelector = mediaType === 'video' ? '[data-test="video-sale-5"]' : '[data-test="price-0"]'
+    expect(wrapper.get(priceSelector).element).toHaveProperty('value', '')
     await wrapper.get('[data-test="product-select"]').setValue(first.product_id); await flushPromises()
     await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
-    expect(wrapper.get('[data-test="price-0"]').element).toHaveProperty('value', '0.18')
+    expect(wrapper.get(priceSelector).element).toHaveProperty('value', '0.18')
     expect(api.saveDraft).not.toHaveBeenCalled()
   })
 

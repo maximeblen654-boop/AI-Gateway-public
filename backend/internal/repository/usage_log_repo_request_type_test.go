@@ -334,9 +334,9 @@ func TestAppendUsageLogBillingModeWhereCondition(t *testing.T) {
 			wantCondition: "(billing_mode = $1 OR ((billing_mode IS NULL OR billing_mode = '') AND COALESCE(image_count, 0) > 0))",
 		},
 		{
-			name:          "video remains exact",
+			name:          "video includes retail videos",
 			billingMode:   string(service.BillingModeVideo),
-			wantCondition: "billing_mode = $1",
+			wantCondition: "(billing_mode = $1 OR billing_mode = 'studio_video_retail')",
 		},
 		{
 			name:          "token includes legacy non-image rows",
@@ -344,9 +344,9 @@ func TestAppendUsageLogBillingModeWhereCondition(t *testing.T) {
 			wantCondition: "(billing_mode = $1 OR ((billing_mode IS NULL OR billing_mode = '') AND COALESCE(image_count, 0) <= 0))",
 		},
 		{
-			name:          "per request remains exact",
+			name:          "per request includes retail videos",
 			billingMode:   string(service.BillingModePerRequest),
-			wantCondition: "billing_mode = $1",
+			wantCondition: "(billing_mode = $1 OR billing_mode = 'studio_video_retail')",
 		},
 	}
 

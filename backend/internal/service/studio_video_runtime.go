@@ -233,32 +233,12 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	if e != nil {
 		return "", q, e
 	}
-	b := StudioVideoBinding{Version: StudioVideoBindingVersion, QuoteID: id, Owner: owner, PublishedRevision: resolved.PublishedRevision,
+	b := StudioVideoBinding{Version: StudioVideoRetailBindingVersion, QuoteID: id, Owner: owner, PublishedRevision: resolved.PublishedRevision,
 		Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash, PlanHash: studioHash(plan), RequestHash: plan.RequestHash,
 		AccountType: a.Type, Platform: a.Platform, BaseURL: studioMediaBaseURL(a), CredentialFingerprint: videoCredentialFingerprint(a), KeyQuotaEnabled: key.Quota > 0, KeyRateEnabled: key.HasRateLimits(), AccountQuotaEnabled: a.HasAnyQuotaLimit(), CreatedAt: now, ExpiresAt: now.Add(2 * time.Minute)}
-	if resolved.Offer.CostVersion >= 1 {
-		b.Accounting, e = r.referenceAccounting(ctx, a, owner, resolved, now)
-	} else {
-		var channel *Channel
-		if r.Core.channelService != nil && r.Core.channelService.repo != nil {
-			cid, err := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
-			if err != nil {
-				return "", q, QuoteFailure("account_cost", err)
-			}
-			if cid > 0 {
-				channel, e = r.Core.channelService.repo.GetByID(ctx, cid)
-				if e != nil {
-					return "", q, QuoteFailure("account_cost", e)
-				}
-			}
-		}
-		if channel == nil || !channel.IsActive() {
-			return "", q, QuoteFailure("cost_channel_missing", ErrStudioImageAccounting)
-		}
-		b.Accounting, e = resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: b.Offer, Spec: b.Spec, SpecHash: b.SpecHash}, channel, now, "CNY", false)
-	}
+	b.Accounting, e = r.referenceAccounting(ctx, a, owner, resolved, now)
 	if e != nil {
-		if QuoteFailureStage(e) == "cost_rule_missing" || QuoteFailureStage(e) == "cost_contract" {
+		if QuoteFailureStage(e) == "account_quota_requires_cost" || QuoteFailureStage(e) == "cost_rule_missing" || QuoteFailureStage(e) == "cost_contract" {
 			return "", q, e
 		}
 		return "", q, QuoteFailure("account_cost", e)
@@ -307,12 +287,15 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		return fail()
 	}
 	if admission {
+		if b.Version == StudioVideoRetailBindingVersion && a.HasAnyQuotaLimit() {
+			return nil, nil, QuoteFailure("account_quota_requires_cost", ErrStudioImageAccounting)
+		}
 		if a.Platform == PlatformGrok {
 			if eligible, _ := a.GrokMediaGenerationEligibility(); !eligible {
 				return fail()
 			}
 		}
-		if !a.IsSchedulable() || (b.Offer.CostVersion == 0 && a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel) || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
+		if !a.IsSchedulable() || (b.Version != StudioVideoRetailBindingVersion && b.Offer.CostVersion == 0 && a.GetMappedModel(b.Offer.SiteModel) != b.Offer.UpstreamModel) || (a.HasAnyQuotaLimit() && !b.AccountQuotaEnabled) {
 			return fail()
 		}
 		ma, e := r.Media.Get(ctx, a.ID)
@@ -324,10 +307,10 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 			return fail()
 		}
 		requested := current.Offer.SiteModel
-		if current.Offer.CostVersion >= 1 {
+		if b.Version == StudioVideoRetailBindingVersion || current.Offer.CostVersion >= 1 {
 			requested = current.Offer.UpstreamModel
 		}
-		ctx = withPublishedMediaModel(ctx, a, requested, current.Offer.UpstreamModel, current.Offer.CostVersion >= 1)
+		ctx = withPublishedMediaModel(ctx, a, requested, current.Offer.UpstreamModel, b.Version == StudioVideoRetailBindingVersion || current.Offer.CostVersion >= 1)
 		a = publishedMediaExecutionAccount(ctx, a, requested)
 		gid := b.Owner.GroupID
 		ctx = r.Core.withOpenAIQuotaAutoPauseContext(ctx)

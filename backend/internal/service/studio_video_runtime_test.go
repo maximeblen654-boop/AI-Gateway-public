@@ -16,8 +16,9 @@ import (
 
 type videoOrderFixture struct {
 	StudioVideoOrderRepository
-	orders             map[string]*StudioVideoOrder
-	captures, reserves int
+	orders                map[string]*StudioVideoOrder
+	captures, reserves    int
+	holds, captureAmounts []float64
 }
 
 func (f *videoOrderFixture) ReserveStudioVideoOrder(_ context.Context, c *StudioVideoReserveCommand) (*StudioVideoOrder, error) {
@@ -28,6 +29,7 @@ func (f *videoOrderFixture) ReserveStudioVideoOrder(_ context.Context, c *Studio
 		return old, nil
 	}
 	f.reserves++
+	f.holds = append(f.holds, c.HoldAmount)
 	o := &StudioVideoOrder{ChildID: c.ChildID, UserID: c.UserID, APIKeyID: c.APIKeyID, GroupID: c.GroupID, QuoteID: c.QuoteID, RequestHash: c.RequestHash, CapabilityVersion: c.CapabilityVersion, HoldFingerprint: c.Fingerprint(), State: StudioVideoHeld}
 	f.orders[c.ChildID] = o
 	return o, nil
@@ -51,6 +53,7 @@ func (f *videoOrderFixture) CaptureStudioVideoOrder(ctx context.Context, c *Stud
 		return o, nil
 	}
 	f.captures++
+	f.captureAmounts = append(f.captureAmounts, c.ActualAmount)
 	o.State = StudioVideoCaptured
 	o.SupplierTaskID = c.SupplierTaskID
 	o.FinalFingerprint = c.Fingerprint()
@@ -72,6 +75,9 @@ func videoRuntimeFixture(t *testing.T) (*StudioVideoRuntime, string, StudioVideo
 	t.Helper()
 	ctx := context.Background()
 	image, _, key, accounts, _ := studioContractFixture(t)
+	delete(accounts.a.Extra, "quota_limit")
+	delete(accounts.a.Extra, "quota_daily_limit")
+	delete(accounts.a.Extra, "quota_weekly_limit")
 	model, ok := videoplan.Lookup("3.0")
 	require.True(t, ok)
 	accounts.a.Credentials["model_mapping"] = map[string]any{"3.0": model.Upstream}

@@ -209,7 +209,7 @@
                 <p>发现此商品的本地恢复副本，基准服务器版本 {{ recovery.base_record_version }}。{{ recoveryConflict ? '服务器已更新，请先核对字段差异再选择。' : recovery.pending_submission ? '上次保存结果待核对；恢复后保留本地输入并暂停自动写入，请核对服务器后继续。' : '恢复后将自动保存草稿，不会正式发布。' }}</p>
                 <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看本地与服务器字段差异（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.field || '商品' }}</strong><p style="overflow-wrap:anywhere">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere">服务器：{{ diff.server }}</p></li></ul></details>
                 <label v-if="recoveryConflict"><input v-model="acceptRecoveryConflict" type="checkbox" data-test="confirm-recovery-conflict" />我已核对差异，恢复本地此商品并以服务器最新版本为基准</label>
-                <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreRecovery(acceptRecoveryConflict)">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
+                <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreWithUndoProtection()">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
                 <button type="button" class="btn btn-secondary" data-test="discard-recovery" :disabled="busy" @click="discardRecoveryDialog = true">丢弃恢复副本</button>
               </div>
               <button type="button" class="btn btn-secondary" data-test="check-server" :disabled="busy" @click="checkServer">核对服务器状态</button>
@@ -296,6 +296,7 @@
       <p>仅删除此商品的浏览器恢复副本；当前表单和服务器配置保持原状。</p>
       <template #actions><button class="btn btn-secondary" data-test="confirm-discard-recovery" :disabled="busy" @click="discardRecovery(); discardRecoveryDialog = false">确认丢弃恢复副本</button></template>
     </MediaDialog>
+    <MediaIndependentCalculator :admin-id="auth.user?.id" />
   </AppLayout>
 </template>
 
@@ -306,6 +307,7 @@ import { useAuthStore } from '@/stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import MediaIndependentCalculator from '@/components/admin/media/MediaIndependentCalculator.vue'
 import MediaDialog from '@/components/admin/media/MediaDialog.vue'
 import MediaProductEditor from '@/components/admin/media/MediaProductEditor.vue'
 import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.vue'
@@ -563,7 +565,10 @@ async function discardAndNavigate() {
 function openPublish() { publishProductIds.value = config.value?.draft.products.some(p => p.product_id === selectedProduct.value) ? [selectedProduct.value] : []; publishDialog.value = true }
 async function confirmPublish() { if (await publish(publishProductIds.value)) publishDialog.value = false }
 async function confirmSales() { if (config.value && await sales(!config.value.sales.enabled)) salesDialog.value = false }
+async function restoreWithUndoProtection() { productEditor.value?.invalidateSaleUndo(); await restoreRecovery(acceptRecoveryConflict.value) }
+watch(conflict, value => { if (value) productEditor.value?.invalidateSaleUndo() })
 async function reload() {
+  productEditor.value?.invalidateSaleUndo()
   const accountId = detail.value?.id
   if (!accountId) return
   const previousStep = step.value

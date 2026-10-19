@@ -6,6 +6,16 @@ const identity = { admin_id: 1, account_id: 77, product_id: imageProduct.product
 const fixture = (): DraftRecovery => ({ version: 1, identity, base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: 1, copy_id: '99999999-9999-4999-8999-999999999999', product: copy(imageProduct) })
 
 describe('bounded product recovery and save comparison', () => {
+  it('normalizes retired video procurement only and still compares image procurement exactly', () => {
+    const original = copy(imageProduct)
+    original.cost_rules = [{ match: {}, cost: { amount: '1.5', currency: 'CNY', billing_mode: 'per_request' } }]
+    const cleared = copy(original); delete cleared.cost_rules
+    expect(draftFingerprint([original])).not.toBe(draftFingerprint([cleared]))
+    original.media_type = 'video'; cleared.media_type = 'video'
+    expect(persistedFingerprint([original], supplier())).toBe(draftFingerprint([cleared]))
+    cleared.pricing_rules[0]!.sale_price!.amount = '99'
+    expect(persistedFingerprint([original], supplier())).not.toBe(draftFingerprint([cleared]))
+  })
   it('keys by administrator Account product and exact model identity, independently of server version', () => {
     const a = fixture(), b = fixture(); b.base_record_version = 100
     expect(recoveryKey(a.identity)).toBe(recoveryKey(b.identity))

@@ -38,7 +38,7 @@ func (b *StudioVideoBinding) Hash() string              { return studioHash(b) }
 func (b *StudioVideoBinding) CapabilityVersion() string { return "av1_" + b.Hash() }
 
 func (b *StudioVideoBinding) Validate() error {
-	if b == nil || b.Version != StudioVideoBindingVersion || !studioImageTaskID.MatchString(b.QuoteID) ||
+	if b == nil || (b.Version != StudioVideoBindingVersion && b.Version != StudioVideoRetailBindingVersion) || !studioImageTaskID.MatchString(b.QuoteID) ||
 		b.Owner.UserID <= 0 || b.Owner.APIKeyID <= 0 || b.Owner.GroupID <= 0 || b.Offer.AccountID <= 0 ||
 		b.PublishedRevision == "" || b.Offer.OfferID == "" || b.Offer.MediaType != "video" ||
 		b.Offer.SiteModel == "" || b.Offer.UpstreamModel == "" ||
@@ -55,6 +55,9 @@ func (b *StudioVideoBinding) Validate() error {
 	n, err := mediaworkbench.DecimalAmount(sale.Amount)
 	if err != nil || n.IsZero() || n.GreaterThanOrEqual(decimalSubscriptionLimit) || (sale.Currency != "CNY" && sale.Currency != "USD") || sale.BillingMode != "per_request" {
 		return ErrStudioVideoInvalidOrder
+	}
+	if b.Version == StudioVideoRetailBindingVersion {
+		return validateVideoRetailAccounting(b)
 	}
 	a := b.Accounting
 	base, e1 := mediaworkbench.DecimalAmount(a.BaseAmount)
@@ -129,9 +132,14 @@ func VideoAccountUsage(childID, upstreamID string, b *StudioVideoBinding) *Usage
 	rate, _ := decimal.NewFromString(b.Accounting.AccountRateMultiplier)
 	cost, multiplier := base.InexactFloat64(), rate.InexactFloat64()
 	model, media, mode, inbound, endpoint := b.Offer.UpstreamModel, "video", "per_request", "/v1/studio/videos/tasks", "/v1/videos"
-	return &UsageLog{UserID: b.Owner.UserID, APIKeyID: b.Owner.APIKeyID, AccountID: b.Offer.AccountID, GroupID: &b.Owner.GroupID,
+	log := &UsageLog{UserID: b.Owner.UserID, APIKeyID: b.Owner.APIKeyID, AccountID: b.Offer.AccountID, GroupID: &b.Owner.GroupID,
 		RequestID: HashUsageRequestPayload([]byte("account-video:" + childID)), Model: b.Offer.SiteModel, RequestedModel: b.Offer.SiteModel, UpstreamModel: &model,
 		TotalCost: sale.InexactFloat64(), ActualCost: sale.InexactFloat64(), RateMultiplier: 1, AccountStatsCost: &cost, AccountRateMultiplier: &multiplier,
 		BillingMode: &mode, RequestType: RequestTypeSync, MediaType: &media, VideoCount: 1, VideoResolution: &b.Spec.Resolution, VideoDurationSeconds: &b.Spec.DurationSeconds,
 		InboundEndpoint: &inbound, UpstreamEndpoint: &endpoint, UpstreamRequestID: &upstreamID, CreatedAt: b.CreatedAt}
+	if b.Version == StudioVideoRetailBindingVersion {
+		mode = StudioVideoRetailUsageMode
+		log.AccountStatsCost = nil
+	}
+	return log
 }

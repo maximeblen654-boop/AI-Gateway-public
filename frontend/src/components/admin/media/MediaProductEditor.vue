@@ -61,7 +61,8 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <MediaProcurementEditor :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
+      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :product="product" :disabled="disabled" @update:product="emit('update:product', $event)" />
+      <MediaProcurementEditor v-else :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
       <label class="mw-field">商品名称<input :value="product.display_name" class="input" data-test="display-name" data-field="display_name" @input="edit(next => { next.display_name = text($event) })" /></label>
@@ -84,7 +85,7 @@
         <span v-else>当前组合价格待填写，或数量不在已配置范围内。</span>
         <small>仅预览当前草稿；实际报价由服务器核验并冻结，不保存或生成。</small>
       </div>
-      <div class="mw-review-block" data-test="procurement-review"><div class="mw-review-heading"><h3>采购成本</h3><button type="button" class="mw-link" @click="goToStep(4)">修改采购成本</button></div><dl class="mw-review-prices"><div v-for="(rule, index) in product.cost_rules ?? []" :key="index"><dt>{{ costLabel(rule.match) }}</dt><dd>{{ rule.cost ? `${rule.cost.amount} ${rule.cost.currency} / ${unitLabel}` : '待填写' }}</dd></div></dl><p v-if="!product.cost_rules?.length" class="mw-muted">尚未配置采购成本；可保存草稿，暂不能发布。</p></div>
+      <div v-if="product.media_type !== 'video'" class="mw-review-block" data-test="procurement-review"><div class="mw-review-heading"><h3>采购成本</h3><button type="button" class="mw-link" @click="goToStep(4)">修改采购成本</button></div><dl class="mw-review-prices"><div v-for="(rule, index) in product.cost_rules ?? []" :key="index"><dt>{{ costLabel(rule.match) }}</dt><dd>{{ rule.cost ? `${rule.cost.amount} ${rule.cost.currency} / ${unitLabel}` : '待填写' }}</dd></div></dl><p v-if="!product.cost_rules?.length" class="mw-muted">尚未配置采购成本；可保存草稿，暂不能发布。</p></div>
       <slot name="review" />
       <slot name="save" />
     </section>
@@ -99,6 +100,8 @@ import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import MediaProcurementEditor from './MediaProcurementEditor.vue'
+import MediaVideoSaleEditor from './MediaVideoSaleEditor.vue'
+import { videoGroups } from './videoSaleGroups'
 import { multiplyDecimalText } from './decimalText'
 import { costLabel } from './procurementMatrix'
 import { allowedSpecs, buildPricingRules, creationModeForRule, dimensionsFor, hasDetailedReferencePricingRules, mergeCreationModePricing, matchesSpec, pricingDimensions, splitCreationModePricing, supportsCreationModePricing, type MatrixSpec, type PricingDimension } from './pricingMatrix'
@@ -123,9 +126,9 @@ const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = 
   { key: 'duration_seconds', label: '时长' }
 ]
 
-const stepLabels = ['可售规格', '参考素材', '计费维度', '采购成本与售价', '确认保存']
-const stepQuestions = ['这个模型可以出售什么规格？', '客户可以上传什么参考素材？', '什么情况需要卖不同的价格？', '采购成本和客户售价分别是多少？', '确认商品配置并保存']
-const stepDescriptions = computed(() => ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', props.product.media_type === 'video' ? '按整条填写人民币采购成本与售价；成本允许明确填 0，售价须大于 0。空白是未配置。' : '按张填写人民币采购成本与售价；成本允许明确填 0，售价须大于 0。空白是未配置。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。'])
+const stepLabels = computed(() => ['可售规格', '参考素材', '计费维度', props.product.media_type === 'video' ? '客户售价' : '采购成本与售价', '确认保存'])
+const stepQuestions = computed(() => ['这个模型可以出售什么规格？', '客户可以上传什么参考素材？', '什么情况需要卖不同的价格？', props.product.media_type === 'video' ? '每条视频的客户售价是多少？' : '采购成本和客户售价分别是多少？', '确认商品配置并保存'])
+const stepDescriptions = computed(() => ['只选择已经确认支持、并准备出售的规格。常用按钮是候选，不代表供应商能力。', '按已确认的接口能力，选择客户是否需要上传素材。', '只选择需要分别收费的规格。没有选中的规格默认同价。', props.product.media_type === 'video' ? '按分辨率选择时长售价。售价为整条人民币金额，须大于 0；独立计算器仅供试算。' : '按张填写人民币采购成本与售价；成本允许明确填 0，售价须大于 0。空白是未配置。', '检查规格、素材要求和售价。保存为草稿后，由后台核验。'])
 const wizardStep = ref(1)
 const stepHeading = ref<HTMLElement>()
 const wizardElement = ref<HTMLElement>()
@@ -148,7 +151,9 @@ function showField(path: string, code?: string) {
   wizardStep.value = (path.includes('pricing_rules') || path.includes('cost_rules') || path.includes('cost_coverage')) ? 4 : path.includes('references') ? 2 : path.includes('display_name') ? 5 : 1
   return path
 }
-defineExpose({ showField })
+const videoSaleEditor = ref<InstanceType<typeof MediaVideoSaleEditor>>()
+function invalidateSaleUndo() { videoSaleEditor.value?.invalidateUndo() }
+defineExpose({ showField, invalidateSaleUndo })
 const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
 const adapterStatus = computed(() => {
   if (adapterDiagnostics.value.length) return { title: '当前工作台适配尚未接通', description: '上次服务端校验发现以下适配缺口。请交由技术维护者处理；填写协议名称不能使未实现的接口获得支持。' }
@@ -163,6 +168,10 @@ function configuredValues(key: PricingDimension): (string | number)[] {
 const availablePricingDimensions = computed(() => pricingDimensionDefinitions.filter(({ key }) => (key !== 'duration_seconds' || props.product.media_type === 'video') && configuredValues(key).length))
 const hiddenPricingDimensions = computed(() => activePricingDimensions.value.filter(key => !availablePricingDimensions.value.some(item => item.key === key)))
 const expectedPriceCount = computed(() => {
+  if (props.product.media_type === 'video') {
+    const groups = props.product.capabilities.resolutions.map(resolution => videoGroups(props.product, resolution))
+    return groups.some(value => !value) ? undefined : groups.reduce((total, value) => total + value!.reduce((count, group) => count + group.rows.length, 0), 0)
+  }
   const specs = allowedSpecs(props.product.capabilities)
   if (!specs) return undefined
   return creationModePricing.value

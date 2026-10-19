@@ -103,7 +103,7 @@ export function draftInput(products: Product[]): { products: Product[] } {
       count: range(p.capabilities.count), references: references(p.capabilities.references),
       combination_rules: (p.capabilities.combination_rules ?? []).map(rule => ({ deny: match(rule.deny) }))
     },
-    ...(p.cost_rules !== undefined ? { cost_rules: p.cost_rules.map(rule => ({
+    ...(p.media_type !== 'video' && p.cost_rules !== undefined ? { cost_rules: p.cost_rules.map(rule => ({
       match: match(rule.match), cost: rule.cost == null ? null : {
         amount: rule.cost.amount, currency: rule.cost.currency, billing_mode: rule.cost.billing_mode
       }, ...(rule.source ? { source: rule.source } : {})

@@ -242,8 +242,12 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 		if !validCapabilities(p.Capabilities) {
 			add("UI_FIXABLE", "INVALID_REFERENCE_LIMIT", pid, "capabilities", "Use valid bounded count/reference ranges and nonempty unique specification values")
 		}
-		if len(p.PricingRules) > 100 || len(p.AdapterConfig.SizeMappings) > 1024 {
-			add("UI_FIXABLE", "CONFIG_TOO_LARGE", pid, "pricing_rules", "Use at most 100 pricing rules and 1024 size mappings per product")
+		priceRuleLimit := 100
+		if p.MediaType == "video" {
+			priceRuleLimit = 1024
+		}
+		if len(p.PricingRules) > priceRuleLimit || len(p.AdapterConfig.SizeMappings) > 1024 {
+			add("UI_FIXABLE", "CONFIG_TOO_LARGE", pid, "pricing_rules", fmt.Sprintf("Use at most %d pricing rules and 1024 size mappings per product", priceRuleLimit))
 			continue
 		}
 		if known {
@@ -285,7 +289,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Customer sale price must be greater than 0 CNY, with at most 8 decimal places and per_request billing")
 			}
 		}
-		if p.CostVersion >= 1 {
+		if requiresPublishedCost(p) {
 			validateCostRules(p, &v)
 		}
 		if len(v.Diagnostics) != start {
@@ -301,7 +305,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			continue
 		}
 		v.CaseCount += len(cases)
-		if p.CostVersion >= 1 {
+		if requiresPublishedCost(p) {
 			validateCostCoverage(p, cases, &v)
 		}
 		hits := make([]int, len(p.PricingRules))

@@ -92,7 +92,7 @@ func TestStudioPublishedCostZeroIsExplicitAndRequired(t *testing.T) {
 	require.ErrorIs(t, err, mediaworkbench.ErrValidation)
 }
 
-func TestStudioVideoPublishedCostNoChannelFrozenBilling(t *testing.T) {
+func TestStudioVideoRetailNoChannelFrozenBilling(t *testing.T) {
 	r, token, q, key, accounts, orders := videoRuntimeFixture(t)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
 	accounts.a.Credentials["model_mapping"] = map[string]any{q.Binding.Offer.SiteModel: "api-only-model", q.Binding.Offer.UpstreamModel: "api-twice"}
@@ -125,7 +125,9 @@ func TestStudioVideoPublishedCostNoChannelFrozenBilling(t *testing.T) {
 	cmd, err := VideoAccountBillingCommand("av_cost", &q.Binding, strings.Repeat("b", 64))
 	require.NoError(t, err)
 	require.Equal(t, "0.80", cmd.ExactAmounts.APIKeyQuota)
-	require.Equal(t, "0.35", cmd.ExactAmounts.AccountQuota)
+	require.Equal(t, "0", cmd.ExactAmounts.AccountQuota)
+	require.Nil(t, VideoAccountUsage("av_cost", "cost-original", &q.Binding).AccountStatsCost)
+	require.Equal(t, StudioVideoRetailUsageMode, *VideoAccountUsage("av_cost", "cost-original", &q.Binding).BillingMode)
 	require.Equal(t, "0", cmd.ExactAmounts.Balance)
 }
 
@@ -153,7 +155,7 @@ func studioCopyCostProduct(p mediaworkbench.Product) mediaworkbench.Product {
 	return out
 }
 
-func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
+func TestStudioVideoReferencePreparationBindsPublishedRevision(t *testing.T) {
 	r, _, q, key, _, _ := videoRuntimeFixture(t)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
 	ma := studioCostMediaFixture(t, r.Media)
@@ -172,7 +174,7 @@ func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
 	require.Equal(t, old.PreparationID, prepare().PreparationID)
 	require.Equal(t, 1, uploader.calls)
 	product := studioCopyCostProduct(ma.a.Config.Draft.Products[0])
-	product.CostRules[0].Cost.Amount = "0.49"
+	product.DisplayName = "republished video"
 	admin := mediaworkbench.NewService(ma)
 	d, err := admin.SaveDraft(context.Background(), 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
 	require.NoError(t, err)
@@ -187,8 +189,10 @@ func TestStudioVideoReferencePreparationBindsCostRevision(t *testing.T) {
 	require.NoError(t, err)
 	newSnapshot, err := r.Store.ReferencePreparation(current.PreparationID, q.Binding.Owner)
 	require.NoError(t, err)
-	require.Equal(t, "0.35", oldSnapshot.Accounting.BaseAmount)
-	require.Equal(t, "0.49", newSnapshot.Accounting.BaseAmount)
+	require.Empty(t, oldSnapshot.Accounting.BaseAmount)
+	require.Empty(t, newSnapshot.Accounting.BaseAmount)
+	require.Equal(t, "unknown", newSnapshot.Accounting.SourceState)
+	require.NotEqual(t, oldSnapshot.Accounting.SourceID, newSnapshot.Accounting.SourceID)
 }
 
 func studioCostMediaFixture(t *testing.T, repo mediaworkbench.Repository) *studioMediaFixture {

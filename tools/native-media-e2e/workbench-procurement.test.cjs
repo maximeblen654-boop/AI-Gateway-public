@@ -1,6 +1,6 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, setKeyStatus, disableFixtureSales } = require('./workbench-procurement.cjs')
+const { assertVideoFailureRelease, assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, clearAccountQuota, setKeyStatus, disableFixtureSales } = require('./workbench-procurement.cjs')
 
 test('customer privacy audit permits sale price, model, offer and task identity', () => {
   assert.doesNotThrow(() => assertPublic({ offers: [{ offer_id: 'offer-1', product_id: 'product-1', model: 'public-model', sale_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } }], task_id: 'task-1' }))
@@ -111,4 +111,30 @@ test('fixture sales cleanup rejects stale CAS, ignored writes or destructive rea
   const destructive = structuredClone(before); destructive.media_workbench_v1.sales.enabled = false; delete destructive.media_workbench_v1.published
   let reads = 0
   await assert.rejects(disableFixtureSales(async (_token, _path, method = 'GET') => method === 'GET' && ++reads === 1 ? before : destructive, 'admin-token', 6), /changed the fixture Published/)
+})
+
+
+test('video terminal failure requires authoritative release and no money, usage, dedup or quota effects', () => {
+  const before = { balance: '20', frozen: '0', usage: 3, dedup: 3, account_quota: '0.3' }
+  const order = { state: 'RELEASED', release_reason: 'supplier_failed', actual_amount: null }
+  assert.doesNotThrow(() => assertVideoFailureRelease(before, { ...before }, order, 4, 5))
+  for (const field of ['balance', 'frozen', 'usage', 'dedup', 'account_quota']) {
+    assert.throws(() => assertVideoFailureRelease(before, { ...before, [field]: 99 }, order, 4, 5), /changed balance/)
+  }
+  assert.throws(() => assertVideoFailureRelease(before, before, { ...order, state: 'HELD' }, 4, 5), /released order/)
+  assert.throws(() => assertVideoFailureRelease(before, before, { ...order, actual_amount: 2 }, 4, 5), /captured/)
+  assert.throws(() => assertVideoFailureRelease(before, before, order, 4, 6), /original video/)
+})
+
+
+test('removing only the isolated monetary limit preserves native usage and other Account settings', async () => {
+  const account = { id: 44, extra: { quota_limit: 100, quota_used: 0.3, fixture_extra: true } }
+  const calls = []
+  const readback = { id: 44, extra: { quota_used: 0.3, fixture_extra: true } }
+  const core = async (_token, path, method = 'GET', body) => { calls.push({ path, method, body }); return readback }
+  await clearAccountQuota(core, 'admin', account)
+  assert.deepEqual(calls[0], { path: '/admin/accounts/44', method: 'PUT', body: { extra: readback.extra } })
+  assert.equal(account.extra.quota_limit, 100, 'Input snapshot must not be mutated')
+  await assert.rejects(clearAccountQuota(async () => account, 'admin', account), /monetary Account limit/)
+  await assert.rejects(clearAccountQuota(async () => ({ id: 44, extra: { quota_used: 0 } }), 'admin', account), /rewrote native usage/)
 })

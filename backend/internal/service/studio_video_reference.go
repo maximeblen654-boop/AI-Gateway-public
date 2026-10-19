@@ -124,6 +124,7 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 		Spec   mediaworkbench.Spec
 		Assets []StudioVideoReferenceAsset
 	}{owner, resolved.Offer, spec, assets})
+	intentHash = studioHash([]string{StudioVideoRetailBindingVersion, intentHash})
 	if resolved.Offer.CostVersion >= 1 {
 		// Cost-only publications deliberately keep the retail OfferID stable.
 		// A new frozen commercial contract needs a distinct preparation identity.
@@ -156,7 +157,7 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 	if err != nil {
 		return empty, err
 	}
-	if accounting.SourceState != "resolved" {
+	if accounting.SourceState != "unknown" {
 		return empty, ErrStudioImageAccounting
 	}
 	prep.Accounting = accounting
@@ -230,26 +231,6 @@ func slicesContainsInt64(values []int64, want int64) bool {
 	return false
 }
 
-func (r *StudioVideoRuntime) referenceAccounting(ctx context.Context, a *Account, owner StudioImageOwner, resolved mediaworkbench.ResolvedVideoOffer, at time.Time) (AccountAccountingSnapshot, error) {
-	if resolved.Offer.CostVersion >= 1 {
-		ma, err := r.Media.Get(ctx, a.ID)
-		if err != nil {
-			return AccountAccountingSnapshot{}, err
-		}
-		return ResolveStudioPublishedAccountCost(a, ma, mediaworkbench.ResolvedImageOffer{PublishedRevision: resolved.PublishedRevision, Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash}, at)
-	}
-	var channel *Channel
-	if r.Core.channelService != nil && r.Core.channelService.repo != nil {
-		id, e := r.Core.channelService.repo.GetChannelIDByGroupID(ctx, owner.GroupID)
-		if e != nil {
-			return AccountAccountingSnapshot{}, e
-		}
-		if id > 0 {
-			channel, e = r.Core.channelService.repo.GetByID(ctx, id)
-			if e != nil {
-				return AccountAccountingSnapshot{}, e
-			}
-		}
-	}
-	return resolveStudioAccountCost(a, mediaworkbench.ResolvedImageOffer{Offer: resolved.Offer, Spec: resolved.Spec, SpecHash: resolved.SpecHash}, channel, at, "CNY", false)
+func (r *StudioVideoRuntime) referenceAccounting(_ context.Context, a *Account, _ StudioImageOwner, resolved mediaworkbench.ResolvedVideoOffer, at time.Time) (AccountAccountingSnapshot, error) {
+	return videoRetailAccounting(a, resolved, at)
 }

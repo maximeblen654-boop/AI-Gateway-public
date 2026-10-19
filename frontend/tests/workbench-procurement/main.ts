@@ -51,6 +51,17 @@ const initial: SupplierDetail = {
   }
 }
 if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: null, source: 'manual' }]
+if (scenario.startsWith('video-retail')) {
+  const product = initial.media_workbench_v1!.draft.products.find(p => p.product_id === video.product_id)!
+  product.capabilities.resolutions = ['720p', '4K']
+  product.capabilities.durations_seconds = Array.from({ length: 12 }, (_, i) => i + 4)
+  // 1,728 legal candidate combinations: above the old 256-row UI ceiling,
+  // within the unchanged 32,768 server budget.
+  product.capabilities.references = { image: { min: 0, max: 2 }, video: { min: 0, max: 1 }, audio: { min: 0, max: 1 }, total_max: 4 }
+  product.pricing_rules = []
+  delete product.cost_rules
+  if (scenario === 'video-retail-shared') product.pricing_rules = [{ match: {}, sale_price: price('3') }]
+}
 if (scenario.startsWith('reference-input')) {
   const refs = initial.media_workbench_v1!.draft.products[0]!.capabilities.references
   refs.image.max = refs.total_max = scenario.endsWith('loss') ? 12 : 1
@@ -79,7 +90,7 @@ const readServer = () => {
 function diagnostics(products: Product[]): Diagnostic[] {
   return products.flatMap(product => {
     const index = dto.media_workbench_v1!.draft.products.findIndex(p => p.product_id === product.product_id)
-    const missing = !product.cost_rules?.length || product.cost_rules.some(rule => rule.cost == null)
+    const missing = product.media_type === 'image' && (!product.cost_rules?.length || product.cost_rules.some(rule => rule.cost == null))
     return [
       ...(missing ? [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_COST', scope: product.product_id, path: `draft.products[${index}].cost_rules[0].cost`, message: `${product.display_name} 的采购成本尚未填写`, action: '前往第4步填写采购成本', match: product.cost_rules?.[0]?.match ?? {} }] : []),
       ...(!product.pricing_rules.length || product.pricing_rules.some(rule => rule.sale_price == null) ? [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_PRICE', scope: product.product_id, path: `draft.products[${index}].pricing_rules[0].sale_price`, message: `${product.display_name} 的客户售价尚未填写`, action: '前往第4步填写客户售价' }] : [])
@@ -97,6 +108,7 @@ function saveDraftFixture(input: { expected_record_version: number; submission_i
   if (input.expected_record_version !== c.record_version) return false
   const baseVersion = c.record_version
   c.draft.products = copy(input.draft.products)
+  for (const product of c.draft.products) if (product.media_type === 'video') { product.cost_version = 2; delete product.cost_rules }
   c.record_version++; c.draft.revision = `fixture-draft-${c.record_version}`
   c.draft.save_receipt = input.submission_id ? {
     submission_id: input.submission_id, base_record_version: baseVersion, draft_revision: c.draft.revision

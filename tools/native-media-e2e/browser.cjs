@@ -59,8 +59,15 @@ const report = { cases: [], http: [] }
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-dimensions-desktop.png`, fullPage: true, animations: 'disabled' })
     await w('wizard-next').click()
-    for (let i = 0; i < (video ? 1 : 3); i++) await w(`price-${i}`).fill(video ? '2.00' : geometry ? ['0.70','0.90','1.10'][i] : '0.70')
-    await w('procurement-cost-0').fill('0.35') // explicit synthetic procurement, never a retail fallback
+    if (video) {
+      await expect(w('video-sale-editor')).toBeVisible()
+      await w('sale-resolution-720p').click()
+      await w('video-sale-5').fill('2.00')
+      await expect(w('procurement-cost-0')).toHaveCount(0)
+    } else {
+      for (let i = 0; i < 3; i++) await w(`price-${i}`).fill(geometry ? ['0.70','0.90','1.10'][i] : '0.70')
+      await w('procurement-cost-0').fill('0.35') // Image procurement remains explicit and required.
+    }
     await page.waitForTimeout(500)
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await page.screenshot({ path: `${root}/evidence/${prefix}-prices-desktop.png`, fullPage: true })
@@ -74,7 +81,39 @@ const report = { cases: [], http: [] }
     assert.equal(report.validation.publish_ready, true, JSON.stringify(report.validation.diagnostics))
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
     report.product = detail.media_workbench_v1.draft.products[0]
-    if (video) assert.deepEqual(report.product.capabilities.durations_seconds, [5], 'saved video duration must be 5 seconds')
+    if (video) {
+      assert.deepEqual(report.product.capabilities.durations_seconds, [5], 'saved video duration must be 5 seconds')
+      assert.equal(report.product.cost_rules?.length || 0, 0, 'video save must not manufacture procurement rules')
+      assert.equal(Number(report.product.pricing_rules[0].sale_price.amount), 2, 'whole-video sale must remain 2, not duration multiplied')
+      await expect(w('autosave-status')).toContainText('已保存')
+      const calculatorRequests = []
+      const recordCalculatorWrite = request => { if (request.method() !== 'GET' && new URL(request.url()).pathname.startsWith('/api/v1/admin/media-workbench/')) calculatorRequests.push({ method: request.method(), path: new URL(request.url()).pathname }) }
+      page.on('request', recordCalculatorWrite)
+      for (const width of [1440, 1366, 390]) {
+        await page.setViewportSize({ width, height: width === 1366 ? 650 : 844 })
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+        const trigger = w('independent-calculator-open')
+        await expect(trigger).toBeVisible()
+        const tab = await trigger.boundingBox()
+        assert(tab && Math.abs(tab.x + tab.width - width) <= 2, 'Calculator tab must stay on the right edge after scrolling')
+        await trigger.click()
+        const drawer = page.getByRole('dialog', { name: '成本计算器', exact: true })
+        await expect(drawer).toBeVisible()
+        const bounds = await drawer.boundingBox()
+        assert(bounds && Math.abs(bounds.x + bounds.width - width) <= 2 && bounds.y <= 2, 'Calculator must enter from the right, including mobile')
+        await w('independent-purchase').fill('100'); await w('independent-credits').fill('1000'); await w('independent-consumption').fill('15')
+        await expect(w('independent-result')).toHaveText('1.5 元')
+        await page.screenshot({ path: `${root}/evidence/${prefix}-calculator-${width}.png`, fullPage: false })
+        await page.keyboard.press('Escape')
+        await expect(drawer).not.toBeVisible()
+        await expect(trigger).toBeFocused()
+        await expect(w('autosave-status')).toContainText('已保存')
+      }
+      page.off('request', recordCalculatorWrite)
+      assert.deepEqual(calculatorRequests, [], 'Independent calculation must not save or mutate a product')
+      await page.setViewportSize({ width: 1440, height: 1000 })
+      report.cases.push('Final candidate right-side calculator at 1440/1366/390; exact 1.5 reference cost, Escape focus and zero product writes')
+    }
 
     if (geometry) {
       const assertNoMappings = products => { for (const p of products) assert.equal(p.adapter_config.size_mappings?.length || 0, 0, 'UI must not prefill technical size mappings') }

@@ -200,11 +200,11 @@ describe('reference limits', () => {
   const wrapper = editor(product)
   expect(wrapper.get('.mw-price-state').text()).toContain('需要修正')
   expect(wrapper.get('[data-test="pricing-preview"]').text()).not.toContain('总价：0 CNY')
-  await wrapper.setProps({ product: { ...product, media_type: 'video', capabilities: { ...product.capabilities, count: { min: 1, max: 1 } } } })
-  expect(wrapper.get('[data-test="price-0"]').attributes('aria-invalid')).toBe('true')
-  expect(wrapper.get('.mw-price-state').text()).not.toContain('明确免费')
+  await wrapper.setProps({ product: { ...product, media_type: 'video', capabilities: { ...product.capabilities, durations_seconds: [5], count: { min: 1, max: 1 } } } })
+  expect(wrapper.get('[data-test="video-sale-5"]').attributes('aria-invalid')).toBe('true')
+  expect(wrapper.get('[data-test="video-sale-editor"]').text()).not.toContain('明确免费')
   expect(wrapper.get('[data-test="pricing-preview"]').text()).not.toContain('总价：0 CNY')
-  expect(wrapper.get('[data-test="wizard-page-4"]').text()).toContain('不能发布或生成')
+  expect(wrapper.get('[data-test="wizard-page-4"]').text()).toContain('大于 0')
   wrapper.unmount()
  })
  it('keeps the full capability domain beyond 64 preview samples', async () => {
@@ -217,3 +217,13 @@ describe('reference limits', () => {
   expect(wrapper.props('product').pricing_rules).toHaveLength(72)
   wrapper.unmount()
  })
+
+it('counts video sale inputs across resolution and duration groups', () => {
+  const product = productFixture(); product.media_type = 'video'
+  product.capabilities.resolutions = ['720p', '4K']; product.capabilities.durations_seconds = [4, 7, 12]
+  product.capabilities.count = { min: 1, max: 1 }; product.pricing_rules = []
+  const wrapper = editor(product)
+  expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('6 个价格')
+  expect(wrapper.findAll('input[data-test^="video-sale-"]')).toHaveLength(3)
+  wrapper.unmount()
+})
