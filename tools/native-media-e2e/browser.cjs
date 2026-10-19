@@ -39,9 +39,15 @@ const report = { cases: [], http: [] }
     await expect(w('adapter-status')).toContainText('已接入')
     assert.equal(await w('model-family').count(), 0)
     assert.equal(await w('wire-profile').count(), 0)
-    for (const value of video ? ['720p', '5', '16:9'] : ['1K', '2K', '4K', '1:1', ...(geometry ? ['3:2'] : []), '16:9']) {
+    for (const value of video ? ['720p', '16:9'] : ['1K', '2K', '4K', '1:1', ...(geometry ? ['3:2'] : []), '16:9']) {
       const button = w('wizard-page-1').locator('button.mw-token-chip').filter({ hasText: new RegExp(`^${value}$`) })
       if (!(await button.getAttribute('class')).includes('mw-token-chip-selected')) await button.click()
+    }
+    if (video) {
+      const duration = w('wizard-page-1').getByLabel('时长（秒）', { exact: true })
+      await duration.fill('5')
+      await duration.press('Tab') // MediaTokensField commits the list on change.
+      await expect(duration).toHaveValue('5')
     }
     await w('wizard-next').click()
     await w('reference-image-mode').selectOption('optional')
@@ -68,6 +74,7 @@ const report = { cases: [], http: [] }
     assert.equal(report.validation.publish_ready, true, JSON.stringify(report.validation.diagnostics))
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
     report.product = detail.media_workbench_v1.draft.products[0]
+    if (video) assert.deepEqual(report.product.capabilities.durations_seconds, [5], 'saved video duration must be 5 seconds')
 
     if (geometry) {
       const assertNoMappings = products => { for (const p of products) assert.equal(p.adapter_config.size_mappings?.length || 0, 0, 'UI must not prefill technical size mappings') }
@@ -137,6 +144,7 @@ const report = { cases: [], http: [] }
     assert.equal(productOptions.length, 2, JSON.stringify(productOptions))
     assert(productOptions.every(option => !option.includes('media-')), JSON.stringify(productOptions))
     if (!geometry) assert(productOptions.some(option => option.includes('商品 1')) && productOptions.some(option => option.includes('商品 2')), JSON.stringify(productOptions))
+    if (video) await expect(w('wizard-page-1').getByLabel('时长（秒）', { exact: true })).toHaveValue('5')
     if (geometry) {
       for (const p of report.products) {
         await w('product-select').selectOption(p.product_id)
