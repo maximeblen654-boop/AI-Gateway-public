@@ -1,8 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
+import type { SaveReceipt } from '../../src/api/admin/mediaWorkbench'
 
-type Snapshot = { media_workbench_v1: { draft: { products: Array<{ product_id: string; enabled: boolean; [key: string]: unknown }> }; published: unknown; sales: unknown } }
+type Snapshot = { media_workbench_v1: { record_version: number; draft: { revision: string; save_receipt?: SaveReceipt; products: Array<{ product_id: string; enabled: boolean; [key: string]: unknown }> }; published: unknown; sales: unknown } }
 const snapshot = (page: Page) => page.evaluate(() => (window as unknown as { mediaFixture: { snapshot: () => Snapshot } }).mediaFixture.snapshot())
-const calls = (page: Page) => page.evaluate(() => (window as unknown as { mediaFixture: { calls: Array<{ method: string; url: string; input: { draft?: { products: unknown[]; remove_product_ids?: string[] } } }> } }).mediaFixture.calls)
+const calls = (page: Page) => page.evaluate(() => (window as unknown as { mediaFixture: { calls: Array<{ method: string; url: string; input: { expected_record_version: number; submission_id: string; draft?: { products: unknown[]; remove_product_ids?: string[] } } }> } }).mediaFixture.calls)
 async function editor(page: Page, kind: string) {
   await page.getByTestId('account-search').fill('#77')
   await page.getByTestId('supplier-77').click()
@@ -73,6 +74,7 @@ for (const kind of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
 test('one configured product creates a second only after explicit confirmation and saves enable state separately', async ({ page }) => {
   await page.goto('/tests/media-workbench/index.html?scenario=DRAFT_MANAGEMENT_IMAGE_SINGLE')
   await editor(page, 'IMAGE')
+  const before = (await snapshot(page)).media_workbench_v1
   await expect(page.getByTestId('product-select')).toHaveCount(0)
   await options(page); await page.getByTestId('new-independent-product').click()
   expect((await snapshot(page)).media_workbench_v1.draft.products).toHaveLength(1)
@@ -81,9 +83,21 @@ test('one configured product creates a second only after explicit confirmation a
   await page.getByTestId('product-enabled').uncheck()
   await page.getByTestId('wizard-step-5').click(); await page.getByTestId('save').click()
   await expect(page.getByTestId('undo-add-product')).toHaveCount(0)
-  const saved = (await snapshot(page)).media_workbench_v1.draft.products
+  await expect(page.getByTestId('autosave-status')).toContainText('已确认保存')
+  const current = (await snapshot(page)).media_workbench_v1, saved = current.draft.products
   expect(saved).toHaveLength(2); expect(saved[0]!.product_id).toBe('canvas-1'); expect(saved[1]!.enabled).toBe(false)
-  expect((await calls(page)).filter(call => call.method !== 'get').map(call => call.url)).toEqual(['/admin/media-workbench/accounts/77/draft'])
+  const writes = (await calls(page)).filter(call => call.method !== 'get')
+  expect(writes.length).toBeGreaterThan(0)
+  writes.forEach((call, index) => {
+    expect(call.method).toBe('put'); expect(call.url).toBe('/admin/media-workbench/accounts/77/draft')
+    expect(call.input.expected_record_version).toBe(before.record_version + index)
+    expect(call.input.submission_id).toEqual(expect.any(String))
+  })
+  const last = writes[writes.length - 1]!.input
+  expect(current.record_version).toBe(before.record_version + writes.length)
+  expect(current.draft.save_receipt).toEqual({ submission_id: last.submission_id, base_record_version: last.expected_record_version, draft_revision: current.draft.revision })
+  expect(saved).toEqual(last.draft!.products)
+  expect(current.published).toEqual(before.published); expect(current.sales).toEqual(before.sales)
 })
 
 

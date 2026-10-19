@@ -1,4 +1,7 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
+import type { Product, SupplierDetail } from '../../src/api/admin/mediaWorkbench'
+
+type DraftCall = { method: string; url: string; input: { submission_id: string; expected_record_version: number; draft: { products: Product[] } } }
 
 async function openWizard(page: Page, scenario = 'WIZARD', mode = 'light') {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
@@ -9,7 +12,29 @@ async function openWizard(page: Page, scenario = 'WIZARD', mode = 'light') {
   await expect(page.getByTestId('wizard-page-1')).toBeVisible()
 }
 async function calls(page: Page) {
-  return page.evaluate(() => (window as unknown as { mediaFixture: { calls: { method: string; url: string; input: unknown }[] } }).mediaFixture.calls)
+  return page.evaluate(() => (window as unknown as { mediaFixture: { calls: DraftCall[] } }).mediaFixture.calls)
+}
+const snapshot = (page: Page) => page.evaluate(() => (window as unknown as { mediaFixture: { snapshot: () => SupplierDetail } }).mediaFixture.snapshot())
+async function confirmedDraft(page: Page, initial: SupplierDetail) {
+  await expect(page.getByTestId('autosave-status')).toContainText('已确认保存')
+  await expect(page.getByTestId('draft-recovery')).toHaveCount(0)
+  const writes = (await calls(page)).filter(call => call.method !== 'get')
+  expect(writes.length).toBeGreaterThan(0)
+  writes.forEach((call, index) => {
+    expect(call.method).toBe('put'); expect(call.url).toBe('/admin/media-workbench/accounts/77/draft')
+    expect(call.input.expected_record_version).toBe(initial.media_workbench_v1!.record_version + index)
+    expect(call.input.submission_id).toEqual(expect.any(String))
+    expect(call.input.submission_id.length).toBeGreaterThan(0)
+  })
+  expect(new Set(writes.map(call => call.input.submission_id)).size).toBe(writes.length)
+  const current = (await snapshot(page)).media_workbench_v1!
+  const last = writes[writes.length - 1]!
+  expect(current.record_version).toBe(initial.media_workbench_v1!.record_version + writes.length)
+  expect(current.draft.save_receipt).toEqual({ submission_id: last.input.submission_id, base_record_version: last.input.expected_record_version, draft_revision: current.draft.revision })
+  expect(current.draft.products).toEqual(last.input.draft.products)
+  expect(current.published).toEqual(initial.media_workbench_v1!.published)
+  expect(current.sales).toEqual(initial.media_workbench_v1!.sales)
+  return writes
 }
 async function capture(page: Page, info: TestInfo, name: string) {
   await page.evaluate(() => document.fonts.ready)
@@ -23,6 +48,7 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.setViewportSize({ width, height: 980 })
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
     await openWizard(page, 'WIZARD', mode)
+    const initial = await snapshot(page)
     await expect(page.getByTestId('save')).toBeHidden()
     await expect(page.getByTestId('price-0')).toBeHidden()
     await expect(page.getByTestId('model-family')).toBeHidden()
@@ -48,11 +74,19 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await expect(page.getByTestId('pricing-dimension-aspect_ratio')).toBeFocused()
     await capture(page, info, '03-price-dimensions')
     await page.getByTestId('wizard-next').click()
-    const saleRows = page.locator('.mw-price-row').filter({ has: page.locator('input[data-test^="price-"]') })
-    await expect(saleRows).toHaveCount(6)
-    await expect(page.getByTestId('procurement-editor').locator('.mw-price-row')).toHaveCount(1)
+    const table = page.getByTestId('unified-spec-table')
+    await expect(table.getByTestId(/^spec-row-/)).toHaveCount(6)
+    await expect(table.locator('input[data-spec-price]')).toHaveCount(6)
+    await expect(table.locator('input[data-spec-cost]')).toHaveCount(6)
+    for (let i = 0; i < 6; i++) {
+      const row = page.getByTestId(`spec-row-${i}`)
+      await expect(row).toContainText(['1K', '2K', '4K'][Math.floor(i / 2)]!)
+      await expect(row).toContainText(i % 2 ? '16:9' : '1:1')
+      await expect(row.getByTestId(`price-${i}`)).toBeVisible()
+    }
     for (let i = 0; i < 6; i++) await page.getByTestId(`price-${i}`).fill(i < 2 ? '0.70' : i < 4 ? '1.20' : '2.00')
     await page.getByTestId('procurement-cost-0').fill('0.35')
+    for (const input of await table.locator('input[data-spec-cost]').all()) await expect(input).toHaveValue('0.35')
     await capture(page, info, '04-unit-prices')
     await page.getByTestId('wizard-back').click()
     // Removing ratio preserves equal pairs without asking to discard prices.
@@ -63,29 +97,54 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await expect(page.getByTestId('price-1')).toHaveValue('1.20')
     await expect(page.getByTestId('price-2')).toHaveValue('2.00')
     await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
+    // Six legal specs remain; each equal-price ratio pair now shares one of three rules.
+    await expect(table.getByTestId(/^spec-row-/)).toHaveCount(6)
+    for (let i = 0; i < 6; i++) {
+      await expect(page.getByTestId(`spec-row-${i}`).locator('input[data-spec-price]')).toHaveValue(['0.70', '1.20', '2.00'][Math.floor(i / 2)]!)
+    }
     await capture(page, info, '04b-three-prices')
     await page.getByTestId('wizard-next').click()
     await page.getByTestId('preview-quantity').fill('10')
     await expect(page.getByTestId('pricing-preview')).toContainText('总价：7 CNY')
     await page.getByTestId('display-name').fill('晴空创作图片 · 测试草稿')
     await capture(page, info, '05-review-save')
-    expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
     await page.getByTestId('save').click()
     await expect(page.getByTestId('unsaved')).toHaveCount(0)
-    const writes = (await calls(page)).filter(call => call.method !== 'get')
-    expect(writes).toHaveLength(1); expect(writes[0]!.url).toMatch(/\/draft$/)
-    expect(writes[0]!.input).toMatchObject({ draft: { products: [{ capabilities: { count: { min: 1, max: 10 }, references: { image: { min: 0, max: 4 }, total_max: 4 } }, cost_rules: [{ match: {}, cost: { amount: '0.35', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }], adapter_config: { execution: { mode: 'native_multi', max_output_images: 2 }, edit_execution: { mode: 'single', max_output_images: 1 } } }] } })
-    await page.getByTestId('return-models').click()
+    const writes = await confirmedDraft(page, initial)
+    expect(writes[writes.length - 1]!.input).toMatchObject({ draft: { products: [{ capabilities: { count: { min: 1, max: 10 }, references: { image: { min: 0, max: 4 }, total_max: 4 } }, cost_rules: [{ match: {}, cost: { amount: '0.35', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }], adapter_config: { execution: { mode: 'native_multi', max_output_images: 2 }, edit_execution: { mode: 'single', max_output_images: 1 } } }] } })
+    expect(writes[writes.length - 1]!.input.draft.products[0]!.pricing_rules.map(rule => rule.sale_price?.amount)).toEqual(['0.70', '1.20', '2.00'])
+    await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
     await expect(page.getByTestId('publish')).toBeEnabled()
     await page.getByTestId('publish').click()
     await expect(page.getByRole('dialog', { name: '发布选中的商品？' })).toContainText('不会自动开启销售')
     await page.keyboard.press('Escape')
-    expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(1)
+    expect((await calls(page)).filter(call => call.method !== 'get')).toEqual(writes)
+    // Account #44 deliberately has the same model ID but a different draft and price.
+    await page.getByRole('button', { name: '← 返回来源与账号', exact: true }).click()
+    await page.getByTestId('account-search').fill('#44')
+    await page.getByTestId('supplier-44').click()
+    await page.getByTestId('model-image-native-1').click()
+    await page.getByTestId('wizard-step-4').click()
+    await expect(page.getByTestId('price-0')).toHaveValue('0.18')
+    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('')
+    await expect(page.getByTestId('editor-page')).toContainText('Account #44')
+    await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
+    await page.getByRole('button', { name: '← 返回来源与账号', exact: true }).click()
+    await page.getByTestId('account-search').fill('#77')
+    await page.getByTestId('supplier-77').click()
     await page.getByTestId('model-image-native-1').click()
     await page.getByTestId('wizard-step-4').click()
     await expect(page.getByTestId('price-2')).toHaveValue('2.00')
     await page.getByTestId('wizard-step-5').click()
     await expect(page.getByTestId('display-name')).toHaveValue('晴空创作图片 · 测试草稿')
+    await page.reload()
+    await page.getByTestId('account-search').fill('#77'); await page.getByTestId('supplier-77').click()
+    await page.getByTestId('model-image-native-1').click(); await page.getByTestId('wizard-step-4').click()
+    await expect(page.getByTestId('price-2')).toHaveValue('2.00')
+    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
+    await expect(page.getByTestId('draft-recovery')).toHaveCount(0)
+    await capture(page, info, '06-confirmed-reloaded')
+    await info.attach('confirmed-draft-contract', { body: JSON.stringify({ writes, saved: await snapshot(page) }, null, 2), contentType: 'application/json' })
     expect(errors).toEqual([])
   })
 }
@@ -103,7 +162,7 @@ test('reference legacy zero, immediate safety limit and unsaved leave prompt', a
   await page.getByTestId('reference-image-max').fill('16')
   await page.getByTestId('reference-image-mode').selectOption('required')
   await expect(page.getByTestId('reference-error')).toHaveCount(0)
-  await page.getByRole('button', { name: '← 返回模型列表' }).click()
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
   await expect(page.getByRole('dialog', { name: '有未保存修改' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('reference-image-mode')).toHaveValue('required')
@@ -142,10 +201,32 @@ test('unsupported Account remains diagnosed before explicit server validation', 
   await capture(page, info, 'unsupported-adapter-specifications')
   await page.getByTestId('wizard-step-5').click()
   await expect(page.getByTestId('copy-codex')).toBeVisible()
-  await page.getByTestId('return-models').click()
+  await page.getByRole('button', { name: '← 返回模型列表', exact: true }).first().click()
   await expect(page.getByTestId('publish')).toBeEnabled()
   await page.getByTestId('publish').click()
   await expect(page.getByTestId('publish-product-canvas-1')).toBeChecked()
   await expect(page.getByTestId('publish-scope')).toContainText('后台只校验这些商品')
   expect((await calls(page)).filter(call => call.method !== 'get')).toHaveLength(0)
+})
+
+test('a missing save receipt remains unconfirmed and preserves the local recovery copy', async ({ page }, info) => {
+  await openWizard(page, 'WIZARD_MISSING_RECEIPT')
+  await page.getByTestId('wizard-step-4').click()
+  await page.getByTestId('procurement-cost-0').fill('0.42')
+  await page.getByTestId('wizard-step-5').click()
+  await expect(page.getByTestId('autosave-status')).toContainText('保存结果待核对，自动写入已暂停')
+  await expect(page.getByTestId('autosave-status')).not.toContainText('已确认保存')
+  await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  expect((await snapshot(page)).media_workbench_v1!.draft.save_receipt).toBeUndefined()
+  const writes = (await calls(page)).filter(call => call.method !== 'get')
+  expect(writes).toHaveLength(1)
+  expect(writes[0]!.input.expected_record_version).toBe(3)
+  expect(writes[0]!.input.submission_id).toEqual(expect.any(String))
+  await page.getByTestId('check-server').click()
+  // The server advanced without a matching receipt: checking must escalate to conflict.
+  await expect(page.getByTestId('autosave-status')).toContainText('存在服务器版本冲突，当前输入保留')
+  await expect(page.getByTestId('autosave-status')).not.toContainText('已确认保存')
+  await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  expect((await calls(page)).filter(call => call.method !== 'get')).toEqual(writes)
+  await capture(page, info, 'missing-receipt-protection')
 })

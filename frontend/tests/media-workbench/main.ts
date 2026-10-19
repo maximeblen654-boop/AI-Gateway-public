@@ -18,8 +18,10 @@ const scenario = query.get('scenario') ?? 'PASS'
 const management = scenario.startsWith('DRAFT_MANAGEMENT')
 const initialDTO = management ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
-const savedManagement = management ? sessionStorage.getItem(scenario) : null
-const dto = savedManagement ? JSON.parse(savedManagement) as typeof initialDTO : initialDTO
+const persistent = management || scenario.startsWith('WIZARD')
+const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
+const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
+const otherAccount = supplier(44)
 if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
 if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   // Browser fixture only: the real model contract remains validated by Core.
@@ -27,7 +29,7 @@ if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
 }
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 Object.assign(window, { mediaFixture: { calls: fixtureCalls, snapshot: () => copy(dto) } })
-if (scenario.startsWith('WIZARD')) {
+if (scenario.startsWith('WIZARD') && !savedFixture) {
   const product = dto.media_workbench_v1!.draft.products[0]!
   dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
   dto.media_workbench_v1!.sales.enabled = false
@@ -70,33 +72,44 @@ apiClient.defaults.adapter = async config => {
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
   fixtureCalls.push({ method: config.method ?? 'get', url, input })
   let data: unknown = {}
-  if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), supplier(44)]
+  if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
+    const accountId = Number(url.split('/')[4])
+    const account = scenario === 'NAVIGATION' ? navigationAccounts.find(item => item.id === accountId)! : accountId === dto.id ? dto : otherAccount
     if (config.method !== 'get' && (scenario === 'DELETED' || scenario === 'STALE')) {
       const status = scenario === 'DELETED' ? 410 : 409
       throw { isAxiosError: true, config, response: { status, data: { code: 'FIXTURE_ERROR', message: 'Deterministic fixture' } } }
     }
     if (url.endsWith('/draft')) {
-      dto.media_workbench_v1!.draft.products = input.draft.products
+      const current = account.media_workbench_v1!
+      if (input.expected_record_version !== current.record_version) {
+        throw { isAxiosError: true, config, response: { status: 409, data: { code: 'RECORD_VERSION_CONFLICT', message: 'Fixture CAS conflict' } } }
+      }
+      const baseVersion = current.record_version
+      current.draft.products = copy(input.draft.products)
       if (management) {
         dto.product_removal = Object.fromEntries(dto.media_workbench_v1!.draft.products.map(p => [p.product_id, {
           allowed: p.product_id !== 'canvas-1' && p.capabilities.resolutions.length === 0 && p.pricing_rules.length === 0,
           reason: p.product_id === 'canvas-1' ? '已发布，不能移除。' : ''
         }]))
       }
-      dto.media_workbench_v1!.record_version++
-      dto.media_workbench_v1!.draft.revision = `fixture_${dto.media_workbench_v1!.record_version}`
-      dto.media_workbench_v1!.validation.draft_revision = dto.media_workbench_v1!.draft.revision
+      current.record_version++
+      current.draft.revision = `fixture_${current.record_version}`
+      // Match the real draft acknowledgement/readback contract, not a generic HTTP 200.
+      current.draft.save_receipt = input.submission_id && scenario !== 'WIZARD_MISSING_RECEIPT' ? {
+        submission_id: input.submission_id, base_record_version: baseVersion, draft_revision: current.draft.revision
+      } : undefined
+      current.validation.draft_revision = current.draft.revision
       // Deterministic UI fixture only. Real validation is covered separately by Core tests.
       if (scenario.startsWith('WIZARD') && scenario !== 'WIZARD_UNSUPPORTED') {
-        const complete = dto.media_workbench_v1!.draft.products.every(product => product.pricing_rules.length && product.pricing_rules.every(rule => rule.sale_price != null))
-        dto.media_workbench_v1!.validation.status = complete ? 'PASS' : 'FAIL'
-        dto.media_workbench_v1!.validation.publish_ready = complete
+        const complete = current.draft.products.every(product => product.pricing_rules.length && product.pricing_rules.every(rule => rule.sale_price != null))
+        current.validation.status = complete ? 'PASS' : 'FAIL'
+        current.validation.publish_ready = complete
       }
     }
-    if (url.endsWith('/sales')) { dto.media_workbench_v1!.sales.enabled = input.enabled; dto.effective_sales = input.enabled; dto.media_workbench_v1!.record_version++ }
-    if (management && config.method !== 'get') sessionStorage.setItem(scenario, JSON.stringify(dto))
-    data = scenario === 'NAVIGATION' ? copy(navigationAccounts.find(account => account.id === Number(url.split('/')[4]))) : copy(dto)
+    if (url.endsWith('/sales')) { account.media_workbench_v1!.sales.enabled = input.enabled; account.effective_sales = input.enabled; account.media_workbench_v1!.record_version++ }
+    if (persistent && config.method !== 'get' && account.id === dto.id) sessionStorage.setItem(scenario, JSON.stringify(dto))
+    data = copy(account)
   } else if (url === '/announcements') data = []
   else if (url === '/keys') data = { items: [], pages: 1, total: 0 }
   else if (url.includes('settings')) data = { site_name: 'Media UI fixture', ops_monitoring_enabled: false }
