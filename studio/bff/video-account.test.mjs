@@ -32,7 +32,7 @@ let original;
 function video(){return original ||= execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=blue:s=1280x720:r=5','-t','5','-an','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','-movflags','frag_keyframe+empty_moov','-f','mp4','pipe:1'],{windowsHide:true,maxBuffer:1<<20});}
 const profile={apiModelId:'3.0',upstreamModelId:'synthetic-video',documentedStatus:'enabled',inputMode:'images',durationSeconds:[5,8],resolutions:['1280x720','720p','1080p'],ratios:['16:9'],mediaLimits:{image:9,video:0,audio:0,total:9}};
 
-function fixture(t,{lost=false,corrupt=false,currency='CNY',resultBytes,resultTimeout=false,taskStatus='completed',captureUnavailable=false}={}){
+function fixture(t,{bindingVersion=VIDEO_CONTRACT,mutateQuote,lost=false,corrupt=false,currency='CNY',resultBytes,resultTimeout=false,taskStatus='completed',captureUnavailable=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'account-video-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const journalRoot=path.join(root,'journal'),store=createVideoResultStore({rootDir:path.join(root,'original')});
  const tasks=new Map();let posts=0,captures=0,captureRequests=0,quoteCalls=0,downloads=0,releases=0,q,lastRequest;
@@ -42,10 +42,10 @@ function fixture(t,{lost=false,corrupt=false,currency='CNY',resultBytes,resultTi
   if(operation==='quotes'){
    quoteCalls++;lastRequest=structuredClone(payload.request);
    assert.equal(payload.request.resolution,payload.spec.resolution);assert.equal(payload.request.duration,payload.spec.duration_seconds);assert.equal(payload.request.ratio,payload.spec.aspect_ratio);assert.equal(payload.request.model,'synthetic-video');
-   const binding={version:VIDEO_CONTRACT,quote_id:'quote-original',owner:{user_id:1,api_key_id:2,group_id:3},published_revision:'pub-original',
+   const binding={version:bindingVersion,quote_id:'quote-original',owner:{user_id:1,api_key_id:2,group_id:3},published_revision:'pub-original',
     offer:{offer_id:payload.offer_id,account_id:7,site_model:'3.0',adapter:{revision:'laoli_video_json_v136_r1'},sale_price:{amount:'0.80',currency,billing_mode:'per_request'}},
     spec:payload.spec,request_hash:hash(JSON.stringify(payload.request)),expires_at:new Date(Date.now()+120000).toISOString()};
-   q={contract:VIDEO_CONTRACT,quote_token:'a'.repeat(64),binding_hash:hash(JSON.stringify(binding)),binding};return {key_ref:2,payload:q};
+   q={contract:VIDEO_CONTRACT,quote_token:'a'.repeat(64),binding_hash:hash(JSON.stringify(binding)),binding};mutateQuote?.(q);return {key_ref:2,payload:q};
   }
   assert.equal(keyRef,2,'recovery must retain original customer key');
   if(operation==='tasks'){posts++;tasks.set(payload.task_id,{status:taskStatus,upstream_id:'original-upstream'});if(lost)throw Error('lost submit response');return {key_ref:2,payload:{}};}
@@ -220,4 +220,55 @@ test('legacy recovery uses original receipt GET and original capture, never Acco
  await legacy.recover(session,op.operationId);await legacy.recover(session,op.operationId);
  assert.equal(captures,1);assert.equal(gets,1);assert.deepEqual(journal.readChildBody(1,op.operationId,0),Buffer.from('{"original":"bytes"}'));
  assert.equal(journal.getForOwner(1,op.operationId).children[0].account,undefined);
+});
+
+
+test('private v1/v2 bindings retain v1 transport and once-only recovery',async t=>{
+ for(const bindingVersion of [VIDEO_CONTRACT,'account_video_v2'])await t.test(bindingVersion,async t=>{
+  const f=fixture(t,{bindingVersion}),r=f.make();
+  const op=await r.prepare(session,{clientKey:'binding-version',offerId:'offer1',request:request()});
+  assert.equal(op.contract,VIDEO_CONTRACT);
+  assert.deepEqual(op.sale_price,{amount:'0.80',currency:'CNY',billing_mode:'per_request'});
+  assert.equal((await f.make().recover(session,op.operation_id)).status,'intent');
+  assert.equal((await r.dispatch(session,op.operation_id)).status,'captured');
+  assert.equal((await f.make().recover(session,op.operation_id)).status,'captured');
+  await f.make().dispatch(session,op.operation_id);
+  assert.deepEqual(Buffer.from(await (await f.make().original(session,op.operation_id)).response.arrayBuffer()),video());
+  assert.deepEqual(f.counts(),{posts:1,captures:1,quoteCalls:1});
+  assert.equal(f.captureRequests(),1);
+ });
+});
+
+test('private v2 acceptance preserves transport and identity rejection',async t=>{
+ const mutations={
+  private_version:q=>{q.binding.version='account_video_v3'},
+  outer_contract:q=>{q.contract='account_video_v2'},
+  owner:q=>{q.binding.owner.user_id=9},
+  key:q=>{q.binding.owner.api_key_id=9},
+  offer:q=>{q.binding.offer.offer_id='other-product'},
+  model:q=>{q.binding.offer.site_model='other-model'},
+  request_hash:q=>{q.binding.request_hash='f'.repeat(64)},
+  adapter:q=>{q.binding.offer.adapter.revision='other-adapter'},
+  currency:q=>{q.binding.offer.sale_price.currency='USD'},
+  token:q=>{q.quote_token='invalid'},
+  binding_hash:q=>{q.binding_hash='invalid'},
+  expired:q=>{q.binding.expires_at=new Date(0).toISOString()},
+ };
+ for(const [name,mutateQuote]of Object.entries(mutations))await t.test(name,async t=>{
+  const f=fixture(t,{bindingVersion:'account_video_v2',mutateQuote});
+  await assert.rejects(f.make().prepare(session,{clientKey:name,offerId:'offer1',request:request()}),/Quote binding mismatch/);
+  assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});
+  assert.deepEqual(f.make().history(session),[]);
+ });
+});
+
+
+test('journal rejects unsupported private binding versions before persisting intent',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'video-version-journal-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const journal=createOperationJournal({rootDir:root}),body=Buffer.from(JSON.stringify({model:'fixture'}));
+ for(const version of ['account_video_v3','',null]){
+  const binding={version,owner:{user_id:1},request_hash:hash(body),quote_id:'quote'};
+  assert.throws(()=>journal.createIntent({ownerId:1,clientKey:'invalid-version',quoteId:'quote',capabilityRevision:'rev',currency:'CNY',children:[{bodyBytes:body,account:{binding,binding_hash:'a'.repeat(64),quote_token:'b'.repeat(64),key_ref:2}}]}),/invalid_account_binding/);
+ }
+ assert.deepEqual(fs.readdirSync(root),[]);
 });

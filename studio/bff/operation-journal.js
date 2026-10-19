@@ -201,7 +201,7 @@ function createOperationJournal({ rootDir }) {
       } catch { fail('invalid_intent'); }
       bodies.push(body);
       const childId = child.account ? `av_${hash(`${id}:${index}`)}` : `${id}_c${index}`;
-      if (child.account && (child.account.binding?.version !== 'account_video_v1' ||
+      if (child.account && (!['account_video_v1','account_video_v2'].includes(child.account.binding?.version) ||
           child.account.binding.owner?.user_id !== ownerId || child.account.binding.request_hash !== hash(body) ||
           !/^[a-f0-9]{64}$/.test(child.account.binding_hash || '') || !/^[a-f0-9]{64}$/.test(child.account.quote_token || '') ||
           child.account.binding.quote_id !== quoteId || !Number.isSafeInteger(child.account.key_ref) || child.account.key_ref <= 0)) fail('invalid_account_binding');
