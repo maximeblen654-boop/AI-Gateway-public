@@ -88,7 +88,9 @@ const report = { cases: [], http: [] }
       await expect(w('autosave-status').locator(':scope > p').first()).toHaveText('已确认保存')
       const submitted = response.request().postDataJSON()
       const savedConfig = detail.media_workbench_v1
-      assert.equal(savedConfig.record_version, submitted.expected_record_version + 1, 'Save must advance the submitted CAS version once')
+      // Core SaveDraft commits the draft (+1), then validateSaved commits its
+      // successful validation snapshot (+1). This isolated ready path has no other writer.
+      assert.equal(savedConfig.record_version, submitted.expected_record_version + 2, 'Core must confirm draft and successful validation CAS commits')
       assert.deepEqual(savedConfig.draft.save_receipt, { submission_id: submitted.submission_id, base_record_version: submitted.expected_record_version, draft_revision: savedConfig.draft.revision }, 'Save receipt must confirm this exact submission')
       const readback = await page.evaluate(async accountId => {
         const reply = await fetch(`/api/v1/admin/media-workbench/accounts/${accountId}`, { headers: { Authorization: 'Bearer ' + localStorage.getItem('auth_token') } })

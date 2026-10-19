@@ -12,6 +12,8 @@ for (const width of [1440, 1366, 390]) test(`candidate confirmed save and indepe
   await expect(status).toHaveText('已确认保存')
   const saved = await page.evaluate(() => ({ snapshot: window.mediaFixture.snapshot(), calls: window.mediaFixture.calls.filter(x => x.method !== 'get') }))
   const last = saved.calls.at(-1), config = saved.snapshot.media_workbench_v1
+  // Vue fixture models one save increment, not Core's separate validation CAS.
+  // This proves UI/receipt behavior only; browser.cjs validates real Core +2.
   expect(config.record_version).toBe(last.input.expected_record_version + 1)
   expect(config.draft.save_receipt).toEqual({ submission_id: last.input.submission_id, base_record_version: last.input.expected_record_version, draft_revision: config.draft.revision })
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
