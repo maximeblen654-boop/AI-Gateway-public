@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { randomUUID, createHash } = require('node:crypto')
 const { chromium, expect } = require('../../frontend/node_modules/@playwright/test')
+const selectPublishedProduct = require('./product-picker.cjs')
 const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const base = 'http://127.0.0.1:28100'
@@ -87,9 +88,10 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     const offerModel = video ? videoModel : geometry ? 'gpt-image-2' : 'gemini-3.1-flash-image'
     const geometryProduct = geometry ? JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json','utf8')).products.find(p=>p.display_name === (geometry.independent ? 'Synthetic geometry independent price' : 'Synthetic geometry image')) : null
     assert(!geometry || geometryProduct, 'saved UI product identity is required')
-    const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!geometry || (o.product_id === geometryProduct.product_id && o.spec.resolution.includes(geometry.resolution))))
+    const configuredProduct = geometryProduct || (video && process.env.NATIVE_ACCEPTANCE_SCENARIO === 'paid-controls' ? JSON.parse(fs.readFileSync(`${root}/evidence/native-video-${videoMode}-browser.json`, 'utf8')).product : null)
+    const offer = catalog.offers?.find(o => (o.upstream_model === offerModel || o.model === offerModel) && (!configuredProduct || o.product_id === configuredProduct.product_id) && (!geometry || o.spec.resolution.includes(geometry.resolution)))
     assert(offer, JSON.stringify(catalog))
-    if(workspace) await page.locator(`[data-offer-id="${offer.offer_id}"]`).click()
+    if(workspace) await selectPublishedProduct(page, catalog.offers, offer)
     else await page.getByTestId('studio-offer-select').selectOption(offer.offer_id)
     if (!video) {if(workspace){await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()}else await page.getByTestId('studio-count').fill(String(count))}
     if (geometry) {
@@ -104,9 +106,30 @@ assert(report && (!recover || report.id), 'Original task evidence is required fo
     }
     await page.getByTestId('studio-prompt').fill(`SYNTHETIC native ${scenario} ${randomUUID()}`)
     report.before = { supplier: stats(), ledger: ledger() }
+    const quoteSelection = page.waitForRequest(r => r.url().endsWith(`/studio-v2/api/${kind}/quotes`) && r.method() === 'POST')
     const quote = page.waitForResponse(r => r.url().endsWith(`/studio-v2/api/${kind}/${video ? 'quotes' : 'prepare'}`) && r.request().method() === 'POST')
     await page.getByTestId('studio-quote').click(); const response = await quote
     report.quote = await response.json(); assert.equal(response.status(), 200, JSON.stringify(report.quote))
+    report.quote_selection = (await quoteSelection).postDataJSON()
+    assert.equal(report.quote_selection.offer_id, offer.offer_id, 'quote request must use the exact selected price Offer')
+    assert.equal(report.quote.offer_id, offer.offer_id, 'prepared task must bind the exact selected Offer')
+    assert.equal(report.quote.spec.resolution, geometry?.resolution || (video ? '720p' : '1K'))
+    assert.equal(report.quote.spec.aspect_ratio, geometry?.ratio || (video ? '16:9' : '1:1'))
+    assert.equal(report.quote.spec.count, count)
+    if (video) {
+      assert.equal(report.quote.model, offer.upstream_model)
+      assert.equal(report.quote.spec.duration_seconds, 5)
+      assert.equal(report.quote_selection.model, offer.model)
+      assert.equal(report.quote_selection.duration, 5)
+      assert.equal(report.quote_selection.resolution, '720p')
+      assert.equal(report.quote_selection.ratio, '16:9')
+    } else {
+      assert.equal(report.quote_selection.spec.resolution, report.quote.spec.resolution)
+      assert.equal(report.quote_selection.spec.aspect_ratio, report.quote.spec.aspect_ratio)
+      assert.equal(report.quote_selection.spec.count, count)
+      assert.equal(report.quote_selection.spec.images, scenario === 'edit' || geometry?.edit ? 1 : 0)
+    }
+    report.selected_product = { product_id: offer.product_id, product_scope: offer.product_scope, offer_id: offer.offer_id, model: offer.model, upstream_model: offer.upstream_model }
     report.id = report.quote.task_id || report.quote.operation_id
     assert.equal(Math.round(Number(report.quote.sale_price.amount) * 100), video ? 200 : count * (geometry?.cents ?? 70))
     if (artifact) {

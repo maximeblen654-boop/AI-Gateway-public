@@ -3,6 +3,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict')
 const {createHash}=require('node:crypto'),{execFileSync}=require('node:child_process')
 const {chromium,expect}=require('../../frontend/node_modules/@playwright/test')
+const selectPublishedProduct=require('./product-picker.cjs')
 const root=process.argv[2],base='http://127.0.0.1:28100'
 assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted');assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO,'paid-controls');assert(root.endsWith('/native-media-20261012'))
 const stats=()=>JSON.parse(fs.readFileSync(root+'/evidence/native-supplier-state.json'))
@@ -20,22 +21,24 @@ const report={production:false,api_mocking:false,checks:[],screenshots:[],tasks:
  const media=(op)=>page.evaluate(async op=>{const r=await fetch('/studio-v2/api/image/'+op,{headers:{'X-Studio-Request':'image-binding-v1'}});return{status:r.status,body:await r.json()}},op)
  const screenshot=async name=>{await expect(page.getByRole('dialog')).toBeHidden();await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:root+'/evidence/'+name,animations:'disabled',fullPage:true});report.screenshots.push(name)}
  const login=async()=>{await page.goto(base+'/login');await page.getByLabel('邮箱').fill('native-customer@example.invalid');await page.getByLabel('密码').fill('Native-Customer-Only-20261012');await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL('**/dashboard');const catalogReady=page.waitForResponse(r=>r.url().endsWith('/studio-v2/api/image/catalog')&&r.request().method()==='GET'&&r.status()===200);await page.goto(base+'/video-studio');await catalogReady;await expect(page.getByTestId('studio-mode-text')).toBeEnabled()}
- let offer
+ let offer,offers
  async function prepare(prompt,count=1,edit=false){
   await page.getByTestId(edit?'studio-mode-edit':'studio-mode-text').click();await expect(page.getByTestId('studio-prompt')).toBeVisible()
-  await page.getByTestId('studio-model-toggle').click();await page.locator(`[data-offer-id="${offer.offer_id}"]`).click()
+  await page.getByTestId('studio-model-toggle').click();await selectPublishedProduct(page,offers,offer)
   await page.getByTestId('studio-resolution').click();await page.locator('#studio-resolution-menu [data-value="4K"]').click()
   await page.getByTestId('studio-ratio-toggle').click();await page.locator('[data-ratio="16:9"]').click()
   await page.getByTestId('studio-count').click();await page.locator(`#studio-count-menu [data-value="${count}"]`).click()
   if(edit){await page.getByTestId('studio-asset-input').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:png});await expect(page.getByTestId('studio-asset-success')).toHaveCount(1)}
   await page.getByTestId('studio-prompt').fill(prompt)
+  const selection=page.waitForRequest(r=>r.url().endsWith('/studio-v2/api/image/quotes')&&r.method()==='POST')
   const ready=page.waitForResponse(r=>r.url().endsWith('/studio-v2/api/image/prepare')&&r.request().method()==='POST')
   await page.getByTestId('studio-quote').click();const response=await ready;assert.equal(response.status(),200);const q=await response.json();assert.equal(q.spec.resolution,'4K');assert.equal(q.spec.aspect_ratio,'16:9');assert.equal(q.spec.count,count);assert.equal(q.spec.images,edit?1:0)
+  assert.equal((await selection).postDataJSON().offer_id,offer.offer_id);assert.equal(q.offer_id,offer.offer_id);assert.equal(Math.round(Number((q.total_price||q.sale_price).amount)*100),110*count)
   await expect(page.getByTestId('studio-confirm-generate')).toBeVisible();report.tasks.push({id:q.task_id,prompt,spec:q.spec,price:q.total_price||q.sale_price});return q
  }
  const pick=async id=>{await page.getByTestId('studio-mode-history').click();await page.locator(`[data-task-id="${id}"]`).click();await expect(page.getByTestId('studio-refresh')).toBeEnabled()}
  try{
-  await login();const catalog=await media('catalog');assert.equal(catalog.status,200);const product=JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json')).products.find(p=>p.display_name==='Synthetic geometry image');offer=catalog.body.offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('4K'));assert(offer)
+  await login();const catalog=await media('catalog');assert.equal(catalog.status,200);offers=catalog.body.offers;const product=JSON.parse(fs.readFileSync(root+'/evidence/native-geometry-browser.json')).products.find(p=>p.display_name==='Synthetic geometry image');offer=offers.find(o=>o.product_id===product.product_id&&o.spec.resolution.includes('4K'));assert(offer)
   report.before={image_posts:stats().image_posts,video_posts:stats().video_posts,balance:balance()}
   const unknown=await prepare('SYNTHETIC_UNKNOWN_502 original three outputs',3)
   const submitted=page.waitForResponse(r=>r.url().endsWith('/studio-v2/api/image/tasks')&&r.request().method()==='POST');await page.getByTestId('studio-confirm-generate').click();await submitted
@@ -68,6 +71,7 @@ const report={production:false,api_mocking:false,checks:[],screenshots:[],tasks:
   assert.equal(balance(),report.after_balance);assert.equal(stats().image_posts,beforeRecovery);assert.equal(stats().video_posts,report.before.video_posts)
   for(const q of [first,second])assert.equal(ledger(q.task_id).usage,1);assert.equal(ledger(unknown.task_id).usage,0)
   report.requests=stats().requests.filter(r=>r.method==='POST'&&report.tasks.some(t=>t.prompt===r.body.prompt)).map(r=>({path:r.path,model:r.body.model,n:r.body.n,size:r.body.size,prompt:r.body.prompt}))
+  for(const request of report.requests)assert.equal(request.model,offer.upstream_model)
   assert.equal(report.requests.filter(r=>r.prompt===report.tasks[0].prompt).length,1)
   assert.equal(report.requests.filter(r=>r.prompt===report.tasks[1].prompt).length,1)
   assert.equal(report.requests.filter(r=>r.prompt===report.tasks[2].prompt).reduce((n,r)=>n+r.n,0),2)
