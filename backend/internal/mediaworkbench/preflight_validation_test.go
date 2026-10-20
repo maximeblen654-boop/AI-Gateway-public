@@ -175,7 +175,10 @@ func TestPublishedValidationMemoCancellationAndDeadline(t *testing.T) {
 						t.Fatalf("terminal hit: calls=%d runs=%d reuses=%d", calls, runs, reuses)
 					}
 				} else {
-					memo := base.Value(publishedValidationMemoKey{}).(*publishedValidationMemo)
+					memo, ok := base.Value(publishedValidationMemoKey{}).(*publishedValidationMemo)
+					if !ok || memo == nil {
+						t.Fatal("missing request-local validation memo")
+					}
 					if calls != 1 || runs != 0 || reuses != 0 || len(memo.values) != 0 {
 						t.Fatalf("terminal compute retained result: calls=%d runs=%d reuses=%d entries=%d", calls, runs, reuses, len(memo.values))
 					}
