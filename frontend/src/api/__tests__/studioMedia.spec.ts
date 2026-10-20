@@ -103,3 +103,17 @@ it('prepares credentials for catalog but not for readiness reads',async()=>{
  expect(client.post).toHaveBeenCalledWith('/keys/studio-access',{media:'image'})
  expect(fetch.mock.calls.filter(call=>String(call[0]).endsWith('/readiness'))).toHaveLength(1)
 })
+
+it('cancels an unused session response before continuing the normal ticket exchange',async()=>{
+ client.get.mockResolvedValue({data:{id:2}});client.post.mockResolvedValue({data:{ticket:'synthetic-ticket'}})
+ const cancel=vi.fn(),body=new ReadableStream<Uint8Array>({cancel})
+ const fetch=vi.fn().mockResolvedValueOnce(new Response(body,{status:401})).mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2})));vi.stubGlobal('fetch',fetch)
+ expect(await ensureStudioSession()).toEqual({owner_id:2});expect(cancel).toHaveBeenCalledTimes(1)
+ expect(client.post).toHaveBeenCalledWith('/auth/studio-media-ticket')
+})
+it('releases an unread session response when website identity changes after headers',async()=>{
+ localStorage.setItem('auth_token','synthetic-a');client.get.mockResolvedValue({data:{id:1}})
+ const cancel=vi.fn(),body=new ReadableStream<Uint8Array>({cancel})
+ vi.stubGlobal('fetch',vi.fn().mockImplementationOnce(async()=>{localStorage.setItem('auth_token','synthetic-b');return new Response(body,{status:401})}))
+ await expect(ensureStudioSession()).rejects.toThrow('studio_session_changed');expect(cancel).toHaveBeenCalledTimes(1);expect(client.post).not.toHaveBeenCalled()
+})

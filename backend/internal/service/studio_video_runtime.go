@@ -34,6 +34,10 @@ type StudioVideoRuntime struct {
 }
 
 func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner, key *APIKey) ([]StudioImageCatalogOffer, error) {
+	ctx = mediaworkbench.WithPublishedValidationMemo(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !videoOwnerKey(owner, key) {
 		return nil, ErrStudioVideoInvalidOrder
 	}
@@ -43,11 +47,24 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 	}
 	out := []StudioImageCatalogOffer{}
 	for i := range rows {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		a, e := r.Core.accountRepo.GetByID(ctx, rows[i].ID)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if e != nil || a == nil || !slices.Contains(a.GroupIDs, owner.GroupID) {
 			continue
 		}
-		for _, o := range mediaworkbench.PublishedVideoOffers(&rows[i]) {
+		offers, err := mediaworkbench.PublishedVideoOffersContext(ctx, &rows[i])
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range offers {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			if key.Group.ModelAllowlist.Allows(o.SiteModel) {
 				mode := o.ResolvedConfig.WireProfile
 				if mode == "" {
@@ -69,6 +86,9 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 		}
 	}
 	attachStudioPassiveStatuses(ctx, r.Monitor, owner, key, out)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

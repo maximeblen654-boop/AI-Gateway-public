@@ -43,16 +43,33 @@ func ValidateVideoSalePrice(p Price) error {
 }
 
 func PublishedVideoOffers(a *Account) []Offer {
-	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReady(a) {
-		return nil
+	offers, _ := PublishedVideoOffersContext(context.Background(), a)
+	return offers
+}
+
+// All products are checked against this fresh immutable Account; results live
+// only for this loop and never grant availability to a later repository read.
+func PublishedVideoOffersContext(ctx context.Context, a *Account) ([]Offer, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	ready := publishedSnapshotValidator(ctx, a)
+	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedReadyWithValidation(ctx, a, ready) {
+		return nil, ctx.Err()
 	}
 	out := []Offer{}
 	for _, o := range a.Config.Published.Offers {
-		if o.MediaType == "video" && publishedProductReady(context.Background(), a, o.ProductID) && validVideoBinding(o.Adapter) && ValidateVideoSalePrice(o.SalePrice) == nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if o.MediaType == "video" && ready(o.ProductID) && validVideoBinding(o.Adapter) && ValidateVideoSalePrice(o.SalePrice) == nil {
 			out = append(out, o)
 		}
 	}
-	return out
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {

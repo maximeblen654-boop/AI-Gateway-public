@@ -999,3 +999,127 @@ describe('draft recovery choices and read-only server check', () => {
     expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
   })
 })
+
+
+describe('account selection feedback and request identity', () => {
+  // The normal DOM path blocks another click while busy. Invoke the real Vue
+  // method here to exercise its additional stale-response defence.
+  function selectThroughView(id: number) {
+    const instance = wrapper.findComponent(MediaWorkbenchView).vm.$ as unknown as { setupState: { openSupplier: (id: number) => Promise<void> } }
+    return instance.setupState.openSupplier(id)
+  }
+  it('keeps the source list after an initial detail request fails', async () => {
+    await mountWorkbench()
+    api.detail.mockRejectedValueOnce({ status: 503 })
+    await selectAccount()
+    expect(wrapper.get('[data-test="account-page"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="model-page"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="selected-account-summary"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="sales"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="banner"]').text()).toContain('后台服务暂不可用')
+  })
+  it('keeps the source list when reselecting the old Account fails', async () => {
+    await mountWorkbench(); await selectAccount()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    api.detail.mockRejectedValueOnce({ status: 503 })
+    await wrapper.get('[data-test="supplier-77"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="account-page"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="model-page"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="editor-page"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="banner"]').text()).toContain('后台服务暂不可用')
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
+  it('names the pending target without treating the old Account as that target', async () => {
+    await mountWorkbench(); await selectAccount()
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    await expandSource('video.example.invalid')
+    let release!: (dto: ReturnType<typeof supplier>) => void
+    api.detail.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    await wrapper.get('[data-test="supplier-44"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="account-loading"]').text()).toContain('Account #44')
+    expect(wrapper.get('[data-test="supplier-77"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="supplier-44"]').attributes('aria-pressed')).toBe('false')
+    expect(wrapper.get('[data-test="supplier-77"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="supplier-44"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="model-page"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="sales"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="display-name"]').exists()).toBe(false)
+    release(supplier(44)); await flushPromises()
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#44')
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).not.toContain('#77')
+    expect(wrapper.find('[data-test="account-loading"]').exists()).toBe(false)
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  })
+  it.each(['success', 'failure'])('isolates late A %s after B is selected through the actual Vue view', async outcome => {
+    await mountWorkbench()
+    let resolveA!: (dto: ReturnType<typeof supplier>) => void
+    let rejectA!: (error: unknown) => void
+    api.detail.mockReturnValueOnce(new Promise((resolve, reject) => { resolveA = resolve; rejectA = reject }))
+      .mockResolvedValueOnce(supplier(44))
+    const old = selectThroughView(77)
+    await selectThroughView(44); await flushPromises()
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#44')
+    if (outcome === 'success') resolveA(supplier(77))
+    else rejectA({ status: 404 })
+    await old; await flushPromises()
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#44')
+    expect(wrapper.find('[data-test="banner"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="sales"]').attributes('disabled')).toBeUndefined()
+    expect(api.sales).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  })
+  it('keeps the old editor actions disabled while loading a different Account', async () => {
+    await openEditor()
+    let release!: (dto: ReturnType<typeof supplier>) => void
+    api.detail.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    const loading = selectThroughView(44); await flushPromises()
+    expect(wrapper.get('[data-test="account-loading"]').text()).toContain('#44')
+    expect(wrapper.get('[data-test="display-name"]').element.matches(':disabled')).toBe(true)
+    expect(wrapper.get('[data-test="save"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="product-enabled"]').attributes('disabled')).toBeDefined()
+    release(supplier(44)); await loading; await flushPromises()
+    expect(wrapper.find('[data-test="editor-page"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#44')
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
+  it('keeps publication and sales unavailable while an Account detail request is pending', async () => {
+    await mountWorkbench(); await selectAccount()
+    let release!: (dto: ReturnType<typeof supplier>) => void
+    api.detail.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    const loading = selectThroughView(44); await flushPromises()
+    expect(wrapper.get('[data-test="account-loading"]').text()).toContain('#44')
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#77')
+    expect(wrapper.get('[data-test="sales"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="publish"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="model-image-native-1"]').attributes('disabled')).toBeDefined()
+    release(supplier(44)); await loading; await flushPromises()
+    expect(wrapper.get('[data-test="selected-account-summary"]').text()).toContain('#44')
+    expect(api.sales).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  })
+  it('discovers only the successful Account recovery even when both Accounts share Product IDs', async () => {
+    await mountWorkbench()
+    const auth = useAuthStore(); auth.user = { id: 1 } as NonNullable<typeof auth.user>
+    const copies = [77, 44].map(id => {
+      const dto = supplier(id), product = copy(dto.media_workbench_v1!.draft.products[0]!)
+      product.display_name = `Account ${id} 的本地恢复`
+      const editorId = crypto.randomUUID()
+      const value: DraftRecovery = { version: 1, identity: { admin_id: 1, account_id: id, product_id: product.product_id, site_model: product.site_model, upstream_model: product.upstream_model }, base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: Date.now(), copy_id: crypto.randomUUID(), editor_id: editorId, product }
+      const key = recoveryCopyKey(value.identity, editorId)!, raw = encodeDraftRecovery(value)
+      localStorage.setItem(key, raw)
+      return { key, raw }
+    })
+    await selectAccount(); await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    await expandSource('video.example.invalid')
+    await wrapper.get('[data-test="supplier-44"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+    const recovery = wrapper.get('[data-test="draft-recovery"]')
+    expect(recovery.text()).toContain('Account 44 的本地恢复')
+    expect(recovery.text()).not.toContain('Account 77 的本地恢复')
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('画布图片')
+    for (const item of copies) expect(localStorage.getItem(item.key)).toBe(item.raw)
+    window.dispatchEvent(new Event('offline'))
+    await wrapper.get('[data-test="restore-recovery"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('Account 44 的本地恢复')
+    expect(localStorage.getItem(copies[0]!.key)).toBe(copies[0]!.raw)
+    expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
+})

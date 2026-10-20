@@ -28,7 +28,8 @@
         <button v-else-if="deleted" class="btn btn-secondary" :disabled="busy" @click="navigate(returnToSuppliers)">返回账号列表</button>
         <button v-else-if="!detail" class="btn btn-secondary" :disabled="busy" @click="loadSuppliers">重试读取</button>
       </div>
-      <p v-if="loading" role="status">正在读取账号配置…</p>
+      <p v-if="loadingAccountId !== null" role="status" data-test="account-loading">正在读取 Account #{{ loadingAccountId }} 的配置…</p>
+      <p v-else-if="loading" role="status">正在读取账号列表…</p>
 
       <main class="mw-flow">
         <section v-if="step === 'suppliers'" class="mw-page mw-panel" aria-label="来源与账号导航" data-test="account-page">
@@ -327,7 +328,7 @@ async function readPaidStatus() {
 }
 const auth = useAuthStore()
 const workbench = useMediaWorkbench(() => auth.user?.id)
-const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
+const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, loadingAccountId, message,
   diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval, videoSaleInputs, updateVideoSaleInputs,
   recovery, recoveryWarning, recoveryConflict, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
@@ -563,7 +564,7 @@ function navigate(action: () => void | Promise<void>) {
   if (videoSaleInputs.value.length) void commitEditor().then(committed => { if (committed) proceed() })
   else proceed()
 }
-async function openSupplier(id: number) { await selectSupplier(id); if (detail.value?.id === id) { step.value = 'models'; void readPaidStatus(); await nextTick(); modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }) } }
+async function openSupplier(id: number) { const selected = await selectSupplier(id); if (selected && !loading.value && detail.value?.id === id) { step.value = 'models'; void readPaidStatus(); await nextTick(); modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }) } }
 async function openEditor(modelId: string) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
   modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }

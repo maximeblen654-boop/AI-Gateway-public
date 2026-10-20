@@ -12,6 +12,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const selectedProduct = ref('')
   const pending = ref('')
   const loading = ref(false)
+  const loadingAccountId = ref<number | null>(null)
   const message = ref('')
   const errorStatus = ref(0)
   const errorDiagnostics = ref<Diagnostic[]>([])
@@ -265,22 +266,24 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     try { suppliers.value = await mediaWorkbenchAPI.suppliers() } catch (e) { failure(e) }
     finally { loading.value = false }
   }
-  async function selectSupplier(id: number, discardConfirmed = false) {
-    if (pending.value) return
-    if (!discardConfirmed && detail.value?.id === id && (dirty.value || saveState.value === 'unconfirmed' || conflict.value)) { await checkServer(); return }
+  async function selectSupplier(id: number, discardConfirmed = false): Promise<boolean> {
+    if (pending.value) return false
+    if (!discardConfirmed && detail.value?.id === id && (dirty.value || saveState.value === 'unconfirmed' || conflict.value)) return await checkServer() && detail.value?.id === id && !disposed
     if (!discardConfirmed) persistRecovery()
     clearTimeout(autoSaveTimer)
     const seq = ++loadSequence
-    stopPolling(); loading.value = true; clearError()
+    stopPolling(); loading.value = true; loadingAccountId.value = id; clearError()
     try {
       const dto = await mediaWorkbenchAPI.detail(id)
-      if (seq !== loadSequence || disposed) return
+      if (seq !== loadSequence || disposed) return false
+      if (dto.id !== id) { message.value = '读取的账号与所选 Account 不一致，请重试。'; return false }
       selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false; unresolvedProductConflicts.value = []
       pendingVideoInputs.value = {}
       lastSubmission = undefined; retryCheck.value = null; rejectedInput = ''; serverSnapshot.value = null
       validationUnavailable.value = false; saveState.value = dto.media_workbench_v1?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''; publicationFeedback.value = ''; salesFeedback.value = ''; apply(dto, true)
-    } catch (e) { if (seq === loadSequence) failure(e, detail.value?.id === id || !detail.value) }
-    finally { if (seq === loadSequence) loading.value = false }
+      return true
+    } catch (e) { if (seq === loadSequence && !disposed) failure(e, detail.value?.id === id || !detail.value); return false }
+    finally { if (seq === loadSequence) { loading.value = false; loadingAccountId.value = null } }
   }
   function selectModel(id: string) {
     selectedModel.value = id
@@ -768,7 +771,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     clearTimeout(autoSaveTimer); apply(detail.value, true); saveState.value = conflict.value ? 'conflict' : config.value?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''
   }
   onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
-  return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
+  return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, loadingAccountId, message,
     errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     recovery, recoveryWarning, recoveryConflict, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
     videoSaleInputs, updateVideoSaleInputs,

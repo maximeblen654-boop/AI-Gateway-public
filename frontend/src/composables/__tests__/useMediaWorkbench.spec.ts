@@ -250,8 +250,12 @@ describe('Media Workbench request lifecycle', () => {
   it('slow supplier responses cannot replace the current supplier', async () => {
     await start(); let resolve!: (dto: ReturnType<typeof supplier>) => void
     api.detail.mockReturnValueOnce(new Promise(r => { resolve = r })).mockResolvedValueOnce(supplier(44))
-    const old = state.selectSupplier(77); await state.selectSupplier(44); resolve(supplier(77)); await old
+    const old = state.selectSupplier(77)
+    expect(state.loadingAccountId.value).toBe(77)
+    expect(await state.selectSupplier(44)).toBe(true)
+    resolve(supplier(77)); expect(await old).toBe(false)
     expect(state.detail.value!.id).toBe(44)
+    expect(state.loadingAccountId.value).toBeNull(); expect(state.loading.value).toBe(false)
   })
   it('late validation A cannot overwrite saved Draft B', async () => {
     vi.useFakeTimers(); await start(); api.saveDraft.mockImplementationOnce(async (_id, version, products, _removed, submissionId) => { const dto = acknowledgement(saved('PENDING'), version, products, submissionId); api.detail.mockResolvedValue(dto); return dto })
@@ -1107,4 +1111,50 @@ it('does not auto-resend an unchanged rejected draft on step/blur, but permits c
  state.products.value[0]!.display_name='Corrected input';mockSave(saved())
  expect(await state.flushAutoSave()).toBe(true);expect(api.saveDraft).toHaveBeenCalledTimes(3)
  expect(state.products.value[0]!.display_name).toBe('Corrected input');expect(state.saveState.value).toBe('saved')
+})
+
+
+describe('explicit account selection result', () => {
+  it('returns false when re-reading the same Account fails and retains the old confirmed state', async () => {
+    await start()
+    const previous = copy(state.detail.value)
+    api.detail.mockRejectedValueOnce({ status: 503 })
+    expect(await state.selectSupplier(77)).toBe(false)
+    expect(state.detail.value).toEqual(previous)
+    expect(state.saveState.value).toBe('saved')
+    expect(state.dirty.value).toBe(false)
+    expect(state.loadingAccountId.value).toBeNull()
+    expect(state.loading.value).toBe(false)
+  })
+  it('does not apply a response belonging to a different Account', async () => {
+    await start()
+    const previous = copy(state.detail.value)
+    api.detail.mockResolvedValueOnce(supplier(77))
+    expect(await state.selectSupplier(44)).toBe(false)
+    expect(state.detail.value).toEqual(previous)
+    expect(state.message.value).toContain('账号与所选 Account 不一致')
+  })
+  it('does not clear the latest Account loading state when an older request finishes first', async () => {
+    await start()
+    let releaseOld!: (dto: ReturnType<typeof supplier>) => void
+    let releaseCurrent!: (dto: ReturnType<typeof supplier>) => void
+    api.detail.mockReturnValueOnce(new Promise(resolve => { releaseOld = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { releaseCurrent = resolve }))
+    const old = state.selectSupplier(77), current = state.selectSupplier(44)
+    releaseOld(supplier(77)); expect(await old).toBe(false)
+    expect(state.loading.value).toBe(true); expect(state.loadingAccountId.value).toBe(44)
+    expect(state.canPublish.value).toBe(false)
+    releaseCurrent(supplier(44)); expect(await current).toBe(true)
+    expect(state.detail.value!.id).toBe(44)
+    expect(state.loading.value).toBe(false); expect(state.loadingAccountId.value).toBeNull()
+  })
+  it('rejects a response after the component is disposed', async () => {
+    await start()
+    let release!: (dto: ReturnType<typeof supplier>) => void
+    api.detail.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    const selection = state.selectSupplier(44)
+    wrapper.unmount(); release(supplier(44))
+    expect(await selection).toBe(false)
+    expect(state.detail.value!.id).toBe(77)
+  })
 })

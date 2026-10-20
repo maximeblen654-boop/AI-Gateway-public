@@ -114,8 +114,14 @@ export function ensureStudioSession(): Promise<{ owner_id: number }> {
     const { data: user } = await apiClient.get<{ id: number }>('/auth/me')
     sameWebsiteSession(token)
     const existing = await fetch(buildGatewayUrl('/studio-v2/api/session'), { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) })
-    sameWebsiteSession(token)
-    if (existing.ok) { const session = record(await existing.json()); sameWebsiteSession(token); if (session.owner_id === user.id) return { owner_id: user.id } }
+    try {
+      sameWebsiteSession(token)
+      if (existing.ok) { const session = record(await existing.json()); sameWebsiteSession(token); if (session.owner_id === user.id) return { owner_id: user.id } }
+    } finally {
+      // Rejected/obsolete session responses are not business data. Release the
+      // unread stream without waiting for its timeout or delaying ticket exchange.
+      if (!existing.bodyUsed) void existing.body?.cancel().catch(() => undefined)
+    }
     const issued = await apiClient.post<{ ticket: string }>('/auth/studio-media-ticket')
     sameWebsiteSession(token)
     if (!issued.data.ticket) throw new StudioError('studio_ticket_unavailable')

@@ -1,5 +1,5 @@
 <template>
-  <section class="studio-workspace" :class="{ 'is-history': historyMode }" data-testid="studio-media-panel">
+  <section ref="panelRoot" class="studio-workspace" :class="{ 'is-history': historyMode }" data-testid="studio-media-panel">
     <aside class="studio-rail" aria-label="创作工作台导航">
       <a href="/dashboard" class="studio-brand-mark" aria-label="AI Gateway，返回控制台"><StudioMark /></a>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'text' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'text'" :disabled="busy" data-testid="studio-mode-text" @click="changeMode('text')"><Icon name="grid" /><span>文生图</span></button>
@@ -109,7 +109,7 @@
   </BaseDialog>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
@@ -122,11 +122,14 @@ import { productDimensionValues, productReferenceOffers, resolveProductOffer, su
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import '@/styles/studio-workspace.css'
 const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref('')
+const panelRoot=ref<HTMLElement|null>(null)
+function releaseLeavingPreviews(){panelRoot.value?.querySelectorAll<HTMLImageElement>('.studio-work-preview img').forEach(image=>image.removeAttribute('src'))}
+onBeforeUnmount(releaseLeavingPreviews)
 type UploadState = 'pending' | 'success' | 'failure'
 type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
 const uploads=ref<StudioAssetUpload[]>([])
 const resolution=ref(''), ratio=ref(''), quality=ref(''), outputFormat=ref<StudioOutputFormat|'auto'>('auto'), count=ref(1), duration=ref(5), prompt=ref('')
-const busy=ref(false), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
+const busy=ref(true), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 type HistoryFilter = 'all'|'image'|'video'
 const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|'format'|null>(null)
 const resultRead=ref(0)
@@ -182,7 +185,7 @@ async function changeMode(mode:'text'|'edit'|'video'){
  if(sameKind&&active.value)newTask()
  if(mode==='text'&&uploads.value.length){clearAssets();notice.value='已切换为文生图，当前输入不再使用参考素材。'}
  imageMode.value=mode==='edit'?'edit':'text'
- if(!sameKind){quoteConfirm.value=false;active.value=null;intent=undefined;kind.value=nextKind;await load(undefined,false);focusPrompt();return}
+ if(!sameKind){releaseLeavingPreviews();quoteConfirm.value=false;active.value=null;intent=undefined;kind.value=nextKind;await load(undefined,false);focusPrompt();return}
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
  remember();focusPrompt()
 }
@@ -387,7 +390,7 @@ async function generate(){
   feedback.value[task.id]={at:Date.now(),message:'本次提交未取得最终结果。',error:e instanceof StudioError && e.code==='image_binding_unavailable'?'本次请求未取得可确认的结果。请查询原任务；不会重新发送生成请求。':studioErrorMessage(e)}
  }finally{delete submitting.value[task.id]}
 }
-onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();storage=`studio-media-view-${session.owner_id}`;let selected:unknown,restorePending=true;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;restorePending=raw.view!=='compose';if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected,restorePending)}catch(e){error.value=studioErrorMessage(e)}
+onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();if(!mounted)return;storage=`studio-media-view-${session.owner_id}`;let selected:unknown,restorePending=true;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;restorePending=raw.view!=='compose';if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected,restorePending)}catch(e){if(!mounted)return;error.value=studioErrorMessage(e);busy.value=false}
  if(mounted)timer=setInterval(()=>{
   clock.value=Date.now()
   const task=active.value

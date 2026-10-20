@@ -560,9 +560,16 @@ func publishedReady(a *Account) bool {
 }
 
 func publishedReadyContext(ctx context.Context, a *Account) bool {
+	return publishedReadyWithValidation(ctx, a, publishedSnapshotValidator(ctx, a))
+}
+
+func publishedReadyWithValidation(ctx context.Context, a *Account, ready func(string) bool) bool {
 	if a != nil && a.Config != nil && a.Config.Published != nil {
 		for _, o := range a.Config.Published.Offers {
-			if publishedProductReady(ctx, a, o.ProductID) {
+			if ctx.Err() != nil {
+				return false
+			}
+			if ready(o.ProductID) {
 				return true
 			}
 		}

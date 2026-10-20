@@ -37,6 +37,27 @@ func PublishedValidationMemoStats(ctx context.Context) (runs, reuses int) {
 	return memo.runs, memo.reuses
 }
 
+// A read operation owns one immutable repository snapshot. Cache its per-product
+// result inside that operation, avoiding even the full Account digest on every
+// Offer lookup. Never retain this closure across reads or mutate its Account.
+func publishedSnapshotValidator(ctx context.Context, a *Account) func(string) bool {
+	results := map[string]bool{}
+	return func(id string) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		if ready, ok := results[id]; ok {
+			return ready
+		}
+		ready := publishedProductReady(ctx, a, id)
+		if ctx.Err() != nil {
+			return false
+		}
+		results[id] = ready
+		return ready
+	}
+}
+
 func memoizedPublishedValidation(ctx context.Context, a *Account, productID string, validate func() bool) bool {
 	memo, _ := ctx.Value(publishedValidationMemoKey{}).(*publishedValidationMemo)
 	if memo == nil {

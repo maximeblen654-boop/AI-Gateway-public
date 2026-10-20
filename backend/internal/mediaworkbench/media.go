@@ -264,26 +264,49 @@ type Service struct{ repo Repository }
 
 func NewService(repo Repository) *Service { return &Service{repo: repo} }
 func (s *Service) Detail(ctx context.Context, id int64) (*Detail, error) {
+	ctx = WithPublishedValidationMemo(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	a, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return describe(a), nil
+	detail := describeContext(ctx, a)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 func (s *Service) Suppliers(ctx context.Context) ([]Detail, error) {
+	ctx = WithPublishedValidationMemo(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	accounts, err := s.repo.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Detail, 0, len(accounts))
 	for i := range accounts {
-		out = append(out, *describe(&accounts[i]))
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		out = append(out, *describeContext(ctx, &accounts[i]))
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
 func describe(a *Account) *Detail {
+	return describeContext(context.Background(), a)
+}
+
+func describeContext(ctx context.Context, a *Account) *Detail {
+	ready := publishedSnapshotValidator(ctx, a)
 	d := &Detail{Account: a, Models: []ModelState{}, EffectiveState: "NOT_INITIALIZED"}
-	d.ProductStates = describeProducts(a)
+	d.ProductStates = describeProductsContext(ctx, a, ready)
 	d.ProductRemoval = draftRemovalOptions(a.Config)
 	d.NativeAdapters = map[string]AdapterDescriptor{}
 	for _, mediaType := range []string{"image", "video"} {
@@ -325,7 +348,7 @@ func describe(a *Account) *Detail {
 		}
 		if c.Sales.Enabled {
 			d.EffectiveState = "PUBLISHED_NOT_READY"
-			if publishedReady(a) {
+			if publishedReadyWithValidation(ctx, a, ready) {
 				d.EffectiveSales = true
 				d.EffectiveState = "SELLING"
 			}

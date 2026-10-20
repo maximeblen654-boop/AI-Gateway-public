@@ -63,6 +63,8 @@ if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
 }
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 let nextDraftOutcome: 'reject' | 'hold' | undefined
+const detailOutcomes = new Map<number, 'hold' | 'reject'>()
+const heldDetails = new Map<number, () => void>()
 let releaseDraft: (() => void) | undefined
 let releaseSuppliers: (() => void) | undefined
 let releasePaidCheck: (() => void) | undefined
@@ -71,6 +73,8 @@ const paidEnabled = { image: true, video: false }
 Object.assign(window, { mediaFixture: {
   calls: fixtureCalls, snapshot: () => copy(dto),
   setDraftOutcome: (outcome: 'reject' | 'hold') => { nextDraftOutcome = outcome },
+  setDetailOutcome: (id: number, outcome: 'reject' | 'hold') => { detailOutcomes.set(id, outcome) },
+  releaseDetail: (id: number) => { heldDetails.get(id)?.(); heldDetails.delete(id) },
   releaseDraft: () => { releaseDraft?.(); releaseDraft = undefined },
   releaseSuppliers: () => { releaseSuppliers?.(); releaseSuppliers = undefined },
   releasePaidCheck: () => { releasePaidCheck?.(); releasePaidCheck = undefined },
@@ -143,6 +147,12 @@ apiClient.defaults.adapter = async config => {
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
     const accountId = Number(url.split('/')[4])
     const account = scenario === 'NAVIGATION' ? navigationAccounts.find(item => item.id === accountId)! : accountId === dto.id ? dto : otherAccount
+    if (config.method === 'get' && url === `/admin/media-workbench/accounts/${accountId}`) {
+      const outcome = detailOutcomes.get(accountId)
+      detailOutcomes.delete(accountId)
+      if (outcome === 'reject') throw { isAxiosError: true, config, response: { status: 503, data: { code: 'FIXTURE_DETAIL_REJECTED', message: 'Deterministic detail failure' } } }
+      if (outcome === 'hold') await new Promise<void>(resolve => { heldDetails.set(accountId, resolve) })
+    }
     if (config.method !== 'get' && (scenario === 'DELETED' || scenario === 'STALE')) {
       const status = scenario === 'DELETED' ? 410 : 409
       throw { isAxiosError: true, config, response: { status, data: { code: 'FIXTURE_ERROR', message: 'Deterministic fixture' } } }

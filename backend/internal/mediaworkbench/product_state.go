@@ -20,7 +20,7 @@ type ProductState struct {
 
 // Status is derived from the published contract, not its in-progress draft.
 // It does not claim that the global paid gate or a customer's native permissions pass.
-func describeProducts(a *Account) []ProductState {
+func describeProductsContext(ctx context.Context, a *Account, ready func(string) bool) []ProductState {
 	out := []ProductState{}
 	if a == nil || a.Config == nil {
 		return out
@@ -40,6 +40,9 @@ func describeProducts(a *Account) []ProductState {
 	}
 	sort.Strings(ids)
 	for _, id := range ids {
+		if ctx.Err() != nil {
+			return nil
+		}
 		p := products[id]
 		_, published := publishedProduct(a, id)
 		state := ProductState{ProductID: id, DisplayName: p.DisplayName, UpstreamModel: p.UpstreamModel, MediaType: p.MediaType, Published: published}
@@ -55,13 +58,13 @@ func describeProducts(a *Account) []ProductState {
 			set("ACCOUNT_UNAVAILABLE", "该 Account 的原生执行或调度条件当前不满足。", "在账号管理核对该 Account 的可用性、权限及执行条件。")
 		case a.Catalog == nil || a.Catalog.SyncedAt == "":
 			set("DEPENDENCIES_CHANGED", "缺少可信的模型目录。", "成功同步完整目录后重新检查，不要直接发布未完成草稿。")
-		case len(a.Config.Published.ProductDependencies) == 0 && !legacyPublishedReady(context.Background(), a):
+		case len(a.Config.Published.ProductDependencies) == 0 && !legacyPublishedReady(ctx, a):
 			set("DEPENDENCIES_CHANGED", "历史已发布快照的完整依赖校验未通过，尚未建立逐商品依赖。", "先对原已发布商品执行受控校验恢复；不要通过发布包含新草稿的整个 Account 来修复。")
 		case !slices.Contains(a.Catalog.Models, p.UpstreamModel):
 			set("UPSTREAM_REMOVED", "该已发布模型已不在当前可信目录中，仅此商品不可售。", "核对目录；不再经营时下架或归档此商品，其他正常商品可继续销售。")
 		case !productDependencyReady(a, id):
 			set("DEPENDENCIES_CHANGED", "该商品的已发布依赖与当前 Account 执行配置不一致。", "核对该模型的映射、路由和执行配置，校验后仅发布本次明确选择的商品。")
-		case !publishedProductReady(context.Background(), a, id):
+		case !ready(id):
 			set("PUBLISHED_INVALID", "该商品的已发布规格、售价或执行校验未通过。", "核对该商品的诊断与规格售价，修正并仅发布该商品。")
 		case !a.Config.Sales.Enabled:
 			set("ACCOUNT_SALES_OFF", "已发布商品通过校验，但 Account 销售尚未开启。", "由管理员单独确认 Account 销售状态；发布不会自动开启销售。")
