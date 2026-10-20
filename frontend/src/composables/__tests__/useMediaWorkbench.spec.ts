@@ -915,6 +915,112 @@ describe('recovery consumption identity', () => {
     expect(localStorage.getItem(source.key)).toBeNull()
     expect(listDraftRecoveries(localStorage, 1, dto.id).entries).toEqual([])
   })
+  it.each(['manual', 'auto'] as const)('consumes an adopted ordinary copy after further edits and %s confirmation, including re-entry', async mode => {
+    if (mode === 'auto') vi.useFakeTimers()
+    const dto = supplier(), source = sourceCopy(dto)
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    state.product.value!.display_name = 'restored then edited and saved'
+    mockSave(dto)
+    if (mode === 'auto') { await vi.advanceTimersByTimeAsync(1500); await flushPromises() }
+    else expect(await state.saveDraft()).toBe(true)
+    expect(state.saveState.value).toBe('saved')
+    expect(state.products.value[0]!.display_name).toBe('restored then edited and saved')
+    expect(localStorage.getItem(source.key)).toBeNull()
+    wrapper.unmount(); await start(); state.selectModel(source.value.identity.upstream_model)
+    expect(state.recovery.value).toBeNull()
+    expect(listDraftRecoveries(localStorage, 1, dto.id).entries).toEqual([])
+  })
+  it.each([false, true])('explicit abandon stops tracking an adopted source before a later same-account save (raw input: %s)', async rawInputs => {
+    const dto = supplier()
+    if (rawInputs) dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'
+    const source = sourceCopy(dto, rawInputs)
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    state.discard()
+    state.product.value!.display_name = source.value.product.display_name
+    mockSave(dto); expect(await state.saveDraft()).toBe(true)
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it('reconciles the exact historical pending copy on re-entry without another PUT', async () => {
+    const dto = supplier(), source = sourceCopy(dto)
+    const submissionId = crypto.randomUUID()
+    source.value.pending_submission = { submission_id: submissionId, base_record_version: dto.media_workbench_v1!.record_version, product: copy(source.value.product) }
+    source.raw = encodeDraftRecovery(source.value); localStorage.setItem(source.key, source.raw)
+    const confirmed = acknowledgement(saved(), dto.media_workbench_v1!.record_version, [source.value.product], submissionId)
+    api.detail.mockResolvedValue(confirmed)
+    await start(); state.selectModel(source.value.identity.upstream_model)
+    expect(state.recovery.value).toBeNull()
+    expect(localStorage.getItem(source.key)).toBeNull()
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+  it('explicitly adopts identical persisted content without a redundant save or recurring prompt', async () => {
+    const dto = supplier(), source = sourceCopy(dto)
+    source.value.product = copy(dto.media_workbench_v1!.draft.products[0]!)
+    source.raw = encodeDraftRecovery(source.value); localStorage.setItem(source.key, source.raw)
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    expect(state.dirty.value).toBe(false); expect(state.saveState.value).toBe('saved')
+    expect(localStorage.getItem(source.key)).toBeNull(); expect(api.saveDraft).not.toHaveBeenCalled()
+    wrapper.unmount(); await start(); state.selectModel(source.value.identity.upstream_model)
+    expect(state.recovery.value).toBeNull()
+  })
+  it('uses the confirmed canonical adapter for an equivalent explicitly restored product without another PUT', async () => {
+    const dto=supplier(); const p=dto.media_workbench_v1!.draft.products[0]!
+    dto.native_adapters={image:{kind:'gemini_images',revision:'v1',auth:'account_apikey',task_flow:'sync'}}
+    p.adapter_config={version:1,model_family:'gemini_images',size_mappings:[]}
+    const source=sourceCopy(dto); source.value.product=copy(p); source.value.product.adapter_config={size_mappings:[]}
+    source.raw=encodeDraftRecovery(source.value);localStorage.setItem(source.key,source.raw)
+    api.detail.mockResolvedValue(dto);await adopt(source)
+    expect(state.product.value!.adapter_config).toEqual(p.adapter_config)
+    expect(state.dirty.value).toBe(false);expect(state.saveState.value).toBe('saved')
+    await state.flushAutoSave();expect(api.saveDraft).not.toHaveBeenCalled()
+    expect(listDraftRecoveries(localStorage,1,77).entries).toEqual([])
+  })
+  it.each([false,true])('restoring B never releases A unknown save or auto-retries it (B changed: %s)', async changed => {
+    const dto=supplier(),b=copy(dto.media_workbench_v1!.draft.products[0]!)
+    b.product_id='product-b';b.display_name='B saved';dto.media_workbench_v1!.draft.products.push(b)
+    api.detail.mockResolvedValue(dto);await start();state.selectModel('image-native-1')
+    state.product.value!.display_name='A unknown input';api.saveDraft.mockRejectedValue({status:503})
+    expect(await state.saveDraft()).toBe(false);expect(state.saveState.value).toBe('unconfirmed')
+    const source=sourceCopy(dto);source.value.identity.product_id=b.product_id;source.value.product=copy(b)
+    if(changed)source.value.product.display_name='B recovered edit'
+    localStorage.removeItem(source.key);source.key=recoveryCopyKey(source.value.identity,source.value.editor_id!)!
+    source.raw=encodeDraftRecovery(source.value);localStorage.setItem(source.key,source.raw)
+    state.chooseRecovery(source.key);expect(await state.restoreRecovery()).toBe(true)
+    expect(state.saveState.value).toBe('unconfirmed');await state.flushAutoSave();await vi.advanceTimersByTimeAsync(1600)
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    expect(state.products.value[0]!.display_name).toBe('A unknown input')
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it('reverting to the confirmed baseline removes only this page obsolete buffer', async () => {
+    await start(); state.selectModel('image-native-1')
+    const original = state.product.value!.display_name
+    state.product.value!.display_name = 'transient edit'
+    expect(listDraftRecoveries(localStorage, 1, 77).entries).toHaveLength(1)
+    state.product.value!.display_name = original
+    expect(state.dirty.value).toBe(false)
+    expect(listDraftRecoveries(localStorage, 1, 77).entries).toHaveLength(0)
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    wrapper.unmount(); await start(); state.selectModel('image-native-1')
+    expect(state.recovery.value).toBeNull()
+  })
+  it('retains newer owned input while the adopted source is consumed by its confirmed submission', async () => {
+    vi.useFakeTimers()
+    const dto=supplier(),source=sourceCopy(dto)
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    state.product.value!.display_name='submitted adopted content'
+    let release!: () => void
+    api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => {
+      const response=acknowledgement(saved(),version,products,submissionId)
+      await new Promise<void>(resolve => {release=resolve})
+      api.detail.mockResolvedValue(response); return response
+    })
+    const saving=state.saveDraft(); await flushPromises()
+    state.product.value!.display_name='newer input during request'
+    release(); expect(await saving).toBe(true)
+    expect(localStorage.getItem(source.key)).toBeNull()
+    const entries=listDraftRecoveries(localStorage,1,77).entries
+    expect(entries).toHaveLength(1);expect(entries[0]!.value.product.display_name).toBe('newer input during request')
+    expect(state.dirty.value).toBe(true);expect(state.saveState.value).toBe('unsaved')
+  })
   it.each(['adopted', 'owned'] as const)('preserves a byte-different externally rewritten %s copy after a matching save', async target => {
     const dto = supplier(), source = sourceCopy(dto, true)
     dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'

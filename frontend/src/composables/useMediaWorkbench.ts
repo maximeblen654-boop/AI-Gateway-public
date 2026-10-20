@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
-import { draftFingerprint, persistedFingerprint, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
+import { draftFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
 import type { VideoSaleInput } from '@/components/admin/media/videoSaleGroups'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -42,7 +42,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   let autoSaveTimer: ReturnType<typeof setTimeout> | undefined
   let queuedSave = false
   let rejectedInput = ''
-  type Submission = { id: string; base: number; products: Product[]; removed: string[]; recoveryKeys: Map<string, string>; recoveryCopies: Map<string, string | null> }
+  type Submission = { id: string; base: number; products: Product[]; removed: string[]; recoveryKeys: Map<string, string>; recoveryCopies: Map<string, string | null>; adopted: Map<string, RecoveryEntry> }
   let lastSubmission: Submission | undefined
   const retryCheck = ref<{ accountId: number; submissionId: string; base: number; revision: string } | null>(null)
   let loadSequence = 0
@@ -64,7 +64,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const recoveryDiff = computed(() => {
     if (!recovery.value) return []
     const differences = recoveryDifferences(recovery.value.product, (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.products.find(p => p.product_id === recovery.value!.identity.product_id))
-    if (recovery.value.video_sale_inputs?.length) differences.push({ field: 'video_sale_inputs', local: JSON.stringify(recovery.value.video_sale_inputs.map(({ resolution, group, duration, amount }) => ({ resolution, group, duration, amount }))), server: '这些本地售价输入尚未应用草稿。' })
+    if (recovery.value.video_sale_inputs?.length) differences.push({ field: 'video_sale_inputs', label: '尚未应用的售价输入', local: recovery.value.video_sale_inputs.slice(0, 3).map(({ resolution, duration, amount }) => `${resolution} · ${duration}秒：${amount || '尚未填写'}`).join('；').slice(0, 160) + (recovery.value.video_sale_inputs.length > 3 ? '…' : ''), server: '这些输入尚未应用到服务器草稿。' })
     return differences
   })
 
@@ -100,9 +100,17 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       (removed && lastSubmission?.removed.includes(p.product_id) ? p : undefined)
     const changedAfterSubmission = !!submitted && draftFingerprint([submitted]) !== draftFingerprint([p])
     if (!removed) {
-      if (!dirty.value && !changedAfterSubmission && !videoInputs.length) return true
       const original = config.value?.draft.products.find(item => item.product_id === p.product_id)
-      if (original && draftFingerprint([original]) === draftFingerprint([p]) && !changedAfterSubmission && !videoInputs.length) return true
+      if (original && draftFingerprint([original]) === draftFingerprint([p]) && !changedAfterSubmission && !videoInputs.length) {
+        // An explicit edit back to the confirmed baseline supersedes only this
+        // page's previous buffer. Unknown/in-flight submissions stay protected.
+        const own = ownedRecoveries.get(p.product_id)
+        if (!lastSubmission && saveState.value !== 'unconfirmed' && !conflict.value && own && !own.value.pending_submission) {
+          clearRecovery(p.product_id, own.key, undefined, own.raw)
+        }
+        return true
+      }
+      if (!dirty.value && !changedAfterSubmission && !videoInputs.length) return true
     }
     const bound = identity(p)
     if (!bound) { recoveryWarning.value = '当前管理员或商品身份尚未确认，浏览器恢复副本不可用；请保留此页。'; return false }
@@ -139,6 +147,12 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     recovery.value = null
     try {
       refreshRecoveryEntries()
+      // A matching server receipt, complete payload and raw-copy CAS prove
+      // this exact historical write was persisted; version equality alone does not.
+      const verified = serverSnapshot.value ?? detail.value
+      if (verified && !lastSubmission) for (const entry of [...recoveryEntries.value]) {
+        if (encodeDraftRecovery(entry.value) === entry.raw && confirmedRecoveryProduct(entry.value, verified)) clearRecovery(entry.value.identity.product_id, entry.key, undefined, entry.raw)
+      }
       if (!product.value) {
         const preview = recoveryEntries.value.find(entry => entry.key === selectedRecoveryKey.value && entry.value.identity.upstream_model === selectedModel.value)
         if (preview) recovery.value = preview.value
@@ -214,7 +228,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     persistRecovery(); scheduleSave()
   }, { deep: true, flush: 'sync' })
   watch(selectedProduct, () => { discoverRecovery(); if (dirty.value) persistRecovery() }, { flush: 'sync' })
-  watch(adminId, discoverRecovery)
+  watch(adminId, () => { adoptedRecoveries.clear(); discoverRecovery() })
 
   function stopPolling() { validationSequence++; clearTimeout(pollTimer) }
   function apply(dto: SupplierDetail, replaceDraft: boolean) {
@@ -277,6 +291,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       const dto = await mediaWorkbenchAPI.detail(id)
       if (seq !== loadSequence || disposed) return false
       if (dto.id !== id) { message.value = '读取的账号与所选 Account 不一致，请重试。'; return false }
+      adoptedRecoveries.clear() // Stop adoption tracking; keep the stored source copies.
       selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false; unresolvedProductConflicts.value = []
       pendingVideoInputs.value = {}
       lastSubmission = undefined; retryCheck.value = null; rejectedInput = ''; serverSnapshot.value = null
@@ -404,16 +419,16 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     for (const p of submission.products) {
       const key = submission.recoveryKeys.get(p.product_id)
       if (key) clearRecovery(p.product_id, key, draftFingerprint([p]), submission.recoveryCopies.get(p.product_id) ?? null)
-      const adopted = adoptedRecoveries.get(p.product_id)
-      // Restored raw text is intentionally absent from the saved Product
-      // snapshot. Once explicitly applied/cleared and saved, consume that exact
-      // adopted copy; a foreign rewrite still fails the raw-copy CAS check.
-      if (adopted) clearRecovery(p.product_id, adopted.key, adopted.value.video_sale_inputs?.length && !pendingVideoInputs.value[p.product_id]?.length ? undefined : draftFingerprint([p]), adopted.raw)
+      const adopted = submission.adopted.get(p.product_id)
+      // The source was explicitly adopted before this submission. Subsequent
+      // edits legitimately supersede it; do not compare source with final input.
+      // Full identity and exact raw-copy CAS still protect every other copy.
+      if (adopted) clearRecovery(p.product_id, adopted.key, undefined, adopted.raw)
     }
     for (const id of submission.removed) {
       const key = submission.recoveryKeys.get(id)
       if (key) clearRecovery(id, key, undefined, submission.recoveryCopies.get(id))
-      const adopted = adoptedRecoveries.get(id)
+      const adopted = submission.adopted.get(id)
       if (adopted?.value.removed_product) clearRecovery(id, adopted.key, undefined, adopted.raw)
     }
     lastSubmission = undefined; if (recovery.value) delete recovery.value.pending_submission
@@ -434,11 +449,20 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     }
     retryCheck.value = null
     const submission: Submission = { id: crypto.randomUUID(), base: config.value?.record_version ?? 0,
-      products: clone(draftInput(products.value).products), removed: removedProducts.value.map(p => p.product_id), recoveryKeys: new Map(), recoveryCopies: new Map() }
+      products: clone(draftInput(products.value).products), removed: removedProducts.value.map(p => p.product_id), recoveryKeys: new Map(), recoveryCopies: new Map(), adopted: new Map() }
     for (const p of submission.products) {
       const original = config.value?.draft.products.find(item => item.product_id === p.product_id)
       if (original && draftFingerprint([original]) === draftFingerprint([p])) continue
       const owned = ownedRecoveries.get(p.product_id); if (owned) submission.recoveryKeys.set(p.product_id, owned.key)
+    }
+    // Freeze adoption ownership before the request; never read a later page's
+    // tracking Map when an old response arrives.
+    for (const [id, entry] of adoptedRecoveries) {
+      const identity = entry.value.identity
+      const original = config.value?.draft.products.find(p => p.product_id === id)
+      if (identity.admin_id === adminId() && identity.account_id === detail.value.id && identity.product_id === id &&
+          (!original || original.site_model === identity.site_model && original.upstream_model === identity.upstream_model) &&
+          (submission.products.some(p => p.product_id === id) || submission.removed.includes(id))) submission.adopted.set(id, clone(entry))
     }
     lastSubmission = submission; queuedSave = false; persistRecovery()
     for (const p of submission.products) { const owned = ownedRecoveries.get(p.product_id); if (owned && submission.recoveryKeys.has(p.product_id)) submission.recoveryKeys.set(p.product_id, owned.key) }
@@ -620,30 +644,42 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const pendingReceipt = value.pending_submission
     const receipt = latest.media_workbench_v1?.draft.save_receipt
     const knownPending = pendingReceipt && receipt?.submission_id === pendingReceipt.submission_id && receipt.base_record_version === pendingReceipt.base_record_version && receipt.draft_revision === latest.media_workbench_v1?.draft.revision && serverProduct && persistedFingerprint([pendingReceipt.product], latest) === draftFingerprint([serverProduct])
+    // Restoring B is not confirmation or an explicit retry of A's unknown write.
+    const otherUnconfirmedWrite = saveState.value === 'unconfirmed' && (!pendingReceipt ||
+      (lastSubmission ? lastSubmission.id !== pendingReceipt.submission_id : [...ownedRecoveries.values()].some(entry =>
+        entry.value.pending_submission && entry.value.pending_submission.submission_id !== pendingReceipt.submission_id)))
+    const identicalPersisted = !value.removed_product && !value.video_sale_inputs?.length && (!pendingReceipt || knownPending) && !!serverProduct &&
+      persistedFingerprint([value.product], latest) === draftFingerprint([serverProduct])
     // Only this explicit product choice resolves its conflict. A second restore
     // of the same product cannot erase another product's unresolved conflict.
     remainingConflicts.delete(value.product.product_id)
     unresolvedProductConflicts.value = [...remainingConflicts]
     conflict.value = remainingConflicts.size > 0
-    saveState.value = conflict.value ? 'conflict' : pendingReceipt && !knownPending && !acceptConflict ? 'unconfirmed' : 'unsaved'
+    saveState.value = conflict.value ? 'conflict' : otherUnconfirmedWrite || pendingReceipt && !knownPending && !acceptConflict ? 'unconfirmed' : 'unsaved'
     applying = true
     const index = products.value.findIndex(p => p.product_id === value.product.product_id)
     if (value.removed_product) {
       products.value = products.value.filter(p => p.product_id !== value.product.product_id)
       removedProducts.value = [...removedProducts.value.filter(p => p.product_id !== value.product.product_id), clone(value.product)]
-    } else if (index >= 0) products.value[index] = clone(value.product)
+    } else if (index >= 0) products.value[index] = clone(identicalPersisted ? serverProduct! : value.product)
     else products.value.push(clone(value.product))
     if (newProduct && !addedProductIds.value.includes(value.product.product_id)) addedProductIds.value.push(value.product.product_id)
     pendingVideoInputs.value = { ...pendingVideoInputs.value, [value.product.product_id]: value.removed_product ? [] : clone(value.video_sale_inputs ?? []) }
     applying = false
     selectedModel.value = value.product.upstream_model; selectedProduct.value = value.product.product_id
     if (source) adoptedRecoveries.set(value.product.product_id, source)
-    if (knownPending || acceptConflict) { lastSubmission = undefined; delete value.pending_submission }
+    if (!otherUnconfirmedWrite && (knownPending || acceptConflict)) { lastSubmission = undefined; delete value.pending_submission }
     recovery.value = value; saveFeedback.value = saveState.value === 'unconfirmed' ? '已恢复本地输入；上次发送结果仍待核对，自动写入已暂停。' : '已恢复本地输入，等待自动保存。'
     if (remainingConflicts.size) {
       const names = [...remainingConflicts].map(id => products.value.find(p => p.product_id === id)?.display_name || id)
       message.value = `其他商品也存在版本冲突：${names.join('、')}。其本地输入已保留，请切换商品逐一核对恢复副本；确认前暂停自动写入。`
       saveFeedback.value = '已恢复本地此商品；其他商品仍有冲突，自动写入已暂停。'
+    }
+    // Explicitly selecting an already persisted product needs no redundant PUT.
+    // Unconfirmed writes and unapplied raw video inputs cannot take this path.
+    if (source && identicalPersisted && !otherUnconfirmedWrite) {
+      clearRecovery(value.identity.product_id, source.key, undefined, source.raw)
+      if (!dirty.value && !conflict.value) { saveState.value = 'saved'; saveFeedback.value = '所选本地内容已与服务器草稿一致，无需重复保存。' }
     }
     persistRecovery(); scheduleSave(); return true
   }
@@ -765,6 +801,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   function discard() {
     if (!detail.value) return
     const abandoned = currentOwnedRecovery()
+    adoptedRecoveries.clear() // Explicitly abandoned adoption is not a future save's source.
     if (abandoned) clearRecovery(abandoned.value.identity.product_id, abandoned.key, undefined, abandoned.raw)
     clearRemovalRecoveries()
     pendingVideoInputs.value = {}

@@ -204,13 +204,15 @@
               <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveEditorDraft">保存草稿与移除操作</button>
             </section>
             <section v-if="product || recovery" aria-live="polite" class="mw-save-draft" data-test="autosave-status">
-              <p>{{ saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
+              <p>{{ recovery && !dirty && saveState === 'saved' ? '服务器草稿已确认；仍有本地内容待处理' : saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
               <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
               <p v-if="recoveryWarning" role="alert" class="mw-field-error" data-test="recovery-warning">{{ recoveryWarning }}</p>
               <div v-if="recovery" class="mw-banner" data-test="draft-recovery">
                 <label v-if="productRecoveries.length > 1">此商品有 {{ productRecoveries.length }} 份独立恢复副本<select class="input" data-test="recovery-copy-select" :value="selectedRecoveryKey" :disabled="busy" @change="chooseProductRecovery(($event.target as HTMLSelectElement).value)"><option v-for="entry in productRecoveries" :key="entry.key" :value="entry.key">{{ new Date(entry.value.updated_at).toLocaleString() }} · {{ entry.value.product.display_name }} · 页面 {{ entry.value.editor_id?.slice(-8) || '旧副本' }}</option></select></label>
-                <p>发现此商品的本地恢复副本，基准服务器版本 {{ recovery.base_record_version }}。{{ recoveryConflict ? '服务器已更新，请先核对字段差异再选择。' : recovery.pending_submission ? '上次保存结果待核对；恢复后保留本地输入并暂停自动写入，请核对服务器后继续。' : '恢复后将自动保存草稿，不会正式发布。' }}</p>
-                <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看本地与服务器字段差异（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.field || '商品' }}</strong><p style="overflow-wrap:anywhere">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere">服务器：{{ diff.server }}</p></li></ul></details>
+                <strong>发现尚未与服务器完全一致的本地修改</strong>
+                <p>这份本地恢复副本暂时保留，以免修改丢失。{{ recoveryConflict ? '服务器内容已发生变化，需要核对差异。' : recovery.pending_submission ? '上一次保存结果仍待核对，确认前不会自动重发。' : recoveryDiff.length ? '本地修改尚未同步。' : '内容目前一致，但尚无足够的保存确认，请核对后处理。' }}</p>
+                <p class="mw-muted">恢复只影响草稿；未应用的售价输入仍需确认，不会正式发布。</p>
+                <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看哪些内容不同（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.label }}</strong><p style="overflow-wrap:anywhere;max-width:100%">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere;max-width:100%">服务器：{{ diff.server }}</p></li></ul></details>
                 <label v-if="recoveryConflict"><input v-model="acceptRecoveryConflict" type="checkbox" data-test="confirm-recovery-conflict" />我已核对差异，恢复本地此商品并以服务器最新版本为基准</label>
                 <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreWithUndoProtection()">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
                 <button type="button" class="btn btn-secondary" data-test="discard-recovery" :disabled="busy" @click="discardRecoveryDialog = true">丢弃恢复副本</button>
@@ -296,7 +298,7 @@
       <template #actions><button class="btn btn-primary" data-test="confirm-reload" :disabled="busy" @click="reload">确认放弃修改并重新加载</button></template>
     </MediaDialog>
     <MediaDialog :show="discardRecoveryDialog" title="丢弃此商品的恢复副本？" :busy="busy" @close="discardRecoveryDialog = false">
-      <p>仅删除此商品的浏览器恢复副本；当前表单和服务器配置保持原状。</p>
+      <p>只删除当前选中的这一份本地副本；其他副本、当前表单和服务器草稿保持不变。</p>
       <template #actions><button class="btn btn-secondary" data-test="confirm-discard-recovery" :disabled="busy" @click="discardRecovery(); discardRecoveryDialog = false">确认丢弃恢复副本</button></template>
     </MediaDialog>
     <MediaIndependentCalculator :admin-id="auth.user?.id" />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { copy, imageProduct, supplier } from '@/components/admin/media/__tests__/fixtures'
-import { draftFingerprint, persistedFingerprint, recoveryKey, recoveryCopyKey, listDraftRecoveries, readDraftRecovery, encodeDraftRecovery, recoveryDifferences, type DraftRecovery } from '../draftRecovery'
+import { draftFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryKey, recoveryCopyKey, listDraftRecoveries, readDraftRecovery, encodeDraftRecovery, recoveryDifferences, type DraftRecovery } from '../draftRecovery'
 
 const identity = { admin_id: 1, account_id: 77, product_id: imageProduct.product_id, site_model: imageProduct.site_model, upstream_model: imageProduct.upstream_model }
 const fixture = (): DraftRecovery => ({ version: 1, identity, base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: 1, copy_id: '99999999-9999-4999-8999-999999999999', product: copy(imageProduct) })
@@ -118,4 +118,70 @@ describe('bounded product recovery and save comparison', () => {
     dto.media_workbench_v1!.draft.products = [copy(submitted)]
     expect(persistedFingerprint([submitted], dto)).toBe(draftFingerprint([submitted]))
   })
+})
+
+describe('exact persisted recovery proof and readable differences', () => {
+  function confirmed() {
+    const value=fixture(), dto=supplier(), submission=crypto.randomUUID()
+    value.pending_submission={submission_id:submission,base_record_version:3,product:copy(value.product)}
+    dto.media_workbench_v1!.record_version=4
+    dto.media_workbench_v1!.draft.save_receipt={submission_id:submission,base_record_version:3,draft_revision:dto.media_workbench_v1!.draft.revision}
+    return {value,dto}
+  }
+  it('recognizes complete receipt/payload proof without confusing the record number for proof', () => {
+    const {value,dto}=confirmed()
+    expect(confirmedRecoveryProduct(value,dto)).toBe(true)
+    delete value.pending_submission
+    expect(confirmedRecoveryProduct(value,dto)).toBe(false)
+  })
+  it.each(['account','model','receipt','base','revision','version','newer','raw','removal'] as const)('retains unresolved or mismatched %s evidence', kind => {
+    const {value,dto}=confirmed()
+    if(kind==='account')dto.id=88
+    if(kind==='model')dto.media_workbench_v1!.draft.products[0]!.upstream_model='another-model'
+    if(kind==='receipt')dto.media_workbench_v1!.draft.save_receipt!.submission_id=crypto.randomUUID()
+    if(kind==='base')dto.media_workbench_v1!.draft.save_receipt!.base_record_version=2
+    if(kind==='revision')dto.media_workbench_v1!.draft.save_receipt!.draft_revision='other-revision'
+    if(kind==='version')dto.media_workbench_v1!.record_version=3
+    if(kind==='newer')value.product.display_name='new local input'
+    if(kind==='raw'){value.product.media_type='video';value.video_sale_inputs=[{resolution:'720p',duration:5,amount:'12.',group:{},source_price:null,domain:'incomplete'}]}
+    if(kind==='removal')value.removed_product=true
+    expect(confirmedRecoveryProduct(value,dto)).toBe(false)
+  })
+  it('shows only real differences, with Chinese price labels and bounded non-JSON values', () => {
+    const local=copy(imageProduct),server=copy(imageProduct)
+    local.pricing_rules[0]!.sale_price!.amount='9.50'
+    const differences=recoveryDifferences(local,server)
+    expect(differences).toHaveLength(1)
+    expect(differences[0]!.label).toBe('售价')
+    expect(differences[0]!.local).toContain('9.50')
+    expect(differences[0]!.local).not.toContain('sale_price')
+    expect(differences[0]!.local.length).toBeLessThanOrEqual(180)
+    local.pricing_rules=copy(server.pricing_rules)
+    local.pricing_rules[0]!.match.quality=[]
+    expect(recoveryDifferences(local,server)).toEqual([])
+    local.display_name='x'.repeat(600)
+    expect(recoveryDifferences(local,server)[0]!.label).toBe('商品名称')
+    expect(recoveryDifferences(local,server)[0]!.local).toHaveLength(180)
+  })
+})
+
+it('explains a changed fourth price or same-length size mapping instead of identical summaries', () => {
+  const local=copy(imageProduct),server=copy(imageProduct)
+  local.pricing_rules=Array.from({length:4},()=>copy(imageProduct.pricing_rules[0]!));server.pricing_rules=copy(local.pricing_rules)
+  local.pricing_rules[3]!.sale_price!.amount='99'
+  let diff=recoveryDifferences(local,server)[0]!
+  expect(diff.label).toBe('售价');expect(diff.local).toContain('第4条');expect(diff.local).toContain('99');expect(diff.local).not.toEqual(diff.server)
+  local.pricing_rules=copy(server.pricing_rules)
+  local.adapter_config.size_mappings=[{resolution:'1K',aspect_ratio:'1:1',wire_size:'1024x1024'}]
+  server.adapter_config.size_mappings=[{resolution:'1K',aspect_ratio:'1:1',wire_size:'512x512'}]
+  diff=recoveryDifferences(local,server)[0]!
+  expect(diff.label).toBe('画幅尺寸映射');expect(diff.local).toContain('1024x1024');expect(diff.server).toContain('512x512')
+})
+
+it('shows the actual tail difference in long names without unbounded text', () => {
+  const local=copy(imageProduct),server=copy(imageProduct)
+  local.display_name='共'.repeat(300)+'本地';server.display_name='共'.repeat(300)+'服务器'
+  const difference=recoveryDifferences(local,server)[0]!
+  expect(difference.local).toContain('本地');expect(difference.server).toContain('服务器')
+  expect(difference.local.length).toBeLessThan(180);expect(difference.server.length).toBeLessThan(180)
 })

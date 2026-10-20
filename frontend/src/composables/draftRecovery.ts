@@ -153,14 +153,93 @@ export function persistedFingerprint(products: Product[], dto: SupplierDetail): 
   }
   return draftFingerprint(input)
 }
-export function recoveryDifferences(local: Product, server?: Product): { field: string; local: string; server: string }[] {
-  const a = draftInput([local]).products[0]!, b = server ? draftInput([server]).products[0]! : undefined
-  const differences: { field: string; local: string; server: string }[] = []
+/** A receipt proves only its exact submitted payload, never newer local text. */
+export function confirmedRecoveryProduct(value: DraftRecovery, dto: SupplierDetail): boolean {
+  const c = dto.media_workbench_v1, receipt = c?.draft.save_receipt, pending = value.pending_submission
+  const server = c?.draft.products.find(p => p.product_id === value.identity.product_id)
+  return !value.removed_product && !value.video_sale_inputs?.length && !!receipt && !!pending && !!server &&
+    dto.id === value.identity.account_id && server.site_model === value.identity.site_model && server.upstream_model === value.identity.upstream_model &&
+    server.media_type === value.product.media_type && receipt.submission_id === pending.submission_id && receipt.base_record_version === pending.base_record_version &&
+    c!.record_version > pending.base_record_version && receipt.draft_revision === c!.draft.revision &&
+    persistedFingerprint([pending.product], dto) === draftFingerprint([server]) && persistedFingerprint([value.product], dto) === draftFingerprint([server])
+}
+const recoveryLabels: Record<string, string> = {
+  display_name: '商品名称', enabled: '商品启用状态', site_model: '站点模型', upstream_model: '上游模型', media_type: '媒体类型', product_id: '商品标识',
+  pricing_rules: '售价', cost_rules: '采购成本', 'capabilities.resolutions': '分辨率', 'capabilities.aspect_ratios': '画面比例',
+  'capabilities.qualities': '画质', 'capabilities.durations_seconds': '视频时长', 'capabilities.output_formats': '图片输出格式',
+  'capabilities.count.min': '最少生成数量', 'capabilities.count.max': '最多生成数量', 'capabilities.references.total_max': '参考素材合计上限',
+  'capabilities.combination_rules': '不可用的规格组合', 'adapter_config.size_mappings': '画幅尺寸映射',
+  'adapter_config.wire_profile': '适配器请求协议', 'adapter_config.model_family': '适配器模型类型', 'adapter_config.version': '适配器配置版本'
+}
+function differenceLabel(field: string): string {
+  const reference = /^capabilities\.references\.(image|video|audio)\.(min|max)$/.exec(field)
+  if (reference) return `${({ image: '参考图片', video: '参考视频', audio: '参考音频' } as Record<string,string>)[reference[1]!]}${reference[2] === 'min' ? '下限' : '上限'}`
+  return recoveryLabels[field] ?? (field.startsWith('adapter_config.') ? '适配器设置' : '其他商品设置')
+}
+function differenceValue(value: unknown, field: string): string {
+  if (value === undefined || value === null) return '未配置'
+  if (typeof value === 'boolean') return value ? '已启用' : '未启用'
+  if (Array.isArray(value)) {
+    if (!value.length) return '未配置'
+    if (field === 'pricing_rules' || field === 'cost_rules') {
+      const previews = value.slice(0, 3).map(rule => {
+        const match = rule.match ?? {}, price = rule.sale_price ?? rule.cost
+        const specs = [match.resolution?.join('/'), match.aspect_ratio?.join('/'), match.quality?.join('/'), match.duration_seconds?.map((v: number) => `${v}秒`).join('/')].filter(Boolean).join(' · ') || '共享规格'
+        return `${specs}：${price ? `${price.amount} ${price.currency}` : '尚未填写'}`
+      })
+      return `共${value.length}条；${previews.join('；')}${value.length > 3 ? '…' : ''}`.slice(0, 180)
+    }
+    if (value.every(item => ['string', 'number'].includes(typeof item))) return value.map(item => field === 'capabilities.durations_seconds' ? `${item}秒` : String(item)).join('、').slice(0, 180)
+    return `共${value.length}项配置`
+  }
+  if (typeof value === 'object') return field === '' ? `商品：${String((value as Product).display_name || '未命名').slice(0, 100)}` : `已配置${Object.keys(value).length}项设置`
+  const text = String(value)
+  return text.length > 180 ? `${text.slice(0, 179)}…` : text
+}
+function differencePair(a: unknown, b: unknown, field: string): { local: string; server: string } {
+  let local = differenceValue(a, field), server = differenceValue(b, field)
+  if (local === server && typeof a === 'string' && typeof b === 'string' && a !== b) {
+    let at = 0
+    while (at < Math.min(a.length, b.length) && a[at] === b[at]) at++
+    local = `…${a.slice(Math.max(0, at - 20), at + 60)}`
+    server = `…${b.slice(Math.max(0, at - 20), at + 60)}`
+  }
+  return { local, server }
+}
+/** Show the changed leaves, not the first (possibly unchanged) rows. */
+function objectArrayDifference(local: unknown, server: unknown): { local: string; server: string } {
+  const changes: { name: string; local: string; server: string }[] = []
+  const names: Record<string,string> = { amount: '金额', currency: '币种', billing_mode: '计费方式', resolution: '分辨率', aspect_ratio: '画面比例', duration_seconds: '时长', quality: '画质', output_formats: '图片格式', wire_size: '请求尺寸', source: '成本来源', min: '下限', max: '上限', total_max: '素材合计上限' }
+  const scan = (a: unknown, b: unknown, parts: string[]) => {
+    if (changes.length >= 4 || JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))) return
+    if (a && typeof a === 'object' || b && typeof b === 'object') {
+      const x = (a ?? {}) as Record<string, unknown>, y = (b ?? {}) as Record<string, unknown>
+      for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) scan(x[k], y[k], [...parts, k])
+      return
+    }
+    const row = /^\d+$/.test(parts[0] ?? '') ? `第${Number(parts[0]) + 1}条` : '设置'
+    const key = [...parts].reverse().find(part => names[part])
+    changes.push({ name: `${row}·${key ? names[key] : '内容'}`, ...differencePair(a, b, '') })
+  }
+  scan(local, server, [])
+  const summary = (side: 'local' | 'server') => changes.slice(0,3).map(change => `${change.name}：${change[side]}`).join('；').slice(0,175) + (changes.length > 3 ? '…' : '')
+  return {local:summary('local'),server:summary('server')}
+}
+export function recoveryDifferences(local: Product, server?: Product): { field: string; label: string; local: string; server: string }[] {
+  // Use the same documented omission rules as save confirmation. An empty
+  // optional match array alone is not an unsaved business change.
+  const a = JSON.parse(draftFingerprint([local]))[0], b = server ? JSON.parse(draftFingerprint([server]))[0] : undefined
+  const differences: { field: string; label: string; local: string; server: string }[] = []
+  const fieldOrder = Object.keys(draftInput([local]).products[0]!)
   const walk = (x: unknown, y: unknown, field: string) => {
     if (JSON.stringify(canonical(x)) === JSON.stringify(canonical(y))) return
     if (x && y && typeof x === 'object' && typeof y === 'object' && !Array.isArray(x) && !Array.isArray(y)) {
-      for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) walk((x as Record<string, unknown>)[k], (y as Record<string, unknown>)[k], field ? `${field}.${k}` : k)
-    } else differences.push({ field, local: JSON.stringify(x) ?? '未配置', server: JSON.stringify(y) ?? '未配置' })
+      const keys = [...new Set([...Object.keys(x), ...Object.keys(y)])]
+      if (!field) keys.sort((a,b) => fieldOrder.indexOf(a) - fieldOrder.indexOf(b))
+      for (const k of keys) walk((x as Record<string, unknown>)[k], (y as Record<string, unknown>)[k], field ? `${field}.${k}` : k)
+    } else if ([x,y].some(value => Array.isArray(value) && value.some(item => item && typeof item === 'object'))) {
+      differences.push({field,label:differenceLabel(field),...objectArrayDifference(x,y)})
+    } else differences.push({ field, label: differenceLabel(field), ...differencePair(x, y, field) })
   }
   walk(a, b, '')
   return differences
