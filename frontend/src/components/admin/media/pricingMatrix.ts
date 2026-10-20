@@ -113,8 +113,14 @@ export function buildPricingRules(product: Product, dimensions: PricingDimension
   }
   return [...rows.values()].map(({ match, specs }) => {
     const prices = specs.map(spec => {
-      const old = product.pricing_rules.filter(rule => matchesSpec(rule.match, spec))
-      return old.length === 1 ? old[0]!.sale_price : null
+      let old: Product['pricing_rules'][number] | undefined
+      for (const rule of product.pricing_rules) {
+        if (!matchesSpec(rule.match, spec)) continue
+        // Even equal prices remain ambiguous when two rules match.
+        if (old) return null
+        old = rule
+      }
+      return old ? old.sale_price : null
     })
     return { match, sale_price: prices.every(price => samePrice(price, prices[0]!)) ? prices[0]! : null }
   })

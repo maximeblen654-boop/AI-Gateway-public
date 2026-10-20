@@ -66,12 +66,15 @@ let nextDraftOutcome: 'reject' | 'hold' | undefined
 let releaseDraft: (() => void) | undefined
 let releaseSuppliers: (() => void) | undefined
 let releasePaidCheck: (() => void) | undefined
+let releasePaidApply: (() => void) | undefined
+const paidEnabled = { image: true, video: false }
 Object.assign(window, { mediaFixture: {
   calls: fixtureCalls, snapshot: () => copy(dto),
   setDraftOutcome: (outcome: 'reject' | 'hold') => { nextDraftOutcome = outcome },
   releaseDraft: () => { releaseDraft?.(); releaseDraft = undefined },
   releaseSuppliers: () => { releaseSuppliers?.(); releaseSuppliers = undefined },
-  releasePaidCheck: () => { releasePaidCheck?.(); releasePaidCheck = undefined }
+  releasePaidCheck: () => { releasePaidCheck?.(); releasePaidCheck = undefined },
+  releasePaidApply: () => { releasePaidApply?.(); releasePaidApply = undefined }
 
 } })
 if (scenario.startsWith('WIZARD') && !savedFixture) {
@@ -119,13 +122,19 @@ apiClient.defaults.adapter = async config => {
   let data: unknown = {}
   if (url.startsWith('/admin/media-workbench/paid-controls/')) {
     const kind = url.includes('/video') ? 'video' : 'image'
+    const paidState = () => ({ media: kind, mode: 'managed-v1', requested_enabled: paidEnabled[kind], effective_enabled: paidEnabled[kind], revision: 'fixture-paid-revision', reason: paidEnabled[kind] ? 'open' : query.get('paidStateReason') ?? 'apply_failed' })
     if (url.endsWith('/check')) {
       if (query.get('holdPaidCheck')) await new Promise<void>(resolve => { releasePaidCheck = resolve })
       if (query.get('paidCheck') === 'post-error') throw { code: 'ERR_NETWORK', status: 0 }
       data = { media: kind, pass: query.get('paidCheck') !== 'business-failure', fingerprint: 'fixture-check', checked_at: '2026-10-20T03:00:00Z', checks: [{ code: query.get('paidCheck') === 'business-failure' ? 'published_offer' : 'native_quote', pass: query.get('paidCheck') !== 'business-failure', account_id: 77 }] }
+    } else if (config.method === 'put') {
+      if (query.get('holdPaidApply')) await new Promise<void>(resolve => { releasePaidApply = resolve })
+      if (query.get('paidApply') === 'timeout') throw { code: 'ECONNABORTED', status: 0 }
+      paidEnabled[kind] = input.enabled
+      data = { state: paidState() }
     } else {
       if (query.get('paidCheck') === 'status-error' && fixtureCalls.some(call => call.url === `${url}/check`)) throw { status: 503 }
-      data = { media: kind, mode: 'managed-v1', requested_enabled: kind === 'image', effective_enabled: kind === 'image', revision: 'fixture-paid-revision', reason: kind === 'image' ? 'open' : query.get('paidStateReason') ?? 'apply_failed' }
+      data = paidState()
     }
   } else if (url === '/admin/media-workbench/suppliers') {
     if (query.get('holdSuppliers')) await new Promise<void>(resolve => { releaseSuppliers = resolve })

@@ -37,17 +37,21 @@ describe('five-step product wizard', () => {
   })
   it('computes 1, 3, 6 prices and preserves explicitly equal prices on collapse', async () => {
     const wrapper = editor()
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
     expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('1 个价格')
     await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
     expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('3 个价格')
     await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(true)
     expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('6 个价格')
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
     for (let i = 0; i < 6; i++) await wrapper.get(`[data-test="price-${i}"]`).setValue('0.70')
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(false)
     expect(confirm).not.toHaveBeenCalled()
     expect(wrapper.props('product').pricing_rules).toHaveLength(3)
     expect(wrapper.props('product').pricing_rules.every(r => r.sale_price?.amount === '0.70')).toBe(true)
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
     await wrapper.get('[data-test="preview-quantity"]').setValue(10)
     expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('总价：7 CNY')
     confirm.mockRestore(); wrapper.unmount()
@@ -56,10 +60,12 @@ describe('five-step product wizard', () => {
     const product = productFixture()
     product.capabilities.combination_rules = [{ deny: { resolution: ['4K'], aspect_ratio: ['16:9'] } }]
     const wrapper = editor(product)
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
     await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
     await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(true)
     expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('5 个价格')
     expect(wrapper.props('product').pricing_rules.every(r => r.sale_price === null)).toBe(true)
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
     await wrapper.get('[data-test="price-0"]').setValue('0')
     expect(wrapper.get('.mw-price-state').text()).toContain('需要修正')
     await wrapper.get('[data-test="price-0"]').setValue('-1')
@@ -198,6 +204,7 @@ describe('reference limits', () => {
  it('keeps zero input visible but rejects free image and video quotes', async () => {
   const product = productFixture(); product.pricing_rules = [{ match: {}, sale_price: { amount: '0', currency: 'CNY', billing_mode: 'per_request' } }]
   const wrapper = editor(product)
+  await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
   expect(wrapper.get('.mw-price-state').text()).toContain('需要修正')
   expect(wrapper.get('[data-test="pricing-preview"]').text()).not.toContain('总价：0 CNY')
   await wrapper.setProps({ product: { ...product, media_type: 'video', capabilities: { ...product.capabilities, durations_seconds: [5], count: { min: 1, max: 1 } } } })
@@ -211,6 +218,7 @@ describe('reference limits', () => {
   const product = productFixture(); product.capabilities.resolutions = Array.from({ length: 9 }, (_, i) => `${i + 1}K`)
   product.capabilities.aspect_ratios = ['1:1','2:1','3:1','4:1','5:1','6:1','7:1','8:1']
   const wrapper = editor(product)
+  await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
   await wrapper.get('[data-test="pricing-dimension-resolution"]').setValue(true)
   await wrapper.get('[data-test="pricing-dimension-aspect_ratio"]').setValue(true)
   expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('72 个价格')
@@ -218,12 +226,14 @@ describe('reference limits', () => {
   wrapper.unmount()
  })
 
-it('counts video sale inputs across resolution and duration groups', () => {
+it('counts video sale inputs across resolution and duration groups', async () => {
   const product = productFixture(); product.media_type = 'video'
   product.capabilities.resolutions = ['720p', '4K']; product.capabilities.durations_seconds = [4, 7, 12]
   product.capabilities.count = { min: 1, max: 1 }; product.pricing_rules = []
   const wrapper = editor(product)
+  await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
   expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('6 个价格')
+  await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
   expect(wrapper.findAll('input[data-test^="video-sale-"]')).toHaveLength(3)
   wrapper.unmount()
 })

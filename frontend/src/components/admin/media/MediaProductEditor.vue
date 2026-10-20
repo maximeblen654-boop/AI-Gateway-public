@@ -61,7 +61,7 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :account-id="accountId" :admin-id="adminId" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
+      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :active="wizardStep === 4" :account-id="accountId" :admin-id="adminId" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
       <MediaProcurementEditor v-else :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
@@ -172,16 +172,21 @@ function configuredValues(key: PricingDimension): (string | number)[] {
 }
 const availablePricingDimensions = computed(() => pricingDimensionDefinitions.filter(({ key }) => (key !== 'duration_seconds' || props.product.media_type === 'video') && configuredValues(key).length))
 const hiddenPricingDimensions = computed(() => activePricingDimensions.value.filter(key => !availablePricingDimensions.value.some(item => item.key === key)))
+// Track the complete reactive input once; the bounded pure calculations below
+// should not pay a reactive Proxy traversal for every spec/rule comparison.
+const calculationProduct = computed<Product>(() => JSON.parse(JSON.stringify(props.product)))
 const expectedPriceCount = computed(() => {
-  if (props.product.media_type === 'video') {
-    const groups = props.product.capabilities.resolutions.map(resolution => videoGroups(props.product, resolution))
+  if (wizardStep.value !== 3) return undefined
+  const product = calculationProduct.value
+  if (product.media_type === 'video') {
+    const groups = product.capabilities.resolutions.map(resolution => videoGroups(product, resolution))
     return groups.some(value => !value) ? undefined : groups.reduce((total, value) => total + value!.reduce((count, group) => count + group.rows.length, 0), 0)
   }
-  const specs = allowedSpecs(props.product.capabilities)
+  const specs = allowedSpecs(product.capabilities)
   if (!specs) return undefined
   return creationModePricing.value
-    ? splitCreationModePricing(props.product, activePricingDimensions.value, specs).length
-    : buildPricingRules(props.product, activePricingDimensions.value, specs).length
+    ? splitCreationModePricing(product, activePricingDimensions.value, specs).length
+    : buildPricingRules(product, activePricingDimensions.value, specs).length
 })
 
 function valuesFor(product: Product, key: PricingDimension): (string | number)[] {
@@ -221,14 +226,20 @@ function losesPrices(previous: Product, nextRules: Product['pricing_rules'], spe
   const previousSpecs = sellableSpecs(previous)
   if (!previousSpecs) return previous.pricing_rules.some(rule => rule.sale_price != null)
   const nextSpecs = new Set(specs.map(spec => JSON.stringify(spec)))
+  const nextRuleKeys = new Set(nextRules.map(rule => JSON.stringify(rule)))
   if (previous.pricing_rules.some(rule => rule.sale_price &&
     !previousSpecs.some(spec => matchesSpec(rule.match, spec)) &&
-    !nextRules.some(next => JSON.stringify(next) === JSON.stringify(rule)))) return true
+    !nextRuleKeys.has(JSON.stringify(rule)))) return true
+  const previousPrices = previous.pricing_rules.filter(rule => rule.sale_price).map(rule => ({ match: rule.match, price: JSON.stringify(rule.sale_price) }))
+  const nextPrices = nextRules.map(rule => ({ match: rule.match, price: JSON.stringify(rule.sale_price) }))
   // Check every formerly priced combination, not merely one surviving value per rule.
-  return previousSpecs.some(spec => previous.pricing_rules.some(rule => rule.sale_price && matchesSpec(rule.match, spec) && (
-    !nextSpecs.has(JSON.stringify(spec)) ||
-    !nextRules.some(next => matchesSpec(next.match, spec) && JSON.stringify(next.sale_price) === JSON.stringify(rule.sale_price))
-  )))
+  return previousSpecs.some(spec => {
+    const prices = previousPrices.filter(rule => matchesSpec(rule.match, spec))
+    if (!prices.length) return false
+    if (!nextSpecs.has(JSON.stringify(spec))) return true
+    const preserved = new Set(nextPrices.filter(rule => matchesSpec(rule.match, spec)).map(rule => rule.price))
+    return prices.some(rule => !preserved.has(rule.price))
+  })
 }
 function editPricing(change: (value: Product) => void, dimensions = activePricingDimensions.value): boolean {
   if (props.disabled) return false
@@ -237,7 +248,7 @@ function editPricing(change: (value: Product) => void, dimensions = activePricin
   const specs = sellableSpecs(next)
   if (specs) {
     const rules = buildPricingRules(next, dimensions, specs)
-    if (losesPrices(props.product, rules, specs) && typeof window !== 'undefined' && !window.confirm('此修改会移除已有价格覆盖的规格，或合并不同售价。仍然一致的价格会保留，冲突价格会变为“待填写”。确认修改当前草稿？')) return false
+    if (losesPrices(calculationProduct.value, rules, specs) && typeof window !== 'undefined' && !window.confirm('此修改会移除已有价格覆盖的规格，或合并不同售价。仍然一致的价格会保留，冲突价格会变为“待填写”。确认修改当前草稿？')) return false
     next.pricing_rules = rules
   }
   emit('update:product', next)
@@ -323,8 +334,9 @@ const referenceSummary = computed(() => {
   return (['image', 'video', 'audio'] as const).filter(key => refs[key].max > 0).map(key => `${({ image: '图片', video: '视频', audio: '音频' })[key]}：${refs[key].min > 0 ? `必填 ${refs[key].min}～` : '可选，最多 '}${Math.min(refs[key].max, refs.total_max)} 份`).join('；') + `。合计最多 ${refs.total_max} 份。`
 })
 const pricingPreview = computed(() => {
+  if (wizardStep.value !== 5) return undefined
   const selected = previewDimensions.value.reduce<Record<string, string>>((result, { key }) => { result[key] = previewValue(key); return result }, {})
-  const specs = sellableSpecs(props.product)
+  const specs = sellableSpecs(calculationProduct.value)
   const quantity = props.product.media_type === 'image' ? previewQuantity.value : 1
   if (!specs || !specs.some(spec => spec.count === quantity && pricingDimensions.every(key => !selected[key] || String(spec[key]) === selected[key]))) return undefined
   const matching = priceRows.value.filter(item => {

@@ -25,6 +25,7 @@ func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 		// credential, database, scheduler or billing-service dependency is admitted.
 		"github.com/shopspring/decimal": true,
 		"strconv":                       true, // pure integer parsing of pixel dimensions and ratios
+		"sync":                          true, // request-local in-memory mutual exclusion; no I/O or admission dependency
 	}
 	for _, dir := range []string{".", "../imageplan", "../videoplan"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))

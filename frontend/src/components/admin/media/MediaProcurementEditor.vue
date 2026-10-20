@@ -11,7 +11,7 @@
     </details>
     <p v-if="matrixMessage" class="mw-field-error" role="status">{{ matrixMessage }}</p>
     <p v-if="joined.reason" class="mw-banner" data-test="spec-table-fallback">{{ joined.reason }}</p>
-    <MediaCostCalculator v-if="joined.rows.length" inline :product="product" :account-id="accountId" :admin-id="adminId" :disabled="disabled">
+    <MediaCostCalculator v-show="joined.rows.length" inline :product="product" :account-id="accountId" :admin-id="adminId" :disabled="disabled">
       <template #default="{ memory, setConsumption }">
         <div class="mw-spec-table" role="table" aria-label="逐规格采购成本与售价" data-test="unified-spec-table">
           <div class="mw-spec-head" role="row"><span role="columnheader">规格 / 积分换算</span><span role="columnheader">实际采购成本</span><span role="columnheader">实际售价</span><span role="columnheader">单{{ unit }}毛利润 / 毛利率</span></div>
@@ -67,13 +67,13 @@ import { buildCostRules, costDimensions, costLabel, costRows, maxCostRules } fro
 import { hasDetailedReferencePricingRules, supportsCreationModePricing, type PricingDimension } from './pricingMatrix'
 import MediaCostCalculator from './MediaCostCalculator.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
-const props = defineProps<{ product: Product; accountId?: number; adminId?: number; active?: boolean; dirty?: boolean; disabled: boolean }>()
+const props = withDefaults(defineProps<{ product: Product; accountId?: number; adminId?: number; active?: boolean; dirty?: boolean; disabled: boolean }>(), { active: true })
 const emit = defineEmits<{ 'update:product': [product: Product]; 'cost-toggle': [open: boolean] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const unit = computed(() => props.product.media_type === 'video' ? '条' : '张')
 const costs = computed(() => costRows(props.product))
 const prices = computed(() => saleRows(props.product))
-const joined = computed(() => costSpecRows(props.product))
+const joined = computed(() => props.active ? costSpecRows(JSON.parse(JSON.stringify(props.product))) : { rows: [] as CostSpecRow[] })
 const dimensions = computed(() => costDimensions(props.product))
 const separateMode = computed(() => costs.value.some(row => row.match.references))
 const complexReferences = computed(() => costs.value.some(row => row.match.output_formats?.length) || hasDetailedReferencePricingRules({ ...props.product, pricing_rules: costs.value.map(row => ({ match: row.match, sale_price: row.cost })) }))

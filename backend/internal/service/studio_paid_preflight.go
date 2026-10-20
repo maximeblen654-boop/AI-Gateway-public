@@ -293,6 +293,11 @@ func (p *studioPaidPreflight) sharedEligibility(ctx context.Context, m string, k
 
 func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) (report PaidReport) {
 	started := time.Now()
+	// Only pure Published validation is memoized, for this one video check.
+	// Native Account admission and final dependency/Key checks remain live.
+	if m == "video" {
+		ctx = mediaworkbench.WithPublishedValidationMemo(ctx)
+	}
 	report = PaidReport{Metrics: &PaidCheckMetrics{TimingsMS: map[string]int64{}}, Media: m, Pass: true, Checks: []PaidCheck{}, CheckedAt: time.Now().UTC()}
 	add := func(code string, account int64, product, path string, err error) {
 		report.Checks = append(report.Checks, PaidCheck{code, account, product, path, err == nil})
@@ -303,6 +308,7 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 	}
 	defer func() {
 		report.Metrics.TimingsMS["total"] = time.Since(started).Milliseconds()
+		report.Metrics.ProductValidations, report.Metrics.ValidationReuses = mediaworkbench.PublishedValidationMemoStats(ctx)
 		if err := ctx.Err(); err != nil {
 			code := "check_cancelled"
 			if errors.Is(err, context.DeadlineExceeded) {

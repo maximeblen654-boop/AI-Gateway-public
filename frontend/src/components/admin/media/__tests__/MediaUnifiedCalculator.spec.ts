@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import type { Product } from '@/api/admin/mediaWorkbench'
 import MediaProcurementEditor from '../MediaProcurementEditor.vue'
 import MediaProductEditor from '../MediaProductEditor.vue'
+import MediaCostCalculator from '../MediaCostCalculator.vue'
 import { costSpecRows } from '../costSpecRows'
 import { copy, imageProduct } from './fixtures'
 const price = (amount: string) => ({ amount, currency: 'CNY', billing_mode: 'per_request' })
@@ -20,6 +21,29 @@ function editor(product = productFixture()) {
 }
 beforeEach(() => { localStorage.clear(); vi.restoreAllMocks() })
 describe('unified calculator', () => {
+  it.each(['storage-unavailable', 'missing-identity'])('retains calculator raw values across wizard 4→3→4 without persistent memory: %s', async mode => {
+    if (mode === 'storage-unavailable') {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('storage unavailable') })
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage unavailable') })
+    }
+    const product = copy(imageProduct)
+    const wrapper = mount(MediaProductEditor, { props: { product, disabled: false, mediaTypes: ['image'], ...(mode === 'missing-identity' ? {} : { adminId: 1, accountId: 44 }) } })
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
+    const calculator = wrapper.getComponent(MediaCostCalculator).vm.$
+    await wrapper.get('[data-test="cost-purchase"]').setValue('100.')
+    await wrapper.get('[data-test="cost-credits"]').setValue('2000.')
+    await wrapper.get('[data-test="cost-consumption-0"]').setValue('90.')
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
+    expect(wrapper.getComponent(MediaCostCalculator).vm.$).toBe(calculator)
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
+    expect(wrapper.getComponent(MediaCostCalculator).vm.$).toBe(calculator)
+    expect(wrapper.get('[data-test="cost-purchase"]').element).toHaveProperty('value', '100.')
+    expect(wrapper.get('[data-test="cost-credits"]').element).toHaveProperty('value', '2000.')
+    expect(wrapper.get('[data-test="cost-consumption-0"]').element).toHaveProperty('value', '90.')
+    expect(wrapper.emitted('update:product')).toBeUndefined()
+    expect(wrapper.props('product')).toEqual(product)
+    wrapper.unmount()
+  })
   it('renders actual spec associations despite cost/sale order differences, with immediate profit updates', async () => {
     const wrapper = editor()
     const first = wrapper.get('[data-test="spec-row-0"]')

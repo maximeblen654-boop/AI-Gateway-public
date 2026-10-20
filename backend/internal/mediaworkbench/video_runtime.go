@@ -56,14 +56,28 @@ func PublishedVideoOffers(a *Account) []Offer {
 }
 
 func ResolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
+	return ResolvePublishedVideoOfferContext(context.Background(), a, offerID, spec)
+}
+
+// ResolvePublishedVideoOfferContext keeps validation scoped to the current
+// request while resolving the supplied fresh Account snapshot on every call.
+func ResolvePublishedVideoOfferContext(ctx context.Context, a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
 	var r ResolvedVideoOffer
-	if a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedOfferReady(context.Background(), a, offerID) {
+	if ctx.Err() != nil || a == nil || a.Config == nil || !a.Config.Sales.Enabled || !publishedOfferReady(ctx, a, offerID) || ctx.Err() != nil {
 		return r, ErrRuntimeBinding
 	}
 	return resolvePublishedVideoOffer(a, offerID, spec)
 }
 
 func resolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (ResolvedVideoOffer, error) {
+	return resolvePublishedVideoOfferWithSnapshot(a, offerID, spec, func(o Offer) (string, Dependencies) {
+		return offerSnapshot(a, o)
+	})
+}
+
+// The inspection caller may reuse an Offer snapshot only while inspecting the
+// same immutable Account. All spec, offer, price and adapter checks stay here.
+func resolvePublishedVideoOfferWithSnapshot(a *Account, offerID string, spec Spec, snapshot func(Offer) (string, Dependencies)) (ResolvedVideoOffer, error) {
 	var r ResolvedVideoOffer
 	if spec.Count != 1 || spec.DurationSeconds <= 0 || spec.Quality != "" {
 		return r, ErrRuntimeBinding
@@ -79,7 +93,7 @@ func resolvePublishedVideoOffer(a *Account, offerID string, spec Spec) (Resolved
 		if e != nil || !n.IsPositive() {
 			return r, ErrRuntimeBinding
 		}
-		revision, deps := offerSnapshot(a, o)
+		revision, deps := snapshot(o)
 		return ResolvedVideoOffer{revision, deps, o, spec, hash(spec)}, nil
 	}
 	return r, ErrRuntimeBinding
@@ -101,7 +115,7 @@ func (s *Service) ResolvePublishedVideoOffer(ctx context.Context, id string, spe
 		if allowed == nil || !allowed(rows[i].ID) {
 			continue
 		}
-		r, e := ResolvePublishedVideoOffer(&rows[i], id, spec)
+		r, e := ResolvePublishedVideoOfferContext(ctx, &rows[i], id, spec)
 		if e != nil {
 			continue
 		}

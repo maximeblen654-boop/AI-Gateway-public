@@ -47,6 +47,28 @@ function conflict(w: ReturnType<typeof editor>, resolution = '720p', duration = 
 beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); HTMLDialogElement.prototype.showModal = vi.fn(); HTMLDialogElement.prototype.close = vi.fn() })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
+it('suspends hidden rows without unmounting raw inputs or weakening source-price conflicts', async () => {
+  const p = smallProduct()
+  const groups = vi.spyOn(saleGroups, 'videoGroups')
+  const w = editor(p)
+  await w.setProps({ active: false })
+  groups.mockClear()
+  const changed = copy(p); changed.pricing_rules[0]!.sale_price = price('3')
+  await w.setProps({ product: changed })
+  expect(groups).not.toHaveBeenCalled()
+  await w.setProps({ active: true })
+  expect(w.get('[data-test="video-sale-4"]').element).toHaveProperty('value', '3')
+  await w.get('[data-test="video-sale-4"]').setValue('12.')
+  await w.setProps({ active: false })
+  const newer = copy(changed); newer.pricing_rules[0]!.sale_price = price('4')
+  await w.setProps({ product: newer })
+  expect(w.get('[data-test="video-sale-conflict"]').text()).toContain('源售价已变化')
+  await w.setProps({ active: true })
+  expect(w.get('[data-test="video-sale-4"]').element).toHaveProperty('value', '12.')
+  expect(w.emitted('update:product')).toBeUndefined()
+  w.unmount()
+})
+
 it('buffers decimal typing, deletion and replacement with zero rule/domain recalculations between keys', async () => {
   const p = product()
   const w = editor(p)

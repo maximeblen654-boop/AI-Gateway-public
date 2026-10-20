@@ -302,7 +302,7 @@ func (r *StudioVideoRuntime) account(ctx context.Context, b StudioVideoBinding, 
 		if e != nil {
 			return fail()
 		}
-		current, e := mediaworkbench.ResolvePublishedVideoOffer(ma, b.Offer.OfferID, b.Spec)
+		current, e := mediaworkbench.ResolvePublishedVideoOfferContext(ctx, ma, b.Offer.OfferID, b.Spec)
 		if e != nil || current.PublishedRevision != b.PublishedRevision || studioHash(current.Offer) != studioHash(b.Offer) {
 			return fail()
 		}

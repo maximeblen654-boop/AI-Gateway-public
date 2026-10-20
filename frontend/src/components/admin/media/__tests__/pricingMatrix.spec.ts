@@ -88,3 +88,12 @@ it('supports bounded thirty references without dropping matrix protections', () 
   c.durations_seconds = []; c.references.image.max = 31
   expect(allowedSpecs(c)).toBeUndefined()
 })
+
+it('keeps equal-price overlapping rules ambiguous when the second match is found', () => {
+  const product = copy(imageProduct)
+  const sale_price = { amount: '1.00', currency: 'CNY', billing_mode: 'per_request' }
+  product.pricing_rules = [{ match: {}, sale_price }, { match: {}, sale_price: { ...sale_price } }, { match: {}, sale_price: { ...sale_price, amount: '9' } }]
+  const rules = buildPricingRules(product, ['resolution'], allowedSpecs(product.capabilities)!)
+  expect(rules).toHaveLength(product.capabilities.resolutions.length)
+  expect(rules.every(rule => rule.sale_price === null)).toBe(true)
+})

@@ -74,6 +74,12 @@ func productDependencyReady(a *Account, id string) bool {
 	return ok && expected == productDependencies(a, p)
 }
 func publishedProductReady(ctx context.Context, a *Account, id string) bool {
+	return memoizedPublishedValidation(ctx, a, id, func() bool {
+		return validatePublishedProduct(ctx, a, id)
+	})
+}
+
+func validatePublishedProduct(ctx context.Context, a *Account, id string) bool {
 	if !productDependencyReady(a, id) {
 		return false
 	}

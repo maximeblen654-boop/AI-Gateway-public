@@ -41,12 +41,16 @@ import { costLabel } from './procurementMatrix'
 import { decimalError } from './costCalculator'
 import { arithmeticFill, setVideoSales, videoGroups, videoGroupKey, videoSaleInputKey, type VideoSaleInput } from './videoSaleGroups'
 
-const props = defineProps<{ product: Product; disabled?: boolean; pendingVideoSales?: VideoSaleInput[]; accountId?: number; adminId?: number }>()
+const props = withDefaults(defineProps<{ product: Product; active?: boolean; disabled?: boolean; pendingVideoSales?: VideoSaleInput[]; accountId?: number; adminId?: number }>(), { active: true })
 const emit = defineEmits<{ 'update:product': [product: Product]; 'pending-video-sales': [inputs: VideoSaleInput[]] }>()
 const selectedResolution = ref(''), selectedGroup = ref(''), message = ref('')
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
+const inputs = ref<VideoSaleInput[]>([])
+const calculationProduct = computed(() => clone(props.product))
 // Text edits do not invalidate either the rows or the progress badges.
-const groupsByResolution = computed(() => new Map(props.product.capabilities.resolutions.map(resolution => [resolution, videoGroups(props.product, resolution)])))
+// Keep this component and its raw input/conflict state mounted when another
+// wizard step is visible. Pending inputs still require current-domain checks.
+const groupsByResolution = computed(() => !props.active && !inputs.value.length ? new Map<string, ReturnType<typeof videoGroups>>() : new Map(calculationProduct.value.capabilities.resolutions.map(resolution => [resolution, videoGroups(calculationProduct.value, resolution)])))
 const progress = computed(() => new Map([...groupsByResolution.value].map(([resolution, groups]) => {
   const rows = groups?.flatMap(group => group.rows) ?? []
   return [resolution, `${rows.filter(row => row.price && !decimalError(row.price.amount, true)).length}/${rows.length}`]
@@ -54,7 +58,6 @@ const progress = computed(() => new Map([...groupsByResolution.value].map(([reso
 const groups = computed(() => groupsByResolution.value.get(selectedResolution.value))
 const current = computed(() => groups.value?.find(group => group.key === selectedGroup.value))
 const domain = computed(() => JSON.stringify(draftInput([props.product]).products[0]!.capabilities))
-const inputs = ref<VideoSaleInput[]>([])
 const inputMap = computed(() => new Map(inputs.value.map(input => [videoSaleInputKey(input), input.amount])))
 const context = computed(() => JSON.stringify([props.adminId, props.accountId, props.product.product_id, props.product.media_type, props.product.site_model, props.product.upstream_model]))
 const readopt = ref<{ input: VideoSaleInput; context: string; domain: string; price: VideoSaleInput['source_price'] }>()
@@ -67,7 +70,7 @@ watch(() => props.pendingVideoSales, value => {
 }, { immediate: true })
 watch(context, () => { if (readopt.value) { readopt.value = undefined; message.value = 'Account 或商品已变化，请重新核对本地输入。' } }, { flush: 'sync' })
 watch(() => props.product.capabilities.resolutions, values => { if (!values.includes(selectedResolution.value)) selectedResolution.value = values[0] ?? '' }, { immediate: true })
-watch(groups, values => { if (!values?.some(group => group.key === selectedGroup.value)) selectedGroup.value = values?.[0]?.key ?? '' }, { immediate: true })
+watch(groups, values => { if (values && !values.some(group => group.key === selectedGroup.value)) selectedGroup.value = values[0]?.key ?? '' }, { immediate: true })
 const groupLabel = (match: Match) => Object.keys(match).length ? costLabel(match) : '所有已配置比例、画质与素材共享'
 function inputValue(duration: number, fallback: string) { return current.value ? inputMap.value.get(videoSaleInputKey({ resolution: selectedResolution.value, group: current.value.match, duration })) ?? fallback : fallback }
 function publishInputs() { emit('pending-video-sales', clone(inputs.value)) }

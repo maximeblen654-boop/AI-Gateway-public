@@ -127,6 +127,7 @@ describe('media editors follow one-way props', () => {
     product.capabilities.aspect_ratios = ['1:1', '16:9']
     product.capabilities.combination_rules = [{ deny: { resolution: ['2K'], aspect_ratio: ['16:9'] } }]
     const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
     await wrapper.get('[data-test="preview-resolution"]').setValue('2K')
     await wrapper.get('[data-test="preview-aspect_ratio"]').setValue('16:9')
     expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('当前组合价格待填写')
@@ -184,10 +185,12 @@ describe('media editors follow one-way props', () => {
   it('starts with an unfilled uniform price and previews exact unit price times quantity', async () => {
     const product = copy(imageProduct); product.pricing_rules = []; product.capabilities.count.max = 4
     const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
     expect(wrapper.get('[data-test="price-0"]').attributes('placeholder')).toBe('待填写')
     expect(wrapper.emitted('update:product')).toBeUndefined()
     await wrapper.get('[data-test="price-0"]').setValue('0.70')
     await wrapper.setProps({ product: wrapper.emitted('update:product')!.at(-1)![0] as Product })
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
     await wrapper.get('[data-test="preview-quantity"]').setValue(4)
     expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('总价：2.8 CNY')
     await wrapper.get('[data-test="preview-quantity"]').setValue(5)
@@ -209,6 +212,7 @@ describe('media editors follow one-way props', () => {
     expect(latest.pricing_rules.map(rule => rule.sale_price?.amount ?? null)).toEqual(['1.20', null, null])
     await wrapper.setProps({ product: latest })
     expect(wrapper.get('[data-test="preview-quantity"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-test="wizard-step-5"]').trigger('click')
     expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('总价：1.2 CNY')
     wrapper.unmount()
   })

@@ -24,9 +24,11 @@ type PaidCheck struct {
 
 // Aggregate admin-only diagnostics; no credentials, request bodies or routes.
 type PaidCheckMetrics struct {
-	AccountsValidated int              `json:"accounts_validated"`
-	SpecsChecked      int              `json:"specs_checked"`
-	TimingsMS         map[string]int64 `json:"timings_ms"`
+	AccountsValidated  int              `json:"accounts_validated"`
+	SpecsChecked       int              `json:"specs_checked"`
+	ProductValidations int              `json:"product_validations,omitempty"`
+	ValidationReuses   int              `json:"validation_reuses,omitempty"`
+	TimingsMS          map[string]int64 `json:"timings_ms"`
 }
 type paidDependencies struct {
 	Shared string            `json:"shared"`
@@ -225,7 +227,20 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 	if s == nil || !s.Managed || !validPaidMedia(m) || actor <= 0 {
 		return PaidState{Media: m, Reason: "deployment_mode"}, nil, ErrPaidControl
 	}
+	started := time.Now()
+	var report PaidReport
+	var lockWait time.Duration
+	defer func() {
+		if report.Metrics != nil {
+			if report.Metrics.TimingsMS == nil {
+				report.Metrics.TimingsMS = map[string]int64{}
+			}
+			report.Metrics.TimingsMS["apply_total"] = time.Since(started).Milliseconds()
+			report.Metrics.TimingsMS["apply_lock_wait"] = lockWait.Milliseconds()
+		}
+	}()
 	s.mu.Lock()
+	lockWait = time.Since(started)
 	defer s.mu.Unlock()
 	current, err := s.read(ctx, m)
 	if err != nil {
@@ -255,13 +270,24 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 	if !enable {
 		return s.Status(ctx, m), nil, nil
 	}
-	report := s.Preflight(ctx, m, actor)
+	checkStarted := time.Now()
+	report = s.Preflight(ctx, m, actor)
+	if report.Metrics != nil {
+		if report.Metrics.TimingsMS == nil {
+			report.Metrics.TimingsMS = map[string]int64{}
+		}
+		report.Metrics.TimingsMS["apply_preflight"] = time.Since(checkStarted).Milliseconds()
+	}
 	if ctx.Err() != nil || !report.Pass || fingerprint == "" || report.Fingerprint != fingerprint {
 		return s.Status(ctx, m), &report, ErrPaidControl
 	}
 	// Re-read shared dependencies and every checked grant before admission.
 	if s.Snapshot != nil {
+		dependencyStarted := time.Now()
 		latest, e := s.Snapshot(ctx, m, actor)
+		if report.Metrics != nil {
+			report.Metrics.TimingsMS["apply_dependencies"] = time.Since(dependencyStarted).Milliseconds()
+		}
 		if ctx.Err() != nil || e != nil || !paidDependenciesContain(latest, report.dependencies) {
 			return s.Status(ctx, m), &report, ErrPaidControl
 		}
@@ -280,7 +306,11 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 		s.failed.Store(m, true)
 		return PaidState{Media: m, Reason: "apply_failed"}, &report, err
 	}
+	statusStarted := time.Now()
 	out := s.Status(ctx, m)
+	if report.Metrics != nil {
+		report.Metrics.TimingsMS["apply_effective_state"] = time.Since(statusStarted).Milliseconds()
+	}
 	if !out.Effective {
 		s.failed.Store(m, true)
 		next.Enabled = false

@@ -60,6 +60,13 @@ func InspectPublishedOffers(ctx context.Context, a *Account, media string) (out 
 			continue
 		}
 		cases, e := publishedOfferSpecs(a, o)
+		// This inspection owns one immutable Account snapshot. Keep the same
+		// native resolver checks for every spec, but hash its Offer identity once.
+		var videoSnapshot func(Offer) (string, Dependencies)
+		if media == "video" {
+			revision, dependencies := offerSnapshot(a, o)
+			videoSnapshot = func(Offer) (string, Dependencies) { return revision, dependencies }
+		}
 		for _, spec := range cases {
 			if err = ctx.Err(); err != nil {
 				return
@@ -81,7 +88,7 @@ func InspectPublishedOffers(ctx context.Context, a *Account, media string) (out 
 					_, e = CompilePublishedImagePlan(resolved, "non-paid preflight", refs)
 				}
 			} else {
-				_, e = resolvePublishedVideoOffer(a, o.OfferID, spec)
+				_, e = resolvePublishedVideoOfferWithSnapshot(a, o.OfferID, spec, videoSnapshot)
 			}
 			if e != nil {
 				break
