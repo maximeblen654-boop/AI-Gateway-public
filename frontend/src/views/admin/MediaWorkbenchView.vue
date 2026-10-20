@@ -13,7 +13,7 @@
         </nav>
       </header>
 
-      <MediaPaidControls v-if="step === 'suppliers'" :suppliers="suppliers" />
+      <MediaPaidControls v-if="step === 'suppliers'" :suppliers="suppliers" :suppliers-loading="loading" />
       <div v-if="step === 'suppliers'" class="mw-statistics">
         <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
         <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>

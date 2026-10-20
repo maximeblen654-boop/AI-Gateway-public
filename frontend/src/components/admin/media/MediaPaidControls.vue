@@ -10,10 +10,11 @@
         <p class="mw-muted">{{ !knownState(kind) ? '请求状态未确认' : states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
         <p v-if="kind === 'image'" class="mw-muted">文生图与图生图共用此开关，视频独立控制。</p>
         <div class="mw-paid-actions">
-          <button class="btn btn-secondary" :disabled="busy || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
+          <button class="btn btn-secondary" :disabled="busy || suppliersLoading || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
           <button class="btn btn-primary" :disabled="busy || !canEnable(kind)" @click="confirmKind = kind">开启{{ label(kind) }}</button>
           <button class="btn btn-secondary" :disabled="busy || !knownState(kind) || !states[kind]?.requested_enabled" @click="apply(kind, false)">关闭提交</button>
         </div>
+        <p v-if="suppliersLoading" class="mw-muted" role="status">供应商列表仍在读取，请等待完成后执行开启前检查。</p>
         <p v-if="pending === `check-${kind}`" class="mw-muted" role="status">正在执行完整检查，本次最多等待 {{ PAID_CHECK_TIMEOUT_MS / 1000 }} 秒；检查不会开启提交。超时后需要重新检查，不能从状态页恢复未返回的报告。</p>
         <div v-if="reports[kind]" class="mw-paid-checks" aria-live="polite">
           <strong>{{ reportSummary(kind) }}</strong>
@@ -34,20 +35,22 @@ import { computed, onMounted, ref, watch } from 'vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { mediaPaidAPI, paidFailureMessage, PAID_CHECK_TIMEOUT_MS, type PaidMedia, type PaidReport, type PaidState, type PaidCheck } from '@/api/admin/mediaPaid'
 import type { SupplierDetail } from '@/api/admin/mediaWorkbench'
-const props = withDefaults(defineProps<{ suppliers?: SupplierDetail[] }>(), { suppliers: () => [] })
+const props = withDefaults(defineProps<{ suppliers?: SupplierDetail[]; suppliersLoading?: boolean }>(), { suppliers: () => [], suppliersLoading: false })
 const kinds: PaidMedia[] = ['image', 'video']
 const states = ref<Partial<Record<PaidMedia, PaidState>>>({})
 const reports = ref<Partial<Record<PaidMedia, PaidReport>>>({})
 // A report is eligible for confirmation only after its own follow-up status
 // succeeds, and until a refresh or an observed dependency change invalidates it.
 const checkedRevisions = ref<Partial<Record<PaidMedia, { revision: string }>>>({})
+const dependencyVersions: Record<PaidMedia, number> = { image: 0, video: 0 }
+const invalidationMessages = ref<Partial<Record<PaidMedia, string>>>({})
 const pending = ref('')
 const busy = computed(() => pending.value !== '')
 const error = ref('')
 const confirmKind = ref<PaidMedia | null>(null)
 const label = (kind: PaidMedia) => kind === 'image' ? '图片' : '视频'
-const reasons: Record<string, string> = { runtime_restarted: '服务已重启，需要重新检查开启', deployment_mode: '当前部署尚未启用管理员开关模式', closed: '提交关闭', open: '运行状态已核对', dependencies_changed: '配置已变化，原检查失效', dependencies_unavailable: '依赖检查不可用，提交关闭', state_unavailable: '无法读取运行状态', apply_failed: '生效失败，提交关闭', no_approved_offer: '没有仍有效的已核准商品，需要重新检查', revision_changed: '开关版本已变化，需要重新检查' }
-const invalidCheckReasons = new Set(['dependencies_changed', 'dependencies_unavailable', 'revision_changed', 'deployment_mode'])
+const reasons: Record<string, string> = { runtime_restarted: '服务已重启，需要重新检查开启', deployment_mode: '当前部署尚未启用管理员开关模式', closed: '提交关闭', open: '运行状态已核对', dependencies_changed: '原付费准入依赖已变化，提交关闭；需重新检查并确认开启', dependencies_unavailable: '依赖检查不可用，提交关闭', state_unavailable: '无法读取运行状态', apply_failed: '生效失败，提交关闭', no_approved_offer: '没有仍有效的已核准商品，需要重新检查', revision_changed: '开关版本已变化，需要重新检查' }
+const invalidCheckReasons = new Set(['dependencies_unavailable', 'revision_changed', 'deployment_mode'])
 const reason = (code?: string) => code && Object.prototype.hasOwnProperty.call(reasons, code) ? reasons[code] : '等待服务端核对'
 const checks: Record<string, string> = { quote_account_quota_requires_cost: '此 Account 设置了金额额度，不能承接未核算采购金额的视频；请管理员核对账号额度政策，不会自动修改配置', quote_cost_channel_missing: '历史发布配置缺少工作台采购成本，请补齐并重新发布', quote_cost_rule_missing: '没有匹配当前商品规格的已发布工作台采购成本', quote_cost_contract: '工作台成本须为 CNY 单张或整条成本，请核对规格与单位', native_account: '原生 Account 可用状态', published_offer: '至少一个已发布商品通过检查', check_timeout: '检查超时', check_cancelled: '检查已取消', dependencies_unavailable: '依赖不可用', sidecar_runtime: 'Core / Bridge / BFF 运行合同', customer_key: '当前管理员的工作台访问权限', customer_key_network_restricted: '工作台 Key 有网络限制，尚不能确认报价权限', billing_eligibility: '原生余额、订阅及权限', customer_quota: '原生 Key 配额', subscription: '订阅状态', private_result_storage: '私有结果存储', published_specs: '已发布规格与正数售价', spec_compilation_and_assets: '规格编译与私有素材', native_quote: '原生非付费报价', quote_account_admission: '账号运行准入未通过：核对 Group、模型映射、调度及运行限制', quote_account_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_workbench_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_published_offer: '发布依赖和报价规格', quote_binding: '原生报价绑定（旧版诊断）', quote_unknown: '报价检查原因未分类，请联系管理员核对服务端诊断', quote_request: '报价请求身份或请求大小不符合要求', quote_model_permission: '当前 Key 所属 Group 未允许此站点模型', quote_execution: '视频协议或规格不兼容：核对模型、时长、比例及参考素材合同', quote_account: '原生 Account 无法读取', quote_reference_preparation: '参考素材准备状态与当前报价不一致，请重新准备', quote_quote_store: '报价暂存失败，请稍后重试', dependencies_changed: '检查期间配置发生变化', video_reference_or_subscription_quote_requires_existing_preparation: '视频报价需要有效素材准备或受支持的计费合同', deployment_mode: '部署需启用管理员开关模式' }
 function checkLabel(item: PaidCheck, kind: PaidMedia) {
@@ -74,7 +77,7 @@ function knownState(kind: PaidMedia) {
 }
 function canEnable(kind: PaidMedia) {
   const state = states.value[kind]
-  return knownState(kind) && !!state && !state.effective_enabled &&
+  return !props.suppliersLoading && knownState(kind) && !!state && !state.effective_enabled &&
     !invalidCheckReasons.has(state.reason) &&
     reports.value[kind]?.pass === true && !!reports.value[kind]?.fingerprint &&
     checkedRevisions.value[kind]?.revision === state.revision
@@ -82,24 +85,35 @@ function canEnable(kind: PaidMedia) {
 function reportSummary(kind: PaidMedia) {
   if (!reports.value[kind]?.pass) return '检查未通过；当前实际开关状态见上方'
   if (!knownState(kind)) return '已取得检查报告；运行状态暂时无法确认，当前不能开启'
-  if (!checkedRevisions.value[kind]) return '检查结果已失效，请重新执行开启前检查'
+  if (props.suppliersLoading) return '供应商列表仍在读取，完成后核对检查结果'
+  if (!checkedRevisions.value[kind]) return invalidationMessages.value[kind] || '检查结果已失效，请重新执行开启前检查'
   return partial(kind) ? '部分商品不可用，开启后仅通过检查的商品可用' : '检查通过，开启时服务端将再次核对'
 }
-function invalidate(kind: PaidMedia) {
+function invalidate(kind: PaidMedia, message = '') {
   delete checkedRevisions.value[kind]
+  invalidationMessages.value[kind] = message
   if (confirmKind.value === kind) confirmKind.value = null
 }
+// Object key order and catalog/set order carry no admission meaning.
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)]))
+  return value
+}
 function supplierDependencies(kind: PaidMedia) {
-  return JSON.stringify(props.suppliers.filter(s => s.media_workbench_v1?.media_types.includes(kind)).map(s => ({
+  return JSON.stringify(canonical(props.suppliers.filter(s => s.media_workbench_v1?.media_types.includes(kind)).map(s => ({
     id: s.id, status: s.status, schedulable: s.schedulable, sales: s.effective_sales,
     configuredSales: s.media_workbench_v1?.sales.enabled,
     published: s.media_workbench_v1?.published?.revision,
-    lifecycle: s.media_workbench_v1?.product_lifecycle, hidden: s.media_workbench_v1?.hidden_models,
-    models: s.model_catalog?.models, adapters: s.native_adapters, bindings: s.media_workbench_v1?.adapter_bindings
-  })).sort((a, b) => a.id - b.id))
+    lifecycle: s.media_workbench_v1?.product_lifecycle, hidden: [...(s.media_workbench_v1?.hidden_models ?? [])].sort(),
+    models: [...(s.model_catalog?.models ?? [])].sort(), adapters: s.native_adapters, bindings: s.media_workbench_v1?.adapter_bindings
+  })).sort((a, b) => a.id - b.id)))
 }
 watch(() => kinds.map(supplierDependencies), (current, previous) => {
-  kinds.forEach((kind, index) => { if (current[index] !== previous[index]) invalidate(kind) })
+  kinds.forEach((kind, index) => { if (current[index] !== previous[index]) {
+    dependencyVersions[kind]++
+    invalidate(kind, pending.value === `check-${kind}` ? '检查结果已失效：检查期间商品或账号配置发生变化，请重新执行开启前检查' : '检查结果已失效：已发布商品、销售或账号依赖发生变化，请重新执行开启前检查')
+  } })
 })
 function checkUpstreamModel(item: PaidCheck) {
  const supplier = props.suppliers.find(s => s.id === item.account_id)
@@ -115,7 +129,7 @@ function checkProductName(item: PaidCheck) {
 
 async function refresh(preserveError = false) {
   if (busy.value) return
-  kinds.forEach(invalidate)
+  kinds.forEach(kind => invalidate(kind))
   pending.value = 'status'; if (!preserveError) error.value = ''
   try {
     const values = await Promise.allSettled(kinds.map(kind => mediaPaidAPI.status(kind)))
@@ -131,8 +145,10 @@ async function refresh(preserveError = false) {
   finally { pending.value = '' }
 }
 async function check(kind: PaidMedia) {
-  if (busy.value) return
+  if (busy.value || props.suppliersLoading) return
   const dependencies = supplierDependencies(kind)
+  const dependencyVersion = dependencyVersions[kind]
+  const revision = states.value[kind]?.revision
   pending.value = `check-${kind}`; error.value = ''; delete reports.value[kind]; invalidate(kind)
   try {
     try { reports.value[kind] = await mediaPaidAPI.check(kind) }
@@ -144,9 +160,20 @@ async function check(kind: PaidMedia) {
     try {
       const state = await mediaPaidAPI.status(kind)
       states.value[kind] = state
-      if (reports.value[kind]?.pass && knownState(kind) && dependencies === supplierDependencies(kind) &&
-          !invalidCheckReasons.has(state.reason)) {
+      // GET describes the previous grant; dependencies_changed on that grant
+      // does not invalidate a fresh POST report. PUT still repeats the full
+      // server check and fingerprint comparison before it can enable anything.
+      if (reports.value[kind]?.pass && knownState(kind) && !props.suppliersLoading &&
+          dependencyVersion === dependencyVersions[kind] && dependencies === supplierDependencies(kind) &&
+          revision === state.revision && !invalidCheckReasons.has(state.reason)) {
         checkedRevisions.value[kind] = { revision: state.revision }
+        delete invalidationMessages.value[kind]
+      } else if (props.suppliersLoading) {
+        invalidate(kind, '检查结果待核对：供应商列表仍在读取，请等待完成后重新执行开启前检查')
+      } else if (revision !== state.revision) {
+        invalidate(kind, '检查结果已失效：开关版本在检查期间发生变化，请重新执行开启前检查')
+      } else if (invalidCheckReasons.has(state.reason)) {
+        invalidate(kind, `检查结果已失效：${reason(state.reason)}，请重新执行开启前检查`)
       }
     } catch (failure) {
       delete states.value[kind]

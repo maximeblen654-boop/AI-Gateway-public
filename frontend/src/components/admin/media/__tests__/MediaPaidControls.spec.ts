@@ -211,7 +211,7 @@ it('invalidates a passing report and closes its confirmation when actual state i
  expect(api.apply).not.toHaveBeenCalled()
 })
 
-it.each(['dependencies_changed','dependencies_unavailable','revision_changed'])('does not authorize a passing report when the follow-up state invalidates it: %s', async reason => {
+it.each(['dependencies_unavailable','revision_changed'])('does not authorize a passing report when the follow-up state invalidates it: %s', async reason => {
  const w=create();await flushPromises();const video=w.get('[data-test="paid-video"]')
  api.status.mockResolvedValue({...state('video'),reason})
  await video.findAll('button')[0].trigger('click');await flushPromises()
@@ -304,4 +304,80 @@ it('uses predefined product failure guidance rather than arbitrary server reason
  await image.findAll('button')[0].trigger('click');await flushPromises()
  expect(image.text()).toContain('上游目录未发现此商品模型')
  expect(image.text()).not.toMatch(/DBerror|SECRET|private\.invalid/)
+})
+
+
+it('waits for supplier dependencies before starting a paid preflight', async () => {
+ const w=create();await w.setProps({suppliersLoading:true});await flushPromises()
+ const video=w.get('[data-test="paid-video"]')
+ expect(video.findAll('button')[0].attributes('disabled')).toBeDefined()
+ expect(video.text()).toContain('供应商列表仍在读取')
+ await video.findAll('button')[0].trigger('click')
+ expect(api.check).not.toHaveBeenCalled()
+ await w.setProps({suppliers:[supplier()],suppliersLoading:false})
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ expect(video.text()).toContain('检查通过，开启时服务端将再次核对')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeUndefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('retains a fresh report across nonmaterial supplier and catalog ordering changes', async () => {
+ const dto=supplier();const w=create([dto]);await flushPromises();const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ const reordered=structuredClone(dto);reordered.model_catalog!.models.reverse()
+ await w.setProps({suppliers:[reordered]})
+ expect(video.text()).toContain('检查通过，开启时服务端将再次核对')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeUndefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('does not revive a report after a real dependency changes and returns while checking', async () => {
+ let finish!: (value: unknown) => void
+ api.check.mockReturnValue(new Promise(resolve => {finish=resolve}))
+ const dto=supplier();const w=create([dto]);await flushPromises();const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click')
+ const changed=structuredClone(dto);changed.effective_sales=false
+ await w.setProps({suppliers:[changed]});await w.setProps({suppliers:[dto]})
+ finish({pass:true,fingerprint:'interrupted',checks:[]});await flushPromises()
+ expect(video.text()).toContain('检查期间商品或账号配置发生变化')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeDefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+
+it('uses the new POST report rather than the previous grant fingerprint and reason', async () => {
+ api.status.mockImplementation(async kind => ({...state(kind),requested_enabled:true,reason:'dependencies_changed',fingerprint:'old-grant'}))
+ const w=create([supplier()]);await flushPromises();const video=w.get('[data-test="paid-video"]')
+ api.check.mockResolvedValue({pass:true,fingerprint:'new-report',checks:[{code:'native_quote',pass:true}]})
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ expect(video.text()).toContain('检查通过，开启时服务端将再次核对')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeUndefined()
+ await video.findAll('button')[1].trigger('click')
+ expect(w.find('[data-test="confirm"]').exists()).toBe(true)
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('requires a new check if the switch revision changes during a passing POST', async () => {
+ const w=create([supplier()]);await flushPromises();const video=w.get('[data-test="paid-video"]')
+ api.status.mockResolvedValue({...state('video'),revision:'changed-revision'})
+ await video.findAll('button')[0].trigger('click');await flushPromises()
+ expect(video.text()).toContain('开关版本在检查期间发生变化')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeDefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+
+it('preserves a passing POST when only catalog ordering and object insertion order change in flight', async () => {
+ let finish!: (value: unknown) => void
+ api.check.mockReturnValue(new Promise(resolve => {finish=resolve}))
+ const dto=supplier();dto.media_workbench_v1!.adapter_bindings={video:{kind:'native_video',revision:'v1',auth:'account_apikey',task_flow:'async'}}
+ const w=create([dto]);await flushPromises();const video=w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click')
+ const reordered=structuredClone(dto);reordered.model_catalog!.models.reverse()
+ reordered.media_workbench_v1!.adapter_bindings!.video={task_flow:'async',auth:'account_apikey',revision:'v1',kind:'native_video'}
+ await w.setProps({suppliers:[reordered]})
+ finish({pass:true,fingerprint:'stable-order',checks:[]});await flushPromises()
+ expect(video.text()).toContain('检查通过，开启时服务端将再次核对')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeUndefined()
+ expect(api.apply).not.toHaveBeenCalled()
 })

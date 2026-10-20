@@ -61,7 +61,7 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
+      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :account-id="accountId" :admin-id="adminId" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
       <MediaProcurementEditor v-else :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">

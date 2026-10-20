@@ -1,9 +1,9 @@
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
 import { useMediaWorkbench } from '../useMediaWorkbench'
-import { encodeDraftRecovery, recoveryKey, recoveryCopyKey, listDraftRecoveries, type DraftRecovery } from '../draftRecovery'
+import { encodeDraftRecovery, recoveryKey, recoveryCopyKey, listDraftRecoveries, type DraftRecovery, type RecoveryEntry } from '../draftRecovery'
 import { supplier, saved, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
@@ -21,8 +21,8 @@ function acknowledgement(dto: ReturnType<typeof saved>, version: number, product
 function mockSave(dto: ReturnType<typeof saved>) { api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => { const result = acknowledgement(dto, version, products, submissionId); api.detail.mockResolvedValue(result); return result }) }
 let state: ReturnType<typeof useMediaWorkbench>
 let wrapper: ReturnType<typeof mount>
-async function start() {
-  wrapper = mount(defineComponent({ setup() { state = useMediaWorkbench(() => 1); return () => null } }))
+async function start(adminId: () => number | undefined = () => 1) {
+  wrapper = mount(defineComponent({ setup() { state = useMediaWorkbench(adminId); return () => null } }))
   await state.selectSupplier(77)
 }
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); vi.spyOn(console, 'warn').mockImplementation(() => undefined); api.detail.mockResolvedValue(supplier()); api.suppliers.mockResolvedValue([supplier(), supplier(44)]) })
@@ -856,6 +856,106 @@ describe('confirmed incremental autosave and local recovery', () => {
   })
 })
 
+
+describe('recovery consumption identity', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  function sourceCopy(dto: ReturnType<typeof supplier>, rawInputs = false, adminId = 1): RecoveryEntry {
+    const p = copy(dto.media_workbench_v1!.draft.products[0]!)
+    p.display_name = 'adopted source input'
+    if (rawInputs) p.media_type = 'video'
+    const value: DraftRecovery = {
+      version: 1, identity: { admin_id: adminId, account_id: dto.id, product_id: p.product_id, site_model: p.site_model, upstream_model: p.upstream_model },
+      editor_id: crypto.randomUUID(), copy_id: crypto.randomUUID(), updated_at: 1,
+      base_record_version: dto.media_workbench_v1!.record_version, base_draft_revision: dto.media_workbench_v1!.draft.revision, product: p,
+      ...(rawInputs ? { video_sale_inputs: [{ resolution: '720p', group: {}, duration: 5, amount: '12.', source_price: null, domain: 'source-domain' }] } : {})
+    }
+    const key = recoveryCopyKey(value.identity, value.editor_id!)!, raw = encodeDraftRecovery(value)
+    localStorage.setItem(key, raw)
+    return { key, raw, value }
+  }
+  async function adopt(source: RecoveryEntry, adminId?: () => number | undefined) {
+    await start(adminId); state.selectModel(source.value.identity.upstream_model); state.chooseRecovery(source.key)
+    expect(await state.restoreRecovery()).toBe(true)
+  }
+  it.each([false, true])('preserves Account A adopted copy when Account B saves the same product ID (raw input: %s)', async rawInputs => {
+    const a = supplier(), b = supplier(88)
+    if (rawInputs) { a.media_workbench_v1!.draft.products[0]!.media_type = 'video'; b.media_workbench_v1!.draft.products[0]!.media_type = 'video' }
+    const source = sourceCopy(a, rawInputs)
+    api.detail.mockResolvedValue(a); await adopt(source)
+    state.discard(); expect(localStorage.getItem(source.key)).toBe(source.raw)
+    api.detail.mockResolvedValue(b); await state.selectSupplier(b.id); state.selectModel(source.value.identity.upstream_model)
+    state.product.value!.display_name = rawInputs ? 'independent B change' : source.value.product.display_name
+    mockSave(b)
+    expect(await state.saveDraft()).toBe(true)
+    expect(state.detail.value!.id).toBe(b.id); expect(state.saveState.value).toBe('saved')
+    expect(api.saveDraft.mock.calls[0]![0]).toBe(b.id)
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it.each([false, true])('preserves another admin adopted copy on the same Account (raw input: %s)', async rawInputs => {
+    const dto = supplier(), adminId = ref(1)
+    if (rawInputs) dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'
+    const source = sourceCopy(dto, rawInputs)
+    api.detail.mockResolvedValue(dto); await adopt(source, () => adminId.value)
+    state.discard(); adminId.value = 2; await flushPromises()
+    state.product.value!.display_name = rawInputs ? 'second admin input' : source.value.product.display_name
+    mockSave(dto); expect(await state.saveDraft()).toBe(true)
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it.each([false, true])('consumes the exact adopted copy after the same Account confirms saving (raw input: %s)', async rawInputs => {
+    const dto = supplier()
+    if (rawInputs) dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'
+    const source = sourceCopy(dto, rawInputs)
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    if (rawInputs) { state.updateVideoSaleInputs([]); state.product.value!.display_name = 'raw input explicitly resolved' }
+    mockSave(dto); expect(await state.saveDraft()).toBe(true)
+    expect(localStorage.getItem(source.key)).toBeNull()
+    expect(listDraftRecoveries(localStorage, 1, dto.id).entries).toEqual([])
+  })
+  it.each(['adopted', 'owned'] as const)('preserves a byte-different externally rewritten %s copy after a matching save', async target => {
+    const dto = supplier(), source = sourceCopy(dto, true)
+    dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'
+    api.detail.mockResolvedValue(dto); await adopt(source)
+    state.updateVideoSaleInputs([]); state.product.value!.display_name = 'raw input explicitly resolved'
+    let rewritten!: { key: string; raw: string }
+    api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => {
+      const entry = target === 'adopted' ? source : listDraftRecoveries(localStorage, 1, dto.id).entries.find(item => item.key !== source.key)!
+      rewritten = { key: entry.key, raw: `${entry.raw} ` }
+      localStorage.setItem(rewritten.key, rewritten.raw)
+      const result = acknowledgement(dto, version, products, submissionId); api.detail.mockResolvedValue(result); return result
+    })
+    expect(await state.saveDraft()).toBe(true)
+    expect(localStorage.getItem(rewritten.key)).toBe(rewritten.raw)
+  })
+  it('preserves Account A removal copy when Account B confirms removal of the same product ID', async () => {
+    const a = draftManagementSupplier(), b = copy(a); b.id = 88
+    a.media_workbench_v1!.draft.products = [copy(a.media_workbench_v1!.draft.products.find(p => p.product_id === 'blank-3')!)]
+    const source = sourceCopy(a); source.value.removed_product = true; source.raw = encodeDraftRecovery(source.value); localStorage.setItem(source.key, source.raw)
+    api.detail.mockResolvedValue(a); await adopt(source)
+    api.detail.mockResolvedValue(b); await state.selectSupplier(b.id); state.selectModel(source.value.identity.upstream_model)
+    state.removeProduct(source.value.identity.product_id); mockSave(b)
+    expect(await state.saveDraft()).toBe(true)
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it('preserves Account A adopted new product when Account B cancels its own product with the same ID', async () => {
+    const a = supplier(), b = supplier(88), id = 'media-11111111-1111-4111-8111-111111111111'
+    a.media_workbench_v1!.draft.products[0]!.product_id = id
+    const source = sourceCopy(a); source.value.new_product = true; source.raw = encodeDraftRecovery(source.value); localStorage.setItem(source.key, source.raw)
+    a.media_workbench_v1!.draft.products = []
+    api.detail.mockResolvedValue(a); await adopt(source)
+    api.detail.mockResolvedValue(b); await state.selectSupplier(b.id); state.selectModel(source.value.identity.upstream_model)
+    vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('11111111-1111-4111-8111-111111111111')
+    state.addProduct('image', true); expect(state.selectedProduct.value).toBe(id)
+    state.removeProduct(id)
+    expect(state.products.value.some(p => p.product_id === id)).toBe(false)
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+  it('preserves a preview from the previous admin when explicit discard runs before discovery updates', async () => {
+    const adminId = ref(1), source = sourceCopy(supplier())
+    await start(() => adminId.value); state.selectModel(source.value.identity.upstream_model); state.chooseRecovery(source.key)
+    adminId.value = 2; state.discardRecovery()
+    expect(localStorage.getItem(source.key)).toBe(source.raw)
+  })
+})
 
 describe('reviewed per-page ownership and per-product conflicts', () => {
   const pages: ReturnType<typeof mount>[] = []

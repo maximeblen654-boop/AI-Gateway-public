@@ -10,6 +10,8 @@ import i18n, { initI18n } from '@/i18n'
 import { initSiteTheme, setSiteTheme, setSidebarStyle, setYellowSidebarStyle, siteThemeOptions, type SidebarStyle, type YellowSidebarStyle } from '@/utils/siteTheme'
 import { supplier, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
 import type { User } from '@/types'
+import { draftInput } from '@/api/admin/mediaWorkbench'
+import { encodeDraftRecovery, recoveryCopyKey } from '@/composables/draftRecovery'
 import '@/style.css'
 import '@/styles/site-theme.css'
 
@@ -38,6 +40,22 @@ if (videoPolish && !savedFixture) {
   ]
   dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
 }
+// Deterministic recovery fixture: current Product price 3, retained raw text
+// still bound to prior source price 1. No real Account or browser data is read.
+if (videoPolish && query.get('seedVideoConflict')) {
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  product.pricing_rules[0]!.sale_price!.amount = '3'
+  const identity = { admin_id: 1, account_id: dto.id, product_id: product.product_id, site_model: product.site_model, upstream_model: product.upstream_model }
+  const editorId = crypto.randomUUID()
+  localStorage.setItem(recoveryCopyKey(identity, editorId)!, encodeDraftRecovery({
+    version: 1, identity, editor_id: editorId, copy_id: crypto.randomUUID(), updated_at: Date.now(),
+    base_record_version: dto.media_workbench_v1!.record_version, base_draft_revision: dto.media_workbench_v1!.draft.revision,
+    product: copy(product), video_sale_inputs: [
+      { resolution: '720p', group: {}, duration: 4, amount: '12.', source_price: { amount: '1', currency: 'CNY', billing_mode: 'per_request' }, domain: JSON.stringify(draftInput([product]).products[0]!.capabilities) },
+      { resolution: '720p', group: {}, duration: 5, amount: '23.', source_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' }, domain: JSON.stringify(draftInput([product]).products[0]!.capabilities) }
+    ]
+  }))
+}
 if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
 if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   // Browser fixture only: the real model contract remains validated by Core.
@@ -46,10 +64,15 @@ if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 let nextDraftOutcome: 'reject' | 'hold' | undefined
 let releaseDraft: (() => void) | undefined
+let releaseSuppliers: (() => void) | undefined
+let releasePaidCheck: (() => void) | undefined
 Object.assign(window, { mediaFixture: {
   calls: fixtureCalls, snapshot: () => copy(dto),
   setDraftOutcome: (outcome: 'reject' | 'hold') => { nextDraftOutcome = outcome },
-  releaseDraft: () => { releaseDraft?.(); releaseDraft = undefined }
+  releaseDraft: () => { releaseDraft?.(); releaseDraft = undefined },
+  releaseSuppliers: () => { releaseSuppliers?.(); releaseSuppliers = undefined },
+  releasePaidCheck: () => { releasePaidCheck?.(); releasePaidCheck = undefined }
+
 } })
 if (scenario.startsWith('WIZARD') && !savedFixture) {
   const product = dto.media_workbench_v1!.draft.products[0]!
@@ -97,13 +120,17 @@ apiClient.defaults.adapter = async config => {
   if (url.startsWith('/admin/media-workbench/paid-controls/')) {
     const kind = url.includes('/video') ? 'video' : 'image'
     if (url.endsWith('/check')) {
+      if (query.get('holdPaidCheck')) await new Promise<void>(resolve => { releasePaidCheck = resolve })
       if (query.get('paidCheck') === 'post-error') throw { code: 'ERR_NETWORK', status: 0 }
       data = { media: kind, pass: query.get('paidCheck') !== 'business-failure', fingerprint: 'fixture-check', checked_at: '2026-10-20T03:00:00Z', checks: [{ code: query.get('paidCheck') === 'business-failure' ? 'published_offer' : 'native_quote', pass: query.get('paidCheck') !== 'business-failure', account_id: 77 }] }
     } else {
       if (query.get('paidCheck') === 'status-error' && fixtureCalls.some(call => call.url === `${url}/check`)) throw { status: 503 }
-      data = { media: kind, mode: 'managed-v1', requested_enabled: kind === 'image', effective_enabled: kind === 'image', revision: 'fixture-paid-revision', reason: kind === 'image' ? 'open' : 'apply_failed' }
+      data = { media: kind, mode: 'managed-v1', requested_enabled: kind === 'image', effective_enabled: kind === 'image', revision: 'fixture-paid-revision', reason: kind === 'image' ? 'open' : query.get('paidStateReason') ?? 'apply_failed' }
     }
-  } else if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]
+  } else if (url === '/admin/media-workbench/suppliers') {
+    if (query.get('holdSuppliers')) await new Promise<void>(resolve => { releaseSuppliers = resolve })
+    data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]
+  }
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
     const accountId = Number(url.split('/')[4])
     const account = scenario === 'NAVIGATION' ? navigationAccounts.find(item => item.id === accountId)! : accountId === dto.id ? dto : otherAccount

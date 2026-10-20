@@ -160,11 +160,17 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     applying = false
     selectedRecoveryKey.value = key; recovery.value = entry.value
   }
-  function clearRecovery(key: string, expected: string | undefined, expectedCopy: string | null | undefined): boolean {
-    if (!expectedCopy) return false
+  function clearRecovery(productId: string, key: string, expected: string | undefined, expectedCopy: string | null | undefined): boolean {
+    if (!expectedCopy || !detail.value) return false
     try {
+      // Maps can retain a same-ID Product from another Account/admin. Every
+      // consumption path must prove ownership before even the raw-text bypass.
+      const bound = (JSON.parse(expectedCopy) as DraftRecovery).identity
+      if (bound?.admin_id !== adminId() || bound.account_id !== detail.value.id || bound.product_id !== productId) return false
+      const value = readDraftRecovery(expectedCopy, bound)!
+      if (key !== (value.editor_id ? recoveryCopyKey(bound, value.editor_id) : recoveryKey(bound))) return false
       if (localStorage.getItem(key) !== expectedCopy) return false
-      if (expected !== undefined && draftFingerprint([JSON.parse(expectedCopy).product]) !== expected) return false
+      if (expected !== undefined && draftFingerprint([value.product]) !== expected) return false
       localStorage.removeItem(key)
       for (const [id, entry] of ownedRecoveries) if (entry.key === key && entry.raw === expectedCopy) ownedRecoveries.delete(id)
       for (const [id, entry] of adoptedRecoveries) if (entry.key === key && entry.raw === expectedCopy) adoptedRecoveries.delete(id)
@@ -174,7 +180,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   }
   function currentOwnedRecovery(): RecoveryEntry | undefined {
     const entry = ownedRecoveries.get(selectedProduct.value)
-    return entry && entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId() ? entry : undefined
+    return entry && entry.value.identity.product_id === selectedProduct.value && entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId() ? entry : undefined
   }
   function updateVideoSaleInputs(inputs: VideoSaleInput[]) {
     const p = product.value
@@ -183,7 +189,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     if (saveState.value !== 'unconfirmed' && !conflict.value && pending.value !== 'save') saveState.value = 'unsaved'
     clearTimeout(autoSaveTimer)
     const owned = currentOwnedRecovery()
-    if (!inputs.length && !committedDirty.value && !lastSubmission && owned?.value.video_sale_inputs?.length) clearRecovery(owned.key, undefined, owned.raw)
+    if (!inputs.length && !committedDirty.value && !lastSubmission && owned?.value.video_sale_inputs?.length) clearRecovery(p.product_id, owned.key, undefined, owned.raw)
     else persistProductRecovery(p)
     if (!inputs.length) scheduleSave()
   }
@@ -320,8 +326,8 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     if (addedProductIds.value.includes(id)) {
       addedProductIds.value = addedProductIds.value.filter(item => item !== id)
       const owned = ownedRecoveries.get(id), adopted = adoptedRecoveries.get(id)
-      if (owned) clearRecovery(owned.key, undefined, owned.raw)
-      if (adopted) clearRecovery(adopted.key, undefined, adopted.raw)
+      if (owned) clearRecovery(id, owned.key, undefined, owned.raw)
+      if (adopted) clearRecovery(id, adopted.key, undefined, adopted.raw)
     }
     else removedProducts.value.push(clone(p))
     delete pendingVideoInputs.value[id]
@@ -343,7 +349,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   function clearRemovalRecoveries(id?: string) {
     for (const entry of [...ownedRecoveries.values(), ...adoptedRecoveries.values()]) {
       if (entry.value.removed_product && (id === undefined || entry.value.identity.product_id === id) &&
-          entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId()) clearRecovery(entry.key, undefined, entry.raw)
+          entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId()) clearRecovery(entry.value.identity.product_id, entry.key, undefined, entry.raw)
     }
   }
   function pollValidation(id: number, revision: string, seq: number, attempt = 0) {
@@ -394,18 +400,18 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     }
     for (const p of submission.products) {
       const key = submission.recoveryKeys.get(p.product_id)
-      if (key) clearRecovery(key, draftFingerprint([p]), submission.recoveryCopies.get(p.product_id) ?? null)
+      if (key) clearRecovery(p.product_id, key, draftFingerprint([p]), submission.recoveryCopies.get(p.product_id) ?? null)
       const adopted = adoptedRecoveries.get(p.product_id)
       // Restored raw text is intentionally absent from the saved Product
       // snapshot. Once explicitly applied/cleared and saved, consume that exact
       // adopted copy; a foreign rewrite still fails the raw-copy CAS check.
-      if (adopted) clearRecovery(adopted.key, adopted.value.video_sale_inputs?.length && !pendingVideoInputs.value[p.product_id]?.length ? undefined : draftFingerprint([p]), adopted.raw)
+      if (adopted) clearRecovery(p.product_id, adopted.key, adopted.value.video_sale_inputs?.length && !pendingVideoInputs.value[p.product_id]?.length ? undefined : draftFingerprint([p]), adopted.raw)
     }
     for (const id of submission.removed) {
       const key = submission.recoveryKeys.get(id)
-      if (key) clearRecovery(key, undefined, submission.recoveryCopies.get(id))
+      if (key) clearRecovery(id, key, undefined, submission.recoveryCopies.get(id))
       const adopted = adoptedRecoveries.get(id)
-      if (adopted?.value.removed_product) clearRecovery(adopted.key, undefined, adopted.raw)
+      if (adopted?.value.removed_product) clearRecovery(id, adopted.key, undefined, adopted.raw)
     }
     lastSubmission = undefined; if (recovery.value) delete recovery.value.pending_submission
     serverSnapshot.value = null; conflict.value = unresolvedProductConflicts.value.length > 0; validationUnavailable.value = false; clearError()
@@ -551,13 +557,13 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const id = detail.value.id
     await selectSupplier(id, true)
     if (detail.value?.id !== id || message.value) return false
-    if (abandoned) clearRecovery(abandoned.key, undefined, abandoned.raw)
+    if (abandoned) clearRecovery(abandoned.value.identity.product_id, abandoned.key, undefined, abandoned.raw)
     clearRemovalRecoveries()
     discoverRecovery(); return true
   }
   function discardRecovery() {
     const entry = recoveryEntries.value.find(item => item.key === selectedRecoveryKey.value)
-    if (entry && recovery.value?.copy_id === entry.value.copy_id) clearRecovery(entry.key, undefined, entry.raw)
+    if (entry && recovery.value?.copy_id === entry.value.copy_id) clearRecovery(entry.value.identity.product_id, entry.key, undefined, entry.raw)
     discoverRecovery()
   }
   async function restoreRecovery(acceptConflict = false): Promise<boolean> {
@@ -756,7 +762,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   function discard() {
     if (!detail.value) return
     const abandoned = currentOwnedRecovery()
-    if (abandoned) clearRecovery(abandoned.key, undefined, abandoned.raw)
+    if (abandoned) clearRecovery(abandoned.value.identity.product_id, abandoned.key, undefined, abandoned.raw)
     clearRemovalRecoveries()
     pendingVideoInputs.value = {}
     clearTimeout(autoSaveTimer); apply(detail.value, true); saveState.value = conflict.value ? 'conflict' : config.value?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''
