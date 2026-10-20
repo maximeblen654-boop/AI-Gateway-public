@@ -648,7 +648,10 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const otherUnconfirmedWrite = saveState.value === 'unconfirmed' && (!pendingReceipt ||
       (lastSubmission ? lastSubmission.id !== pendingReceipt.submission_id : [...ownedRecoveries.values()].some(entry =>
         entry.value.pending_submission && entry.value.pending_submission.submission_id !== pendingReceipt.submission_id)))
-    const identicalPersisted = !value.removed_product && !value.video_sale_inputs?.length && (!pendingReceipt || knownPending) && !!serverProduct &&
+    // A strictly newer CAS base prevents the old pending request from committing.
+    // Require explicit conflict acceptance before resolving its matching copy.
+    const obsoletePending = !!pendingReceipt && acceptConflict && (latest.media_workbench_v1?.record_version ?? 0) > pendingReceipt.base_record_version
+    const identicalPersisted = !value.removed_product && !value.video_sale_inputs?.length && (!pendingReceipt || knownPending || obsoletePending) && !!serverProduct &&
       persistedFingerprint([value.product], latest) === draftFingerprint([serverProduct])
     // Only this explicit product choice resolves its conflict. A second restore
     // of the same product cannot erase another product's unresolved conflict.

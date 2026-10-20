@@ -990,6 +990,19 @@ describe('recovery consumption identity', () => {
     expect(state.products.value[0]!.display_name).toBe('A unknown input')
     expect(localStorage.getItem(source.key)).toBe(source.raw)
   })
+  it.each([false,true])('resolves a matching historical pending copy only after explicit acceptance of an advanced CAS base (%s)', async advanced => {
+    const original=supplier(),source=sourceCopy(original),current=copy(original)
+    source.value.pending_submission={submission_id:crypto.randomUUID(),base_record_version:3,product:copy(source.value.product)}
+    source.raw=encodeDraftRecovery(source.value);localStorage.setItem(source.key,source.raw)
+    current.media_workbench_v1!.draft.products=[copy(source.value.product)]
+    if(advanced){current.media_workbench_v1!.record_version=4;current.media_workbench_v1!.draft.revision='newer-draft';current.media_workbench_v1!.draft.save_receipt={submission_id:crypto.randomUUID(),base_record_version:3,draft_revision:'newer-draft'}}
+    api.detail.mockResolvedValue(current);await start();state.selectModel(source.value.identity.upstream_model);state.chooseRecovery(source.key)
+    expect(await state.restoreRecovery(advanced)).toBe(true)
+    expect(state.dirty.value).toBe(false)
+    expect(state.saveState.value).toBe(advanced?'saved':'unconfirmed')
+    expect(localStorage.getItem(source.key)).toBe(advanced?null:source.raw)
+    await state.flushAutoSave();expect(api.saveDraft).not.toHaveBeenCalled()
+  })
   it('reverting to the confirmed baseline removes only this page obsolete buffer', async () => {
     await start(); state.selectModel('image-native-1')
     const original = state.product.value!.display_name
