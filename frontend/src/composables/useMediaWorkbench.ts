@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
 import { draftFingerprint, persistedFingerprint, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
+import type { VideoSaleInput } from '@/components/admin/media/videoSaleGroups'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 export function useMediaWorkbench(adminId: () => number | undefined = () => undefined) {
@@ -34,6 +35,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const salesFeedback = ref('')
   const addedProductIds = ref<string[]>([])
   const removedProducts = ref<Product[]>([])
+  const pendingVideoInputs = ref<Record<string, VideoSaleInput[]>>({})
   const baseline = ref('[]')
   let applying = false
   let autoSaveTimer: ReturnType<typeof setTimeout> | undefined
@@ -47,7 +49,10 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   let pollTimer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   const config = computed(() => detail.value?.media_workbench_v1)
-  const dirty = computed(() => draftFingerprint(products.value) !== baseline.value)
+  const committedDirty = computed(() => draftFingerprint(products.value) !== baseline.value)
+  const hasPendingVideoSales = computed(() => Object.values(pendingVideoInputs.value).some(inputs => inputs.length > 0))
+  const videoSaleInputs = computed(() => pendingVideoInputs.value[selectedProduct.value] ?? [])
+  const dirty = computed(() => committedDirty.value || hasPendingVideoSales.value)
   const canRetryUnconfirmedSave = computed(() => saveState.value === 'unconfirmed' && !!retryCheck.value && online.value && !pending.value && !loading.value && !deleted.value && !conflict.value)
   const product = computed(() => products.value.find(p => p.product_id === selectedProduct.value))
   const validationCurrent = computed(() => !!config.value && config.value.validation.draft_revision === config.value.draft.revision)
@@ -55,7 +60,12 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     !!config.value && Number.isInteger(config.value.record_version) && config.value.record_version >= 0 && !!config.value.draft.revision && !!config.value.draft.products.length)
   const diagnostics = computed(() => errorDiagnostics.value.length ? errorDiagnostics.value : validationCurrent.value ? config.value?.validation.diagnostics ?? [] : [])
   const recoveryConflict = computed(() => !!recovery.value && (unresolvedProductConflicts.value.includes(recovery.value.product.product_id) || recovery.value.base_record_version !== (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.record_version || recovery.value.base_draft_revision !== ((serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.revision ?? '')))
-  const recoveryDiff = computed(() => recovery.value ? recoveryDifferences(recovery.value.product, (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.products.find(p => p.product_id === recovery.value!.identity.product_id)) : [])
+  const recoveryDiff = computed(() => {
+    if (!recovery.value) return []
+    const differences = recoveryDifferences(recovery.value.product, (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.products.find(p => p.product_id === recovery.value!.identity.product_id))
+    if (recovery.value.video_sale_inputs?.length) differences.push({ field: 'video_sale_inputs', local: JSON.stringify(recovery.value.video_sale_inputs.map(({ resolution, group, duration, amount }) => ({ resolution, group, duration, amount }))), server: '这些本地售价输入尚未应用草稿。' })
+    return differences
+  })
 
   const productRecoveries = computed(() => recoveryEntries.value.filter(entry => entry.value.product.product_id === selectedProduct.value))
   const unsubmittedRecoveries = computed(() => recoveryEntries.value.filter(entry => !entry.value.removed_product && entry.value.identity.upstream_model === selectedModel.value &&
@@ -84,13 +94,14 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     if (product.value) persistProductRecovery(product.value)
   }
   function persistProductRecovery(p: Product, removed = false): boolean {
+    const videoInputs = pendingVideoInputs.value[p.product_id] ?? []
     const submitted = lastSubmission?.products.find(item => item.product_id === p.product_id) ??
       (removed && lastSubmission?.removed.includes(p.product_id) ? p : undefined)
     const changedAfterSubmission = !!submitted && draftFingerprint([submitted]) !== draftFingerprint([p])
     if (!removed) {
-      if (!dirty.value && !changedAfterSubmission) return true
+      if (!dirty.value && !changedAfterSubmission && !videoInputs.length) return true
       const original = config.value?.draft.products.find(item => item.product_id === p.product_id)
-      if (original && draftFingerprint([original]) === draftFingerprint([p]) && !changedAfterSubmission) return true
+      if (original && draftFingerprint([original]) === draftFingerprint([p]) && !changedAfterSubmission && !videoInputs.length) return true
     }
     const bound = identity(p)
     if (!bound) { recoveryWarning.value = '当前管理员或商品身份尚未确认，浏览器恢复副本不可用；请保留此页。'; return false }
@@ -112,6 +123,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       const value: DraftRecovery = { version: 1, identity: bound, editor_id: writeEditor,
         new_product: addedProductIds.value.includes(p.product_id), ...(removed ? { removed_product: true } : {}), base_record_version: unresolvedBase?.base_record_version ?? config.value?.record_version ?? 0,
         base_draft_revision: unresolvedBase?.base_draft_revision ?? config.value?.draft.revision ?? '', updated_at: Date.now(), copy_id: crypto.randomUUID(), product: p,
+        ...(videoInputs.length ? { video_sale_inputs: videoInputs } : {}),
         ...(lastSubmission && submitted ? { pending_submission: { submission_id: lastSubmission.id, base_record_version: lastSubmission.base, product: submitted } } : recovery.value?.product.product_id === p.product_id && recovery.value.pending_submission && saveState.value === 'unconfirmed' ? { pending_submission: recovery.value.pending_submission } : {}) }
       const raw = encodeDraftRecovery(value)
       localStorage.setItem(writeKey, raw)
@@ -164,14 +176,25 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const entry = ownedRecoveries.get(selectedProduct.value)
     return entry && entry.value.identity.account_id === detail.value?.id && entry.value.identity.admin_id === adminId() ? entry : undefined
   }
+  function updateVideoSaleInputs(inputs: VideoSaleInput[]) {
+    const p = product.value
+    if (!p || p.media_type !== 'video') return
+    pendingVideoInputs.value = { ...pendingVideoInputs.value, [p.product_id]: clone(inputs) }
+    if (saveState.value !== 'unconfirmed' && !conflict.value && pending.value !== 'save') saveState.value = 'unsaved'
+    clearTimeout(autoSaveTimer)
+    const owned = currentOwnedRecovery()
+    if (!inputs.length && !committedDirty.value && !lastSubmission && owned?.value.video_sale_inputs?.length) clearRecovery(owned.key, undefined, owned.raw)
+    else persistProductRecovery(p)
+    if (!inputs.length) scheduleSave()
+  }
   function scheduleSave() {
     clearTimeout(autoSaveTimer)
-    if (applying || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return
+    if (applying || hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return
     autoSaveTimer = setTimeout(() => { void flushAutoSave() }, 1500)
   }
   async function flushAutoSave() {
     clearTimeout(autoSaveTimer)
-    if (!dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return false
+    if (hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return false
     // A step/blur event is not an explicit retry of an unchanged rejected input.
     if (rejectedInput === draftFingerprint(products.value)) return false
     if (pending.value || loading.value) { queuedSave = true; return false }
@@ -247,6 +270,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       const dto = await mediaWorkbenchAPI.detail(id)
       if (seq !== loadSequence || disposed) return
       selectedModel.value = ''; selectedProduct.value = ''; deleted.value = false; conflict.value = false; unresolvedProductConflicts.value = []
+      pendingVideoInputs.value = {}
       lastSubmission = undefined; retryCheck.value = null; rejectedInput = ''; serverSnapshot.value = null
       validationUnavailable.value = false; saveState.value = dto.media_workbench_v1?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''; publicationFeedback.value = ''; salesFeedback.value = ''; apply(dto, true)
     } catch (e) { if (seq === loadSequence) failure(e, detail.value?.id === id || !detail.value) }
@@ -300,6 +324,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       if (adopted) clearRecovery(adopted.key, undefined, adopted.raw)
     }
     else removedProducts.value.push(clone(p))
+    delete pendingVideoInputs.value[id]
     products.value = products.value.filter(item => item.product_id !== id)
     if (selectedProduct.value === id) selectedProduct.value = products.value.find(item => item.upstream_model === selectedModel.value)?.product_id ?? ''
   }
@@ -309,6 +334,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     if (!p) return
     removedProducts.value = removedProducts.value.filter(item => item.product_id !== id)
     clearRemovalRecoveries(id)
+    delete pendingVideoInputs.value[id]
     products.value.push(p)
     const order = (config.value?.draft.products ?? []).map(item => item.product_id)
     products.value.sort((a, b) => (order.indexOf(a.product_id) < 0 ? Infinity : order.indexOf(a.product_id)) - (order.indexOf(b.product_id) < 0 ? Infinity : order.indexOf(b.product_id)))
@@ -352,7 +378,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     if (!receiptMatches(dto, submission) || disposed) return false
     retryCheck.value = null
     rejectedInput = ''
-    const unchanged = draftFingerprint(products.value) === draftFingerprint(submission.products)
+    const unchanged = !hasPendingVideoSales.value && draftFingerprint(products.value) === draftFingerprint(submission.products)
     const local = clone(products.value)
     apply(dto, unchanged)
     baseline.value = draftFingerprint(dto.media_workbench_v1!.draft.products)
@@ -364,13 +390,16 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       removedProducts.value = removedProducts.value.filter(p => !submission.removed.includes(p.product_id))
     } else {
       saveState.value = 'saved'
-      saveFeedback.value = `草稿已确认保存${reconciled ? '（已重新读取核对）' : ''} · ${dto.media_workbench_v1!.draft.revision}。${dto.media_workbench_v1!.validation.status === 'FAIL' ? '暂不能发布，请处理下方缺项。' : '发布前仍由后台检查选中的商品。'}`
+      saveFeedback.value = `草稿已确认保存${reconciled ? '（已重新读取核对）' : ''}。${dto.media_workbench_v1!.validation.status === 'FAIL' ? '暂不能发布，请处理下方缺项。' : '发布前仍由后台检查选中的商品。'}`
     }
     for (const p of submission.products) {
       const key = submission.recoveryKeys.get(p.product_id)
       if (key) clearRecovery(key, draftFingerprint([p]), submission.recoveryCopies.get(p.product_id) ?? null)
       const adopted = adoptedRecoveries.get(p.product_id)
-      if (adopted) clearRecovery(adopted.key, draftFingerprint([p]), adopted.raw)
+      // Restored raw text is intentionally absent from the saved Product
+      // snapshot. Once explicitly applied/cleared and saved, consume that exact
+      // adopted copy; a foreign rewrite still fails the raw-copy CAS check.
+      if (adopted) clearRecovery(adopted.key, adopted.value.video_sale_inputs?.length && !pendingVideoInputs.value[p.product_id]?.length ? undefined : draftFingerprint([p]), adopted.raw)
     }
     for (const id of submission.removed) {
       const key = submission.recoveryKeys.get(id)
@@ -388,6 +417,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   }
   async function saveDraft(): Promise<boolean> {
     clearTimeout(autoSaveTimer)
+    if (hasPendingVideoSales.value) { persistRecovery(); saveFeedback.value = '售价输入尚未应用草稿，本地输入已保留。请完成或修正输入后再保存。'; return false }
     if (pending.value || loading.value || deleted.value || conflict.value || saveState.value === 'unconfirmed' || !detail.value) { if (pending.value === 'save' && dirty.value) queuedSave = true; return false }
     if (!online.value) { persistRecovery(); saveState.value = 'unsaved'; saveFeedback.value = '当前离线，输入已保留在本地；联网后先核对服务器版本。'; return false }
     if (!products.value.length && !removedProducts.value.length) {
@@ -473,7 +503,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
         for (const p of products.value) {
           const base = current?.draft.products.find(item => item.product_id === p.product_id)
           const server = c?.draft.products.find(item => item.product_id === p.product_id)
-          if (draftFingerprint([p]) !== draftFingerprint(base ? [base] : []) && draftFingerprint(server ? [server] : []) !== draftFingerprint(base ? [base] : [])) unresolved.add(p.product_id)
+          if ((pendingVideoInputs.value[p.product_id]?.length || draftFingerprint([p]) !== draftFingerprint(base ? [base] : [])) && draftFingerprint(server ? [server] : []) !== draftFingerprint(base ? [base] : [])) unresolved.add(p.product_id)
         }
         for (const p of removedProducts.value) {
           const base = current?.draft.products.find(item => item.product_id === p.product_id)
@@ -595,6 +625,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     } else if (index >= 0) products.value[index] = clone(value.product)
     else products.value.push(clone(value.product))
     if (newProduct && !addedProductIds.value.includes(value.product.product_id)) addedProductIds.value.push(value.product.product_id)
+    pendingVideoInputs.value = { ...pendingVideoInputs.value, [value.product.product_id]: value.removed_product ? [] : clone(value.video_sale_inputs ?? []) }
     applying = false
     selectedModel.value = value.product.upstream_model; selectedProduct.value = value.product.product_id
     if (source) adoptedRecoveries.set(value.product.product_id, source)
@@ -624,7 +655,6 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const id = detail.value.id
     const previousRevision = config.value.published?.revision
     const draftRevision = config.value.draft.revision
-    const selectedNames = productIds.map(id => config.value!.draft.products.find(p => p.product_id === id)?.display_name || id).join('、')
     try {
       const result = await mediaWorkbenchAPI.publish(id, config.value.record_version, config.value.draft.revision, [...productIds])
       // Accept either the editor DTO or the documented revision acknowledgement.
@@ -633,7 +663,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       const acknowledgedRevision = 'published_revision' in result ? result.published_revision : undefined
       if (!confirmed.media_workbench_v1?.published || (acknowledgedRevision && confirmed.media_workbench_v1.published.revision !== acknowledgedRevision)) throw { status: 0, message: '发布回执与重新读取的版本不一致。' }
       apply(confirmed, true)
-      publicationFeedback.value = `${selectedNames} 已发布 · 版本 ${config.value.published?.revision ?? '待读取'}。${config.value.sales.enabled ? 'Account 工作台销售已开启，新版本按已发布范围生效。' : '尚未开启工作台销售，请在账号操作区开启。'}`
+      publicationFeedback.value = `配置已发布。${config.value.sales.enabled ? 'Account 工作台销售已开启，新版本按已发布范围生效。' : 'Account 销售尚未开启，请在账号操作区开启。'}`
       return true
     } catch (e) {
       failure(e)
@@ -644,7 +674,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
           const confirmed = await mediaWorkbenchAPI.detail(id)
           const published = confirmed.media_workbench_v1?.published
           if (published && published.revision !== previousRevision && published.source_draft_revision === draftRevision && productIds.every(productId => published.products?.some(p => p.product_id === productId && JSON.stringify(draftInput([p]).products) === JSON.stringify(draftInput(products.value.filter(draft => draft.product_id === productId)).products)))) {
-            apply(confirmed, true); clearError(); publicationFeedback.value = `${selectedNames} 已发布（已重新读取核对）· 版本 ${published.revision}`
+            apply(confirmed, true); clearError(); publicationFeedback.value = `配置已发布（已重新读取核对）。${config.value.sales.enabled ? 'Account 工作台销售已开启，新版本按已发布范围生效。' : 'Account 销售尚未开启，请在账号操作区开启。'}`
             return true
           }
         } catch { /* Unknown publication never triggers an automatic retry. */ }
@@ -728,12 +758,14 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     const abandoned = currentOwnedRecovery()
     if (abandoned) clearRecovery(abandoned.key, undefined, abandoned.raw)
     clearRemovalRecoveries()
+    pendingVideoInputs.value = {}
     clearTimeout(autoSaveTimer); apply(detail.value, true); saveState.value = conflict.value ? 'conflict' : config.value?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''
   }
   onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, message,
     errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     recovery, recoveryWarning, recoveryConflict, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
+    videoSaleInputs, updateVideoSaleInputs,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
 }

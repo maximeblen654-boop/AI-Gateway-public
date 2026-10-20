@@ -6,7 +6,7 @@ import MediaWorkbenchView from '../MediaWorkbenchView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { encodeDraftRecovery, recoveryCopyKey, type DraftRecovery } from '@/composables/draftRecovery'
 import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
-import { supplier, saved, copy } from '@/components/admin/media/__tests__/fixtures'
+import { supplier, saved, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
@@ -636,6 +636,284 @@ describe('Per-product readiness and explicit publication',()=>{
  })
 })
 
+
+describe('confirmed draft save time and human publication feedback', () => {
+  const initialSavedAt = new Date(2026, 9, 20, 9, 8, 47).toISOString()
+  const latestSavedAt = new Date(2026, 9, 20, 10, 15, 59).toISOString()
+  function serverDraft(updatedAt = initialSavedAt) {
+    const dto = supplier()
+    dto.media_workbench_v1!.draft.updated_at = updatedAt
+    return dto
+  }
+
+  it('shows the confirmed draft time beside publication and sales actions while keeping revisions internal', async () => {
+    const dto = serverDraft()
+    dto.media_workbench_v1!.draft.revision = `mwd_${'a'.repeat(64)}`
+    dto.media_workbench_v1!.validation.draft_revision = dto.media_workbench_v1!.draft.revision
+    dto.media_workbench_v1!.published!.revision = `mwp_${'b'.repeat(64)}`
+    api.detail.mockResolvedValue(dto)
+    await mountWorkbench(); await selectAccount()
+    const actions = wrapper.get('[data-test="account-publication"]')
+    expect(actions.text()).toContain('草稿最近保存：2026-10-20 09:08')
+    expect(actions.get('[data-test="publish"]').exists()).toBe(true)
+    expect(actions.get('[data-test="sales"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain(dto.media_workbench_v1!.published!.revision)
+    await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 09:08')
+    expect(wrapper.text()).not.toContain(dto.media_workbench_v1!.draft.revision)
+  })
+
+  it('updates the time only after matching server readback and keeps the previous time while saving', async () => {
+    api.detail.mockResolvedValue(serverDraft())
+    await openEditor()
+    await wrapper.get('[data-test="display-name"]').setValue('待确认的草稿名称')
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toContain('2026-10-20 09:08')
+    let written!: ReturnType<typeof saved>
+    let confirm!: (value: ReturnType<typeof saved>) => void
+    const readback = new Promise<ReturnType<typeof saved>>(resolve => { confirm = resolve })
+    api.saveDraft.mockImplementationOnce(async (_id, version, products, _removed, submissionId) => {
+      const dto = saved()
+      dto.media_workbench_v1!.draft.updated_at = new Date(2026, 9, 20, 10, 14).toISOString()
+      dto.media_workbench_v1!.draft.revision = `mwd_${'c'.repeat(64)}`
+      dto.media_workbench_v1!.validation.draft_revision = dto.media_workbench_v1!.draft.revision
+      written = acknowledgement(dto, version, products, submissionId)
+      return written
+    })
+    api.detail.mockImplementationOnce(() => readback)
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('保存中')
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toContain('2026-10-20 09:08')
+    const confirmed = copy(written)
+    confirmed.media_workbench_v1!.draft.updated_at = latestSavedAt
+    confirm(confirmed); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('已确认保存')
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 10:15')
+    expect(wrapper.get('[data-test="save-feedback"]').text()).not.toContain(confirmed.media_workbench_v1!.draft.revision)
+  })
+
+  it.each([
+    [422, '保存失败'], [0, '保存结果待核对']
+  ])('retains the last confirmed time after a failed or ambiguous save (%s)', async (status, label) => {
+    api.detail.mockResolvedValue(serverDraft())
+    await openEditor()
+    api.saveDraft.mockRejectedValueOnce({ status })
+    await wrapper.get('[data-test="display-name"]').setValue('保留的本地输入')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain(label)
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 09:08')
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('保留的本地输入')
+  })
+
+  it('does not adopt a later timestamp from an unconfirmed write or mismatching readback', async () => {
+    api.detail.mockResolvedValue(serverDraft())
+    await openEditor()
+    const unconfirmed = saved()
+    unconfirmed.media_workbench_v1!.draft.updated_at = latestSavedAt
+    api.saveDraft.mockResolvedValueOnce(unconfirmed)
+    api.detail.mockResolvedValueOnce(unconfirmed)
+    await wrapper.get('[data-test="display-name"]').setValue('回执不匹配的输入')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('保存结果待核对')
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 09:08')
+  })
+
+  it.each(['', 'invalid-server-time', '0001-01-01T00:00:00Z'])('shows no invented time when the server save time is unknown (%s)', async updatedAt => {
+    api.detail.mockResolvedValue(serverDraft(updatedAt))
+    const response = saved()
+    response.media_workbench_v1!.draft.updated_at = updatedAt
+    mockSave(response)
+    await openEditor()
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：尚未保存')
+    await wrapper.get('[data-test="display-name"]').setValue('服务端时间仍未知')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('已确认保存')
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：尚未保存')
+  })
+
+  it('shows not yet saved before an Account has a server draft', async () => {
+    const dto = supplier()
+    dto.media_workbench_v1 = null
+    api.detail.mockResolvedValue(dto)
+    await mountWorkbench(); await selectAccount()
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：尚未保存')
+    expect(wrapper.get('[data-test="publication-layers"]').text()).toContain('尚未建立')
+  })
+
+  it('reports a confirmed publication without a hash and leaves Account sales separate', async () => {
+    const dto = serverDraft()
+    dto.media_workbench_v1!.sales.enabled = false; dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
+    api.detail.mockResolvedValue(dto)
+    const published = copy(dto)
+    published.media_workbench_v1!.record_version++
+    published.media_workbench_v1!.published!.revision = `mwp_${'d'.repeat(64)}`
+    api.publish.mockResolvedValue(published)
+    await openEditor(); await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="publish"]').trigger('click')
+    await wrapper.get('[data-test="confirm-publish"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="publication-feedback"]').text()).toBe('配置已发布。Account 销售尚未开启，请在账号操作区开启。')
+    expect(wrapper.text()).not.toContain(published.media_workbench_v1!.published!.revision)
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 09:08')
+    expect(wrapper.get('[data-test="sales-state"]').text()).toContain('已暂停销售')
+    expect(api.publish).toHaveBeenCalledWith(77, 3, 'mwd_a', ['canvas-1'])
+    expect(api.sales).not.toHaveBeenCalled()
+  })
+
+  it('keeps a reconciled publication revision internal after an ambiguous response', async () => {
+    const dto = serverDraft()
+    dto.media_workbench_v1!.sales.enabled = false; dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'
+    api.detail.mockResolvedValue(dto)
+    await openEditor(); await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    const confirmed = copy(dto)
+    confirmed.media_workbench_v1!.record_version++
+    confirmed.media_workbench_v1!.published!.revision = `mwp_${'e'.repeat(64)}`
+    api.publish.mockRejectedValueOnce({ status: 0 })
+    api.detail.mockResolvedValueOnce(confirmed)
+    await wrapper.get('[data-test="publish"]').trigger('click')
+    await wrapper.get('[data-test="confirm-publish"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="publication-feedback"]').text()).toBe('配置已发布（已重新读取核对）。Account 销售尚未开启，请在账号操作区开启。')
+    expect(wrapper.text()).not.toContain(confirmed.media_workbench_v1!.published!.revision)
+    expect(wrapper.get('[data-test="draft-save-time"]').text()).toBe('草稿最近保存：2026-10-20 09:08')
+    expect(api.publish).toHaveBeenCalledTimes(1)
+    expect(api.sales).not.toHaveBeenCalled()
+  })
+})
+
+describe('video sale buffers at workbench save and navigation boundaries', () => {
+  function videoSupplier() {
+    const dto = supplier()
+    const product = dto.media_workbench_v1!.draft.products[0]!
+    product.media_type = 'video'
+    product.capabilities.resolutions = ['720p']
+    product.capabilities.aspect_ratios = ['16:9']
+    product.capabilities.durations_seconds = [5, 10]
+    product.capabilities.references = { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 0 }
+    dto.media_workbench_v1!.published!.products = [copy(product)]
+    return dto
+  }
+
+  it('applies the current video input before an explicit server save', async () => {
+    const dto = videoSupplier()
+    api.detail.mockResolvedValue(dto); mockSave(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.50')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="pending-video-sales"]').text()).toContain('尚未应用草稿')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    expect(api.saveDraft.mock.calls[0]![2][0]!.pricing_rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ match: expect.objectContaining({ duration_seconds: [5] }), sale_price: expect.objectContaining({ amount: '12.50' }) })
+    ]))
+    expect(wrapper.find('[data-test="pending-video-sales"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('已确认保存')
+  })
+
+  it('retains invalid video text on navigation and saves corrected text before leaving', async () => {
+    const dto = videoSupplier()
+    api.detail.mockResolvedValue(dto); mockSave(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('0')
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="editor-page"]').exists()).toBe(true)
+    expect((wrapper.get('[data-test="video-sale-5"]').element as HTMLInputElement).value).toBe('0')
+    expect(wrapper.find('dialog[open]').exists()).toBe(false)
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.50')
+    await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+    expect(wrapper.find('dialog[open]').text()).toContain('有未保存修改')
+    await wrapper.get('[data-test="save-navigate"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="model-page"]').exists()).toBe(true)
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    expect(api.saveDraft.mock.calls[0]![2][0]!.pricing_rules.some(rule => rule.sale_price?.amount === '12.50')).toBe(true)
+  })
+
+  it('keeps incomplete video text on the original product before adding and consumes repeated confirmation once', async () => {
+    const dto = videoSupplier()
+    api.detail.mockResolvedValue(dto); mockSave(dto)
+    await openEditor()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
+    await wrapper.get('[data-test="new-independent-product"]').trigger('click')
+    let confirm = wrapper.get('[data-test="confirm-add-product"]').element as HTMLButtonElement
+    confirm.click(); confirm.click(); await flushPromises()
+    expect(wrapper.find('[data-test="product-select"]').exists()).toBe(false)
+    expect((wrapper.get('[data-test="video-sale-5"]').element as HTMLInputElement).value).toBe('12.')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.50')
+    await wrapper.get('[data-test="new-independent-product"]').trigger('click')
+    confirm = wrapper.get('[data-test="confirm-add-product"]').element as HTMLButtonElement
+    confirm.click(); confirm.click(); await flushPromises()
+    expect(wrapper.get('[data-test="product-select"]').findAll('option')).toHaveLength(2)
+    expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).not.toBe('canvas-1')
+    await wrapper.get('[data-test="save"]').trigger('click'); await flushPromises()
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    const products = api.saveDraft.mock.calls[0]![2]
+    expect(new Set(products.map(product => product.product_id)).size).toBe(2)
+    expect(products.find(product => product.product_id === 'canvas-1')!.pricing_rules.some(rule => rule.sale_price?.amount === '12.50')).toBe(true)
+    expect(wrapper.get('[data-test="autosave-status"]').text()).toContain('已确认保存')
+  })
+
+  it('adds only one independent product on repeated confirmation when no video input is buffered', async () => {
+    api.detail.mockResolvedValue(videoSupplier())
+    await openEditor()
+    await wrapper.get('[data-test="new-independent-product"]').trigger('click')
+    const confirm = wrapper.get('[data-test="confirm-add-product"]').element as HTMLButtonElement
+    confirm.click(); confirm.click(); await flushPromises()
+    expect(wrapper.get('[data-test="product-select"]').findAll('option')).toHaveLength(2)
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('does not switch to another product recovery while the current video text is incomplete', async () => {
+    const dto = videoSupplier()
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    const auth = useAuthStore(); auth.user = { id: 1 } as NonNullable<typeof auth.user>; await flushPromises()
+    const product = copy(dto.media_workbench_v1!.draft.products[0]!)
+    product.product_id = `media-${crypto.randomUUID()}`; product.display_name = '尚未提交的视频 B'
+    const editorId = crypto.randomUUID()
+    const value: DraftRecovery = {
+      version: 1, identity: { admin_id: 1, account_id: 77, product_id: product.product_id, site_model: product.site_model, upstream_model: product.upstream_model },
+      base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: Date.now(), copy_id: crypto.randomUUID(), editor_id: editorId, new_product: true, product
+    }
+    const key = recoveryCopyKey(value.identity, editorId)!
+    localStorage.setItem(key, encodeDraftRecovery(value)); window.dispatchEvent(new StorageEvent('storage', { key })); await flushPromises()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
+    await wrapper.get(`[data-test="recover-unsubmitted"][data-product-id="${product.product_id}"]`).trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('画布图片')
+    expect((wrapper.get('[data-test="video-sale-5"]').element as HTMLInputElement).value).toBe('12.')
+    expect(wrapper.get('[data-test="unsubmitted-recoveries"]').text()).toContain('尚未提交的视频 B')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('commits current video text before undoing another product removal and keeps invalid text visible', async () => {
+    const dto = draftManagementSupplier('video')
+    api.detail.mockResolvedValue(dto); mockSave(dto)
+    await openEditor(77, 'video-model')
+    window.dispatchEvent(new Event('offline'))
+    await wrapper.get('[data-test="product-select"]').setValue('blank-1')
+    await wrapper.get('[data-test="remove-blank-product"]').trigger('click')
+    await wrapper.get('[data-test="confirm-remove-product"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-1')
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    api.saveDraft.mockClear()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
+    await wrapper.get('[data-test="undo-removal-blank-1"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-1')
+    expect((wrapper.get('[data-test="video-sale-5"]').element as HTMLInputElement).value).toBe('12.')
+    expect(wrapper.find('[data-test="undo-removal-blank-1"]').exists()).toBe(true)
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="video-sale-5"]').setValue('12.50')
+    await wrapper.get('[data-test="undo-removal-blank-1"]').trigger('click'); await flushPromises()
+    expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('blank-1')
+    expect(wrapper.find('[data-test="undo-removal-blank-1"]').exists()).toBe(false)
+    window.dispatchEvent(new Event('online')); await flushPromises()
+    expect(api.saveDraft).toHaveBeenCalledTimes(1)
+    expect(api.saveDraft.mock.calls[0]![2].find(product => product.product_id === 'canvas-1')!.pricing_rules.some(rule => rule.sale_price?.amount === '12.50')).toBe(true)
+  })
+})
 
 describe('draft recovery choices and read-only server check', () => {
   async function identifyAdmin() { const auth = useAuthStore(); auth.user = { id: 1 } as NonNullable<typeof auth.user>; await flushPromises() }

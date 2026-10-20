@@ -6,22 +6,23 @@
     <div class="mw-paid-grid">
       <article v-for="kind in kinds" :key="kind" :data-test="`paid-${kind}`">
         <h3>{{ label(kind) }}付费生成</h3>
-        <p class="mw-paid-state" :class="{ 'is-open': states[kind]?.effective_enabled }">{{ states[kind]?.mode === 'managed-v1' ? (states[kind]?.effective_enabled ? '实际已开放' : '实际未开放') : '状态未确认' }}</p>
-        <p class="mw-muted">{{ !states[kind] || states[kind]?.mode !== 'managed-v1' || states[kind]?.reason === 'state_unavailable' ? '请求状态未确认' : states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
+        <p class="mw-paid-state" :class="{ 'is-open': knownState(kind) && states[kind]?.effective_enabled }">{{ knownState(kind) ? (states[kind]?.effective_enabled ? '实际已开放' : '实际未开放') : '状态未确认' }}</p>
+        <p class="mw-muted">{{ !knownState(kind) ? '请求状态未确认' : states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
         <p v-if="kind === 'image'" class="mw-muted">文生图与图生图共用此开关，视频独立控制。</p>
         <div class="mw-paid-actions">
           <button class="btn btn-secondary" :disabled="busy || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
-          <button class="btn btn-primary" :disabled="busy || !reports[kind]?.pass || states[kind]?.effective_enabled || states[kind]?.mode !== 'managed-v1'" @click="confirmKind = kind">开启{{ label(kind) }}</button>
-          <button class="btn btn-secondary" :disabled="busy || !states[kind]?.requested_enabled" @click="apply(kind, false)">关闭提交</button>
+          <button class="btn btn-primary" :disabled="busy || !canEnable(kind)" @click="confirmKind = kind">开启{{ label(kind) }}</button>
+          <button class="btn btn-secondary" :disabled="busy || !knownState(kind) || !states[kind]?.requested_enabled" @click="apply(kind, false)">关闭提交</button>
         </div>
+        <p v-if="pending === `check-${kind}`" class="mw-muted" role="status">正在执行完整检查，本次最多等待 {{ PAID_CHECK_TIMEOUT_MS / 1000 }} 秒；检查不会开启提交。超时后需要重新检查，不能从状态页恢复未返回的报告。</p>
         <div v-if="reports[kind]" class="mw-paid-checks" aria-live="polite">
-          <strong>{{ partial(kind) ? '部分商品不可用，开启后仅通过检查的商品可用' : reports[kind]?.pass ? '检查通过，开启时服务端将再次核对' : '检查未通过；当前实际开关状态见上方' }}</strong>
+          <strong>{{ reportSummary(kind) }}</strong>
           <aside v-if="hasCostFailure(kind)" class="mw-cost-guide" data-test="cost-guide">
             <p><strong>工作台采购成本未就绪</strong></p>
             <p>选择对应 Account 和商品，在第 4 步“采购成本与售价”填写采购成本，保存草稿后检查并发布。计算器结果采用后进入草稿自动保存，服务器确认后再检查并发布。</p>
             <p>成本按商品的合法规格独立匹配；客户售价与采购成本分别管理。旧发布版本缺少工作台成本时，请补齐成本后重新发布。</p>
           </aside>
-          <details :open="!reports[kind]?.pass || partial(kind)"><summary>检查明细（{{ reports[kind]?.checks.length }} 项）</summary><ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item.code, kind) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="checkProductName(item)"> · {{ checkProductName(item) }}</template><template v-if="item.path"> · {{ item.path === 'edit' ? '参考素材路径' : '无参考素材路径' }}</template></small><small v-if="costCodes.has(item.code) && checkUpstreamModel(item)">上游模型：{{ checkUpstreamModel(item) }}</small><small v-if="!item.pass && checkProductState(item)">{{ checkProductState(item)?.reason }} {{ checkProductState(item)?.action }}</small></span></li></ul></details>
+          <details :open="!reports[kind]?.pass || !checkedRevisions[kind] || partial(kind)"><summary>检查明细（{{ reports[kind]?.checks.length }} 项）</summary><ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item, kind) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="checkProductName(item)"> · {{ checkProductName(item) }}</template><template v-if="pathLabel(item.path)"> · {{ pathLabel(item.path) }}</template></small><small v-if="costCodes.has(item.code) && checkUpstreamModel(item)">上游模型：{{ checkUpstreamModel(item) }}</small><small v-if="!item.pass && productGuidance(item)">{{ productGuidance(item) }}</small></span></li></ul></details>
         </div>
       </article>
     </div>
@@ -29,27 +30,77 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { mediaPaidAPI, type PaidMedia, type PaidReport, type PaidState, type PaidCheck } from '@/api/admin/mediaPaid'
+import { mediaPaidAPI, paidFailureMessage, PAID_CHECK_TIMEOUT_MS, type PaidMedia, type PaidReport, type PaidState, type PaidCheck } from '@/api/admin/mediaPaid'
 import type { SupplierDetail } from '@/api/admin/mediaWorkbench'
 const props = withDefaults(defineProps<{ suppliers?: SupplierDetail[] }>(), { suppliers: () => [] })
 const kinds: PaidMedia[] = ['image', 'video']
 const states = ref<Partial<Record<PaidMedia, PaidState>>>({})
 const reports = ref<Partial<Record<PaidMedia, PaidReport>>>({})
+// A report is eligible for confirmation only after its own follow-up status
+// succeeds, and until a refresh or an observed dependency change invalidates it.
+const checkedRevisions = ref<Partial<Record<PaidMedia, { revision: string }>>>({})
 const pending = ref('')
 const busy = computed(() => pending.value !== '')
 const error = ref('')
 const confirmKind = ref<PaidMedia | null>(null)
 const label = (kind: PaidMedia) => kind === 'image' ? '图片' : '视频'
-const reasons: Record<string, string> = { runtime_restarted: '服务已重启，需要重新检查开启', deployment_mode: '当前部署尚未启用管理员开关模式', closed: '提交关闭', open: '运行状态已核对', dependencies_changed: '配置已变化，原检查失效', dependencies_unavailable: '依赖检查不可用，提交关闭', state_unavailable: '无法读取运行状态', apply_failed: '生效失败，提交关闭' }
-const reason = (code?: string) => reasons[code || ''] || '等待服务端核对'
+const reasons: Record<string, string> = { runtime_restarted: '服务已重启，需要重新检查开启', deployment_mode: '当前部署尚未启用管理员开关模式', closed: '提交关闭', open: '运行状态已核对', dependencies_changed: '配置已变化，原检查失效', dependencies_unavailable: '依赖检查不可用，提交关闭', state_unavailable: '无法读取运行状态', apply_failed: '生效失败，提交关闭', no_approved_offer: '没有仍有效的已核准商品，需要重新检查', revision_changed: '开关版本已变化，需要重新检查' }
+const invalidCheckReasons = new Set(['dependencies_changed', 'dependencies_unavailable', 'revision_changed', 'deployment_mode'])
+const reason = (code?: string) => code && Object.prototype.hasOwnProperty.call(reasons, code) ? reasons[code] : '等待服务端核对'
 const checks: Record<string, string> = { quote_account_quota_requires_cost: '此 Account 设置了金额额度，不能承接未核算采购金额的视频；请管理员核对账号额度政策，不会自动修改配置', quote_cost_channel_missing: '历史发布配置缺少工作台采购成本，请补齐并重新发布', quote_cost_rule_missing: '没有匹配当前商品规格的已发布工作台采购成本', quote_cost_contract: '工作台成本须为 CNY 单张或整条成本，请核对规格与单位', native_account: '原生 Account 可用状态', published_offer: '至少一个已发布商品通过检查', check_timeout: '检查超时', check_cancelled: '检查已取消', dependencies_unavailable: '依赖不可用', sidecar_runtime: 'Core / Bridge / BFF 运行合同', customer_key: '当前管理员的工作台访问权限', customer_key_network_restricted: '工作台 Key 有网络限制，尚不能确认报价权限', billing_eligibility: '原生余额、订阅及权限', customer_quota: '原生 Key 配额', subscription: '订阅状态', private_result_storage: '私有结果存储', published_specs: '已发布规格与正数售价', spec_compilation_and_assets: '规格编译与私有素材', native_quote: '原生非付费报价', quote_account_admission: '账号运行准入未通过：核对 Group、模型映射、调度及运行限制', quote_account_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_workbench_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_published_offer: '发布依赖和报价规格', quote_binding: '原生报价绑定（旧版诊断）', quote_unknown: '报价检查原因未分类，请联系管理员核对服务端诊断', quote_request: '报价请求身份或请求大小不符合要求', quote_model_permission: '当前 Key 所属 Group 未允许此站点模型', quote_execution: '视频协议或规格不兼容：核对模型、时长、比例及参考素材合同', quote_account: '原生 Account 无法读取', quote_reference_preparation: '参考素材准备状态与当前报价不一致，请重新准备', quote_quote_store: '报价暂存失败，请稍后重试', dependencies_changed: '检查期间配置发生变化', video_reference_or_subscription_quote_requires_existing_preparation: '视频报价需要有效素材准备或受支持的计费合同', deployment_mode: '部署需启用管理员开关模式' }
-const checkLabel = (code: string, kind: PaidMedia) => kind === 'video' && costCodes.has(code) ? '视频历史合同检查未通过，请核对服务端诊断；视频商品不再配置采购成本' : checks[code] || '其他服务端检查'
+function checkLabel(item: PaidCheck, kind: PaidMedia) {
+  if (kind === 'video' && costCodes.has(item.code)) return '视频历史合同检查未通过，请核对服务端诊断；视频商品不再配置采购成本'
+  if (!item.pass && item.code === 'published_offer') return '没有可用的已发布商品，当前不能开启；请核对商品发布、销售及原生准入状态'
+  if (!item.pass && item.code === 'sidecar_runtime') return 'Core / Bridge / BFF 运行合同检查未通过，请核对服务可用性与版本配置'
+  if (!item.pass && item.code === 'dependencies_unavailable') return '依赖暂时不可用，当前不能开启；请核对服务运行状态后重新检查'
+  if (!item.pass && item.code === 'dependencies_changed') return '检查期间配置发生变化，本次结果已失效，请重新检查'
+  return Object.prototype.hasOwnProperty.call(checks, item.code) ? checks[item.code] : '其他服务端检查，请管理员核对诊断'
+}
 const costCodes = new Set(['quote_workbench_cost', 'quote_account_cost', 'quote_cost_channel_missing', 'quote_cost_rule_missing', 'quote_cost_contract'])
 const hasCostFailure = (kind: PaidMedia) => kind === 'image' && (reports.value[kind]?.checks.some(item => !item.pass && costCodes.has(item.code)) ?? false)
 const partial = (kind: PaidMedia) => !!reports.value[kind]?.pass && reports.value[kind]!.checks.some(item => !item.pass)
 const checkProductState = (item: PaidCheck) => props.suppliers.find(s => s.id === item.account_id)?.product_states?.find(p => p.product_id === item.product_id)
+const pathLabel = (path?: string) => path === 'edit' || path === 'with_references' ? '参考素材路径' : path === 'text' || path === 'without_references' ? '无参考素材路径' : ''
+const productGuidance = (item: PaidCheck) => checkProductState(item)?.state === 'UPSTREAM_REMOVED' ? '上游目录未发现此商品模型。先核对并同步目录，再重新检查。' : ''
+
+function knownState(kind: PaidMedia) {
+  const state = states.value[kind]
+  return !!state && state.media === kind && state.mode === 'managed-v1' &&
+    typeof state.requested_enabled === 'boolean' && typeof state.effective_enabled === 'boolean' &&
+    typeof state.revision === 'string' && Object.prototype.hasOwnProperty.call(reasons, state.reason) && state.reason !== 'state_unavailable' &&
+    (!state.effective_enabled || state.requested_enabled)
+}
+function canEnable(kind: PaidMedia) {
+  const state = states.value[kind]
+  return knownState(kind) && !!state && !state.effective_enabled &&
+    !invalidCheckReasons.has(state.reason) &&
+    reports.value[kind]?.pass === true && !!reports.value[kind]?.fingerprint &&
+    checkedRevisions.value[kind]?.revision === state.revision
+}
+function reportSummary(kind: PaidMedia) {
+  if (!reports.value[kind]?.pass) return '检查未通过；当前实际开关状态见上方'
+  if (!knownState(kind)) return '已取得检查报告；运行状态暂时无法确认，当前不能开启'
+  if (!checkedRevisions.value[kind]) return '检查结果已失效，请重新执行开启前检查'
+  return partial(kind) ? '部分商品不可用，开启后仅通过检查的商品可用' : '检查通过，开启时服务端将再次核对'
+}
+function invalidate(kind: PaidMedia) {
+  delete checkedRevisions.value[kind]
+  if (confirmKind.value === kind) confirmKind.value = null
+}
+function supplierDependencies(kind: PaidMedia) {
+  return JSON.stringify(props.suppliers.filter(s => s.media_workbench_v1?.media_types.includes(kind)).map(s => ({
+    id: s.id, status: s.status, schedulable: s.schedulable, sales: s.effective_sales,
+    configuredSales: s.media_workbench_v1?.sales.enabled,
+    published: s.media_workbench_v1?.published?.revision,
+    lifecycle: s.media_workbench_v1?.product_lifecycle, hidden: s.media_workbench_v1?.hidden_models,
+    models: s.model_catalog?.models, adapters: s.native_adapters, bindings: s.media_workbench_v1?.adapter_bindings
+  })).sort((a, b) => a.id - b.id))
+}
+watch(() => kinds.map(supplierDependencies), (current, previous) => {
+  kinds.forEach((kind, index) => { if (current[index] !== previous[index]) invalidate(kind) })
+})
 function checkUpstreamModel(item: PaidCheck) {
  const supplier = props.suppliers.find(s => s.id === item.account_id)
  return supplier?.media_workbench_v1?.published?.products?.find(p => p.product_id === item.product_id)?.upstream_model || checkProductState(item)?.upstream_model || ''
@@ -64,23 +115,57 @@ function checkProductName(item: PaidCheck) {
 
 async function refresh(preserveError = false) {
   if (busy.value) return
+  kinds.forEach(invalidate)
   pending.value = 'status'; if (!preserveError) error.value = ''
-  try { const values = await Promise.all(kinds.map(kind => mediaPaidAPI.status(kind))); values.forEach((value, i) => { states.value[kinds[i]] = value }) }
-  catch { states.value = {}; error.value = '无法确认运行状态，请稍后刷新。' }
+  try {
+    const values = await Promise.allSettled(kinds.map(kind => mediaPaidAPI.status(kind)))
+    values.forEach((value, index) => {
+      const kind = kinds[index]!
+      if (value.status === 'fulfilled') states.value[kind] = value.value
+      else {
+        delete states.value[kind]
+        error.value += `${error.value ? ' ' : ''}${label(kind)}状态读取失败（GET）：${paidFailureMessage(value.reason)}`
+      }
+    })
+  }
   finally { pending.value = '' }
 }
 async function check(kind: PaidMedia) {
   if (busy.value) return
-  pending.value = `check-${kind}`; error.value = ''; delete reports.value[kind]
-  try { reports.value[kind] = await mediaPaidAPI.check(kind); states.value[kind] = await mediaPaidAPI.status(kind) }
-  catch { error.value = '检查失败，未执行开启。请刷新后重试。' }
+  const dependencies = supplierDependencies(kind)
+  pending.value = `check-${kind}`; error.value = ''; delete reports.value[kind]; invalidate(kind)
+  try {
+    try { reports.value[kind] = await mediaPaidAPI.check(kind) }
+    catch (failure) {
+      delete states.value[kind]
+      error.value = `${label(kind)}开启前检查请求失败（POST）：${paidFailureMessage(failure)} 未执行开启。`
+      return
+    }
+    try {
+      const state = await mediaPaidAPI.status(kind)
+      states.value[kind] = state
+      if (reports.value[kind]?.pass && knownState(kind) && dependencies === supplierDependencies(kind) &&
+          !invalidCheckReasons.has(state.reason)) {
+        checkedRevisions.value[kind] = { revision: state.revision }
+      }
+    } catch (failure) {
+      delete states.value[kind]
+      error.value = `${label(kind)}检查报告已返回，但状态读取失败（GET）：${paidFailureMessage(failure)} 当前不能开启。`
+    }
+  }
   finally { pending.value = '' }
 }
 async function apply(kind: PaidMedia, enabled: boolean) {
-  if (busy.value || !states.value[kind]) return
+  if (busy.value || !knownState(kind) || (enabled && !canEnable(kind))) return
   pending.value = `apply-${kind}`; error.value = ''
+  invalidate(kind)
   try { const value = await mediaPaidAPI.apply(kind, enabled, states.value[kind]!, reports.value[kind]); states.value[kind] = value.state; if (value.report) reports.value[kind] = value.report; if (enabled && !value.state.effective_enabled) error.value = '开关尚未实际生效，请刷新检查。' }
-  catch { error.value = '操作未确认生效，请查看刷新后的实际状态。'; delete reports.value[kind] }
+  catch (failure) {
+    delete reports.value[kind]
+    error.value = enabled
+      ? `${label(kind)}开启结果未确认（PUT）：${paidFailureMessage(failure)} 暂勿重复开启；请读取实际状态并重新检查。`
+      : `${label(kind)}操作未确认生效（PUT）：${paidFailureMessage(failure)} 请查看刷新后的实际状态。`
+  }
   finally { pending.value = ''; await refresh(true) }
 }
 function confirmOpen() { const kind = confirmKind.value; confirmKind.value = null; if (kind) void apply(kind, true) }

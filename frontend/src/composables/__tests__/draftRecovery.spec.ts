@@ -6,6 +6,22 @@ const identity = { admin_id: 1, account_id: 77, product_id: imageProduct.product
 const fixture = (): DraftRecovery => ({ version: 1, identity, base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: 1, copy_id: '99999999-9999-4999-8999-999999999999', product: copy(imageProduct) })
 
 describe('bounded product recovery and save comparison', () => {
+  it('round-trips unfinished video price text with its exact source and strips undocumented buffer fields', () => {
+    const value = fixture(); value.product.media_type = 'video'
+    value.video_sale_inputs = [{ resolution: '720p', group: { aspect_ratio: ['16:9'] }, duration: 5, amount: '12.', source_price: null, domain: JSON.stringify(value.product.capabilities) }]
+    Object.assign(value.video_sale_inputs[0]!, { token: 'SYNTHETIC_SECRET' })
+    Object.assign(value.video_sale_inputs[0]!.group, { authorization: 'SYNTHETIC_SECRET' })
+    const raw = encodeDraftRecovery(value)
+    expect(raw).not.toContain('SYNTHETIC_SECRET')
+    expect(readDraftRecovery(raw, identity)?.video_sale_inputs).toEqual([{ resolution: '720p', group: { aspect_ratio: ['16:9'] }, duration: 5, amount: '12.', source_price: null, domain: JSON.stringify(value.product.capabilities) }])
+    expect(readDraftRecovery(encodeDraftRecovery(fixture()), identity)?.video_sale_inputs).toBeUndefined()
+    for (const patch of [{ amount: '1'.repeat(129) }, { duration: -1 }, { group: { aspect_ratio: 'invalid' } }, { source_price: {} }]) {
+      const invalid = { ...value, video_sale_inputs: [{ ...value.video_sale_inputs[0], ...patch }] }
+      expect(() => readDraftRecovery(JSON.stringify(invalid), identity)).toThrow()
+    }
+    value.product.media_type = 'image'
+    expect(() => readDraftRecovery(JSON.stringify(value), identity)).toThrow()
+  })
   it('normalizes retired video procurement only and still compares image procurement exactly', () => {
     const original = copy(imageProduct)
     original.cost_rules = [{ match: {}, cost: { amount: '1.5', currency: 'CNY', billing_mode: 'per_request' } }]

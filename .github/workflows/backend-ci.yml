@@ -74,7 +74,7 @@ jobs:
         working-directory: frontend
         run: |
           pnpm exec playwright install --with-deps chromium
-          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts media-limits.spec.ts
+          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts media-limits.spec.ts video-polish.spec.ts
 
       - name: Isolated procurement, publication and Account sales browser acceptance
         working-directory: frontend

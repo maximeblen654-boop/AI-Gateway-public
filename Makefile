@@ -12,8 +12,10 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/video/__tests__/StudioModelPicker.spec.ts \
 	src/components/admin/media/__tests__/MediaAspectOptions.spec.ts \
 	src/api/admin/__tests__/mediaWorkbench.spec.ts \
+	src/api/admin/__tests__/mediaPaid.spec.ts \
 	src/components/admin/media/__tests__ \
 	src/composables/__tests__/useMediaWorkbench.spec.ts \
+	src/composables/__tests__/useMediaVideoSaleInput.spec.ts \
 	src/views/admin/__tests__/MediaWorkbenchView.spec.ts \
 	src/api/__tests__/keys.bulkUpdate.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.spec.ts \

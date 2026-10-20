@@ -1,4 +1,5 @@
 import { draftInput, type Product, type SupplierDetail } from '@/api/admin/mediaWorkbench'
+import type { VideoSaleInput } from '@/components/admin/media/videoSaleGroups'
 
 // Follow costCalculator's small, bounded JSON/localStorage pattern. This stores
 // only one product's documented editable fields and optional removal intent,
@@ -13,6 +14,7 @@ export interface DraftRecovery {
   editor_id?: string
   new_product?: boolean
   removed_product?: boolean
+  video_sale_inputs?: VideoSaleInput[]
   pending_submission?: { submission_id: string; base_record_version: number; product: Product }
 }
 export interface RecoveryEntry { key: string; raw: string; value: DraftRecovery }
@@ -75,6 +77,24 @@ function validProduct(p: Product): boolean {
     [p.adapter_config.execution, p.adapter_config.edit_execution].every(e => e === undefined || !!e && (e.mode === undefined || ['single', 'native_multi', 'provider_async'].includes(e.mode)) && (e.max_output_images === undefined || Number.isSafeInteger(e.max_output_images)) && (e.provider === undefined || typeof e.provider === 'string')) &&
     (p.adapter_config.version === undefined || Number.isSafeInteger(p.adapter_config.version)) && [p.adapter_config.wire_profile, p.adapter_config.model_family].every(s => s === undefined || typeof s === 'string')
 }
+function validVideoInputs(inputs: DraftRecovery['video_sale_inputs'], product: Product): boolean {
+  return inputs === undefined || product.media_type === 'video' && Array.isArray(inputs) && inputs.length <= 128 &&
+    inputs.every(input => !!input && typeof input.resolution === 'string' && input.resolution.length > 0 && input.resolution.length <= 128 &&
+      Number.isSafeInteger(input.duration) && input.duration > 0 && input.duration <= 3600 && typeof input.amount === 'string' && input.amount.length <= 128 &&
+      typeof input.domain === 'string' && input.domain.length <= 16000) &&
+    validProduct({ ...product, pricing_rules: inputs.map(input => ({ match: input.group, sale_price: input.source_price })) })
+}
+function inputPayload(inputs: VideoSaleInput[]): VideoSaleInput[] {
+  const range = (value: { min: number; max: number }) => ({ min: value.min, max: value.max })
+  return inputs.map(({ resolution, group, duration, amount, source_price, domain }) => ({ resolution, duration, amount, domain,
+    group: {
+      ...Object.fromEntries((['output_formats', 'resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const).filter(key => group[key] !== undefined).map(key => [key, [...group[key]!]])),
+      ...(group.count ? { count: range(group.count) } : {}),
+      ...(group.references ? { references: { image: range(group.references.image), video: range(group.references.video), audio: range(group.references.audio), total_max: group.references.total_max } } : {})
+    },
+    source_price: source_price === null ? null : { amount: source_price.amount, currency: source_price.currency, billing_mode: source_price.billing_mode }
+  }))
+}
 export function readDraftRecovery(raw: string | null, identity: RecoveryIdentity): DraftRecovery | null {
   if (raw === null) return null
   if (raw.length > MAX_BYTES) throw new Error('oversize')
@@ -82,13 +102,14 @@ export function readDraftRecovery(raw: string | null, identity: RecoveryIdentity
   if (!bounded(value) || value.version !== 1 || recoveryKey(value.identity) !== recoveryKey(identity) || !recoveryKey(identity) ||
       !Number.isSafeInteger(value.base_record_version) || value.base_record_version < 0 || typeof value.base_draft_revision !== 'string' ||
       !Number.isSafeInteger(value.updated_at) || !validUUID(value.copy_id) || (value.editor_id !== undefined && !validUUID(value.editor_id)) || (value.new_product !== undefined && typeof value.new_product !== 'boolean') || (value.removed_product !== undefined && typeof value.removed_product !== 'boolean') || (value.removed_product === true && value.new_product === true) || !validProduct(value.product) || value.product.product_id !== identity.product_id ||
+      !validVideoInputs(value.video_sale_inputs, value.product) ||
       (value.pending_submission !== undefined && (!/^[a-f0-9-]{36}$/i.test(value.pending_submission.submission_id) || !Number.isSafeInteger(value.pending_submission.base_record_version) || value.pending_submission.base_record_version < 0 || !validProduct(value.pending_submission.product) || value.pending_submission.product.product_id !== identity.product_id))) throw new Error('invalid')
   return { version: 1, identity, base_record_version: value.base_record_version, base_draft_revision: value.base_draft_revision,
-    updated_at: value.updated_at, copy_id: value.copy_id, ...(value.editor_id ? { editor_id: value.editor_id } : {}), ...(value.new_product !== undefined ? { new_product: value.new_product } : {}), ...(value.removed_product !== undefined ? { removed_product: value.removed_product } : {}), product: draftInput([value.product]).products[0]!, ...(value.pending_submission ? { pending_submission: { submission_id: value.pending_submission.submission_id, base_record_version: value.pending_submission.base_record_version, product: draftInput([value.pending_submission.product]).products[0]! } } : {}) }
+    updated_at: value.updated_at, copy_id: value.copy_id, ...(value.editor_id ? { editor_id: value.editor_id } : {}), ...(value.new_product !== undefined ? { new_product: value.new_product } : {}), ...(value.removed_product !== undefined ? { removed_product: value.removed_product } : {}), ...(value.video_sale_inputs?.length ? { video_sale_inputs: inputPayload(value.video_sale_inputs) } : {}), product: draftInput([value.product]).products[0]!, ...(value.pending_submission ? { pending_submission: { submission_id: value.pending_submission.submission_id, base_record_version: value.pending_submission.base_record_version, product: draftInput([value.pending_submission.product]).products[0]! } } : {}) }
 }
 export function encodeDraftRecovery(value: DraftRecovery): string {
   const { admin_id, account_id, product_id, site_model, upstream_model } = value.identity
-  const raw = JSON.stringify({ version: 1, identity: { admin_id, account_id, product_id, site_model, upstream_model }, base_record_version: value.base_record_version, base_draft_revision: value.base_draft_revision, updated_at: value.updated_at, copy_id: value.copy_id, ...(value.editor_id ? { editor_id: value.editor_id } : {}), ...(value.new_product !== undefined ? { new_product: value.new_product } : {}), ...(value.removed_product !== undefined ? { removed_product: value.removed_product } : {}), product: draftInput([value.product]).products[0], ...(value.pending_submission ? { pending_submission: { submission_id: value.pending_submission.submission_id, base_record_version: value.pending_submission.base_record_version, product: draftInput([value.pending_submission.product]).products[0] } } : {}) })
+  const raw = JSON.stringify({ version: 1, identity: { admin_id, account_id, product_id, site_model, upstream_model }, base_record_version: value.base_record_version, base_draft_revision: value.base_draft_revision, updated_at: value.updated_at, copy_id: value.copy_id, ...(value.editor_id ? { editor_id: value.editor_id } : {}), ...(value.new_product !== undefined ? { new_product: value.new_product } : {}), ...(value.removed_product !== undefined ? { removed_product: value.removed_product } : {}), ...(value.video_sale_inputs?.length ? { video_sale_inputs: inputPayload(value.video_sale_inputs) } : {}), product: draftInput([value.product]).products[0], ...(value.pending_submission ? { pending_submission: { submission_id: value.pending_submission.submission_id, base_record_version: value.pending_submission.base_record_version, product: draftInput([value.pending_submission.product]).products[0] } } : {}) })
   readDraftRecovery(raw, value.identity)
   return raw
 }

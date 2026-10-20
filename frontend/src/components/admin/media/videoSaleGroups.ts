@@ -3,6 +3,10 @@ import { allowedSpecs, matchesSpec, type MatrixSpec } from './pricingMatrix'
 import { decimalUnits, ratioText } from './costCalculator'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+export interface VideoSaleEdit { resolution: string; group: Match; duration: number; amount: string }
+/** Raw text is kept outside Product until the user finishes editing. */
+export interface VideoSaleInput extends VideoSaleEdit { source_price: PricingRule['sale_price']; domain: string }
+export const videoSaleInputKey = (input: Pick<VideoSaleEdit, 'resolution' | 'group' | 'duration'>) => JSON.stringify([input.resolution, videoGroupKey(input.group), input.duration])
 export function videoGroupKey(match: Match): string {
   const { resolution: _r, duration_seconds: _d, ...rest } = match
   return JSON.stringify(Object.fromEntries(Object.entries(rest).sort(([a], [b]) => a.localeCompare(b))))
@@ -62,44 +66,50 @@ export function videoGroups(product: Product, resolution: string) {
 
 /** Subtract the exact edited cell; retain each untouched part of a shared rule. */
 export function setVideoSale(product: Product, resolution: string, group: Match, duration: number, amount: string): Product {
+  return setVideoSales(product, [{ resolution, group, duration, amount }])
+}
+/** One immutable Product copy and one spec enumeration for the whole edit batch. */
+export function setVideoSales(product: Product, edits: VideoSaleEdit[]): Product {
   const next = clone(product)
-  const target: Match = { ...clone(group), resolution: [resolution], duration_seconds: [duration] }
   const specs = allowedSpecs(product.capabilities)
   if (!specs) throw new Error('请先修正规格范围。')
-  const targetSpecs = specs.filter(spec => matchesSpec(target, spec))
-  if (!targetSpecs.length) throw new Error('此规格不在合法售价范围内，未修改草稿。')
-  const rules: PricingRule[] = []
-  const appendRemainder = (rule: PricingRule) => { if (specs.some(spec => matchesSpec(rule.match, spec))) rules.push(rule) }
-  for (const rule of next.pricing_rules) {
-    if (!targetSpecs.some(spec => matchesSpec(rule.match, spec))) { rules.push(rule); continue }
-    let rest = clone(rule.match)
-    for (const key of ['resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const) {
-      const domain = key === 'resolution' ? product.capabilities.resolutions : key === 'duration_seconds' ? product.capabilities.durations_seconds : key === 'aspect_ratio' ? product.capabilities.aspect_ratios : product.capabilities.qualities
-      const original = (rest[key]?.length ? rest[key] : domain) as (string | number)[]
-      const selection = (target[key]?.length ? target[key] : domain) as (string | number)[]
-      const outside = original.filter(value => !selection.includes(value))
-      if (outside.length) appendRemainder({ ...clone(rule), match: { ...clone(rest), [key]: outside } })
-      rest = { ...rest, [key]: original.filter(value => selection.includes(value)) }
-    }
-    if (target.count) {
-      const old = rest.count ?? product.capabilities.count, chosen = target.count
-      if (old.min < chosen.min) appendRemainder({ ...clone(rule), match: { ...clone(rest), count: { min: old.min, max: chosen.min - 1 } } })
-      if (old.max > chosen.max) appendRemainder({ ...clone(rule), match: { ...clone(rest), count: { min: chosen.max + 1, max: old.max } } })
-      rest.count = { min: Math.max(old.min, chosen.min), max: Math.min(old.max, chosen.max) }
-    }
-    if (target.references) {
-      rest.references = clone(rest.references ?? product.capabilities.references)
-      for (const key of ['image', 'video', 'audio'] as const) {
-        const old = rest.references[key], chosen = target.references[key]
-        if (old.min < chosen.min) { const outside = clone(rest); outside.references![key] = { min: old.min, max: chosen.min - 1 }; appendRemainder({ ...clone(rule), match: outside }) }
-        if (old.max > chosen.max) { const outside = clone(rest); outside.references![key] = { min: chosen.max + 1, max: old.max }; appendRemainder({ ...clone(rule), match: outside }) }
-        rest.references[key] = { min: Math.max(old.min, chosen.min), max: Math.min(old.max, chosen.max) }
+  for (const { resolution, group, duration, amount } of edits) {
+    const target: Match = { ...clone(group), resolution: [resolution], duration_seconds: [duration] }
+    const targetSpecs = specs.filter(spec => matchesSpec(target, spec))
+    if (!targetSpecs.length) throw new Error('此规格不在合法售价范围内，未修改草稿。')
+    const rules: PricingRule[] = []
+    const appendRemainder = (rule: PricingRule) => { if (specs.some(spec => matchesSpec(rule.match, spec))) rules.push(rule) }
+    for (const rule of next.pricing_rules) {
+      if (!targetSpecs.some(spec => matchesSpec(rule.match, spec))) { rules.push(rule); continue }
+      let rest = clone(rule.match)
+      for (const key of ['resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const) {
+        const domain = key === 'resolution' ? product.capabilities.resolutions : key === 'duration_seconds' ? product.capabilities.durations_seconds : key === 'aspect_ratio' ? product.capabilities.aspect_ratios : product.capabilities.qualities
+        const original = (rest[key]?.length ? rest[key] : domain) as (string | number)[]
+        const selection = (target[key]?.length ? target[key] : domain) as (string | number)[]
+        const outside = original.filter(value => !selection.includes(value))
+        if (outside.length) appendRemainder({ ...clone(rule), match: { ...clone(rest), [key]: outside } })
+        rest = { ...rest, [key]: original.filter(value => selection.includes(value)) }
+      }
+      if (target.count) {
+        const old = rest.count ?? product.capabilities.count, chosen = target.count
+        if (old.min < chosen.min) appendRemainder({ ...clone(rule), match: { ...clone(rest), count: { min: old.min, max: chosen.min - 1 } } })
+        if (old.max > chosen.max) appendRemainder({ ...clone(rule), match: { ...clone(rest), count: { min: chosen.max + 1, max: old.max } } })
+        rest.count = { min: Math.max(old.min, chosen.min), max: Math.min(old.max, chosen.max) }
+      }
+      if (target.references) {
+        rest.references = clone(rest.references ?? product.capabilities.references)
+        for (const key of ['image', 'video', 'audio'] as const) {
+          const old = rest.references[key], chosen = target.references[key]
+          if (old.min < chosen.min) { const outside = clone(rest); outside.references![key] = { min: old.min, max: chosen.min - 1 }; appendRemainder({ ...clone(rule), match: outside }) }
+          if (old.max > chosen.max) { const outside = clone(rest); outside.references![key] = { min: chosen.max + 1, max: old.max }; appendRemainder({ ...clone(rule), match: outside }) }
+          rest.references[key] = { min: Math.max(old.min, chosen.min), max: Math.min(old.max, chosen.max) }
+        }
       }
     }
+    rules.push({ match: target, sale_price: amount ? { amount, currency: 'CNY', billing_mode: 'per_request' } : null })
+    if (rules.length > 1024) throw new Error('视频售价规则最多 1024 条；本次修改未应用，请减少独立售价分组。')
+    next.pricing_rules = rules
   }
-  rules.push({ match: target, sale_price: amount ? { amount, currency: 'CNY', billing_mode: 'per_request' } : null })
-  if (rules.length > 1024) throw new Error('视频售价规则最多 1024 条；本次修改未应用，请减少独立售价分组。')
-  next.pricing_rules = rules
   return next
 }
 

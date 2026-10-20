@@ -61,7 +61,7 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :product="product" :disabled="disabled" @update:product="emit('update:product', $event)" />
+      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
       <MediaProcurementEditor v-else :product="product" :account-id="accountId" :admin-id="adminId" :active="wizardStep === 4" :dirty="dirty" :disabled="disabled" @update:product="emit('update:product', $event)" @cost-toggle="emit('cost-toggle', $event)" />
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
@@ -101,12 +101,12 @@ import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
 import MediaProcurementEditor from './MediaProcurementEditor.vue'
 import MediaVideoSaleEditor from './MediaVideoSaleEditor.vue'
-import { videoGroups } from './videoSaleGroups'
+import { videoGroups, type VideoSaleInput } from './videoSaleGroups'
 import { multiplyDecimalText } from './decimalText'
 import { costLabel } from './procurementMatrix'
 import { allowedSpecs, buildPricingRules, creationModeForRule, dimensionsFor, hasDetailedReferencePricingRules, mergeCreationModePricing, matchesSpec, pricingDimensions, splitCreationModePricing, supportsCreationModePricing, type MatrixSpec, type PricingDimension } from './pricingMatrix'
-const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number }>()
-const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [open: boolean] }>()
+const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; dirty?: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter; diagnostics?: Diagnostic[]; accountLabel?: string; accountId?: number; adminId?: number; pendingVideoSales?: VideoSaleInput[] }>()
+const emit = defineEmits<{ 'update:product': [value: Product]; 'cost-toggle': [open: boolean]; 'pending-video-sales': [inputs: VideoSaleInput[]] }>()
 const text = (event: Event) => (event.target as HTMLInputElement).value
 const baseRatioPresets = ['1:1', '4:5', '5:4', '3:4', '4:3', '2:3', '3:2', '9:16', '16:9', '9:21', '21:9']
 const ratioPresets = computed(() => props.product.media_type === 'image' ? [...baseRatioPresets, '1:4', '4:1', '1:8', '8:1'] : baseRatioPresets)
@@ -140,6 +140,7 @@ async function goToStep(step: number) {
     const committed = referenceEditor.value.commitPending()
     if (committed !== true && !await committed) return
   }
+  if (wizardStep.value === 4 && step !== 4 && videoSaleEditor.value && !await videoSaleEditor.value.commitPending()) return
   wizardStep.value = step
   await nextTick()
   stepHeading.value?.focus({ preventScroll: true })
@@ -153,7 +154,11 @@ function showField(path: string, code?: string) {
 }
 const videoSaleEditor = ref<InstanceType<typeof MediaVideoSaleEditor>>()
 function invalidateSaleUndo() { videoSaleEditor.value?.invalidateUndo() }
-defineExpose({ showField, invalidateSaleUndo })
+async function commitPending(): Promise<boolean> {
+  if (videoSaleEditor.value && !await videoSaleEditor.value.commitPending()) return false
+  return await referenceEditor.value?.commitPending() ?? true
+}
+defineExpose({ showField, invalidateSaleUndo, commitPending })
 const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
 const adapterStatus = computed(() => {
   if (adapterDiagnostics.value.length) return { title: '当前工作台适配尚未接通', description: '上次服务端校验发现以下适配缺口。请交由技术维护者处理；填写协议名称不能使未实现的接口获得支持。' }

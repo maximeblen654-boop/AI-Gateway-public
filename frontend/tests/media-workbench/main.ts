@@ -16,12 +16,28 @@ import '@/styles/site-theme.css'
 const query = new URLSearchParams(location.search)
 const scenario = query.get('scenario') ?? 'PASS'
 const management = scenario.startsWith('DRAFT_MANAGEMENT')
-const initialDTO = management ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+const videoPolish = scenario === 'VIDEO_POLISH'
+const initialDTO = management || videoPolish ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
-const persistent = management || scenario.startsWith('WIZARD')
+const persistent = management || videoPolish || scenario.startsWith('WIZARD')
 const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
 const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
 const otherAccount = supplier(44)
+if (videoPolish && !savedFixture) {
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  product.capabilities.resolutions = ['720p', '1080p', '4K']
+  product.capabilities.aspect_ratios = ['9:16', '3:4', '1:1', '4:3', '3:2', '16:9']
+  product.capabilities.durations_seconds = Array.from({ length: 27 }, (_, i) => i + 4)
+  product.capabilities.references.image = { min: 0, max: 10 }
+  product.capabilities.references.total_max = 10
+  product.pricing_rules = [
+    { match: { resolution: ['720p'], duration_seconds: [4] }, sale_price: { amount: '1', currency: 'CNY', billing_mode: 'per_request' } },
+    { match: { resolution: ['720p'], duration_seconds: [5] }, sale_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } },
+    { match: { resolution: ['720p'], duration_seconds: product.capabilities.durations_seconds.slice(2) }, sale_price: null },
+    { match: { resolution: ['1080p', '4K'] }, sale_price: { amount: '4', currency: 'CNY', billing_mode: 'per_request' } }
+  ]
+  dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
+}
 if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
 if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   // Browser fixture only: the real model contract remains validated by Core.
@@ -78,7 +94,16 @@ apiClient.defaults.adapter = async config => {
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
   fixtureCalls.push({ method: config.method ?? 'get', url, input })
   let data: unknown = {}
-  if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]
+  if (url.startsWith('/admin/media-workbench/paid-controls/')) {
+    const kind = url.includes('/video') ? 'video' : 'image'
+    if (url.endsWith('/check')) {
+      if (query.get('paidCheck') === 'post-error') throw { code: 'ERR_NETWORK', status: 0 }
+      data = { media: kind, pass: query.get('paidCheck') !== 'business-failure', fingerprint: 'fixture-check', checked_at: '2026-10-20T03:00:00Z', checks: [{ code: query.get('paidCheck') === 'business-failure' ? 'published_offer' : 'native_quote', pass: query.get('paidCheck') !== 'business-failure', account_id: 77 }] }
+    } else {
+      if (query.get('paidCheck') === 'status-error' && fixtureCalls.some(call => call.url === `${url}/check`)) throw { status: 503 }
+      data = { media: kind, mode: 'managed-v1', requested_enabled: kind === 'image', effective_enabled: kind === 'image', revision: 'fixture-paid-revision', reason: kind === 'image' ? 'open' : 'apply_failed' }
+    }
+  } else if (url === '/admin/media-workbench/suppliers') data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]
   else if (url.startsWith('/admin/media-workbench/accounts/')) {
     const accountId = Number(url.split('/')[4])
     const account = scenario === 'NAVIGATION' ? navigationAccounts.find(item => item.id === accountId)! : accountId === dto.id ? dto : otherAccount
@@ -106,6 +131,7 @@ apiClient.defaults.adapter = async config => {
       }
       current.record_version++
       current.draft.revision = `fixture_${current.record_version}`
+      if (videoPolish) current.draft.updated_at = '2026-10-20T03:24:00Z'
       // Match the real draft acknowledgement/readback contract, not a generic HTTP 200.
       current.draft.save_receipt = input.submission_id && scenario !== 'WIZARD_MISSING_RECEIPT' ? {
         submission_id: input.submission_id, base_record_version: baseVersion, draft_revision: current.draft.revision
