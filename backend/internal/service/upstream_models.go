@@ -258,14 +258,9 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 		)
 	}
 	if liveListAvailable && account != nil && account.ID > 0 && s.accountRepo != nil {
-		snapshot := map[string]any{"source": "upstream", "synced_at": time.Now().UTC().Format(time.RFC3339), "models": models}
-		if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{"upstream_model_catalog_snapshot": snapshot}); err != nil {
-			return nil, newUpstreamModelSyncInternalError("Failed to save upstream model catalog", err)
+		if err := s.persistUpstreamModelCatalogSnapshot(ctx, account, models); err != nil {
+			return nil, err
 		}
-		if account.Extra == nil {
-			account.Extra = make(map[string]any)
-		}
-		account.Extra["upstream_model_catalog_snapshot"] = snapshot
 	}
 	var mediaSource *UpstreamImage2ProMetadataSource
 	if liveListAvailable {

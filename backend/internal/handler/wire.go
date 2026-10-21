@@ -127,6 +127,7 @@ func ProvideGatewayHandler(
 }
 
 func ProvideOpenAIGatewayHandler(
+	catalogSync *service.StudioModelCatalogSync,
 	monitor *service.ChannelMonitorV2Service,
 	paidSettings service.SettingRepository,
 	videoOrders service.StudioVideoOrderRepository,
@@ -156,9 +157,11 @@ func ProvideOpenAIGatewayHandler(
 	h.studioImage.Gemini = geminiCompatService
 	h.studioImage.APIKeys = apiKeyService
 	h.studioImage.Monitor = monitor
+	h.studioImage.CatalogSync = catalogSync
 	h.studioVideo = service.NewStudioVideoRuntime(gatewayService, mediaRepository, videoOrders)
 	h.studioVideo.APIKeys = apiKeyService
 	h.studioVideo.Monitor = monitor
+	h.studioVideo.CatalogSync = catalogSync
 	h.studioPaidControl = service.NewStudioPaidControl(paidSettings, h.studioImage, h.studioVideo, apiKeyService)
 	h.studioImage.PaidControl = h.studioPaidControl
 	h.studioVideo.PaidControl = h.studioPaidControl

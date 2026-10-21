@@ -105,6 +105,7 @@
               </div>
             </div>
           </section>
+          <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ sourceHost(detail) === 'api.image2pro.top' ? '每5分钟自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
           <div v-if="detail" class="mw-model-toolbar">
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
             <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
@@ -194,7 +195,7 @@
               <div v-if="addedProductIds.includes(product.product_id)" class="mw-product-local" role="status"><span>本次新增，尚未保存</span><button type="button" class="btn btn-secondary" data-test="undo-add-product" :disabled="managementDisabled" @click="removeProduct(product.product_id)">撤销新增</button></div>
               <details class="mw-product-options" data-test="product-options"><summary>更多商品操作</summary>
                 <p class="mw-muted">同一模型通常只需一份商品：图片的文生图、参考图编辑及多种规格可在这里一起配置。仅在需要独立售价或销售方案时另建商品。</p>
-                <div class="mw-product-type-actions"><button type="button" class="btn btn-secondary" data-test="new-independent-product" :disabled="managementDisabled" @click="newProductType = product.media_type">另建独立销售商品</button><button v-if="!addedProductIds.includes(product.product_id) && !removalReason(product)" type="button" class="btn mw-danger" data-test="remove-blank-product" :disabled="managementDisabled" @click="removeProductId = product.product_id">移除空白草稿</button></div>
+                <div class="mw-product-type-actions"><button type="button" class="btn btn-secondary" data-test="new-independent-product" :disabled="managementDisabled || !selectedModelCurrent" @click="newProductType = product.media_type">另建独立销售商品</button><button v-if="!addedProductIds.includes(product.product_id) && !removalReason(product)" type="button" class="btn mw-danger" data-test="remove-blank-product" :disabled="managementDisabled" @click="removeProductId = product.product_id">移除空白草稿</button></div>
                 <p v-if="!addedProductIds.includes(product.product_id) && removalReason(product)" class="mw-muted" data-test="removal-protection">{{ removalReason(product) }}</p>
               </details>
             </section>
@@ -267,7 +268,7 @@
       <p>文生图与参考图编辑、不同分辨率和比例通常可以放在同一份图片商品中，无需分别新增。</p>
       <label class="mw-field">新商品类型<select v-model="newProductType" class="input" data-test="new-product-type"><option v-for="type in config?.media_types ?? ['image', 'video']" :key="type" :value="type">{{ type === 'video' ? '视频' : '图片' }}</option></select></label>
       <p class="mw-muted">确认后仅在本页新增，仍需保存草稿；不会发布或启售。</p>
-      <template #actions><button type="button" class="btn btn-primary" data-test="confirm-add-product" :disabled="managementDisabled" @click="confirmAddProduct">确认另建一份</button></template>
+      <template #actions><button type="button" class="btn btn-primary" data-test="confirm-add-product" :disabled="managementDisabled || !selectedModelCurrent" @click="confirmAddProduct">确认另建一份</button></template>
     </MediaDialog>
     <MediaDialog :show="!!removeProductId" title="移除这份空白草稿？" :busy="busy" @close="removeProductId = ''">
       <p>{{ removalTarget ? productOptionLabel(removalTarget, modelProducts.indexOf(removalTarget)) : '' }}</p>
@@ -393,8 +394,13 @@ const sourceGroups = computed(() => {
 const filteredGroups = computed(() => sourceGroups.value.map(group => ({ ...group, accounts: group.accounts.filter(supplier => matchesAccount(supplier, accountSearch.value) && (!accountFilter.value || accountState(supplier) === accountFilter.value) && (!platformFilter.value || supplier.platform === platformFilter.value)) })).filter(group => group.accounts.length))
 const visibleAccountCount = computed(() => filteredGroups.value.reduce((count, group) => count + group.accounts.length, 0))
 const platforms = computed(() => [...new Set(suppliers.value.map(supplier => supplier.platform).filter(Boolean))].sort())
+const catalogUpdatedAt = computed(() => {
+ const at=Date.parse(detail.value?.model_catalog?.synced_at ?? '')
+ return Number.isFinite(at) ? formatDateTimeLocalInput(at/1000).replace('T',' ') : '尚未成功同步'
+})
+const selectedModelCurrent = computed(() => !!detail.value?.model_catalog?.models.includes(selectedModel.value))
 const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
-const filteredModels = computed(() => detail.value?.models.filter(m => (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id))) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
+const filteredModels = computed(() => detail.value?.models.filter(m => detail.value?.model_catalog?.models.includes(m.model_id) && !['UPSTREAM_NOT_DISCOVERED','UPSTREAM_MISSING','MODEL_SYNC_REQUIRED'].includes(m.state) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id))) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value && (showArchived.value || lifecycleState(p) !== 'archived')))
 const lifecycleProducts = computed(() => {

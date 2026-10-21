@@ -164,9 +164,10 @@ type Diagnostic struct {
 	SpecCount int    `json:"spec_count,omitempty"`
 }
 type Catalog struct {
-	Source   string   `json:"source"`
-	SyncedAt string   `json:"synced_at"`
-	Models   []string `json:"models"`
+	Source                string   `json:"source"`
+	SyncedAt              string   `json:"synced_at"`
+	Models                []string `json:"models"`
+	AccountIdentitySHA256 string   `json:"account_identity_sha256,omitempty"`
 }
 type CatalogDependency struct {
 	SyncedAt string `json:"synced_at"`

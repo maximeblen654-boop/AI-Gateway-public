@@ -25,7 +25,12 @@ func (e *StudioImageUpstreamError) Error() string {
 }
 func (e *StudioImageUpstreamError) Unwrap() error { return ErrStudioImageUnknown }
 func (e *StudioImageUpstreamError) rejected() bool {
-	return e.Status == 400 || e.Status == 401 || e.Status == 403 || e.Status == 404 || e.Status == 422 || e.Status == 429
+	switch e.Status {
+	case 400, 401, 402, 403, 404, 405, 413, 415, 422, 429:
+		return true
+	default:
+		return false
+	}
 }
 
 // One immutable response envelope per claimed unit. Save this before parsing
@@ -117,6 +122,11 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 	}
 	if !time.Now().Before(q.ExpiresAt) || time.Now().Before(q.CreatedAt) || (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
+	}
+	if r.CatalogSync != nil {
+		if err := r.CatalogSync.Ensure(ctx, q.Binding.Offer.AccountID); err != nil {
+			return nil, QuoteFailure("model_catalog", err)
+		}
 	}
 	if !r.PaidControl.AllowsOffer(ctx, "image", q.Binding.Offer.AccountID, q.Binding.Offer.OfferID) {
 		return nil, ErrPaidControl

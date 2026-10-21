@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +37,7 @@ type studioImage2ProDocumentedHTTP struct {
 	bodies       [][]byte
 	counts       []int
 	allRequested bool
+	rejectAfter  int
 }
 
 func (s *studioImage2ProDocumentedHTTP) Do(req *http.Request, proxy string, accountID int64, concurrency int) (*http.Response, error) {
@@ -84,7 +86,8 @@ func (s *studioImage2ProDocumentedHTTP) Do(req *http.Request, proxy string, acco
 		status = http.StatusOK
 	}
 	response := s.response
-	if s.allRequested {
+	if s.allRequested || (s.rejectAfter > 0 && len(s.bodies) <= s.rejectAfter) {
+		status = http.StatusOK
 		response = studioResultN(s.t, documented.N)
 	}
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}, "X-Request-Id": []string{"synthetic-image2pro-receipt"}}, Body: io.NopCloser(bytes.NewReader(response)), Request: req}, nil
@@ -432,4 +435,62 @@ func TestStudioImage2ProRetiredReceiptRecoversOriginalResponseWithoutPOST(t *tes
 	require.Zero(t, calls)
 	require.Equal(t, 1, billing.applied)
 	require.Equal(t, 1, billing.calls)
+}
+
+// These are documented request rejections, not an ambiguous accepted job.
+// Successful earlier units must remain deliverable and bill exactly once.
+func TestStudioImage2ProDocumentedRejectionsReleaseCompletedUnits(t *testing.T) {
+	for _, status := range []int{402, 405, 413, 415} {
+		for _, count := range []int{1, 5} {
+			t.Run(fmt.Sprintf("http_%d_count_%d", status, count), func(t *testing.T) {
+				r, quote, key, billing := studioImage2ProSyncQuote(t, count, 0, true)
+				mock := &studioImage2ProDocumentedHTTP{t: t, endpoint: imageplan.Generations, status: status,
+					response: []byte(`{"error":{"type":"invalid_request_error","message":"documented request rejection"}}`)}
+				if count == 5 {
+					mock.rejectAfter = 1
+				}
+				r.Core.httpUpstream = mock
+				r.network = r.dispatchHTTP
+				c, _ := newOpenAIImagesTestContext(t, nil)
+				receipt, err := r.Dispatch(t.Context(), c, quote, "documented-rejection", "synthetic", nil, key)
+				require.NoError(t, err)
+				require.Zero(t, receipt.PendingCount)
+				require.Equal(t, 1, receipt.FailedCount)
+				if count == 1 {
+					require.Equal(t, "failed", receipt.Status)
+					require.Equal(t, "not_charged", receipt.BillingState)
+					require.Zero(t, billing.calls)
+				} else {
+					require.Equal(t, "partial", receipt.Status)
+					require.Equal(t, 4, receipt.DeliveredCount)
+					require.Equal(t, "3.20", billing.cmd.ExactAmounts.Balance)
+					require.Equal(t, 4, billing.cmd.ImageCount)
+					saved, readErr := r.Store.Result(receipt)
+					require.NoError(t, readErr)
+					_, images, readErr := studioExecutionResult(saved, 4)
+					require.NoError(t, readErr)
+					require.Equal(t, 4, images)
+					require.Equal(t, 1, billing.calls)
+					require.Equal(t, 1, billing.applied)
+				}
+				calls := len(mock.bodies)
+				require.Equal(t, (count+3)/4, calls)
+				restarted := *r
+				restarted.Store = NewStudioImageStore(r.Store.Root)
+				recovered, err := restarted.Recover(t.Context(), receipt.TaskID, quote.Owner)
+				require.NoError(t, err)
+				require.Equal(t, receipt.Status, recovered.Status)
+				require.Zero(t, recovered.PendingCount)
+				repeated, err := restarted.Dispatch(t.Context(), c, quote, receipt.TaskID, "synthetic", nil, key)
+				require.NoError(t, err)
+				require.Equal(t, receipt.Status, repeated.Status)
+				require.Len(t, mock.bodies, calls)
+				if count == 5 {
+					require.Equal(t, 1, billing.applied)
+				} else {
+					require.Zero(t, billing.calls)
+				}
+			})
+		}
+	}
 }

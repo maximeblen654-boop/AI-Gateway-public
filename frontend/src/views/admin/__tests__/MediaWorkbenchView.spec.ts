@@ -607,7 +607,7 @@ describe('Per-product readiness and explicit publication',()=>{
  it('defaults publication only to the selected product while another incomplete draft remains unselected',async()=>{
   const dto=supplier(77,'FAIL');const c=dto.media_workbench_v1!
   const banana=structuredClone(c.draft.products[0]!);banana.product_id='banana-draft';banana.display_name='Banana 未完成草稿';banana.upstream_model='banana-image';banana.pricing_rules=[]
-  c.draft.products.push(banana);dto.models.push({model_id:'banana-image',state:'DRAFT'})
+  c.draft.products.push(banana);dto.models.push({model_id:'banana-image',state:'DRAFT'});dto.model_catalog!.models.push('banana-image')
   api.detail.mockResolvedValue(dto);api.publish.mockResolvedValue(dto)
   await openEditor();await wrapper.get('.mw-back').trigger('click');await flushPromises()
   await wrapper.get('[data-test="model-search"]').setValue('image-native-1')
@@ -1174,4 +1174,41 @@ describe('publication time and plain-language status', () => {
     expect(wrapper.get('[data-test="diagnostic-technical-details"]').attributes('open')).toBeUndefined()
     expect(wrapper.get('[data-test="adapter-status"]').attributes('open')).toBeUndefined()
   })
+})
+
+
+it('automatically lists current names and excludes retired names without rewriting saved products',async()=>{
+ const dto=supplier()
+ dto.model_catalog={source:'upstream',synced_at:'2026-10-21T07:32:00Z',models:['gpt-image-2.0','gpt-image-2.0-原生4K']}
+ dto.models=[{model_id:'image-native-1',state:'UPSTREAM_NOT_DISCOVERED'},{model_id:'gpt-image-2.0',state:'PENDING'},{model_id:'gpt-image-2.0-原生4K',state:'PENDING'}]
+ const original=copy(dto.media_workbench_v1)
+ api.detail.mockResolvedValue(dto)
+ await mountWorkbench();await selectAccount()
+ expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+ expect(wrapper.find('[data-test="model-gpt-image-2.0"]').exists()).toBe(true)
+ expect(wrapper.find('[data-test="model-gpt-image-2.0-原生4K"]').exists()).toBe(true)
+ expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('最近成功同步')
+ expect(dto.media_workbench_v1).toEqual(original)
+ expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled();expect(api.sales).not.toHaveBeenCalled()
+})
+
+
+it.each(['UNLISTED','ARCHIVED'])('keeps retired %s IDs out of new candidates even when archived models are shown',async state=>{
+ const dto=supplier();dto.models[0]!.state=state;dto.model_catalog!.models=['new-model','flow-needs-development']
+ api.detail.mockResolvedValue(dto);await mountWorkbench();await selectAccount()
+ await wrapper.get('[data-test="show-archived-models"]').setValue(true)
+ expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+ expect(dto.media_workbench_v1!.draft.products[0]!.upstream_model).toBe('image-native-1')
+ expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
+})
+
+
+it('allows historical inspection but disables creating another product for a removed ID',async()=>{
+ const dto=supplier();const product=dto.media_workbench_v1!.draft.products[0]!
+ dto.model_catalog!.models=['new-model'];dto.models[0]!.state='UPSTREAM_NOT_DISCOVERED'
+ dto.product_states=[{product_id:product.product_id,display_name:product.display_name,upstream_model:product.upstream_model,media_type:'image',published:true,published_ready:false,state:'UPSTREAM_REMOVED',reason:'型号已退出上游目录',action:'原配置保留作历史核对'}]
+ api.detail.mockResolvedValue(dto);await mountWorkbench();await selectAccount()
+ await wrapper.get(`[data-test="readiness-${product.product_id}"] button`).trigger('click');await flushPromises()
+ expect(wrapper.get('[data-test="new-independent-product"]').attributes('disabled')).toBeDefined()
+ expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
 })

@@ -27,6 +27,7 @@ import (
 type studioImageProtocolContextKey struct{}
 
 type StudioImageRuntime struct {
+	CatalogSync studioCatalogRefresher
 	PaidControl *StudioPaidControl
 	Monitor     *ChannelMonitorV2Service
 	Core        *OpenAIGatewayService
@@ -65,6 +66,13 @@ func (r *StudioImageRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 	out := []StudioImageCatalogOffer{}
 	for i := range rows {
 		a := &rows[i]
+		if r.CatalogSync != nil && a.Config != nil && a.Config.Published != nil {
+			var e error
+			a, e = refreshStudioCatalog(ctx, r.Media, r.CatalogSync, a)
+			if e != nil {
+				continue
+			}
+		}
 		if a.Config == nil || a.Config.Published == nil {
 			continue
 		}
@@ -152,6 +160,15 @@ func (r *StudioImageRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 		a, e := r.Core.accountRepo.GetByID(ctx, id)
 		return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
 	})
+	if err == nil && !preflight && r.CatalogSync != nil {
+		if err = r.CatalogSync.Ensure(ctx, resolved.Offer.AccountID); err != nil {
+			return "", QuoteFailure("model_catalog", err)
+		}
+		resolved, err = mediaworkbench.NewService(r.Media).ResolvePublishedImageOffer(ctx, offerID, spec, func(id int64) bool {
+			a, e := r.Core.accountRepo.GetByID(ctx, id)
+			return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
+		})
+	}
 	if err != nil || !studioGroupAllows(key, resolved.Offer.SiteModel) {
 		return "", QuoteFailure("published_offer", mediaworkbench.ErrRuntimeBinding)
 	}
@@ -248,6 +265,11 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	// key accounting or move a new request between balance/subscription ledgers.
 	if (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
+	}
+	if r.CatalogSync != nil {
+		if err := r.CatalogSync.Ensure(ctx, q.Binding.Offer.AccountID); err != nil {
+			return nil, QuoteFailure("model_catalog", err)
+		}
 	}
 	if !r.PaidControl.AllowsOffer(ctx, "image", q.Binding.Offer.AccountID, q.Binding.Offer.OfferID) {
 		return nil, ErrPaidControl

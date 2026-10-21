@@ -63,7 +63,7 @@ if (videoPolish && query.get('seedVideoConflict')) {
     ]
   }))
 }
-if (scenario === 'PUBLICATION_LONG_LIST') dto.models.push(...Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })))
+if (scenario === 'PUBLICATION_LONG_LIST') { const extra=Array.from({ length: 30 }, (_, i) => ({ model_id: `sample-model-${i + 1}`, state: 'UNCONFIGURED' })); dto.models.push(...extra);dto.model_catalog!.models.push(...extra.map(m=>m.model_id)) }
 if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   // Browser fixture only: the real model contract remains validated by Core.
   dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
@@ -120,6 +120,10 @@ const navigationAccounts = Array.from({ length: 46 }, (_, index) => {
 if (scenario === 'NEEDS_DEVELOPMENT') Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, { class: 'NEEDS_DEVELOPMENT', code: 'UNSUPPORTED_REFERENCE_FLOW', message: '当前适配器还不能表达首尾帧参数', action: '请开发共享请求构造能力' })
 if (scenario === 'PAUSED') { dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'; dto.media_workbench_v1!.sales.enabled = false }
 if (scenario === 'UPSTREAM_MISSING') { dto.models[0]!.state = 'UPSTREAM_NOT_DISCOVERED'; dto.media_workbench_v1!.validation.publish_ready = false }
+if (scenario === 'CURRENT_UPSTREAM_NAMES') {
+ dto.model_catalog={source:'upstream',synced_at:'2026-10-21T07:32:00Z',models:['gpt-image-2.0','gpt-image-2.0-原生4K']}
+ dto.models=[{model_id:'image-native-1',state:'UPSTREAM_NOT_DISCOVERED'},{model_id:'gpt-image-2.0',state:'PENDING'},{model_id:'gpt-image-2.0-原生4K',state:'PENDING'}]
+}
 if (['SELLING', 'PUBLISHED_NOT_READY', 'ACCOUNT_RUNTIME_BLOCKED'].includes(scenario)) { dto.effective_state = scenario; dto.effective_sales = scenario === 'SELLING' }
 if (scenario === 'VALUE_MAPPING') Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, {
   code: 'MISSING_VALUE_MAPPING', path: 'draft.products[0].adapter_config.size_mappings',

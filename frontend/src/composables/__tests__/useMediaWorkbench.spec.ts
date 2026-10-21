@@ -1280,3 +1280,13 @@ describe('explicit account selection result', () => {
     expect(state.detail.value!.id).toBe(77)
   })
 })
+
+
+it('does not create a retired model through a historical product selection',async()=>{
+ const dto=supplier();dto.model_catalog!.models=['new-model']
+ api.detail.mockResolvedValue(dto);await start();state.selectModel('image-native-1')
+ const before=copy(state.products.value)
+ state.addProduct('image',true)
+ expect(state.products.value).toEqual(before);expect(state.message.value).toContain('不能另建新商品')
+ expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
+})

@@ -313,6 +313,10 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       if (independent) message.value = '已有一份尚未保存的新商品，请先完成或撤销该商品。'
       return
     }
+    if (!detail.value?.model_catalog?.models.includes(selectedModel.value)) {
+      message.value = '此型号已不在上游当前目录中，不能另建新商品；原配置和历史记录仍保留。'
+      return
+    }
     // Identity generation only; no capability or pricing is inferred from the model name.
     const id = `media-${crypto.randomUUID()}`
     products.value.push({ product_id: id, media_type: mediaType, site_model: selectedModel.value, display_name: selectedModel.value,

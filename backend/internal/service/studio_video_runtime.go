@@ -21,6 +21,7 @@ import (
 )
 
 type StudioVideoRuntime struct {
+	CatalogSync       studioCatalogRefresher
 	PaidControl       *StudioPaidControl
 	Monitor           *ChannelMonitorV2Service
 	Core              *OpenAIGatewayService
@@ -49,6 +50,13 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 	for i := range rows {
 		if err := ctx.Err(); err != nil {
 			return nil, err
+		}
+		if r.CatalogSync != nil && rows[i].Config != nil && rows[i].Config.Published != nil {
+			fresh, err := refreshStudioCatalog(ctx, r.Media, r.CatalogSync, &rows[i])
+			if err != nil {
+				continue
+			}
+			rows[i] = *fresh
 		}
 		a, e := r.Core.accountRepo.GetByID(ctx, rows[i].ID)
 		if err := ctx.Err(); err != nil {
@@ -181,6 +189,15 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 		a, e := r.Core.accountRepo.GetByID(ctx, id)
 		return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
 	})
+	if e == nil && !preflight && r.CatalogSync != nil {
+		if e = r.CatalogSync.Ensure(ctx, resolved.Offer.AccountID); e != nil {
+			return "", q, QuoteFailure("model_catalog", e)
+		}
+		resolved, e = mediaworkbench.NewService(r.Media).ResolvePublishedVideoOffer(ctx, offerID, spec, func(id int64) bool {
+			a, e := r.Core.accountRepo.GetByID(ctx, id)
+			return e == nil && a != nil && slices.Contains(a.GroupIDs, owner.GroupID)
+		})
+	}
 	if e != nil {
 		return "", q, QuoteFailure("published_offer", ErrStudioVideoInvalidOrder)
 	}

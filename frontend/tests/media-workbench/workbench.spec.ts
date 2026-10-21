@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import type { SupplierDetail } from '../../src/api/admin/mediaWorkbench'
 const themes = ['yellow', 'blue', 'pink', 'green', 'lavender']
 const viewports = [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]
 for (const width of [1440, 390]) {
@@ -89,7 +90,7 @@ for (const artwork of ['botanical', 'whale', 'whale_girl', 'osmanthus', 'lion', 
     await page.screenshot({ path: testInfo.outputPath('sidebar.png'), fullPage: true })
   })
 }
-for (const scenario of ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'PAUSED', 'UPSTREAM_MISSING', 'DELETED', 'STALE']) {
+for (const scenario of ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'PAUSED', 'DELETED', 'STALE']) {
   test(`state ${scenario}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1440, height: 900 }); await openEditor(page, `theme=blue&scenario=${scenario}`)
     if (scenario === 'DELETED' || scenario === 'STALE') {
@@ -133,4 +134,31 @@ test('mobile size mapping diagnostic locates an editable mapping and save preser
   await expect(page.getByTestId('unsaved')).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
   await page.screenshot({ path: testInfo.outputPath('size-mapping.png'), fullPage: true })
+})
+
+for(const width of [1440,390]){
+ test(`current upstream names ${width}: retired IDs exit without rewriting saved products`,async({page},info)=>{
+  await page.setViewportSize({width,height:900})
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort())
+  await page.goto('/tests/media-workbench/index.html?scenario=CURRENT_UPSTREAM_NAMES&theme=blue')
+  await page.getByTestId('account-search').fill('#77');await page.getByTestId('supplier-77').click()
+  await expect(page.getByTestId('model-image-native-1')).toHaveCount(0)
+  await expect(page.getByTestId('model-gpt-image-2.0')).toBeVisible()
+  await expect(page.getByTestId('model-gpt-image-2.0-原生4K')).toBeVisible()
+  await expect(page.getByTestId('catalog-updated')).toContainText('最近成功同步')
+  const calls=await page.evaluate(()=>(window as unknown as { mediaFixture: { calls: { method: string }[]; snapshot: () => SupplierDetail } }).mediaFixture.calls)
+  expect(calls.filter(call=>call.method!=='get')).toHaveLength(0)
+  const saved=await page.evaluate(()=>(window as unknown as { mediaFixture: { calls: { method: string }[]; snapshot: () => SupplierDetail } }).mediaFixture.snapshot())
+  expect(saved.media_workbench_v1.draft.products[0].upstream_model).toBe('image-native-1')
+  await page.screenshot({path:info.outputPath(`catalog-${width}.png`),fullPage:true})
+ })
+}
+test('state UPSTREAM_MISSING rejects the retired model as a new configuration candidate',async({page},info)=>{
+ await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort())
+ await page.goto('/tests/media-workbench/index.html?scenario=UPSTREAM_MISSING&theme=blue')
+ await page.getByTestId('account-search').fill('#77');await page.getByTestId('supplier-77').click()
+ await expect(page.getByTestId('model-image-native-1')).toHaveCount(0)
+ const calls=await page.evaluate(()=>(window as unknown as { mediaFixture: { calls: { method: string }[]; snapshot: () => SupplierDetail } }).mediaFixture.calls)
+ expect(calls.filter(call=>call.method!=='get')).toHaveLength(0)
+ await page.screenshot({path:info.outputPath('retired-model.png'),fullPage:true})
 })

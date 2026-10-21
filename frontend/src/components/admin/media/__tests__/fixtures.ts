@@ -49,6 +49,7 @@ export function draftManagementSupplier(mediaType: 'image' | 'video' = 'image'):
   if (mediaType === 'video') configured.capabilities.durations_seconds = [5]
   dto.name = mediaType === 'image' ? 'Image2Pro 图片（隔离）' : '兼容视频（隔离）'
   dto.models = [{ model_id: configured.upstream_model, state: 'PUBLISHED' }]
+  dto.model_catalog!.models = [configured.upstream_model]
   dto.media_workbench_v1!.published!.products = [copy(configured)]
   dto.media_workbench_v1!.published!.offers = [{ product_id: configured.product_id, offer_id: 'frozen-offer' }]
   dto.media_workbench_v1!.sales.enabled = false; dto.effective_sales = false; dto.effective_state = 'SALES_PAUSED'

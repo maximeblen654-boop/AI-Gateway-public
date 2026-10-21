@@ -162,6 +162,10 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		if !slices.Contains(native.GroupIDs, out.group) {
 			continue
 		}
+		if p.image.CatalogSync != nil && !p.image.CatalogSync.Current(native) {
+			out.checks = append(out.checks, PaidCheck{Code: "model_catalog", AccountID: a.ID})
+			continue
+		}
 		for _, offer := range a.Config.Published.Offers {
 			if offer.MediaType != m || !key.Group.ModelAllowlist.Allows(offer.SiteModel) {
 				continue
@@ -282,7 +286,26 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 	if ctx.Err() != nil {
 		return report
 	}
+	catalogUnavailable := map[int64]bool{}
 	stage := time.Now()
+	if p.image != nil && p.image.CatalogSync != nil {
+		rows, err := p.image.Media.List(ctx)
+		if err != nil {
+			add("model_catalog", 0, "", "", err)
+			return report
+		}
+		for _, a := range rows {
+			if a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled {
+				continue
+			}
+			if err = p.image.CatalogSync.Ensure(ctx, a.ID); err != nil {
+				catalogUnavailable[a.ID] = true
+				add("model_catalog", a.ID, "", "", err)
+			}
+		}
+	}
+	report.Metrics.TimingsMS["model_catalog"] = time.Since(stage).Milliseconds()
+	stage = time.Now()
 	snap, e := p.snapshot(ctx, m, actor)
 	report.Metrics.TimingsMS["initial_dependencies"] = time.Since(stage).Milliseconds()
 	if e != nil {
@@ -312,6 +335,9 @@ func (p *studioPaidPreflight) check(ctx context.Context, m string, actor int64) 
 			return report
 		}
 		a := &snap.accounts[i]
+		if catalogUnavailable[a.ID] {
+			continue
+		}
 		inspection, err := mediaworkbench.InspectPublishedOffers(ctx, a, m)
 		report.Metrics.TimingsMS["published_validation"] += inspection.ValidationTime.Milliseconds()
 		report.Metrics.TimingsMS["spec_compilation"] += inspection.CompilationTime.Milliseconds()
