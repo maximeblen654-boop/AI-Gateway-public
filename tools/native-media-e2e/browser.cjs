@@ -36,7 +36,8 @@ const report = { cases: [], http: [] }
     await w(`supplier-${accountId}`).click()
     await w(`model-${model}`).click()
     if (await w(`add-product-${video ? 'video' : 'image'}`).isVisible()) await w(`add-product-${video ? 'video' : 'image'}`).click()
-    await expect(w('adapter-status')).toContainText('已接入')
+    await expect(w('adapter-status').locator('summary')).toHaveText('已识别账号连接方式')
+    await expect(w('adapter-status')).toContainText('识别成功不代表已完成真实生成')
     assert.equal(await w('model-family').count(), 0)
     assert.equal(await w('wire-profile').count(), 0)
     for (const value of video ? ['720p', '16:9'] : ['1K', '2K', '4K', '1:1', ...(geometry ? ['3:2'] : []), '16:9']) {
