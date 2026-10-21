@@ -133,7 +133,7 @@ jobs:
           cache: false
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.2'
+          go version | grep -q 'go1.27.3'
 
   release:
     needs: [prepare, build-binaries]
