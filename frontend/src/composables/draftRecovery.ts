@@ -118,13 +118,12 @@ function canonical(value: unknown): unknown {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]))
   return value
 }
-/** Explicit write whitelist plus Go's documented empty-list omission. Never
- * remove prices, costs, model identity or user-selected adapter settings. */
+/** Compare current editable retail fields and Go's documented empty-list omission.
+ * Retired procurement metadata is not editable; prices and identity stay exact. */
 export function draftFingerprint(products: Product[]): string {
   const input = draftInput(products).products
   for (const p of input) {
-    if (!p.cost_rules?.length) delete p.cost_rules
-    for (const rule of [...p.pricing_rules, ...(p.cost_rules ?? []), ...p.capabilities.combination_rules.map(r => ({ match: r.deny }))]) {
+    for (const rule of [...p.pricing_rules, ...p.capabilities.combination_rules.map(r => ({ match: r.deny }))]) {
       for (const key of ['output_formats', 'resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const) if (!rule.match[key]?.length) delete rule.match[key]
     }
   }

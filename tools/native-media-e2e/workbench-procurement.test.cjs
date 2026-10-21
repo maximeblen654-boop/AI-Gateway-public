@@ -143,31 +143,31 @@ test('removing only the isolated monetary limit preserves native usage and other
 })
 
 
-test('shared fixture quota phases preserve image accounting and do not rewrite usage from stale snapshots', async () => {
+test('shared fixture quota phases preserve native API accounting and do not rewrite usage from stale snapshots', async () => {
   const stale = { id: 44, extra: {} }
   let current = structuredClone(stale)
   const core = async (_token, _path, method = 'GET', body) => {
     if (method === 'PUT') current.extra = structuredClone(body.extra)
     return structuredClone(current)
   }
-  const videoAllowed = () => !Number(current.extra.quota_limit)
-  assert.equal(videoAllowed(), true, 'Initial video preflight must see no amount limit')
+  const mediaAllowed = () => !Number(current.extra.quota_limit)
+  assert.equal(mediaAllowed(), true, 'Initial media preflight must see no amount limit')
   await setAccountQuota(core, 'admin', stale, 100)
-  assert.equal(videoAllowed(), false, 'Video must not run during image quota phase')
-  // Synthetic stand-in for the real image ledger: the cloud acceptance retains
-  // its exact +0.3 assertion; this unit checks only fixture transition safety.
+  assert.equal(mediaAllowed(), false, 'Neither media may run during native API monetary-quota phase')
+  // This is only a native API usage stand-in. Actual media settlement must keep
+  // procurement SQL NULL and leave monetary usage unchanged in the cloud test.
   current.extra.quota_used = 0.3
   await clearAccountQuota(core, 'admin', stale)
-  assert.equal(videoAllowed(), true)
+  assert.equal(mediaAllowed(), true)
   assert.equal(current.extra.quota_used, 0.3)
   await setAccountQuota(core, 'admin', stale, 100)
-  assert.equal(current.extra.quota_used, 0.3, 'Second image phase must retain prior consumption')
+  assert.equal(current.extra.quota_used, 0.3, 'Second native API phase must retain prior consumption')
   await clearAccountQuota(core, 'admin', stale)
-  assert.equal(videoAllowed(), true)
+  assert.equal(mediaAllowed(), true)
   await setAccountQuota(core, 'admin', stale, 0.00000001)
-  assert.equal(videoAllowed(), false)
+  assert.equal(mediaAllowed(), false)
   await setAccountQuota(core, 'admin', stale, 100)
-  assert.equal(videoAllowed(), false)
+  assert.equal(mediaAllowed(), false)
   await clearAccountQuota(core, 'admin', stale)
   assert.deepEqual(current.extra, { quota_used: 0.3 })
 })
@@ -177,18 +177,18 @@ test('candidate image/video phases refresh grants for the active quota contract 
   const source = require('node:fs').readFileSync(require.resolve('./workbench-procurement.cjs'), 'utf8')
   const checkpoints = [
     "await refreshPaidGrants()",
-    "await setAccountQuota(core, admin, account, 100)",
-    "await refreshPaidGrants(['image'])",
     "const beforeAlias = await prepare",
-    "await execute(user, 'image', beforeAlias, '1.8', '0.3'",
+    "await setAccountQuota(core, admin, account, 100)",
+    "const apiBefore = snapshot(user)",
+    "const apiAfter = snapshot(user)",
     "await clearAccountQuota(core, admin, account)",
     "await refreshPaidGrants()",
+    "await execute(user, 'image', beforeAlias, '1.8', '0'",
     "for (const refs of [0, 1])",
     "await failVideo(user, wanOffer)",
     "await refreshPaidGrants()",
-    "await setAccountQuota(core, admin, account, 100)",
-    "await refreshPaidGrants(['image'])",
     "const zeroOffer = await offer",
+    "await execute(user, 'image', await prepare(user, 'image', zeroOffer",
     "await clearAccountQuota(core, admin, account)",
     "await refreshPaidGrants()",
     "const beforeBlocked = stats().video_posts",

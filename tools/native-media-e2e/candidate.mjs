@@ -27,7 +27,7 @@ if (catalogRecovery && paidControls) acceptanceScope = 'published-catalog-depend
 const modelLifecycle = fs.existsSync(path.join(source, 'backend/internal/mediaworkbench/lifecycle.go'))
 if (modelLifecycle && paidControls) acceptanceScope = 'model-lifecycle-isolation-and-media-regression'
 const procurementContract = fs.existsSync(path.join(source,'backend/internal/mediaworkbench/cost.go'))
-if (procurementContract && paidControls) acceptanceScope = 'workbench-procurement-dual-business-and-media-regression'
+if (procurementContract && paidControls) acceptanceScope = 'media-retail-dual-business-and-media-regression'
 const mediaOptions = focusedEntry && fs.existsSync(path.join(source, 'backend/internal/service/studio_passive_status.go'))
 const workspaceArtifact = process.env.NATIVE_ACCEPTANCE_SCENARIO === 'studio-workspace'
 if (workspaceArtifact) assert.equal(sha, '40310e2961a5e8150e0c9df4cc86bb8087406c06')

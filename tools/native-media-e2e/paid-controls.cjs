@@ -57,7 +57,6 @@ const p='/admin/media-workbench/paid-controls/'
    const imageProducts=products.filter(p=>p.media_type==='image')
    assert.equal(imageProducts.length,2)
    const product=imageProducts[0]
-   product.cost_rules=[{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}]
    const siblingBefore=structuredClone(imageProducts[1])
    imageProducts[1].enabled=false
    report.scale_fixture={target_product_id:product.product_id,preserved_sibling_id:siblingBefore.product_id,sibling_disabled_only_in_isolation:true}

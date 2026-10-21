@@ -183,8 +183,11 @@ func (r *StudioImageRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	}
 	q.Execution = &execution
 	q.ExpiresAt = q.CreatedAt.Add(2 * time.Minute)
-	q.Accounting, err = r.Core.studioImageAccountCost(ctx, a, resolved, owner.GroupID, q.CreatedAt, r.Media)
+	q.Accounting, err = imageRetailAccounting(a, resolved, q.CreatedAt)
 	if err != nil {
+		if QuoteFailureStage(err) == "account_quota_requires_cost" {
+			return "", err
+		}
 		return "", QuoteFailure("account_cost", err)
 	}
 	if _, release, e := r.Core.SelectQuotedImageAccount(ctx, q, r.Media, false, r.Gemini); e != nil {
@@ -232,6 +235,11 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 		return r.Recover(ctx, taskID, q.Owner)
 	} else if !os.IsNotExist(e) {
 		return nil, e
+	}
+	// Only new sale-only quotes may start a supplier request. Existing receipts
+	// above recover their original frozen accounting without creating a new POST.
+	if q.Accounting.SourceType != StudioImageRetailUsageMode || q.Accounting.Validate(q) != nil {
+		return nil, QuoteFailure("account_cost", ErrStudioImageAccounting)
 	}
 	if !time.Now().Before(q.ExpiresAt) || time.Now().Before(q.CreatedAt) {
 		return nil, mediaworkbench.ErrRuntimeBinding

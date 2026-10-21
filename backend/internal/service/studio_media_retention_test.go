@@ -531,13 +531,15 @@ func TestStudioVideoRetentionCaptureFixedAndExpiredSettlement(t *testing.T) {
 func TestStudioVideoRetentionFirstCaptureAfterExpiryStillSettlesProof(t *testing.T) {
 	r, token, q, key, _, orders := videoRuntimeFixture(t)
 	first := q.Binding.CreatedAt.Add(time.Second)
-	now := first.Add(49 * time.Hour)
+	now := first
 	r.Store.clock = func() time.Time { return now }
 	r.request = func(context.Context, *Account, string, string, []byte) ([]byte, string, error) {
 		return []byte(`{"id":"upstream-original"}`), "application/json", nil
 	}
 	_, err := r.Submit(context.Background(), q.Binding.Owner, key, token, "av_late_capture")
 	require.NoError(t, err)
+	// Submit within the original quote TTL, then delay only the first capture.
+	now = first.Add(49 * time.Hour)
 	expires := first.Add(48 * time.Hour)
 	input := &StudioResultRetention{PersistedAt: &first, ExpiresAt: &expires, Policy: StudioVideoRetentionPolicy}
 	_, err = r.Capture(context.Background(), q.Binding.Owner, "av_late_capture", strings.Repeat("a", 64), input)

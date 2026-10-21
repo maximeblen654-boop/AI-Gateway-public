@@ -66,7 +66,7 @@ const report = { cases: [], http: [] }
       await expect(w('procurement-cost-0')).toHaveCount(0)
     } else {
       for (let i = 0; i < 3; i++) await w(`price-${i}`).fill(geometry ? ['0.70','0.90','1.10'][i] : '0.70')
-      await w('procurement-cost-0').fill('0.35') // Image procurement remains explicit and required.
+      await expect(w('procurement-cost-0')).toHaveCount(0)
     }
     await page.waitForTimeout(500)
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
@@ -103,6 +103,9 @@ const report = { cases: [], http: [] }
     assert.equal(report.validation.publish_ready, true, JSON.stringify(report.validation.diagnostics))
     report.cases.push('Five-step UI to actual Core save/validation without protocol input')
     report.product = detail.media_workbench_v1.draft.products[0]
+    assert.equal(report.product.cost_version, 2, 'Both media must use the server-owned sale-only contract')
+    assert.equal(report.product.cost_rules?.length || 0, 0, 'New draft must not create procurement rules')
+    assert(response.request().postDataJSON().draft.products.every(product => !('cost_rules' in product) && !('cost_version' in product)), 'Browser submitted retired procurement metadata')
     if (video) {
       assert.deepEqual(report.product.capabilities.durations_seconds, [5], 'saved video duration must be 5 seconds')
       assert.equal(report.product.cost_rules?.length || 0, 0, 'video save must not manufacture procurement rules')
@@ -125,7 +128,7 @@ const report = { cases: [], http: [] }
         const tab = await trigger.boundingBox()
         assert(tab && Math.abs(tab.x + tab.width - width) <= 2, 'Calculator tab must stay on the right edge after scrolling')
         await trigger.click()
-        const drawer = page.getByRole('dialog', { name: '成本计算器', exact: true })
+        const drawer = page.getByRole('dialog', { name: '成本与利润计算器', exact: true })
         await expect(drawer).toBeVisible()
         const bounds = await drawer.boundingBox()
         assert(bounds && Math.abs(bounds.x + bounds.width - width) <= 2 && bounds.y <= 2, 'Calculator must enter from the right, including mobile')
@@ -162,7 +165,7 @@ const report = { cases: [], http: [] }
       await w('wizard-next').click(); await w('wizard-next').click()
       await expect(w('price-0')).toHaveValue('')
       await w('price-0').fill('1.30')
-      await w('procurement-cost-0').fill('0.35')
+      await expect(w('procurement-cost-0')).toHaveCount(0)
       await w('wizard-next').click(); await w('display-name').fill('Synthetic geometry independent price')
       const saveSecond = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().endsWith('/accounts/'+accountId+'/draft'))
       await w('save').click(); const result = await saveSecond

@@ -24,6 +24,9 @@ func insertQuotedImageUsage(ctx context.Context, tx *sql.Tx, cmd *service.UsageB
 	prepared.args[27] = "1"
 	prepared.args[28] = receipt.Quote.Accounting.AccountRateMultiplier
 	prepared.args[57] = accountBase
+	if receipt.Quote.Accounting.SourceType == service.StudioImageRetailUsageMode {
+		prepared.args[57] = nil
+	}
 	repo := newUsageLogRepositoryWithSQL(nil, tx)
 	_, err = repo.createSinglePrepared(ctx, tx, log, prepared)
 	return err

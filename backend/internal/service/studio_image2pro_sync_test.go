@@ -343,6 +343,8 @@ func studioImage2ProRetiredQuote(t *testing.T, profile string) (*StudioImageRunt
 	ma.a.BaseURL = account.a.GetOpenAIBaseURL()
 	pub := ma.a.Config.Published
 	for i := range pub.Products {
+		pub.Products[i].CostVersion = 1
+		pub.Products[i].CostRules = []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}}}
 		pub.Products[i].AdapterConfig.ModelFamily = profile
 		pub.Products[i].AdapterConfig.Version = 0
 		if profile != "" {
@@ -350,7 +352,10 @@ func studioImage2ProRetiredQuote(t *testing.T, profile string) (*StudioImageRunt
 		}
 	}
 	for i := range pub.Offers {
+		pub.Offers[i].CostVersion = 1
 		pub.Offers[i].ResolvedConfig = pub.Products[0].AdapterConfig
+		pub.Offers[i].OfferID = ""
+		pub.Offers[i].OfferID = "mw_offer_" + studioHash(pub.Offers[i])
 	}
 	pub.ProductDependencies = nil
 	pub.Dependencies = mediaworkbench.PublishedDependenciesFor(&ma.a)
@@ -368,11 +373,7 @@ func studioImage2ProRetiredQuote(t *testing.T, profile string) (*StudioImageRunt
 	quote.Binding.PublishedRevision = pub.Revision
 	quote.Binding.Dependencies = pub.Dependencies
 	quote.CredentialFingerprint = studioOfferCredentialFingerprint(account.a, quote.Binding.Offer)
-	quote.Accounting.SourceID = studioPublishedCostSourceID(account.a.ID, quote.Binding.Offer.ProductID, quote.Binding.PublishedRevision)
-	token, err := r.Store.Issue(quote)
-	require.NoError(t, err)
-	quote, err = r.Store.Quote(token, quote.Owner, time.Now())
-	require.NoError(t, err)
+	quote = freezeLegacyImageAccounting(t, r, quote, 1)
 	return r, quote, key, billing
 }
 

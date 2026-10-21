@@ -9,114 +9,78 @@ import (
 	"time"
 )
 
-func TestCostCoverageIndependentOfRetailRules(t *testing.T) {
-	_, r := validatorFixture(t)
-	for _, tc := range []struct {
-		name, code string
-		change     func(*Product)
-	}{
-		{"missing", "MISSING_COST", func(p *Product) { p.CostRules = nil }},
-		{"blank", "MISSING_COST", func(p *Product) { p.CostRules[0].Cost = nil }},
-		{"overlap", "COST_RULE_OVERLAP", func(p *Product) { p.CostRules = append(p.CostRules, p.CostRules[0]) }},
-		{"gap", "MISSING_COST", func(p *Product) { p.CostRules[0].Match.AspectRatio = []string{"1:1"} }},
-		{"obsolete", "INVALID_COST_MATCH", func(p *Product) { p.CostRules[0].Match.AspectRatio = []string{"99:1"} }},
-		{"negative", "INVALID_COST", func(p *Product) { p.CostRules[0].Cost.Amount = "-1" }},
-		{"precision", "INVALID_COST", func(p *Product) { p.CostRules[0].Cost.Amount = "0.123456789" }},
-		{"currency", "INVALID_COST", func(p *Product) { p.CostRules[0].Cost.Currency = "USD" }},
-		{"source", "INVALID_COST_SOURCE", func(p *Product) { p.CostRules[0].Source = "supplier_bill" }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+func TestMediaRetailImageSaveAndPublishWithoutProcurement(t *testing.T) {
+	for _, amount := range []string{"", "0", "-1", "0.123456789", "999"} {
+		t.Run("old_cost_"+amount, func(t *testing.T) {
+			s, r, _ := runtimeFixture(t)
+			old := hash(r.a.Config.Published)
 			p := validProduct()
-			p.CostVersion = 1
-			tc.change(&p)
-			v, _ := Validate(&r.a, Draft{Revision: "cost", Products: []Product{p}}, time.Now())
-			if v.PublishReady || !hasCode(v, tc.code, "UI_FIXABLE") {
-				t.Fatalf("missing %s: %+v", tc.code, v.Diagnostics)
+			p.CostVersion = 999 // clients cannot select a cost contract
+			p.CostRules[0].Cost.Amount = amount
+			d, err := s.SaveDraft(context.Background(), 7, r.a.Config.RecordVersion, DraftInput{Products: []Product{p}})
+			must(t, err)
+			if !d.Config.Validation.PublishReady || d.Config.Draft.Products[0].CostVersion != MediaRetailVersion || len(d.Config.Draft.Products[0].CostRules) != 0 {
+				t.Fatal(d.Config.Validation.Diagnostics, d.Config.Draft.Products)
 			}
-			for _, d := range v.Diagnostics {
-				if d.Code == tc.code && (d.Scope != p.ProductID || !strings.HasPrefix(d.Path, "cost_rules") || !strings.Contains(d.Action, "4")) {
-					t.Fatal(d)
+			if hash(d.Config.Published) != old {
+				t.Fatal("draft save mutated immutable publication")
+			}
+			if _, err := s.SaveDraft(context.Background(), 7, d.Config.RecordVersion-1, DraftInput{Products: []Product{p}}); !errors.Is(err, ErrStale) {
+				t.Fatal("stale CAS admitted", err)
+			}
+			d, err = s.PublishSelected(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID})
+			must(t, err)
+			if d.Config.Published.Products[0].CostVersion != MediaRetailVersion || len(d.Config.Published.Products[0].CostRules) != 0 {
+				t.Fatal("new publication retained procurement configuration")
+			}
+			for i, offer := range d.Config.Published.Offers {
+				if offer.CostVersion != MediaRetailVersion || offer.SalePrice.Amount != p.PricingRules[i].SalePrice.Amount {
+					t.Fatal("sale-only publication changed customer price", offer)
 				}
 			}
 		})
 	}
-	p := validProduct()
-	p.CostVersion = 1
-	p.CostRules = []CostRule{
-		{Match: Match{AspectRatio: []string{"1:1"}}, Cost: &Price{Amount: "0", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"},
-		{Match: Match{AspectRatio: []string{"16:9"}}, Cost: &Price{Amount: "0.12345678", Currency: "CNY", BillingMode: "per_request"}, Source: "calculator"},
-	}
-	v, offers := Validate(&r.a, Draft{Revision: "cost", Products: []Product{p}}, time.Now())
-	if !v.PublishReady || len(offers) != len(p.PricingRules) {
-		t.Fatal(v.Diagnostics)
-	}
-	// Cost has two independent ratio rules; retail still has its two creation
-	// mode rules. Cost is not copied into any customer-facing offer.
-	encoded, _ := json.Marshal(offers)
-	if strings.Contains(string(encoded), "0.12345678") || strings.Contains(string(encoded), "cost_rules") {
-		t.Fatal("private cost leaked into offers")
-	}
 }
 
-func TestCostDraftSaveCASAndExplicitPublishGate(t *testing.T) {
-	s, r, b := runtimeFixture(t)
-	old := hash(r.a.Config.Published)
-	p := r.a.Config.Draft.Products[0]
-	p.CostVersion, p.CostRules = 0, nil // client cannot request legacy admission
-	d, err := s.SaveDraft(context.Background(), 7, r.a.Config.RecordVersion, DraftInput{Products: []Product{p}})
-	must(t, err)
-	if d.Config.Draft.Products[0].CostVersion != 1 || !hasCode(d.Config.Validation, "MISSING_COST", "UI_FIXABLE") {
-		t.Fatal(d.Config.Validation.Diagnostics)
-	}
-	if hash(d.Config.Published) != old {
-		t.Fatal("incomplete cost draft changed publication")
-	}
-	if _, err = s.PublishSelected(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID}); !errors.Is(err, ErrValidation) {
-		t.Fatal(err)
-	}
-	if _, err = s.SaveDraft(context.Background(), 7, d.Config.RecordVersion-1, DraftInput{Products: []Product{p}}); !errors.Is(err, ErrStale) {
-		t.Fatal(err)
-	}
-	bound, err := ResolvePublishedImageOffer(&r.a, b.Offer.OfferID, b.Spec)
-	must(t, err)
-	cost, _, err := ResolvePublishedCost(&r.a, bound)
-	must(t, err)
-	if cost.Amount != "0.35" {
-		t.Fatal("draft repriced publication", cost)
-	}
-}
-
-func TestCostPublishedExactModelIgnoresAPIMapping(t *testing.T) {
-	_, r, b := runtimeFixture(t)
-	before, _, err := ResolvePublishedCost(&r.a, b)
-	must(t, err)
-	r.a.ModelMapping = map[string]string{"gpt-image-2": "api-only-other-model", "*": "api-only-fallback"}
-	after, err := ResolvePublishedImageOffer(&r.a, b.Offer.OfferID, b.Spec)
-	must(t, err)
-	if hash(b) != hash(after) {
-		t.Fatal("API alias mutation invalidated Studio quote")
-	}
-	cost, _, err := ResolvePublishedCost(&r.a, after)
-	must(t, err)
-	if cost != before {
-		t.Fatal("API mapping changed cost")
-	}
-	if _, err := InspectPublishedOffers(context.Background(), &r.a, "image"); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCostOutputFormatCoverageIncludesNativeDefault(t *testing.T) {
+func TestMediaRetailIgnoresLegacyCostsAndKeepsSaleValidation(t *testing.T) {
 	_, r := validatorFixture(t)
 	p := validProduct()
 	p.CostVersion = 1
-	p.Capabilities.OutputFormats = []string{"png", "jpeg"}
-	p.CostRules = nil
-	for _, format := range []string{"", "png", "jpeg"} {
-		p.CostRules = append(p.CostRules, CostRule{Match: Match{OutputFormats: []string{format}}, Cost: &Price{Amount: "0.10", Currency: "CNY", BillingMode: "per_request"}})
-	}
-	v, _ := Validate(&r.a, Draft{Revision: "format-cost", Products: []Product{p}}, time.Now())
-	if !v.PublishReady {
+	p.CostRules = []CostRule{{Cost: nil, Source: "obsolete"}, {Cost: &Price{Amount: "-3", Currency: "USD"}}}
+	v, offers := Validate(&r.a, Draft{Revision: "legacy", Products: []Product{p}}, time.Now())
+	if !v.PublishReady || len(offers) == 0 {
 		t.Fatal(v.Diagnostics)
+	}
+	data, _ := json.Marshal(offers)
+	if strings.Contains(string(data), "cost_rules") || strings.Contains(string(data), "obsolete") {
+		t.Fatal("procurement leaked into customer offer")
+	}
+	p.PricingRules[0].SalePrice.Amount = "0"
+	v, _ = Validate(&r.a, Draft{Revision: "invalid-sale", Products: []Product{p}}, time.Now())
+	if v.PublishReady || !hasCode(v, "INVALID_PRICE", "UI_FIXABLE") {
+		t.Fatal("cost removal weakened customer price validation", v.Diagnostics)
+	}
+}
+
+func TestMediaRetailOldPublicationNotRewrittenForNewQuote(t *testing.T) {
+	_, r, b := runtimeFixture(t)
+	pub := r.a.Config.Published
+	for i := range pub.Products {
+		pub.Products[i].CostVersion = 1
+		pub.Products[i].CostRules = []CostRule{{Cost: &Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}}}
+	}
+	for i := range pub.Offers {
+		pub.Offers[i].CostVersion = 1
+		pub.Offers[i].OfferID = ""
+		pub.Offers[i].OfferID = "mw_offer_" + hash(pub.Offers[i])
+	}
+	pub.Revision = publishedRevision(pub)
+	before := hash(pub)
+	r.a.ModelMapping = map[string]string{"gpt-image-2": "api-only-other-model"}
+	after, err := ResolvePublishedImageOffer(&r.a, pub.Offers[0].OfferID, b.Spec)
+	must(t, err)
+	expectedRevision, _ := offerSnapshot(&r.a, pub.Offers[0])
+	if after.Offer.CostVersion != 1 || after.PublishedRevision != expectedRevision || before != hash(pub) {
+		t.Fatal("reading old publication changed its identity")
 	}
 }

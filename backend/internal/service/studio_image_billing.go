@@ -117,6 +117,12 @@ func QuotedImageUsageAmounts(r *StudioImageReceipt) (sale, accountBase string, q
 	if err != nil {
 		return "", "", 0, err
 	}
+	if err := r.Quote.Accounting.Validate(r.Quote); err != nil {
+		return "", "", 0, err
+	}
+	if r.Quote.Accounting.SourceType == StudioImageRetailUsageMode {
+		return total.Amount, "", quantity, nil
+	}
 	base, err := mediaworkbench.DecimalAmount(r.Quote.Accounting.BaseAmount)
 	if err != nil {
 		return "", "", 0, err
@@ -137,11 +143,18 @@ func QuotedImageUsageLog(r *StudioImageReceipt) *UsageLog {
 		saleAmount, baseAmount, quantity = q.Binding.Offer.SalePrice.Amount, q.Accounting.BaseAmount, q.Binding.Spec.Count
 	}
 	sale, _ := mediaworkbench.DecimalAmount(saleAmount)
-	base, _ := mediaworkbench.DecimalAmount(baseAmount)
 	rate, _ := mediaworkbench.DecimalAmount(q.Accounting.AccountRateMultiplier)
-	baseFloat, rateFloat := base.InexactFloat64(), rate.InexactFloat64()
+	rateFloat := rate.InexactFloat64()
 	upstream, mode, inbound := q.Binding.Offer.UpstreamModel, "image", "/v1/studio/images/tasks"
-	log := &UsageLog{UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, RequestID: HashUsageRequestPayload([]byte("studio-image:" + r.TaskID)), Model: q.Binding.Offer.SiteModel, RequestedModel: q.Binding.Offer.SiteModel, UpstreamModel: &upstream, GroupID: &q.Owner.GroupID, SubscriptionID: q.SubscriptionID, TotalCost: sale.InexactFloat64(), ActualCost: sale.InexactFloat64(), RateMultiplier: 1, AccountStatsCost: &baseFloat, AccountRateMultiplier: &rateFloat, BillingMode: &mode, RequestType: RequestTypeSync, ImageCount: quantity, InboundEndpoint: &inbound, UpstreamEndpoint: &r.Endpoint, CreatedAt: q.CreatedAt}
+	var accountBase *float64
+	if q.Accounting.SourceType == StudioImageRetailUsageMode {
+		mode = StudioImageRetailUsageMode
+	} else {
+		base, _ := mediaworkbench.DecimalAmount(baseAmount)
+		baseFloat := base.InexactFloat64()
+		accountBase = &baseFloat
+	}
+	log := &UsageLog{UserID: q.Owner.UserID, APIKeyID: q.Owner.APIKeyID, AccountID: q.Binding.Offer.AccountID, RequestID: HashUsageRequestPayload([]byte("studio-image:" + r.TaskID)), Model: q.Binding.Offer.SiteModel, RequestedModel: q.Binding.Offer.SiteModel, UpstreamModel: &upstream, GroupID: &q.Owner.GroupID, SubscriptionID: q.SubscriptionID, TotalCost: sale.InexactFloat64(), ActualCost: sale.InexactFloat64(), RateMultiplier: 1, AccountStatsCost: accountBase, AccountRateMultiplier: &rateFloat, BillingMode: &mode, RequestType: RequestTypeSync, ImageCount: quantity, InboundEndpoint: &inbound, UpstreamEndpoint: &r.Endpoint, CreatedAt: q.CreatedAt}
 	// Native schema accepts only these display buckets. Other administrator
 	// resolutions retain their exact commercial spec in the immutable receipt.
 	size := q.Binding.Spec.Resolution
@@ -189,7 +202,10 @@ func QuotedImageBillingCommand(receipt *StudioImageReceipt) (*UsageBillingComman
 	}
 	amount := frozenTotal.Amount
 	accountCost := q.Accounting.EffectiveAccountQuotaCost
-	if receipt.Version == StudioImageMultiReceiptVersion {
+	if q.Accounting.SourceType == StudioImageRetailUsageMode {
+		// This is a zero Account-quota delta, not a known supplier cost.
+		accountCost = "0"
+	} else if receipt.Version == StudioImageMultiReceiptVersion {
 		scaled, e := scaleImageAccountAmount(accountCost, quantity, q.Binding.Spec.Count)
 		if e != nil {
 			return nil, e

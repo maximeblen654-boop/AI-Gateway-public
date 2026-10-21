@@ -47,7 +47,7 @@ export default {
       cache: 'Cache',
       actual: 'Actual',
       standard: 'Standard',
-      accountCost: 'Cost',
+      accountCost: 'Recorded procurement cost (excludes unknown costs; not a complete profit basis)',
       noDataAvailable: 'No data available',
       recentUsage: 'Recent Usage',
       actualSpending: 'Actual spending ($)',

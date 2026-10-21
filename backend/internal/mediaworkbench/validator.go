@@ -297,9 +297,6 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				add("UI_FIXABLE", "INVALID_PRICE", pid, path+".sale_price", "Customer sale price must be greater than 0 CNY, with at most 8 decimal places and per_request billing")
 			}
 		}
-		if requiresPublishedCost(p) {
-			validateCostRules(p, &v)
-		}
 		if len(v.Diagnostics) != start {
 			continue
 		}
@@ -313,9 +310,6 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			continue
 		}
 		v.CaseCount += len(cases)
-		if requiresPublishedCost(p) {
-			validateCostCoverage(p, cases, &v)
-		}
 		hits := make([]int, len(p.PricingRules))
 		missing, overlap, mappingMissing, compilerFailed := false, false, false, false
 		missingSpecs := []Spec{}

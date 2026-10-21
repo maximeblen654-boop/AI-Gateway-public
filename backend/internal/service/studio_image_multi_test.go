@@ -56,7 +56,7 @@ func enableStudioNativeMulti(t *testing.T, r *StudioImageRuntime) StudioImageQuo
 	require.True(t, ok)
 	account := accountFixture.a
 	q := StudioImageQuote{Owner: StudioImageOwner{1, 2, 3}, Binding: binding, BaseURL: account.GetOpenAIBaseURL(), CredentialFingerprint: studioOfferCredentialFingerprint(account, binding.Offer), CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), KeyQuotaEnabled: true, KeyRateEnabled: true, AccountQuotaEnabled: account.HasAnyQuotaLimit()}
-	q.Accounting, err = ResolveStudioPublishedAccountCost(account, &ma.a, binding, q.CreatedAt)
+	q.Accounting, err = imageRetailAccounting(account, binding, q.CreatedAt)
 	require.NoError(t, err)
 	unit, total, err := mediaworkbench.PriceForQuantity(binding.Offer.SalePrice, 5)
 	require.NoError(t, err)

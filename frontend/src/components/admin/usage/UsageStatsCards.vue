@@ -69,7 +69,7 @@
         </p>
         <p class="text-xs text-gray-400">
           <template v-if="showAccountCost && totalAccountCost != null">
-            <span class="text-orange-500" title="仅含已核算采购成本；未知成本视频不计入此合计，不能据此推算完整利润。">{{ t('usage.accountCost') }}（已核算） ${{ totalAccountCost.toFixed(4) }}</span>
+            <span class="text-orange-500" title="仅含已记录采购成本；工作台图片和视频的未知采购成本不计入此合计，不能据此推算完整利润。">{{ t('usage.accountCost') }}（已核算） ${{ totalAccountCost.toFixed(4) }}</span>
             <span> · </span>
           </template>
           <span>

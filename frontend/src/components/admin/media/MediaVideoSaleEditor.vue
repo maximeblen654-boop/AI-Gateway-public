@@ -37,7 +37,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { draftInput, type Match, type Product } from '@/api/admin/mediaWorkbench'
 import MediaDialog from './MediaDialog.vue'
-import { costLabel } from './procurementMatrix'
+import { mediaSpecLabel } from './mediaSpecLabel'
 import { decimalError } from './costCalculator'
 import { arithmeticFill, setVideoSales, videoGroups, videoGroupKey, videoSaleInputKey, type VideoSaleInput } from './videoSaleGroups'
 
@@ -71,7 +71,7 @@ watch(() => props.pendingVideoSales, value => {
 watch(context, () => { if (readopt.value) { readopt.value = undefined; message.value = 'Account 或商品已变化，请重新核对本地输入。' } }, { flush: 'sync' })
 watch(() => props.product.capabilities.resolutions, values => { if (!values.includes(selectedResolution.value)) selectedResolution.value = values[0] ?? '' }, { immediate: true })
 watch(groups, values => { if (values && !values.some(group => group.key === selectedGroup.value)) selectedGroup.value = values[0]?.key ?? '' }, { immediate: true })
-const groupLabel = (match: Match) => Object.keys(match).length ? costLabel(match) : '所有已配置比例、画质与素材共享'
+const groupLabel = (match: Match) => Object.keys(match).length ? mediaSpecLabel(match) : '所有已配置比例、画质与素材共享'
 function inputValue(duration: number, fallback: string) { return current.value ? inputMap.value.get(videoSaleInputKey({ resolution: selectedResolution.value, group: current.value.match, duration })) ?? fallback : fallback }
 function publishInputs() { emit('pending-video-sales', clone(inputs.value)) }
 function targetRow(input: VideoSaleInput) {
@@ -92,7 +92,7 @@ const priceLabel = (price: VideoSaleInput['source_price']) => price ? `${price.a
 function specSummary(value: string) {
   try {
     const caps = JSON.parse(value) as Product['capabilities']
-    return `${costLabel({ resolution: caps.resolutions, duration_seconds: caps.durations_seconds, aspect_ratio: caps.aspect_ratios, quality: caps.qualities, output_formats: caps.output_formats, count: caps.count, references: caps.references })} · 参考素材总数上限 ${caps.references.total_max}；${caps.combination_rules.length ? `排除组合：${caps.combination_rules.map(rule => `${costLabel(rule.deny)}${rule.deny.references ? ` · 参考素材总数上限 ${rule.deny.references.total_max}` : ''}`).join('；')}` : '无额外组合限制'}`
+    return `${mediaSpecLabel({ resolution: caps.resolutions, duration_seconds: caps.durations_seconds, aspect_ratio: caps.aspect_ratios, quality: caps.qualities, output_formats: caps.output_formats, count: caps.count, references: caps.references })} · 参考素材总数上限 ${caps.references.total_max}；${caps.combination_rules.length ? `排除组合：${caps.combination_rules.map(rule => `${mediaSpecLabel(rule.deny)}${rule.deny.references ? ` · 参考素材总数上限 ${rule.deny.references.total_max}` : ''}`).join('；')}` : '无额外组合限制'}`
   } catch { return '规格记录无法读取' }
 }
 function selectedInput(snapshot: VideoSaleInput) {

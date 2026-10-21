@@ -14,7 +14,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -139,9 +138,6 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 		Rates       [3]float64
 		Allow, Deny []string
 	}{key.ID, key.UserID, key.User.Status, studioPaidGroupIdentity(key.Group), key.Status, key.Quota, key.ExpiresAt, [3]float64{key.RateLimit5h, key.RateLimit1d, key.RateLimit7d}, key.IPWhitelist, key.IPBlacklist}}
-	var costChannel *Channel
-	legacyChannelRead := false
-	var legacyChannelError error
 	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 	for _, a := range rows {
 		if a.Config == nil || a.Config.Published == nil || !a.Config.Sales.Enabled {
@@ -174,25 +170,9 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			if !ok {
 				continue
 			}
-			// Channel is solely a historical v0 cost source. Its read failures or
-			// API pricing/mapping changes cannot invalidate a v1 Studio grant.
 			mappedModel := offer.UpstreamModel
-			var costIdentity any
-			if offer.MediaType != "video" && offer.CostVersion == 0 {
-				if !legacyChannelRead {
-					legacyChannelRead = true
-					if ch := p.image.Core.channelService; ch != nil && ch.repo != nil {
-						var cid int64
-						cid, legacyChannelError = ch.repo.GetChannelIDByGroupID(ctx, out.group)
-						if legacyChannelError == nil && cid > 0 {
-							costChannel, legacyChannelError = ch.repo.GetByID(ctx, cid)
-						}
-					}
-				}
-				if legacyChannelError != nil {
-					continue
-				}
-				mappedModel, costIdentity = native.GetMappedModel(offer.SiteModel), paidOfferCostIdentity(costChannel, native, offer)
+			if offer.MediaType == "image" && offer.CostVersion == 0 {
+				mappedModel = native.GetMappedModel(offer.SiteModel)
 			}
 			credentials := make(map[string]any, len(native.Credentials))
 			for k, v := range native.Credentials {
@@ -205,7 +185,7 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 			if native.Proxy != nil {
 				proxy = native.Proxy.URL()
 			}
-			out.grants[paidOfferKey(a.ID, offer.OfferID)] = studioHash([]any{costIdentity, identity, native.ID, native.Type, native.Platform, native.ParentAccountID, credentials, native.ProxyID, proxy, studioMediaBaseURL(native), mappedModel, native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
+			out.grants[paidOfferKey(a.ID, offer.OfferID)] = studioHash([]any{nil, identity, native.ID, native.Type, native.Platform, native.ParentAccountID, credentials, native.ProxyID, proxy, studioMediaBaseURL(native), mappedModel, native.GroupIDs, native.RateMultiplier, []float64{native.GetQuotaLimit(), native.GetQuotaDailyLimit(), native.GetQuotaWeeklyLimit()}})
 		}
 		out.accounts = append(out.accounts, a)
 	}
@@ -215,24 +195,6 @@ func (p *studioPaidPreflight) snapshot(ctx context.Context, m string, actor int6
 	}
 	out.fingerprint = studioHash(parts)
 	return out, nil
-}
-
-// Resolve the same first Account/model cost rule as native quote accounting.
-// Keep an exact decimal explicitly: its API JSON field is intentionally hidden.
-func paidOfferCostIdentity(channel *Channel, account *Account, offer mediaworkbench.Offer) any {
-	if channel == nil || !channel.IsActive() {
-		return nil
-	}
-	for _, rule := range channel.AccountStatsPricingRules {
-		if !slices.Contains(rule.AccountIDs, account.ID) {
-			continue
-		}
-		price := findPricingForModel(rule.Pricing, firstNonEmptyString(account.Platform, PlatformOpenAI), strings.ToLower(offer.UpstreamModel))
-		if price != nil {
-			return []any{rule.ID, rule.ChannelID, price, price.AccountStatsPerRequestExact}
-		}
-	}
-	return nil
 }
 
 // API pricing/aliases are independent. Retain actual Group access, identity and

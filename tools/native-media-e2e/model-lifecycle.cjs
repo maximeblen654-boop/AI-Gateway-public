@@ -57,17 +57,19 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   const [a,b]=products
   const configure=(product,model,name)=>Object.assign(product,{enabled:true,upstream_model:model,site_model:model,display_name:name,
    capabilities:{resolutions:['1024x1024'],aspect_ratios:['1:1'],qualities:[],durations_seconds:[],count:{min:1,max:1},references:{image:{min:0,max:0},video:{min:0,max:0},audio:{min:0,max:0},total_max:0},combination_rules:[]},
-   cost_rules:[{match:{},cost:{amount:'0.35',currency:'CNY',billing_mode:'per_request'},source:'manual'}],
    pricing_rules:[{match:{},sale_price:{amount:'0.025',currency:'CNY',billing_mode:'per_request'}}],adapter_config:{version:1,model_family:'openai_json',size_mappings:[],execution:{mode:'single',max_output_images:1}}})
   configure(a,'gpt-image-2','Synthetic lifecycle target')
   configure(b,'gpt-image-1','Synthetic lifecycle healthy sibling')
   let c=await saveDraft(accountPath,products);assert.equal(c.validation.publish_ready,true,JSON.stringify(c.validation));await publish(accountPath,c);await salesOn(accountPath)
   // A separate Account in the same real Group proves isolation is not merely
   // a different customer or a different Group. Credentials target only localhost.
-  const peer=await api('/admin/accounts','POST',{name:'Synthetic lifecycle peer',platform:'openai',type:'apikey',credentials:{api_key:'synthetic-native-only',base_url:'https://localhost:19090',model_mapping:{'gpt-image-2':'gpt-image-2'}},extra:{quota_limit:100},concurrency:5,priority:1,group_ids:[gid],upstream_billing_probe_enabled:false})
+  const peer=await api('/admin/accounts','POST',{name:'Synthetic lifecycle peer',platform:'openai',type:'apikey',credentials:{api_key:'synthetic-native-only',base_url:'https://localhost:19090',model_mapping:{'gpt-image-2':'gpt-image-2'}},extra:{},concurrency:5,priority:1,group_ids:[gid],upstream_billing_probe_enabled:false})
   assert(Number.isSafeInteger(peer.id));const peerPath='/admin/media-workbench/accounts/'+peer.id
-  // Each Published product carries explicit synthetic procurement independent of API Channels.
-  report.native_cost={source:'studio_published_cost',channel_mutated:false,peer_account_rule_added:false}
+  // Media retail does not require or fall back to API Channel procurement.
+  report.native_cost={source:'unknown_media_retail',channel_mutated:false,peer_account_rule_added:false}
+  const retailPublished=(await config(accountPath)).published
+  assert.deepEqual(retailPublished.products.map(product=>product.product_id).sort(),[a.product_id,b.product_id].sort(),'Retail evidence must read back the two newly published products')
+  assert(retailPublished.products.every(product=>product.cost_version===2 && !product.cost_rules?.length))
   await api('/admin/accounts/'+peer.id+'/models/sync-upstream','POST',{})
   const peerProduct=structuredClone(a);peerProduct.product_id='synthetic-lifecycle-peer';peerProduct.display_name='Synthetic lifecycle same Group peer'
   c=await saveDraft(peerPath,[peerProduct]);assert.equal(c.validation.publish_ready,true,JSON.stringify(c.validation));await publish(peerPath,c);await salesOn(peerPath)

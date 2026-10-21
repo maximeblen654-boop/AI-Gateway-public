@@ -22,11 +22,12 @@ describe('bounded product recovery and save comparison', () => {
     value.product.media_type = 'image'
     expect(() => readDraftRecovery(JSON.stringify(value), identity)).toThrow()
   })
-  it('normalizes retired video procurement only and still compares image procurement exactly', () => {
+  it('normalizes retired procurement for both media while preserving exact sale prices', () => {
     const original = copy(imageProduct)
     original.cost_rules = [{ match: {}, cost: { amount: '1.5', currency: 'CNY', billing_mode: 'per_request' } }]
     const cleared = copy(original); delete cleared.cost_rules
-    expect(draftFingerprint([original])).not.toBe(draftFingerprint([cleared]))
+    expect(draftFingerprint([original])).toBe(draftFingerprint([cleared]))
+    expect(readDraftRecovery(encodeDraftRecovery({ ...fixture(), product: original }), identity)?.product).not.toHaveProperty('cost_rules')
     original.media_type = 'video'; cleared.media_type = 'video'
     expect(persistedFingerprint([original], supplier())).toBe(draftFingerprint([cleared]))
     cleared.pricing_rules[0]!.sale_price!.amount = '99'
@@ -89,11 +90,11 @@ describe('bounded product recovery and save comparison', () => {
     expect(draftFingerprint([a])).toBe(draftFingerprint([b]))
     for (const field of ['site_model', 'upstream_model', 'display_name'] as const) { const changed = copy(a); changed[field] = 'different'; expect(draftFingerprint([a])).not.toBe(draftFingerprint([changed])) }
     const cost = copy(a); cost.cost_rules = [{ match: {}, cost: { amount: '0', currency: 'CNY', billing_mode: 'per_request' } }]
-    expect(draftFingerprint([a])).not.toBe(draftFingerprint([cost]))
+    expect(draftFingerprint([a])).toBe(draftFingerprint([cost]))
     const price = copy(a); price.pricing_rules[0]!.sale_price!.amount = '0.18000001'
     expect(draftFingerprint([a])).not.toBe(draftFingerprint([price]))
   })
-  it('accepts only known native adapter defaults without ignoring explicit adapter or cost changes', () => {
+  it('accepts only known native adapter defaults without ignoring explicit adapter changes', () => {
     const a = copy(imageProduct), b = copy(imageProduct), dto = supplier()
     dto.native_adapters = { image: { kind: 'gemini_images', revision: 'v1', auth: '', task_flow: '', media_type: 'image', max_references: 1, parameters: {} } }
     b.adapter_config.version = 1; b.adapter_config.model_family = 'gemini_images'
@@ -101,7 +102,7 @@ describe('bounded product recovery and save comparison', () => {
     a.adapter_config.model_family = 'explicit'
     expect(persistedFingerprint([a], dto)).not.toBe(draftFingerprint([b]))
   })
-  it('shows meaningful cost price and exact model differences without including Account data', () => {
+  it('shows meaningful sale-price and exact model differences without including Account data', () => {
     const a = copy(imageProduct), b = copy(imageProduct)
     a.pricing_rules[0]!.sale_price!.amount = '0.5'; a.upstream_model = 'other-real-model'
     expect(recoveryDifferences(a, b).map(d => d.field)).toEqual(['upstream_model', 'pricing_rules'])

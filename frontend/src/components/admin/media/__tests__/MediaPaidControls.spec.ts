@@ -75,7 +75,7 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  ]})
  const w=create();await flushPromises();const video=w.get('[data-test="paid-video"]')
  await video.findAll('button')[0].trigger('click');await flushPromises()
- expect(video.text()).toContain('视频商品不再配置采购成本')
+ expect(video.text()).toContain('历史检查结果已失效，请重新执行开启前检查')
  expect(video.find('[data-test="cost-guide"]').exists()).toBe(false)
  expect(video.text()).toContain('视频协议或规格不兼容')
  expect(video.text()).toContain('报价检查原因未分类')
@@ -87,29 +87,28 @@ it('explains safe quote stages without exposing arbitrary server error text or e
  expect(api.apply).not.toHaveBeenCalled()
 })
 
-it('guides administrators to persisted workbench costs without channel coupling', async () => {
+it.each(['image', 'video'])('keeps obsolete procurement reports closed without restoring any configuration UI: %s', async media => {
  api.check.mockResolvedValue({pass:false, group_id:31, checks:[
  {code:'quote_cost_channel_missing',pass:false,account_id:44},
  {code:'quote_cost_rule_missing',pass:false,account_id:44},
  {code:'quote_cost_contract',pass:false,account_id:44}
  ]})
- const w=create(); await flushPromises(); const video=w.get('[data-test="paid-image"]')
- await video.findAll('button')[0].trigger('click');await flushPromises()
- const guide=video.get('[data-test="cost-guide"]')
- expect(guide.text()).toContain('采购成本与售价')
- expect(guide.text()).toContain('保存草稿后检查并发布')
- expect(guide.find('a[href="/admin/channels"]').exists()).toBe(false)
- expect(video.text()).not.toContain('Channel')
- expect(video.text()).toContain('CNY 单张或整条成本')
+ const w=create(); await flushPromises(); const panel=w.get(`[data-test="paid-${media}"]`)
+ await panel.findAll('button')[0].trigger('click');await flushPromises()
+ expect(panel.text()).toContain('历史检查结果已失效，请重新执行开启前检查')
+ expect(panel.find('[data-test="cost-guide"]').exists()).toBe(false)
+ expect(panel.text()).not.toContain('采购成本与售价')
+ expect(panel.findAll('button')[1].attributes('disabled')).toBeDefined()
  expect(api.apply).not.toHaveBeenCalled()
- expect(w.find('[data-test="paid-video"] [data-test="cost-guide"]').exists()).toBe(false)
 })
 
-it('explains the video amount-quota restriction without offering procurement or changing settings', async () => {
+it.each(['image', 'video'])('explains the %s amount-quota restriction without offering procurement or changing settings', async media => {
  api.check.mockResolvedValue({ pass:false, checks:[{ code:'quote_account_quota_requires_cost', pass:false, account_id:44 }] })
- const w=create(); await flushPromises(); const video=w.get('[data-test="paid-video"]')
+ const w=create(); await flushPromises(); const video=w.get(`[data-test="paid-${media}"]`)
  await video.findAll('button')[0].trigger('click'); await flushPromises()
  expect(video.text()).toContain('此 Account 设置了金额额度')
+ expect(video.text()).toContain('采购成本未知，暂不可用')
+ expect(video.text()).toContain('请使用无金额额度的账号')
  expect(video.text()).toContain('不会自动修改配置')
  expect(video.find('[data-test="cost-guide"]').exists()).toBe(false)
  expect(api.apply).not.toHaveBeenCalled()

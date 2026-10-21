@@ -22,6 +22,9 @@ func (s *OpenAIGatewayService) SelectQuotedImageAccount(ctx context.Context, q S
 	if !studioMediaAccountSupported(a) || a.Type != firstNonEmptyString(q.AccountType, AccountTypeAPIKey) || a.Platform != firstNonEmptyString(q.Platform, PlatformOpenAI) || a.ParentAccountID != nil || !a.IsSchedulable() || !slices.Contains(a.GroupIDs, q.Owner.GroupID) {
 		return fail()
 	}
+	if q.Accounting.SourceType == StudioImageRetailUsageMode && a.HasAnyQuotaLimit() {
+		return nil, nil, QuoteFailure("account_quota_requires_cost", ErrStudioImageAccounting)
+	}
 	if a.HasAnyQuotaLimit() && !q.AccountQuotaEnabled {
 		return fail()
 	}

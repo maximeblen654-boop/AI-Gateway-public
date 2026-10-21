@@ -17,13 +17,13 @@ func TestVideoRetailSaveAndPublishWithoutProcurement(t *testing.T) {
 			}
 			d, err := s.SaveDraft(t.Context(), 7, 0, DraftInput{Products: []Product{p}})
 			must(t, err)
-			if !d.Config.Validation.PublishReady || d.Config.Draft.Products[0].CostVersion != VideoRetailVersion || len(d.Config.Draft.Products[0].CostRules) != 0 {
+			if !d.Config.Validation.PublishReady || d.Config.Draft.Products[0].CostVersion != MediaRetailVersion || len(d.Config.Draft.Products[0].CostRules) != 0 {
 				t.Fatalf("video retail draft: %+v", d.Config)
 			}
 			d, err = s.PublishSelected(t.Context(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID})
 			must(t, err)
 			saved := d.Config.Published.Products[0]
-			if saved.CostVersion != VideoRetailVersion || len(saved.CostRules) != 0 || len(d.Config.Published.Offers) != 1 || d.Config.Published.Offers[0].CostVersion != VideoRetailVersion || d.Config.Published.Offers[0].SalePrice.Amount != "2.50" {
+			if saved.CostVersion != MediaRetailVersion || len(saved.CostRules) != 0 || len(d.Config.Published.Offers) != 1 || d.Config.Published.Offers[0].CostVersion != MediaRetailVersion || d.Config.Published.Offers[0].SalePrice.Amount != "2.50" {
 				t.Fatal("published retail contract changed", d.Config.Published)
 			}
 		})

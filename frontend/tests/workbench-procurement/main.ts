@@ -22,20 +22,22 @@ const scenario = query.get('scenario') || 'complete'
 const key = `procurement-ui-fixture:${scenario}`
 const image: Product = {
   product_id: 'procurement-image', media_type: 'image', site_model: 'image-native-1', display_name: '隔离图片商品', upstream_model: 'image-native-1', enabled: true,
-  capabilities: { resolutions: ['1K', '2K'], aspect_ratios: ['1:1', '16:9'], qualities: [], durations_seconds: [], count: { min: 1, max: 5 }, references: { image: { min: 0, max: 4 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 4 }, combination_rules: [] },
-  // Unified customer price deliberately has two independent procurement costs.
-  pricing_rules: [{ match: {}, sale_price: price('0.90') }],
-  cost_rules: [{ match: { resolution: ['1K'] }, cost: price('0.10'), source: 'manual' }, { match: { resolution: ['2K'] }, cost: price('0.20'), source: 'manual' }],
+  capabilities: { resolutions: ['1K', '2K', '4K'], aspect_ratios: ['1:1', '16:9'], qualities: [], durations_seconds: [], count: { min: 1, max: 5 }, references: { image: { min: 0, max: 4 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 4 }, combination_rules: [] },
+  // Three independent retail rules preserve multi-field save/recovery coverage.
+  pricing_rules: [
+    { match: { resolution: ['1K'] }, sale_price: price('0.90') },
+    { match: { resolution: ['2K'] }, sale_price: price('0.90') },
+    { match: { resolution: ['4K'] }, sale_price: price('1.90') }
+  ],
   adapter_config: { version: 1, model_family: 'openai_json', execution: { mode: 'native_multi', max_output_images: 5 }, edit_execution: { mode: 'single', max_output_images: 1 }, size_mappings: [] }
 }
 const video: Product = {
   product_id: 'procurement-wan', media_type: 'video', site_model: 'WAN3.0-可参考视频', display_name: 'WAN3.0 隔离商品', upstream_model: 'WAN3.0-可参考视频', enabled: true,
   capabilities: { resolutions: ['720p'], aspect_ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], qualities: [], durations_seconds: [5, 10, 15], count: { min: 1, max: 1 }, references: { image: { min: 0, max: 10 }, video: { min: 0, max: 5 }, audio: { min: 0, max: 5 }, total_max: 14 }, combination_rules: [] },
   pricing_rules: [5, 10, 15].map(seconds => ({ match: { duration_seconds: [seconds] }, sale_price: price(String(seconds / 5)) })),
-  cost_rules: [5, 10, 15].map((seconds, index) => ({ match: { duration_seconds: [seconds] }, cost: price(['0.3', '0.6', '0.9'][index]!), source: 'manual' })),
   adapter_config: { version: 1, wire_profile: 'inline_multimedia', size_mappings: [] }
 }
-const blank: Product = { ...copy(image), product_id: 'procurement-unselected', site_model: 'incomplete-model', upstream_model: 'incomplete-model', display_name: '未选中的未完成草稿', pricing_rules: [], cost_rules: [] }
+const blank: Product = { ...copy(image), product_id: 'procurement-unselected', site_model: 'incomplete-model', upstream_model: 'incomplete-model', display_name: '未选中的未完成草稿', pricing_rules: [] }
 const initial: SupplierDetail = {
   id: 44, name: 'Synthetic procurement Account', host: 'supplier.example.invalid', platform: 'openai', type: 'apikey', status: 'active', schedulable: true,
   effective_sales: false, effective_state: 'SALES_PAUSED', sales_resume_ready: true,
@@ -50,7 +52,7 @@ const initial: SupplierDetail = {
     published: { revision: 'fixture-published-2', source_draft_revision: 'fixture-draft-2', products: [copy(image), copy(video)], offers: [{ product_id: image.product_id, offer_id: 'fixture-image-offer' }, { product_id: video.product_id, offer_id: 'fixture-wan-offer' }] }
   }
 }
-if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: null, source: 'manual' }]
+if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.pricing_rules[2]!.sale_price = null
 if (scenario.startsWith('video-retail')) {
   const product = initial.media_workbench_v1!.draft.products.find(p => p.product_id === video.product_id)!
   product.capabilities.resolutions = ['720p', '4K']
@@ -65,6 +67,13 @@ if (scenario.startsWith('video-retail')) {
 if (scenario.startsWith('reference-input')) {
   const refs = initial.media_workbench_v1!.draft.products[0]!.capabilities.references
   refs.image.max = refs.total_max = scenario.endsWith('loss') ? 12 : 1
+  if (scenario.endsWith('loss')) {
+    // This price really applies only to 2..12 reference images. Reducing the
+    // capability to one image removes its priced domain and must ask once.
+    initial.media_workbench_v1!.draft.products[0]!.pricing_rules[0]!.match.references = {
+      image: { min: 2, max: 12 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 12
+    }
+  }
 }
 if (scenario === 'recovery-blank-removal') {
   const empty=initial.media_workbench_v1!.draft.products.find(p=>p.product_id===blank.product_id)!
@@ -90,10 +99,9 @@ const readServer = () => {
 function diagnostics(products: Product[]): Diagnostic[] {
   return products.flatMap(product => {
     const index = dto.media_workbench_v1!.draft.products.findIndex(p => p.product_id === product.product_id)
-    const missing = product.media_type === 'image' && (!product.cost_rules?.length || product.cost_rules.some(rule => rule.cost == null))
+    const priceIndex = Math.max(0, product.pricing_rules.findIndex(rule => rule.sale_price == null))
     return [
-      ...(missing ? [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_COST', scope: product.product_id, path: `draft.products[${index}].cost_rules[0].cost`, message: `${product.display_name} 的采购成本尚未填写`, action: '前往第4步填写采购成本', match: product.cost_rules?.[0]?.match ?? {} }] : []),
-      ...(!product.pricing_rules.length || product.pricing_rules.some(rule => rule.sale_price == null) ? [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_PRICE', scope: product.product_id, path: `draft.products[${index}].pricing_rules[0].sale_price`, message: `${product.display_name} 的客户售价尚未填写`, action: '前往第4步填写客户售价' }] : [])
+      ...(!product.pricing_rules.length || product.pricing_rules.some(rule => rule.sale_price == null) ? [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_PRICE', scope: product.product_id, path: `draft.products[${index}].pricing_rules[${priceIndex}].sale_price`, message: `${product.display_name} 的客户售价尚未填写`, action: '前往第4步填写客户售价' }] : [])
     ]
   })
 }
@@ -108,7 +116,7 @@ function saveDraftFixture(input: { expected_record_version: number; submission_i
   if (input.expected_record_version !== c.record_version) return false
   const baseVersion = c.record_version
   c.draft.products = copy(input.draft.products)
-  for (const product of c.draft.products) if (product.media_type === 'video') { product.cost_version = 2; delete product.cost_rules }
+  for (const product of c.draft.products) { product.cost_version = 2; delete product.cost_rules }
   c.record_version++; c.draft.revision = `fixture-draft-${c.record_version}`
   c.draft.save_receipt = input.submission_id ? {
     submission_id: input.submission_id, base_record_version: baseVersion, draft_revision: c.draft.revision

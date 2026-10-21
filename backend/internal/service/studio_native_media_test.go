@@ -38,7 +38,7 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				a := accounts.a
 				a.Platform = platform
 				key.Group.Platform = platform
-				a.Extra = map[string]any{"quota_limit": 100.0}
+				a.Extra = map[string]any{}
 				upstreamModel := map[string]string{PlatformOpenAI: "gemini-3.1-flash-image", PlatformGrok: "grok-imagine-image", PlatformGemini: "gemini-3.1-flash-image"}[platform]
 				a.Credentials["model_mapping"] = map[string]any{"gpt-image-2": upstreamModel, upstreamModel: "must-not-map-twice"}
 				ma, ok := r.Media.(*studioMediaFixture)
@@ -98,8 +98,8 @@ func TestStudioNativeImagesParity(t *testing.T) {
 				q, err := r.Store.Quote(token, old.Owner, time.Now())
 				require.NoError(t, err)
 				require.Equal(t, platform, q.QuotaPlatform)
-				require.Equal(t, "resolved", q.Accounting.SourceState)
-				require.Equal(t, "0.35", q.Accounting.BaseAmount)
+				require.Equal(t, "unknown", q.Accounting.SourceState)
+				require.Empty(t, q.Accounting.BaseAmount)
 				receipt, err := r.Dispatch(ctx, nil, q, "native-parity", "same prompt", refs, key)
 				require.NoError(t, err)
 				require.Equal(t, "completed", receipt.Status)

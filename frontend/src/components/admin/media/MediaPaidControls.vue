@@ -19,12 +19,7 @@
         <p v-if="pending === `apply-${kind}`" class="mw-muted" role="status" data-test="paid-applying">正在提交并核对生效状态；开启时会再次执行完整检查，最多等待 {{ PAID_CHECK_TIMEOUT_MS / 1000 }} 秒。服务器确认前请勿重复操作。</p>
         <div v-if="reports[kind]" class="mw-paid-checks" aria-live="polite">
           <strong>{{ reportSummary(kind) }}</strong>
-          <aside v-if="hasCostFailure(kind)" class="mw-cost-guide" data-test="cost-guide">
-            <p><strong>工作台采购成本未就绪</strong></p>
-            <p>选择对应 Account 和商品，在第 4 步“采购成本与售价”填写采购成本，保存草稿后检查并发布。计算器结果采用后进入草稿自动保存，服务器确认后再检查并发布。</p>
-            <p>成本按商品的合法规格独立匹配；客户售价与采购成本分别管理。旧发布版本缺少工作台成本时，请补齐成本后重新发布。</p>
-          </aside>
-          <details :open="!reports[kind]?.pass || !checkedRevisions[kind] || partial(kind)"><summary>检查明细（{{ reports[kind]?.checks.length }} 项）</summary><ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item, kind) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="checkProductName(item)"> · {{ checkProductName(item) }}</template><template v-if="pathLabel(item.path)"> · {{ pathLabel(item.path) }}</template></small><small v-if="costCodes.has(item.code) && checkUpstreamModel(item)">上游模型：{{ checkUpstreamModel(item) }}</small><small v-if="!item.pass && productGuidance(item)">{{ productGuidance(item) }}</small></span></li></ul></details>
+          <details :open="!reports[kind]?.pass || !checkedRevisions[kind] || partial(kind)"><summary>检查明细（{{ reports[kind]?.checks.length }} 项）</summary><ul><li v-for="(item, index) in reports[kind]?.checks" :key="index"><span>{{ item.pass ? '✓' : '×' }}</span><span>{{ checkLabel(item) }}<small v-if="item.account_id">Account #{{ item.account_id }}<template v-if="checkProductName(item)"> · {{ checkProductName(item) }}</template><template v-if="pathLabel(item.path)"> · {{ pathLabel(item.path) }}</template></small><small v-if="!item.pass && productGuidance(item)">{{ productGuidance(item) }}</small></span></li></ul></details>
         </div>
       </article>
     </div>
@@ -61,17 +56,16 @@ function phase(kind: PaidMedia) {
 const reasons: Record<string, string> = { runtime_restarted: '服务已重启，需要重新检查开启', deployment_mode: '当前部署尚未启用管理员开关模式', closed: '提交关闭', open: '运行状态已核对', dependencies_changed: '原付费准入依赖已变化，提交关闭；需重新检查并确认开启', dependencies_unavailable: '依赖检查不可用，提交关闭', state_unavailable: '无法读取运行状态', apply_failed: '生效失败，提交关闭', no_approved_offer: '没有仍有效的已核准商品，需要重新检查', revision_changed: '开关版本已变化，需要重新检查' }
 const invalidCheckReasons = new Set(['dependencies_unavailable', 'revision_changed', 'deployment_mode'])
 const reason = (code?: string) => code && Object.prototype.hasOwnProperty.call(reasons, code) ? reasons[code] : '等待服务端核对'
-const checks: Record<string, string> = { quote_account_quota_requires_cost: '此 Account 设置了金额额度，不能承接未核算采购金额的视频；请管理员核对账号额度政策，不会自动修改配置', quote_cost_channel_missing: '历史发布配置缺少工作台采购成本，请补齐并重新发布', quote_cost_rule_missing: '没有匹配当前商品规格的已发布工作台采购成本', quote_cost_contract: '工作台成本须为 CNY 单张或整条成本，请核对规格与单位', native_account: '原生 Account 可用状态', published_offer: '至少一个已发布商品通过检查', check_timeout: '检查超时', check_cancelled: '检查已取消', dependencies_unavailable: '依赖不可用', sidecar_runtime: 'Core / Bridge / BFF 运行合同', customer_key: '当前管理员的工作台访问权限', customer_key_network_restricted: '工作台 Key 有网络限制，尚不能确认报价权限', billing_eligibility: '原生余额、订阅及权限', customer_quota: '原生 Key 配额', subscription: '订阅状态', private_result_storage: '私有结果存储', published_specs: '已发布规格与正数售价', spec_compilation_and_assets: '规格编译与私有素材', native_quote: '原生非付费报价', quote_account_admission: '账号运行准入未通过：核对 Group、模型映射、调度及运行限制', quote_account_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_workbench_cost: '已发布工作台采购成本未匹配，请在商品第 4 步补齐后重新发布', quote_published_offer: '发布依赖和报价规格', quote_binding: '原生报价绑定（旧版诊断）', quote_unknown: '报价检查原因未分类，请联系管理员核对服务端诊断', quote_request: '报价请求身份或请求大小不符合要求', quote_model_permission: '当前 Key 所属 Group 未允许此站点模型', quote_execution: '视频协议或规格不兼容：核对模型、时长、比例及参考素材合同', quote_account: '原生 Account 无法读取', quote_reference_preparation: '参考素材准备状态与当前报价不一致，请重新准备', quote_quote_store: '报价暂存失败，请稍后重试', dependencies_changed: '检查期间配置发生变化', video_reference_or_subscription_quote_requires_existing_preparation: '视频报价需要有效素材准备或受支持的计费合同', deployment_mode: '部署需启用管理员开关模式' }
-function checkLabel(item: PaidCheck, kind: PaidMedia) {
-  if (kind === 'video' && costCodes.has(item.code)) return '视频历史合同检查未通过，请核对服务端诊断；视频商品不再配置采购成本'
+const checks: Record<string, string> = { quote_account_quota_requires_cost: '此 Account 设置了金额额度，工作台采购成本未知，暂不可用；请使用无金额额度的账号，不会自动修改配置', native_account: '原生 Account 可用状态', published_offer: '至少一个已发布商品通过检查', check_timeout: '检查超时', check_cancelled: '检查已取消', dependencies_unavailable: '依赖不可用', sidecar_runtime: 'Core / Bridge / BFF 运行合同', customer_key: '当前管理员的工作台访问权限', customer_key_network_restricted: '工作台 Key 有网络限制，尚不能确认报价权限', billing_eligibility: '原生余额、订阅及权限', customer_quota: '原生 Key 配额', subscription: '订阅状态', private_result_storage: '私有结果存储', published_specs: '已发布规格与正数售价', spec_compilation_and_assets: '规格编译与私有素材', native_quote: '原生非付费报价', quote_account_admission: '账号运行准入未通过：核对 Group、模型映射、调度及运行限制', quote_published_offer: '发布依赖和报价规格', quote_binding: '原生报价绑定（旧版诊断）', quote_unknown: '报价检查原因未分类，请联系管理员核对服务端诊断', quote_request: '报价请求身份或请求大小不符合要求', quote_model_permission: '当前 Key 所属 Group 未允许此站点模型', quote_execution: '视频协议或规格不兼容：核对模型、时长、比例及参考素材合同', quote_account: '原生 Account 无法读取', quote_reference_preparation: '参考素材准备状态与当前报价不一致，请重新准备', quote_quote_store: '报价暂存失败，请稍后重试', dependencies_changed: '检查期间配置发生变化', video_reference_or_subscription_quote_requires_existing_preparation: '视频报价需要有效素材准备或受支持的计费合同', deployment_mode: '部署需启用管理员开关模式' }
+function checkLabel(item: PaidCheck) {
+  if (obsoleteCostChecks.has(item.code)) return '历史检查结果已失效，请重新执行开启前检查'
   if (!item.pass && item.code === 'published_offer') return '没有可用的已发布商品，当前不能开启；请核对商品发布、销售及原生准入状态'
   if (!item.pass && item.code === 'sidecar_runtime') return 'Core / Bridge / BFF 运行合同检查未通过，请核对服务可用性与版本配置'
   if (!item.pass && item.code === 'dependencies_unavailable') return '依赖暂时不可用，当前不能开启；请核对服务运行状态后重新检查'
   if (!item.pass && item.code === 'dependencies_changed') return '检查期间配置发生变化，本次结果已失效，请重新检查'
   return Object.prototype.hasOwnProperty.call(checks, item.code) ? checks[item.code] : '其他服务端检查，请管理员核对诊断'
 }
-const costCodes = new Set(['quote_workbench_cost', 'quote_account_cost', 'quote_cost_channel_missing', 'quote_cost_rule_missing', 'quote_cost_contract'])
-const hasCostFailure = (kind: PaidMedia) => kind === 'image' && (reports.value[kind]?.checks.some(item => !item.pass && costCodes.has(item.code)) ?? false)
+const obsoleteCostChecks = new Set(['quote_workbench_cost', 'quote_account_cost', 'quote_cost_channel_missing', 'quote_cost_rule_missing', 'quote_cost_contract'])
 const partial = (kind: PaidMedia) => !!reports.value[kind]?.pass && reports.value[kind]!.checks.some(item => !item.pass)
 const checkProductState = (item: PaidCheck) => props.suppliers.find(s => s.id === item.account_id)?.product_states?.find(p => p.product_id === item.product_id)
 const pathLabel = (path?: string) => path === 'edit' || path === 'with_references' ? '参考素材路径' : path === 'text' || path === 'without_references' ? '无参考素材路径' : ''
@@ -124,10 +118,6 @@ watch(() => kinds.map(supplierDependencies), (current, previous) => {
     invalidate(kind, pending.value === `check-${kind}` ? '检查结果已失效：检查期间商品或账号配置发生变化，请重新执行开启前检查' : '检查结果已失效：已发布商品、销售或账号依赖发生变化，请重新执行开启前检查')
   } })
 })
-function checkUpstreamModel(item: PaidCheck) {
- const supplier = props.suppliers.find(s => s.id === item.account_id)
- return supplier?.media_workbench_v1?.published?.products?.find(p => p.product_id === item.product_id)?.upstream_model || checkProductState(item)?.upstream_model || ''
-}
 function checkProductName(item: PaidCheck) {
  if (!item.product_id) return ''
  const supplier = props.suppliers.find(s => s.id === item.account_id)
@@ -211,9 +201,6 @@ function confirmOpen() { const kind = confirmKind.value; confirmKind.value = nul
 onMounted(() => refresh())
 </script>
 <style scoped>
-.mw-cost-guide { margin-block:12px; padding:12px; border:1px solid var(--mw-border, #d8dee7); border-radius:8px; overflow-wrap:anywhere; }
-.mw-cost-guide p + p { margin-top:8px; }
-.mw-cost-guide a { display:inline-block; margin-top:10px; text-decoration:underline; }
 .mw-paid-panel { margin: 0 0 24px; padding: 24px; }
 .mw-paid-panel > header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; }
 .mw-paid-panel h2,.mw-paid-panel h3 { font-weight:650; margin-bottom:8px; }
@@ -231,8 +218,5 @@ onMounted(() => refresh())
 :global(html.dark .mw-paid-grid article),:global(html.dark .mw-paid-checks) { border-color:#374151; }
 :global(html.dark .mw-paid-state.is-open) { color:#86efac; }
 :global(html.dark .mw-paid-error) { color:#fca5a5; }
-@media(max-width:640px) { .mw-paid-grid { grid-template-columns:1fr; } .mw-cost-guide { margin-block:12px; padding:12px; border:1px solid var(--mw-border, #d8dee7); border-radius:8px; overflow-wrap:anywhere; }
-.mw-cost-guide p + p { margin-top:8px; }
-.mw-cost-guide a { display:inline-block; margin-top:10px; text-decoration:underline; }
-.mw-paid-panel { padding:16px; } .mw-paid-panel > header { flex-wrap:wrap; } }
+@media(max-width:640px) { .mw-paid-grid { grid-template-columns:1fr; } .mw-paid-panel { padding:16px; } .mw-paid-panel > header { flex-wrap:wrap; } }
 </style>

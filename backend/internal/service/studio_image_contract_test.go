@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/gin-gonic/gin"
 	"image"
@@ -122,19 +121,19 @@ func TestStudioImageIssuedAccountingSnapshot(t *testing.T) {
 		calls++
 		return studioResult(t, "png"), "original-id", nil
 	}
-	// Freeze Published .35/rate 1; changing the API Channel cannot reprice it.
+	// Supplier procurement remains unknown even when old metadata and API rules exist.
 	live.channel = studioAccountPrice("0.40")
 	v := 2.0
 	account.a.RateMultiplier = &v
 	newQ := issue()
-	if q.Accounting.BaseAmount != "0.35" || newQ.Accounting.BaseAmount != "0.35" || newQ.Accounting.EffectiveAccountQuotaCost != "0.7" || q.Binding.Offer.SalePrice.Amount != "0.80" {
+	if q.Accounting.SourceState != "unknown" || q.Accounting.BaseAmount != "" || newQ.Accounting.BaseAmount != "" || newQ.Accounting.EffectiveAccountQuotaCost != "" || q.Accounting.AccountRateMultiplier != "1" || newQ.Accounting.AccountRateMultiplier != "2" || q.Binding.Offer.SalePrice.Amount != "0.80" {
 		t.Fatal(q.Accounting, newQ.Accounting)
 	}
 	_, e := r.Dispatch(context.Background(), nil, q, "snapshot", "prompt", nil, key)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0.35" {
+	if billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0" {
 		t.Fatal(billing.cmd)
 	}
 	live.channel = nil
@@ -161,27 +160,39 @@ func TestStudioImageIssueFreezesUnitTotalAndQuantity(t *testing.T) {
 }
 
 func TestStudioImageAccountingAdmissionBeforeNetwork(t *testing.T) {
-	for _, quota := range []bool{true, false} {
-		t.Run(fmt.Sprintf("quota_%t", quota), func(t *testing.T) {
-			r, q, key, account, billing := studioContractFixture(t)
-			if !quota {
-				account.a.Extra = map[string]any{}
+	for _, field := range []string{"", "quota_limit", "quota_daily_limit", "quota_weekly_limit"} {
+		t.Run("quota_"+field, func(t *testing.T) {
+			r, q, key, accounts, billing := studioContractFixture(t)
+			calls := 0
+			r.network = func(context.Context, *gin.Context, *Account, []byte, string) ([]byte, string, error) {
+				calls++
+				return studioResult(t, "png"), "retail", nil
 			}
-			token, e := r.Issue(context.Background(), q.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, nil)
-			if e != nil {
-				t.Fatal(e)
+			if field != "" {
+				accounts.a.Extra[field] = 100.0
 			}
-			allowed, e := r.Store.Quote(token, q.Owner, time.Now())
-			if e != nil || allowed.Accounting.SourceType != "studio_published_cost" || allowed.Accounting.BaseAmount != "0.35" {
-				t.Fatal(allowed.Accounting, e)
+			token, err := r.Issue(context.Background(), q.Owner, key, q.Binding.Offer.OfferID, q.Binding.Spec, nil)
+			if field != "" {
+				if token != "" || QuoteFailureStage(err) != "account_quota_requires_cost" {
+					t.Fatal("limited Account received unknown-cost quote", token, err)
+				}
+				if _, err := r.Dispatch(context.Background(), nil, q, "quota-drift", "prompt", nil, key); QuoteFailureStage(err) != "account_quota_requires_cost" {
+					t.Fatal("limit enabled after quote was admitted", err)
+				}
+				if calls != 0 || billing.calls != 0 {
+					t.Fatal("quota rejection invoked supplier or billing")
+				}
+				return
 			}
-			_, e = r.Dispatch(context.Background(), nil, allowed, "published-cost", "prompt", nil, key)
-			want := "0"
-			if quota {
-				want = "0.35"
+			if err != nil {
+				t.Fatal(err)
 			}
-			if e != nil || billing.cmd == nil || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != want {
-				t.Fatal(e, billing.cmd)
+			allowed, err := r.Store.Quote(token, q.Owner, time.Now())
+			if err != nil || allowed.Accounting.SourceType != StudioImageRetailUsageMode || allowed.Accounting.BaseAmount != "" {
+				t.Fatal(allowed.Accounting, err)
+			}
+			if _, err = r.Dispatch(context.Background(), nil, allowed, "retail", "prompt", nil, key); err != nil || billing.cmd == nil || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0" {
+				t.Fatal(err, billing.cmd)
 			}
 		})
 	}
@@ -221,7 +232,7 @@ func (r *studioBillingFixture) Apply(_ context.Context, cmd *UsageBillingCommand
 func studioContractFixture(t *testing.T, origins ...string) (*StudioImageRuntime, StudioImageQuote, *APIKey, *studioAccountFixture, *studioBillingFixture) {
 	t.Helper()
 	ctx := context.Background()
-	a := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, GroupIDs: []int64{3}, Credentials: map[string]any{"api_key": "synthetic-only", "base_url": "https://supplier.example/v1"}, Extra: map[string]any{"quota_limit": 100.0}}
+	a := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, GroupIDs: []int64{3}, Credentials: map[string]any{"api_key": "synthetic-only", "base_url": "https://supplier.example/v1"}, Extra: map[string]any{}}
 	if len(origins) != 0 {
 		a.Credentials["base_url"] = origins[0]
 	}
@@ -259,7 +270,7 @@ func studioContractFixture(t *testing.T, origins ...string) (*StudioImageRuntime
 	runtime.Store = NewStudioImageStore(t.TempDir())
 	runtime.enabled = true
 	q := StudioImageQuote{Owner: StudioImageOwner{1, 2, 3}, Binding: binding, BaseURL: a.GetOpenAIBaseURL(), CredentialFingerprint: studioOfferCredentialFingerprint(a, binding.Offer), CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Minute), KeyQuotaEnabled: true, KeyRateEnabled: true, AccountQuotaEnabled: a.HasAnyQuotaLimit()}
-	q.Accounting, err = ResolveStudioPublishedAccountCost(a, &ma.a, binding, q.CreatedAt)
+	q.Accounting, err = imageRetailAccounting(a, binding, q.CreatedAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,6 +419,7 @@ func TestStudioImageExactAccountDrift(t *testing.T) {
 			r.Core.openaiAccountRuntimeBlockUntil.Store(a.a.ID, until)
 		}},
 		{"quota_exhausted", func(_ *StudioImageRuntime, _ *StudioImageQuote, a *studioAccountFixture) {
+			a.a.Extra["quota_limit"] = 100.0
 			a.a.Extra["quota_used"] = 100.0
 		}},
 		{"published_changed", func(r *StudioImageRuntime, _ *StudioImageQuote, _ *studioAccountFixture) {
@@ -448,88 +460,36 @@ func TestStudioImageExactAccountDrift(t *testing.T) {
 }
 
 func TestStudioImageIndependentAccounting(t *testing.T) {
-	r, q, _, a, _ := studioContractFixture(t)
-	q.Binding.Offer.CostVersion = 0
+	_, q, _, a, _ := studioContractFixture(t)
 	for _, sale := range []string{"0.80", "1.20"} {
-		t.Run("sale_"+sale, func(t *testing.T) {
-			binding := q.Binding
-			binding.Offer.SalePrice.Amount = sale
-			ch := studioAccountPrice("0.35")
-			ch.ApplyPricingToAccountStats = true
-			bad := 9.0
-			ch.ModelPricing = []ChannelModelPricing{{PerRequestPrice: &bad}}
-			snap, e := ResolveStudioImageAccountCost(a.a, binding, ch, time.Now())
-			if e != nil || snap.BaseAmount != "0.35" || snap.EffectiveAccountQuotaCost != "0.35" {
-				t.Fatal(snap, e)
-			}
-		})
+		binding := q.Binding
+		binding.Offer.SalePrice.Amount = sale
+		snapshot, err := imageRetailAccounting(a.a, binding, time.Now())
+		if err != nil || snapshot.SourceState != "unknown" || snapshot.BaseAmount != "" || snapshot.EffectiveAccountQuotaCost != "" {
+			t.Fatal("customer sale inferred procurement", snapshot, err)
+		}
 	}
-	for _, tc := range []struct {
-		name   string
-		mutate func(*Account, *Channel)
-	}{
-		{"other_account", func(_ *Account, c *Channel) { c.AccountStatsPricingRules[0].AccountIDs = []int64{99} }},
-		{"group_only", func(_ *Account, c *Channel) {
-			c.AccountStatsPricingRules[0].AccountIDs = nil
-			c.AccountStatsPricingRules[0].GroupIDs = []int64{3}
-		}},
-		{"wrong_model", func(_ *Account, c *Channel) { c.AccountStatsPricingRules[0].Pricing[0].Models = []string{"other"} }},
-		{"wrong_platform", func(_ *Account, c *Channel) { c.AccountStatsPricingRules[0].Pricing[0].Platform = PlatformAnthropic }},
-		{"missing_price", func(_ *Account, c *Channel) {
-			p := &c.AccountStatsPricingRules[0].Pricing[0]
-			p.PerRequestPrice = nil
-			p.AccountStatsPerRequestExact = nil
-		}},
-		{"token_price", func(_ *Account, c *Channel) { c.AccountStatsPricingRules[0].Pricing[0].BillingMode = BillingModeToken }},
-		{"ninth_decimal", func(_ *Account, c *Channel) {
-			v := "0.350000001"
-			c.AccountStatsPricingRules[0].Pricing[0].AccountStatsPerRequestExact = &v
-		}},
-		{"negative_rate", func(a *Account, _ *Channel) { v := -1.0; a.RateMultiplier = &v }},
-		{"unrepresentable_rate", func(a *Account, _ *Channel) { v := 1.00001; a.RateMultiplier = &v }},
+	for _, value := range []float64{-1, 1.00001, 1000000} {
+		a.a.RateMultiplier = &value
+		if _, err := imageRetailAccounting(a.a, q.Binding, time.Now()); err == nil {
+			t.Fatal("invalid native account multiplier admitted", value)
+		}
+	}
+	for _, mutate := range []func(*StudioImageQuote){
+		func(q *StudioImageQuote) { q.AccountQuotaEnabled = true },
+		func(q *StudioImageQuote) { q.Accounting.BaseAmount = "0" },
+		func(q *StudioImageQuote) { q.Accounting.EffectiveAccountQuotaCost = "0" },
+		func(q *StudioImageQuote) { q.Accounting.SourceType = StudioVideoRetailUsageMode },
+		func(q *StudioImageQuote) { q.Accounting.SourceID = "other" },
+		func(q *StudioImageQuote) { q.Accounting.SourceHash = strings.Repeat("a", 64) },
+		func(q *StudioImageQuote) { q.Accounting.RequestCount++ },
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, q, _, a, _ := studioContractFixture(t)
-			q.Binding.Offer.CostVersion = 0
-			ch := studioAccountPrice("0.35")
-			tc.mutate(a.a, ch)
-			if _, e := ResolveStudioImageAccountCost(a.a, q.Binding, ch, time.Now()); e == nil {
-				t.Fatal("non-independent accounting accepted")
-			}
-		})
+		changed := q
+		mutate(&changed)
+		if changed.Accounting.Validate(changed) == nil {
+			t.Fatal("tampered unknown-cost snapshot admitted")
+		}
 	}
-	t.Run("quota_missing_customer_not_fallback", func(t *testing.T) {
-		if _, e := ResolveStudioImageAccountCost(a.a, q.Binding, nil, time.Now()); e == nil {
-			t.Fatal("quota admitted without strict cost")
-		}
-	})
-	t.Run("no_quota_not_required", func(t *testing.T) {
-		a.a.Extra = map[string]any{}
-		snap, e := ResolveStudioImageAccountCost(a.a, q.Binding, nil, time.Now())
-		if e != nil || snap.SourceState != "not_required" || snap.BaseAmount != "0" {
-			t.Fatal(snap, e)
-		}
-	})
-	t.Run("rate_frozen", func(t *testing.T) {
-		v := 2.0
-		a.a.RateMultiplier = &v
-		snap, e := ResolveStudioImageAccountCost(a.a, q.Binding, studioAccountPrice("0.35"), time.Now())
-		if e != nil || snap.EffectiveAccountQuotaCost != "0.7" {
-			t.Fatal(snap, e)
-		}
-		v = 3
-		if snap.AccountRateMultiplier != "2" || snap.EffectiveAccountQuotaCost != "0.7" {
-			t.Fatal("rate recomputed")
-		}
-	})
-	t.Run("new_rule_new_snapshot", func(t *testing.T) {
-		a.a.RateMultiplier = nil
-		snap, e := ResolveStudioImageAccountCost(a.a, q.Binding, studioAccountPrice("0.40"), time.Now())
-		if e != nil || snap.BaseAmount != "0.4" || q.Accounting.BaseAmount != "0.35" {
-			t.Fatal(snap, e)
-		}
-	})
-	_ = r
 }
 
 func TestStudioImageDispatchAndRecovery(t *testing.T) {
@@ -559,11 +519,11 @@ func TestStudioImageDispatchAndRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if receipt.BillingState != "billed" || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0.35" {
+	if receipt.BillingState != "billed" || billing.cmd.ExactAmounts.Balance != "0.80" || billing.cmd.ExactAmounts.AccountQuota != "0" {
 		t.Fatal(receipt, billing.cmd)
 	}
 	log := QuotedImageUsageLog(receipt)
-	if log.ActualCost != 0.8 || *log.AccountStatsCost != 0.35 || *log.AccountRateMultiplier != 1 {
+	if log.ActualCost != 0.8 || log.AccountStatsCost != nil || *log.BillingMode != StudioImageRetailUsageMode || *log.AccountRateMultiplier != 1 {
 		t.Fatal("customer/account report mixed")
 	}
 	// Live Published/account/rate drift cannot rewrite an already claimed task.

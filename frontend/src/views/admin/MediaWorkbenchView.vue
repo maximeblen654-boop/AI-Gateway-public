@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="media-workbench" :class="[`mw-step-${step}`, { 'mw-cost-open': costOpen }]" :aria-busy="!!pending || loading">
+    <div class="media-workbench" :class="`mw-step-${step}`" :aria-busy="!!pending || loading">
       <header class="mw-heading">
         <div>
           <h1>媒体工作台</h1>
@@ -224,7 +224,7 @@
               <button v-if="canRetryUnconfirmedSave" type="button" class="btn btn-secondary" data-test="retry-unconfirmed-save" @click="retryUnconfirmedSave">重新核对并保存当前草稿</button>
               <button type="button" class="btn btn-secondary" data-test="editor-discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
             </section>
-            <MediaProductEditor @cost-toggle="costOpen = $event" v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
@@ -325,7 +325,6 @@ import { formatDateTimeLocalInput } from '@/utils/format'
 import { mediaPublicationLabel } from '@/utils/mediaAdminPresentation'
 import '@/styles/media-workbench.css'
 
-const costOpen = ref(false)
 const paidStates = ref<Partial<Record<PaidMedia, PaidState>>>({})
 const paidStatusLabel = (kind: PaidMedia) => paidStates.value[kind]?.mode === 'managed-v1' ? paidStates.value[kind]?.effective_enabled ? '已开放' : '尚未开放' : '状态未确认'
 async function readPaidStatus() {
@@ -649,10 +648,10 @@ async function locate(diagnostic: Diagnostic) {
   }
   const fieldPath = productEditor.value?.showField(path, diagnostic.code) ?? path
   await nextTick()
-  const costIndex = /cost_rules(?:\[|\.)(\d+)/.exec(fieldPath)?.[1]
-  const exactCost = costIndex === undefined ? undefined : editorElement.value?.querySelector<HTMLElement>(`[data-field="cost_rules.${costIndex}.cost"]`)
-  const field = ['cost_rules', 'cost_coverage', 'adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
-  const section = exactCost ?? editorElement.value?.querySelector<HTMLElement>(`[data-field="${field === 'cost_coverage' ? 'cost_rules' : field}"]`)
+  const priceIndex = /pricing_rules(?:\[|\.)(\d+)/.exec(fieldPath)?.[1]
+  const exactPrice = priceIndex === undefined ? undefined : editorElement.value?.querySelector<HTMLElement>(`[data-field="pricing_rules.${priceIndex}.sale_price"]`)
+  const field = ['adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
+  const section = exactPrice ?? editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)
   section?.querySelectorAll('details').forEach(node => { node.open = true })
   let ancestor = section
   while (ancestor && ancestor !== editorElement.value) {

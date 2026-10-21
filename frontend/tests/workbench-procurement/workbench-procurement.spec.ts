@@ -27,7 +27,7 @@ async function open(page: Page, scenario = 'complete', mode = 'light') {
 async function editor(page: Page, model = 'image-native-1') {
   await page.getByTestId(`model-${model}`).click()
   await page.getByTestId('wizard-step-4').click()
-  await expect(page.getByTestId('procurement-editor')).toBeVisible()
+  await expect(page.getByTestId('pricing-editor')).toBeVisible()
 }
 async function save(page: Page) {
   await page.getByTestId('wizard-step-5').click()
@@ -42,7 +42,7 @@ async function publishImage(page: Page) {
 }
 
 for (const viewport of widths) for (const mode of ['light', 'dark']) {
-  test(`actual shell cost editor and top account operations ${viewport.width} ${mode}`, async ({ page }, info) => {
+  test(`actual shell retail editor and top account operations ${viewport.width} ${mode}`, async ({ page }, info) => {
     await page.setViewportSize(viewport)
     await open(page, 'complete', mode)
     await expect(page.locator('aside.sidebar')).toHaveCount(1)
@@ -56,12 +56,12 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     const box = (await panel.boundingBox())!
     expect(box.width).toBeLessThanOrEqual(980)
     expect(box.width).toBeGreaterThan(viewport.width < 1024 ? viewport.width - 100 : 650)
+    await expect(page.getByTestId('price-1')).toHaveValue('0.90')
     await expect(page.getByTestId('price-0')).toHaveValue('0.90')
-    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.10')
-    await expect(page.getByTestId('procurement-cost-1')).toHaveValue('0.20')
+    await expect(page.getByTestId('price-2')).toHaveValue('1.90')
     await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'))})
-    await page.getByTestId('procurement-cost-0').fill('0.123456')
-    await expect(page.getByTestId('price-0')).toHaveValue('0.90')
+    await page.getByTestId('price-0').fill('0.123456')
+    await expect(page.getByTestId('price-1')).toHaveValue('0.90')
     expect(await writes(page)).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
     if (viewport.width < 1024) {
@@ -72,13 +72,13 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
       await page.locator('.fixed.inset-0.bg-black\\/50').click({ position: { x: viewport.width - 10, y: 100 } })
       await expect.poll(async () => { const r = (await sidebar.boundingBox())!; return r.x + r.width }).toBeLessThanOrEqual(1)
     }
-    await page.getByTestId('procurement-editor').scrollIntoViewIfNeeded()
+    await page.getByTestId('pricing-editor').scrollIntoViewIfNeeded()
     if (viewport.width <= 390) {
-      const label = (await page.getByTestId('procurement-editor').locator('.mw-spec-identity').first().boundingBox())!
+      const label = (await page.getByTestId('pricing-editor').locator('.mw-field').first().boundingBox())!
       expect(label.width).toBeGreaterThanOrEqual(200)
-      expect((await page.getByTestId('procurement-cost-0').boundingBox())!.width).toBeGreaterThanOrEqual(200)
+      expect((await page.getByTestId('price-0').boundingBox())!.width).toBeGreaterThanOrEqual(200)
     }
-    await page.screenshot({ path: info.outputPath('cost-editor.png'), animations: 'disabled' })
+    await page.screenshot({ path: info.outputPath('retail-editor.png'), animations: 'disabled' })
     await page.getByTestId('wizard-step-5').click()
     await page.getByRole('button', { name: '← 返回模型列表', exact: true }).click()
     const dirty = page.getByRole('dialog', { name: '有未保存修改' })
@@ -86,49 +86,54 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     expect((await dirty.boundingBox())!.width).toBeLessThanOrEqual(viewport.width)
     await page.keyboard.press('Escape')
     await page.getByTestId('wizard-step-4').click()
-    await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.123456')
+    await expect(page.getByTestId('price-0')).toHaveValue('0.123456')
   })
 }
 
-test('calculator adoption, boundary save and a fresh page recover independent costs', async ({ page }) => {
+test('independent profit calculation never mutates product; explicit retail edits recover from server', async ({ page }) => {
   await open(page)
-  const original = (await snapshot(page)).media_workbench_v1!
+  const before = await snapshot(page)
   await editor(page)
-  await page.getByTestId('cost-purchase').fill('100')
-  await page.getByTestId('cost-credits').fill('10000')
-  await page.getByTestId('cost-consumption-0').fill('35')
-  page.once('dialog', dialog => dialog.accept())
-  await page.getByTestId('cost-apply-0').click()
-  await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
-  await expect(page.getByTestId('procurement-cost-1')).toHaveValue('0.20')
-  await expect(page.getByTestId('price-0')).toHaveValue('0.90')
+  await page.getByTestId('independent-calculator-open').click()
+  await page.getByTestId('independent-purchase').fill('100')
+  await page.getByTestId('independent-credits').fill('10000')
+  await page.getByTestId('independent-consumption').fill('35')
+  await page.getByTestId('independent-sale').fill('0.90')
+  await expect(page.getByTestId('independent-result')).toHaveText('0.35 元')
+  await expect(page.getByTestId('independent-profit')).toHaveText('0.55 元')
+  await page.keyboard.press('Escape')
+  expect(await snapshot(page)).toEqual(before)
   expect(await writes(page)).toEqual([])
-  expect((await snapshot(page)).media_workbench_v1!.published).toEqual(original.published)
+  await expect(page.getByTestId('price-0')).toHaveValue('0.90')
+  await expect(page.getByTestId('price-2')).toHaveValue('1.90')
+  await page.getByTestId('price-0').fill('0.95')
   await save(page)
   await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
   const saved = (await snapshot(page)).media_workbench_v1!
-  expect(saved.draft.products[0]!.cost_rules?.[0]?.cost?.amount).toBe('0.35')
-  expect(saved.published).toEqual(original.published)
+  expect(saved.draft.products[0]!.pricing_rules[0]!.sale_price!.amount).toBe('0.95')
+  expect(saved.draft.products[0]).not.toHaveProperty('cost_rules')
+  expect(saved.published).toEqual(before.media_workbench_v1!.published)
   expect(saved.sales.enabled).toBe(false)
-  expect((await writes(page)).map(call => call.url.split('/').pop())).toEqual(['draft'])
+  expect((await writes(page)).every(call => call.url.endsWith('/draft'))).toBe(true)
   await page.reload()
   await page.getByTestId('account-search').fill('#44'); await page.getByTestId('supplier-44').click()
   await editor(page)
-  await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.35')
+  await expect(page.getByTestId('price-0')).toHaveValue('0.95')
+  await expect(page.getByTestId('price-2')).toHaveValue('1.90')
 })
 
-test('incomplete draft saves and missing-cost diagnostic locates step 4 without losing input', async ({ page }) => {
+test('incomplete draft saves and missing-price diagnostic locates step 4 without losing input', async ({ page }) => {
   await open(page, 'missing')
   await editor(page)
-  await page.getByTestId('price-0').fill('0.92')
+  await page.getByTestId('price-1').fill('0.92')
   await save(page)
   await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
-  const issue = page.locator('.mw-diagnostic').filter({ hasText: '隔离图片商品 的采购成本尚未填写' })
+  const issue = page.locator('.mw-diagnostic').filter({ hasText: '隔离图片商品 的客户售价尚未填写' })
   await expect(issue).toBeVisible()
   await issue.click()
   await expect(page.getByTestId('wizard-page-4')).toBeVisible()
-  await expect(page.getByTestId('procurement-cost-0')).toBeFocused()
-  await expect(page.getByTestId('price-0')).toHaveValue('0.92')
+  await expect(page.getByTestId('price-2')).toBeFocused()
+  await expect(page.getByTestId('price-1')).toHaveValue('0.92')
   expect((await writes(page)).filter(call => call.url.endsWith('/publish'))).toEqual([])
 })
 
@@ -149,7 +154,7 @@ for (const mode of ['fail', 'timeout-committed', 'timeout-rejected', 'conflict']
   test(`save ${mode} preserves evidence and avoids a second mutation`, async ({ page }) => {
     await open(page)
     await editor(page)
-    await page.getByTestId('procurement-cost-0').fill('0.456')
+    await page.getByTestId('price-0').fill('0.456')
     await fault(page, 'draft', mode)
     await save(page)
     await expect.poll(async () => (await writes(page)).filter(call => call.url.endsWith('/draft')).length).toBe(1)
@@ -157,7 +162,7 @@ for (const mode of ['fail', 'timeout-committed', 'timeout-rejected', 'conflict']
     else {
       await expect(page.getByTestId('banner')).toContainText(mode === 'conflict' ? /其他页面|冲突/ : /未保存|未确认|未完成|不可用|核对/)
       if (mode !== 'conflict') await page.getByTestId('wizard-step-4').click()
-      await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.456')
+      await expect(page.getByTestId('price-0')).toHaveValue('0.456')
     }
     expect((await writes(page)).filter(call => call.url.endsWith('/draft'))).toHaveLength(1)
     expect((await snapshot(page)).media_workbench_v1!.published?.revision).toBe('fixture-published-2')
@@ -166,7 +171,7 @@ for (const mode of ['fail', 'timeout-committed', 'timeout-rejected', 'conflict']
 
 test('pending save disables a duplicate click and never reports early success', async ({ page }) => {
   await open(page); await editor(page)
-  await page.getByTestId('procurement-cost-0').fill('0.333')
+  await page.getByTestId('price-0').fill('0.333')
   await fault(page, 'draft', 'delay')
   await save(page)
   await expect(page.getByTestId('save')).toBeDisabled()
@@ -178,17 +183,17 @@ test('pending save disables a duplicate click and never reports early success', 
 
 test('definite input rejection retains the draft for correction and an explicit save', async ({ page }) => {
   await open(page); await editor(page)
-  await page.getByTestId('procurement-cost-0').fill('0.333')
+  await page.getByTestId('price-0').fill('0.333')
   await fault(page, 'draft', 'invalid')
   await save(page)
   await expect(page.getByTestId('banner')).toContainText(/输入不合法|不合法|未保存/)
   await page.getByTestId('wizard-step-4').click()
-  await expect(page.getByTestId('procurement-cost-0')).toHaveValue('0.333')
-  await page.getByTestId('procurement-cost-0').fill('0.334')
+  await expect(page.getByTestId('price-0')).toHaveValue('0.333')
+  await page.getByTestId('price-0').fill('0.334')
   await page.getByTestId('wizard-step-5').click()
   await expect.poll(async () => (await writes(page)).filter(call => call.url.endsWith('/draft')).length).toBe(2)
   await expect(page.getByTestId('save-feedback')).toContainText('草稿已确认保存')
-  expect((await snapshot(page)).media_workbench_v1!.draft.products[0]!.cost_rules?.[0]?.cost?.amount).toBe('0.334')
+  expect((await snapshot(page)).media_workbench_v1!.draft.products[0]!.pricing_rules[0]?.sale_price?.amount).toBe('0.334')
 })
 
 test('sales failure leaves confirmation open; server-confirmed retry changes only Account sales', async ({ page }) => {

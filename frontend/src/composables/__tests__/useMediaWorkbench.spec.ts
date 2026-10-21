@@ -1,7 +1,7 @@
 import { defineComponent, ref } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
+import { draftInput, mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
 import { useMediaWorkbench } from '../useMediaWorkbench'
 import { encodeDraftRecovery, recoveryKey, recoveryCopyKey, listDraftRecoveries, type DraftRecovery, type RecoveryEntry } from '../draftRecovery'
 import { supplier, saved, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
@@ -47,50 +47,50 @@ it('confirms the new video receipt after legacy procurement fields are removed, 
   expect(state.products.value[0]!.pricing_rules).toEqual(video.pricing_rules)
 })
 
-it('reconciles a save timeout by reading persisted cost without repeating the write', async () => {
+it('reconciles a save timeout by reading the persisted customer price without repeating the write', async () => {
   await start()
   const dto = saved()
-  dto.media_workbench_v1!.draft.products[0]!.cost_rules = [{ match: {}, cost: { amount: '0', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }]
+  dto.media_workbench_v1!.draft.products[0]!.pricing_rules[0]!.sale_price!.amount = '0.25'
   state.products.value = copy(dto.media_workbench_v1!.draft.products)
   api.saveDraft.mockImplementation(async (_id, version, products, _removed, submissionId) => { api.detail.mockResolvedValue(acknowledgement(dto, version, products, submissionId)); throw { status: 0 } })
   expect(await state.saveDraft()).toBe(true)
   expect(api.saveDraft).toHaveBeenCalledTimes(1)
   expect(state.saveFeedback.value).toContain('重新读取核对')
-  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('0')
+  expect(state.products.value[0]!.pricing_rules[0]!.sale_price!.amount).toBe('0.25')
 })
-it('keeps ambiguous writes blocked when readback cannot confirm the cost draft', async () => {
-  await start(); state.products.value[0]!.cost_rules = [{ match: {}, cost: null }]
+it('keeps ambiguous writes blocked when readback cannot confirm the customer price draft', async () => {
+  await start(); state.products.value[0]!.pricing_rules[0]!.sale_price = null
   api.saveDraft.mockRejectedValue({ status: 503 })
   expect(await state.saveDraft()).toBe(false)
   expect(await state.saveDraft()).toBe(false)
   expect(api.saveDraft).toHaveBeenCalledTimes(1)
   expect(state.saveState.value).toBe('unconfirmed')
-  expect(state.products.value[0]!.cost_rules).toEqual([{ match: {}, cost: null }])
+  expect(state.products.value[0]!.pricing_rules).toEqual([{ match: {}, sale_price: null }])
 })
-it.each([400, 422])('retains a rejected cost draft (%s) and allows correction followed by an explicit save', async status => {
+it.each([400, 422])('retains a rejected customer price draft (%s) and allows correction followed by an explicit save', async status => {
   await start()
   state.products.value[0]!.display_name = '保留当前商品名称'
-  state.products.value[0]!.cost_rules = [{ match: {}, cost: { amount: '-1', currency: 'CNY', billing_mode: 'per_request' }, source: 'manual' }]
-  const diagnostic = { class: 'UI_FIXABLE', severity: 'error', code: 'INVALID_COST', scope: 'canvas-1', path: 'cost_rules.0.cost', message: '采购成本不合法', action: '修正后保存' }
+  state.products.value[0]!.pricing_rules[0]!.sale_price!.amount = '-1'
+  const diagnostic = { class: 'UI_FIXABLE', severity: 'error', code: 'INVALID_PRICE', scope: 'canvas-1', path: 'pricing_rules.0.sale_price', message: '客户售价不合法', action: '修正后保存' }
   api.saveDraft.mockRejectedValue({ status, metadata: { diagnostics: [diagnostic] } })
   expect(await state.saveDraft()).toBe(false)
   expect(state.saveState.value).toBe('failed')
   expect(state.dirty.value).toBe(true)
   expect(state.config.value!.record_version).toBe(3)
   expect(state.products.value[0]!.display_name).toBe('保留当前商品名称')
-  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('-1')
+  expect(state.products.value[0]!.pricing_rules[0]!.sale_price!.amount).toBe('-1')
   expect(state.diagnostics.value).toEqual([diagnostic])
   expect(state.saveFeedback.value).toContain('修正字段后重新保存')
   expect(api.detail).toHaveBeenCalledTimes(1)
   expect(api.saveDraft).toHaveBeenCalledTimes(1)
-  state.products.value[0]!.cost_rules![0]!.cost!.amount = '0.25'
+  state.products.value[0]!.pricing_rules[0]!.sale_price!.amount = '0.25'
   const dto = saved(); dto.media_workbench_v1!.draft.products = copy(state.products.value)
   mockSave(dto)
   expect(await state.saveDraft()).toBe(true)
   expect(api.saveDraft).toHaveBeenCalledTimes(2)
   expect(api.saveDraft.mock.calls[1]![1]).toBe(3)
   expect(state.saveState.value).toBe('saved')
-  expect(state.products.value[0]!.cost_rules![0]!.cost!.amount).toBe('0.25')
+  expect(state.products.value[0]!.pricing_rules[0]!.sale_price!.amount).toBe('0.25')
 })
 it('keeps an acknowledged write uncertain when its readback is rejected with 400', async () => {
   await start()
@@ -479,7 +479,7 @@ describe('pending blank removal recovery before autosave', () => {
     expect(state.recoveryConflict.value).toBe(true)
     expect(await state.restoreRecovery()).toBe(false)
     expect(await state.restoreRecovery(true)).toBe(false)
-    expect(state.products.value).toEqual(latest.media_workbench_v1!.draft.products)
+    expect(state.products.value).toEqual(draftInput(latest.media_workbench_v1!.draft.products).products)
     expect(state.removedProducts.value).toEqual([])
     expect(localStorage.getItem(entry.key)).toBe(entry.raw)
     expect(api.saveDraft).not.toHaveBeenCalled()
@@ -490,7 +490,7 @@ describe('pending blank removal recovery before autosave', () => {
     api.detail.mockResolvedValue(dto); await start(); state.selectModel(dto.models[0]!.model_id)
     state.removeProduct('blank-3')
     state.selectedProduct.value = 'canvas-1'; state.product.value!.display_name = '另一商品的本地名称'
-    state.product.value!.cost_rules = [{ match: {}, cost: { amount: '0.27', currency: 'CNY', billing_mode: 'per_request' } }]
+    state.product.value!.pricing_rules[0]!.sale_price!.amount = '0.27'
     const latest = copy(dto)
     latest.media_workbench_v1!.record_version = 4; latest.media_workbench_v1!.draft.revision = 'new-server'
     latest.media_workbench_v1!.draft.products[0]!.display_name = '另一商品的服务器名称'
@@ -502,7 +502,7 @@ describe('pending blank removal recovery before autosave', () => {
     expect(state.products.value.some(p => p.product_id === 'blank-3')).toBe(false)
     expect(state.removedProducts.value.map(p => p.product_id)).toEqual(['blank-3'])
     expect(state.products.value.find(p => p.product_id === 'canvas-1')!.display_name).toBe('另一商品的本地名称')
-    expect(state.products.value.find(p => p.product_id === 'canvas-1')!.cost_rules![0]!.cost!.amount).toBe('0.27')
+    expect(state.products.value.find(p => p.product_id === 'canvas-1')!.pricing_rules[0]!.sale_price!.amount).toBe('0.27')
     expect(state.unresolvedProductConflicts.value).toEqual(['canvas-1'])
     expect(await state.restoreRecovery()).toBe(true)
     expect(state.unresolvedProductConflicts.value).toEqual(['canvas-1'])
@@ -596,15 +596,18 @@ describe('confirmed incremental autosave and local recovery', () => {
   async function editStart() { await start(); state.selectModel('image-native-1') }
   const stored = () => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(key => key.startsWith('ai-gateway:media-draft:'))!) || 'null') as DraftRecovery | null
   async function tick() { await vi.advanceTimersByTimeAsync(1500); await flushPromises() }
-  it('invalidates old success immediately and saves stopped cost then price input with separate IDs and updated CAS', async () => {
+  it('invalidates old success immediately and saves stopped name then price input with separate IDs and updated CAS', async () => {
     vi.useFakeTimers(); await editStart(); mockSave(saved())
-    state.product.value!.cost_rules = [{ match: {}, cost: { amount: '0.25', currency: 'CNY', billing_mode: 'per_request' } }]
-    expect(state.saveState.value).toBe('unsaved'); expect(stored()?.product.cost_rules![0]!.cost!.amount).toBe('0.25')
+    state.product.value!.display_name = '停止输入后保存的商品名称'
+    expect(state.saveState.value).toBe('unsaved'); expect(stored()?.product.display_name).toBe('停止输入后保存的商品名称')
     await tick(); expect(state.saveState.value).toBe('saved'); expect(api.saveDraft).toHaveBeenCalledTimes(1)
     state.product.value!.pricing_rules[0]!.sale_price!.amount = '0.50'
     expect(state.saveState.value).toBe('unsaved'); expect(state.saveFeedback.value).toBe('')
     await tick(); expect(state.saveState.value).toBe('saved'); expect(api.saveDraft).toHaveBeenCalledTimes(2)
+    expect(api.saveDraft.mock.calls[0]![1]).toBe(3)
     expect(api.saveDraft.mock.calls[1]![1]).toBe(4)
+    expect(api.saveDraft.mock.calls[1]![2][0]!.display_name).toBe('停止输入后保存的商品名称')
+    expect(api.saveDraft.mock.calls[1]![2][0]!.pricing_rules[0]!.sale_price!.amount).toBe('0.50')
     expect(api.saveDraft.mock.calls[1]![4]).not.toBe(api.saveDraft.mock.calls[0]![4]); expect(stored()).toBeNull()
   })
   it('coalesces quick edits and serializes a newer queued snapshot without applying the old response to the form', async () => {
@@ -1122,7 +1125,7 @@ describe('reviewed per-page ownership and per-product conflicts', () => {
     vi.useFakeTimers(); const dto = twoProducts(); api.detail.mockResolvedValue(dto)
     const { value } = await page()
     value.product.value!.display_name = 'local A'; value.selectedProduct.value = 'product-b'; value.product.value!.display_name = 'local B'
-    value.product.value!.cost_rules = [{ match: {}, cost: { amount: '0.37', currency: 'CNY', billing_mode: 'per_request' } }]
+    value.product.value!.pricing_rules[0]!.sale_price!.amount = '0.37'
     value.selectedProduct.value = 'canvas-1'
     const latest = copy(dto); latest.media_workbench_v1!.record_version = 4; latest.media_workbench_v1!.draft.revision = 'server-new'
     latest.media_workbench_v1!.draft.products[0]!.display_name = 'server changed A'; latest.media_workbench_v1!.draft.products[1]!.display_name = 'server changed B'
@@ -1135,7 +1138,7 @@ describe('reviewed per-page ownership and per-product conflicts', () => {
     await vi.advanceTimersByTimeAsync(2000)
     expect(api.saveDraft).not.toHaveBeenCalled()
     const b = value.products.value.find(p => p.product_id === 'product-b')!
-    expect(b.display_name).toBe('local B'); expect(b.cost_rules![0]!.cost!.amount).toBe('0.37')
+    expect(b.display_name).toBe('local B'); expect(b.pricing_rules[0]!.sale_price!.amount).toBe('0.37')
     value.selectedProduct.value = 'product-b'
     expect(await value.restoreRecovery(false)).toBe(false)
     expect(value.recovery.value!.base_record_version).toBe(3)

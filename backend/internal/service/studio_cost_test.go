@@ -56,40 +56,36 @@ func TestStudioPublishedCostFrozenExecutionIgnoresAPIMapping(t *testing.T) {
 	require.Equal(t, before, after, "request-local execution view mutated shared Account")
 	require.Equal(t, "api-only-model", accounts.a.GetMappedModel("gpt-image-2"), "ordinary API mapping changed")
 	require.Equal(t, "0.80", billing.cmd.ExactAmounts.Balance)
-	require.Equal(t, "0.35", billing.cmd.ExactAmounts.AccountQuota)
-	require.Equal(t, "studio_published_cost", q.Accounting.SourceType)
+	require.Equal(t, "0", billing.cmd.ExactAmounts.AccountQuota)
+	require.Equal(t, StudioImageRetailUsageMode, q.Accounting.SourceType)
 	_, err = r.Recover(context.Background(), "cost-frozen", q.Owner)
 	require.NoError(t, err)
 	require.Equal(t, 1, calls)
 	require.Equal(t, 1, billing.applied)
 }
 
-func TestStudioPublishedCostZeroIsExplicitAndRequired(t *testing.T) {
+func TestStudioImageNewPublicationDiscardsOldCostConfiguration(t *testing.T) {
 	r, original, key, _, _ := studioContractFixture(t)
 	ma := studioCostMediaFixture(t, r.Media)
 	p := studioCopyCostProduct(ma.a.Config.Draft.Products[0])
-	p.CostRules[0].Cost.Amount = "0"
+	p.CostRules = []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0", Currency: "CNY", BillingMode: "per_request"}}}
 	admin := mediaworkbench.NewService(ma)
-	d, err := admin.SaveDraft(context.Background(), 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
+	d, err := admin.SaveDraft(t.Context(), 7, ma.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
 	require.NoError(t, err)
-	d, err = admin.PublishSelected(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID})
+	require.Empty(t, d.Config.Draft.Products[0].CostRules)
+	d, err = admin.PublishSelected(t.Context(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID})
 	require.NoError(t, err)
 	r.Core.channelService = &ChannelService{repo: studioNoChannel{}}
-	token, err := r.Issue(context.Background(), original.Owner, key, d.Config.Published.Offers[0].OfferID, original.Binding.Spec, nil)
+	token, err := r.Issue(t.Context(), original.Owner, key, d.Config.Published.Offers[0].OfferID, original.Binding.Spec, nil)
 	require.NoError(t, err)
 	q, err := r.Store.Quote(token, original.Owner, time.Now())
 	require.NoError(t, err)
-	require.Equal(t, "resolved", q.Accounting.SourceState)
-	require.Equal(t, "studio_published_cost", q.Accounting.SourceType)
-	require.Equal(t, "0", q.Accounting.BaseAmount)
+	require.Equal(t, "unknown", q.Accounting.SourceState)
+	require.Equal(t, StudioImageRetailUsageMode, q.Accounting.SourceType)
+	require.Empty(t, q.Accounting.BaseAmount)
 	require.NoError(t, q.Accounting.Validate(q))
 	q.Accounting.SourceID = "wrong-published-revision"
 	require.Error(t, q.Accounting.Validate(q))
-	p.CostRules = nil
-	d, err = admin.SaveDraft(context.Background(), 7, d.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{p}})
-	require.NoError(t, err)
-	_, err = admin.PublishSelected(context.Background(), 7, d.Config.RecordVersion, d.Config.Draft.Revision, []string{p.ProductID})
-	require.ErrorIs(t, err, mediaworkbench.ErrValidation)
 }
 
 func TestStudioVideoRetailNoChannelFrozenBilling(t *testing.T) {

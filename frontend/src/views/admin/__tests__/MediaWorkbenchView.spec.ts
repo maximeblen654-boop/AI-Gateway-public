@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaWorkbenchView from '../MediaWorkbenchView.vue'
 import { useAuthStore } from '@/stores/auth'
+import { formatDateTimeLocalInput } from '@/utils/format'
 import { encodeDraftRecovery, recoveryCopyKey, type DraftRecovery } from '@/composables/draftRecovery'
 import { mediaWorkbenchAPI } from '@/api/admin/mediaWorkbench'
 import { supplier, saved, copy, draftManagementSupplier } from '@/components/admin/media/__tests__/fixtures'
@@ -56,19 +57,33 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
 
-it('opens missing procurement at step four and focuses the exact cost field', async () => {
+it('opens a missing customer sale price at step four and focuses that exact field', async () => {
   const dto = supplier(77, 'FAIL')
-  dto.media_workbench_v1!.draft.products[0]!.cost_rules = [
-    { match: { resolution: ['1K'] }, cost: { amount: '0.1', currency: 'CNY', billing_mode: 'per_request' } },
-    { match: { resolution: ['4K'] }, cost: null }
+  dto.media_workbench_v1!.draft.products[0]!.pricing_rules = [
+    { match: { resolution: ['1K'] }, sale_price: { amount: '0.1', currency: 'CNY', billing_mode: 'per_request' } },
+    { match: { resolution: ['4K'] }, sale_price: null }
   ]
-  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_COST', scope: 'canvas-1', path: 'draft.products.0.cost_rules.1.cost', message: '4K 采购成本尚未填写', action: '前往第4步填写' }]
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'UI_FIXABLE', severity: 'error', code: 'MISSING_PRICE', scope: 'canvas-1', path: 'draft.products.0.pricing_rules.1.sale_price', message: '4K 客户售价尚未填写', action: '前往第4步填写' }]
   api.detail.mockResolvedValue(dto)
   await mountWorkbench(); await selectAccount()
   await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
   expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
-  expect(document.activeElement).toBe(wrapper.get('[data-test="procurement-cost-1"]').element)
-  expect(wrapper.get('[data-test="procurement-cost-1"]').classes()).toContain('mw-field-located')
+  expect(document.activeElement).toBe(wrapper.get('[data-test="price-1"]').element)
+  expect(wrapper.get('[data-test="price-1"]').classes()).toContain('mw-field-located')
+})
+
+it('never dirties or saves a product when using the independent profit calculator', async () => {
+  await openEditor()
+  vi.useFakeTimers()
+  try {
+    api.saveDraft.mockClear()
+    for (const [field, value] of [['purchase', '100'], ['credits', '1000'], ['consumption', '8'], ['sale', '1']]) await wrapper.get(`[data-test="independent-${field}"]`).setValue(value)
+    await vi.advanceTimersByTimeAsync(1600); await flushPromises()
+    expect(wrapper.get('[data-test="independent-profit"]').text()).toBe('0.2 元')
+    expect(wrapper.get('.mw-draft-state').text()).toContain('正在查看草稿')
+    expect(api.saveDraft).not.toHaveBeenCalled()
+    expect(api.publish).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers() }
 })
 it('keeps failed account sales confirmation open with its scope and old server state', async () => {
   api.sales.mockRejectedValue({ status: 422 })
@@ -1132,7 +1147,7 @@ describe('publication time and plain-language status', () => {
     dto.media_workbench_v1!.published!.revision = 'mwp_LONG_INTERNAL_REVISION_NEVER_NEEDED_BY_ADMIN'
     api.detail.mockResolvedValue(dto)
     await openEditor()
-    expect(wrapper.get('[data-test="published-time"]').text()).toContain('2026-10-20 09:08')
+    expect(wrapper.get('[data-test="published-time"]').text()).toContain(formatDateTimeLocalInput(Date.parse(dto.media_workbench_v1!.published!.published_at!) / 1000).replace('T', ' '))
     expect(wrapper.get('[data-test="published-time"]').text()).toContain('保存草稿不等于发布')
     expect(wrapper.get('[data-test="publication-status"]').text()).toContain('与已发布配置一致')
     expect(wrapper.text()).not.toContain('mwp_LONG_INTERNAL_REVISION')

@@ -291,7 +291,7 @@ func (r *usageLogRepository) fillDashboardUsageStatsFromUsageLogs(ctx context.Co
 				cache_read_tokens,
 				total_cost,
 				actual_cost,
-				(CASE WHEN billing_mode = 'studio_video_retail' THEN NULL ELSE COALESCE(account_stats_cost, total_cost) END) * COALESCE(account_rate_multiplier, 1) AS account_cost,
+				(CASE WHEN billing_mode IN ('studio_video_retail', 'studio_image_retail') THEN NULL ELSE COALESCE(account_stats_cost, total_cost) END) * COALESCE(account_rate_multiplier, 1) AS account_cost,
 				COALESCE(duration_ms, 0) AS duration_ms
 			FROM usage_logs
 			WHERE created_at >= LEAST($1::timestamptz, $3::timestamptz)

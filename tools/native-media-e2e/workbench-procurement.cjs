@@ -209,6 +209,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
   async function execute(user, kind, prepared, expectedSale, expectedQuota, prompt) {
     const taskID = kind === 'image' ? prepared.task_id : prepared.operation_id
     const before = snapshot(user), supplierBefore = stats()
+    const statsPath = '/admin/usage/stats?user_id=' + id(user.id) + '&billing_mode=studio_' + kind + '_retail&period=month&nocache=1'
+    const retailStatsBefore = await core(admin, statsPath)
     const submission = await media(user, kind, 'tasks', kind === 'image' ? { task_id: taskID } : { operation_id: taskID })
     assert([200, 202].includes(submission.status), JSON.stringify(submission))
     let completed
@@ -228,15 +230,18 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.equal(money(after.frozen), 0)
     assert.equal(after.usage - before.usage, 1)
     assert.equal(after.dedup - before.dedup, 1, 'Successful settlement must claim exactly one native dedup record')
-    if (kind === 'video') {
-      const usage = JSON.parse(sql(`SELECT json_build_object('billing_mode',billing_mode,'account_stats_cost',account_stats_cost,'computed_account_cost',(CASE WHEN billing_mode='studio_video_retail' THEN NULL ELSE COALESCE(account_stats_cost,total_cost) END * COALESCE(account_rate_multiplier,1)),'actual_cost',actual_cost,'total_cost',total_cost) FROM usage_logs WHERE user_id=${id(user.id)} ORDER BY id DESC LIMIT 1`))
-      assert.equal(usage.billing_mode, 'studio_video_retail')
-      assert.equal(usage.account_stats_cost, null, 'Unknown video procurement must stay NULL, never fake zero or retail fallback')
-      assert.equal(usage.computed_account_cost, null, 'Native account statistics must not infer procurement from video retail')
-      assert.equal(money(usage.actual_cost), money(expectedSale), 'CNY retail and native ledger retain the existing numeric 1:1 contract')
-      assert.equal(money(usage.total_cost), money(expectedSale))
-      report.video_unknown_cost = usage
-    }
+    const usage = JSON.parse(sql(`SELECT json_build_object('billing_mode',billing_mode,'account_stats_cost',account_stats_cost,'actual_cost',actual_cost,'total_cost',total_cost) FROM usage_logs WHERE user_id=${id(user.id)} ORDER BY id DESC LIMIT 1`))
+    assert.equal(usage.billing_mode, 'studio_' + kind + '_retail')
+    assert.equal(usage.account_stats_cost, null, 'Unknown media procurement must stay SQL NULL, never zero or retail fallback')
+    assert.equal(money(usage.actual_cost), money(expectedSale), 'CNY retail and native ledger retain numeric 1:1')
+    assert.equal(money(usage.total_cost), money(expectedSale))
+    const retailStatsAfter = await core(admin, statsPath)
+    assert.equal(retailStatsAfter.total_requests - retailStatsBefore.total_requests, 1, 'Authoritative filtered usage count must observe this settlement')
+    assert.equal(money(retailStatsAfter.total_actual_cost) - money(retailStatsBefore.total_actual_cost), money(expectedSale), 'Authoritative filtered customer charge must match the exact sale')
+    assert.equal(retailStatsBefore.total_account_cost, 0, 'Cost-unknown media filter must not contain fabricated recorded procurement')
+    assert.equal(retailStatsAfter.total_account_cost, 0, 'Actual repository statistics must not fall back to retail sale for unknown procurement')
+    const publicStats = value => ({ total_requests: value.total_requests, total_actual_cost: value.total_actual_cost, total_account_cost: value.total_account_cost })
+    report[kind + '_unknown_cost'] = { usage, stats_before: publicStats(retailStatsBefore), stats_after: publicStats(retailStatsAfter), stats_source: 'official admin usage/stats filtered by exact synthetic user and retail mode, nocache=1' }
     assert.equal(money(after.account_quota) - money(before.account_quota), money(expectedQuota), `${kind} Account quota delta differs from its frozen accounting contract`)
     assert.equal(supplierAfter[kind + '_posts'] - supplierBefore[kind + '_posts'], 1)
     const calls = supplierAfter.requests.filter(request => request.method === 'POST' && request.body.prompt === prompt)
@@ -291,24 +296,30 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     apiChannel = await core(admin, '/admin/channels', 'POST', { name: 'Synthetic procurement API channel', group_ids: [apiGroup.id], model_pricing: [{ platform: 'openai', models: ['procurement-chat-alias'], billing_mode: 'per_request', per_request_price: 0.125 }] })
     account = await core(admin, '/admin/accounts', 'POST', { name: 'Synthetic procurement shared Account', platform: 'openai', type: 'apikey', credentials: { api_key: 'synthetic-native-only', base_url: 'https://localhost:19090', model_mapping: { 'procurement-chat-alias': 'synthetic-chat-upstream' } }, extra: {}, rate_multiplier: 1.25, concurrency: 5, priority: 1, group_ids: [imageGroup, videoGroup, apiGroup.id], upstream_billing_probe_enabled: false })
     await core(admin, '/admin/accounts/' + account.id + '/models/sync-upstream', 'POST', {})
-    const image = { product_id: 'procurement-isolated-image', media_type: 'image', site_model: 'gpt-image-2', display_name: 'Synthetic procurement image', upstream_model: 'gpt-image-2', enabled: true, capabilities: { resolutions: ['1K'], aspect_ratios: ['1:1'], qualities: [], durations_seconds: [], count: { min: 1, max: 2 }, references: { image: { min: 0, max: 1 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 1 }, combination_rules: [] }, pricing_rules: [{ match: {}, sale_price: price('0.9') }], cost_rules: [{ match: {}, cost: price('0.12'), source: 'manual' }], adapter_config: { version: 1, model_family: 'openai_json', size_mappings: [], execution: { mode: 'native_multi', max_output_images: 2 }, edit_execution: { mode: 'single', max_output_images: 1 } } }
+    const image = { product_id: 'procurement-isolated-image', media_type: 'image', site_model: 'gpt-image-2', display_name: 'Synthetic procurement image', upstream_model: 'gpt-image-2', enabled: true, capabilities: { resolutions: ['1K'], aspect_ratios: ['1:1'], qualities: [], durations_seconds: [], count: { min: 1, max: 2 }, references: { image: { min: 0, max: 1 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 1 }, combination_rules: [] }, pricing_rules: [{ match: {}, sale_price: price('0.9') }], adapter_config: { version: 1, model_family: 'openai_json', size_mappings: [], execution: { mode: 'native_multi', max_output_images: 2 }, edit_execution: { mode: 'single', max_output_images: 1 } } }
     const wan = { product_id: 'procurement-isolated-wan', media_type: 'video', site_model: 'WAN3.0-可参考视频', display_name: 'Synthetic procurement WAN', upstream_model: 'WAN3.0-可参考视频', enabled: true, capabilities: { resolutions: ['720p'], aspect_ratios: ['16:9', '9:16', '1:1', '3:4', '4:3', '21:9'], qualities: [], durations_seconds: [5, 10, 15], count: { min: 1, max: 1 }, references: { image: { min: 0, max: 10 }, video: { min: 0, max: 5 }, audio: { min: 0, max: 5 }, total_max: 14 }, combination_rules: [] }, pricing_rules: [{ match: {}, sale_price: price('2') }], adapter_config: { version: 1, wire_profile: 'inline_multimedia', size_mappings: [] } }
-    const incomplete = { ...structuredClone(image), product_id: 'procurement-isolated-incomplete', display_name: 'Synthetic incomplete draft', cost_rules: [{ match: {}, cost: null, source: 'manual' }] }
+    const incomplete = { ...structuredClone(image), product_id: 'procurement-isolated-incomplete', display_name: 'Synthetic incomplete draft', pricing_rules: [{ match: {}, sale_price: null }] }
     const legacyVideoDraft = { ...structuredClone(wan), cost_version: 1, cost_rules: [{ match: {}, cost: price('0.3'), source: 'manual' }] }
-    let detail = await draft([image, legacyVideoDraft, incomplete])
+    const legacyImageDraft = { ...structuredClone(image), cost_version: 1, cost_rules: [{ match: {}, cost: price('0.12'), source: 'manual' }] }
+    let detail = await draft([legacyImageDraft, legacyVideoDraft, incomplete])
+    const normalizedImage = detail.media_workbench_v1.draft.products.find(product => product.product_id === image.product_id)
+    assert.equal(normalizedImage.cost_version, 2)
+    assert.equal(normalizedImage.cost_rules?.length || 0, 0)
+    assert.deepEqual(normalizedImage.pricing_rules, image.pricing_rules)
     const normalizedVideo = detail.media_workbench_v1.draft.products.find(product => product.product_id === wan.product_id)
     assert.equal(normalizedVideo.cost_version, 2)
     assert.equal(normalizedVideo.cost_rules?.length || 0, 0)
     assert.deepEqual(normalizedVideo.pricing_rules, wan.pricing_rules, 'Video cost normalization must preserve retail rules')
-    report.checks.push('Saving a legacy video cost draft normalizes only its obsolete procurement fields; retail rules are preserved by the real server')
+    report.checks.push('Saving legacy image/video drafts retires procurement while preserving exact retail rules and identity')
     assert.equal(detail.media_workbench_v1.validation.publish_ready, false)
-    assert(detail.media_workbench_v1.validation.diagnostics.some(issue => /cost/i.test(issue.path)))
+    assert(detail.media_workbench_v1.validation.diagnostics.some(issue => /pricing_rules/i.test(issue.path)))
     const stale = await raw(admin, configPath() + '/draft', 'PUT', { expected_record_version: 0, draft: { products: [image] } })
     assert.equal(stale.status, 409)
     const rejected = await raw(admin, configPath() + '/publish', 'POST', { expected_record_version: detail.media_workbench_v1.record_version, expected_draft_revision: detail.media_workbench_v1.draft.revision, product_ids: [incomplete.product_id] })
     assert.equal(rejected.status, 422)
     detail = await publish(await core(admin, configPath()), [image.product_id, wan.product_id])
-    assert.equal(detail.media_workbench_v1.published.products.find(product => product.product_id === image.product_id).cost_version, 1)
+    assert.equal(detail.media_workbench_v1.published.products.find(product => product.product_id === image.product_id).cost_version, 2)
+    assert.equal(detail.media_workbench_v1.published.products.find(product => product.product_id === image.product_id).cost_rules?.length || 0, 0)
     const publishedVideo = detail.media_workbench_v1.published.products.find(product => product.product_id === wan.product_id)
     assert.equal(publishedVideo.cost_version, 2, 'video retail contract must not fall back to Channel costing')
     assert.equal(publishedVideo.cost_rules?.length || 0, 0, 'video publication must not synthesize cost rules')
@@ -316,7 +327,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.equal(detail.media_workbench_v1.sales.enabled, false)
     await core(admin, configPath() + '/sales', 'PUT', { expected_record_version: detail.media_workbench_v1.record_version, enabled: true })
     await refreshPaidGrants()
-    report.checks.push('Incomplete image cost saves and fails selected publication; image publishes with cost_version=1 and cost-free video with server contract=2; sales stays separate; both Studio Groups have no Channel')
+    report.checks.push('Incomplete retail price saves but cannot publish; both media publish sale-only without Channel procurement; Account sales stays separate')
     const user = await customer('funded', 100, [imageGroup, videoGroup, apiGroup.id])
     // Native admission rejects exhausted balances; a positive balance below the
     // sale price is not a promise of projected-price pre-reservation.
@@ -332,14 +343,13 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert(deniedCatalog.status >= 400 || !deniedCatalog.body.offers?.some(item => item.product_id === image.product_id))
     report.checks.push('Customer cannot bind the unauthorized exclusive API Group; a separate customer without its own Studio Key cannot obtain the Studio offer (public Group binding policy unchanged)')
     const imgOffer = await offer(user, 'image', image.product_id), wanOffer = await offer(user, 'video', wan.product_id)
-    // Image quotes freeze monetary-quota eligibility. Enable only after video
-    // preflight, and clear before video quotes; preserve accrued native usage.
-    await setAccountQuota(core, admin, account, 100)
-    await refreshPaidGrants(['image'])
+    // New media require no monetary Account limit; the native API below still
+    // uses and consumes its original Account monetary quota.
     const beforeAlias = await prepare(user, 'image', imgOffer, 0, 'SYNTHETIC procurement pre-alias', 2)
     const native = await core(admin, '/admin/accounts/' + account.id)
     const mapped = { ...native.credentials, model_mapping: { ...native.credentials.model_mapping, 'gpt-image-2': 'wrong-api-image-only', 'WAN3.0-可参考视频': 'wrong-api-video-only' } }
     await core(admin, '/admin/accounts/' + account.id, 'PUT', { credentials: mapped })
+    await setAccountQuota(core, admin, account, 100)
     const apiBefore = snapshot(user)
     const apiKey = user.keys.find(key => key.group_id === apiGroup.id)
     assert(apiKey && typeof apiKey.key === 'string', 'Native customer key must come from its own create response')
@@ -364,25 +374,24 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     await core(admin, '/admin/channels/' + apiChannel.id, 'PUT', { model_pricing: [{ platform: 'openai', models: ['procurement-chat-alias'], billing_mode: 'per_request', per_request_price: 0.25 }], account_stats_pricing_rules: [{ name: 'Synthetic irrelevant API cost', group_ids: [], account_ids: [account.id], pricing: [{ platform: 'openai', models: ['*'], billing_mode: 'per_request', per_request_price: 99 }] }] })
     assert.equal((await offer(user, 'image', image.product_id)).offer_id, imgOffer.offer_id)
     assert.equal((await offer(user, 'video', wan.product_id)).offer_id, wanOffer.offer_id)
-    await execute(user, 'image', beforeAlias, '1.8', '0.3', 'SYNTHETIC procurement pre-alias')
+    assert(money(apiAfter.account_quota) > money(apiBefore.account_quota), 'Native API must still accrue Account procurement quota')
     await clearAccountQuota(core, admin, account)
     await refreshPaidGrants()
+    await execute(user, 'image', beforeAlias, '1.8', '0', 'SYNTHETIC procurement pre-alias')
     for (const refs of [0, 1]) {
       const prompt = 'SYNTHETIC procurement WAN refs=' + refs
       const prepared = await prepare(user, 'video', wanOffer, refs, prompt)
       assert.equal(money(prepared.sale_price.amount), money('2'))
       await execute(user, 'video', prepared, '2', '0', prompt) // Unknown procurement: no inferred Account monetary consumption.
     }
-    report.checks.push('One shared Account routes native API alias and charges API Channel price; Channel cost 99 and Account aliases leave Studio exact model/price unchanged; image uses its explicit cost, video has no inferred monetary cost; WAN refs0/1 execute, deliver, settle and recover once')
+    report.checks.push('One shared Account routes native API alias and charges API Channel price; Channel cost 99 and Account aliases leave Studio exact model/price unchanged; both media retain SQL NULL procurement and do not infer Account monetary usage; WAN refs0/1 execute, deliver, settle and recover once')
     await failVideo(user, wanOffer)
     const prior = structuredClone(report.tasks)
-    const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }], cost_rules: [{ match: {}, cost: price('0'), source: 'manual' }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }] }, incomplete])
+    const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }] }, incomplete])
     await publish(saved, [image.product_id, wan.product_id])
     await refreshPaidGrants()
-    await setAccountQuota(core, admin, account, 100)
-    await refreshPaidGrants(['image'])
     const zeroOffer = await offer(user, 'image', image.product_id)
-    const zeroPrompt = 'SYNTHETIC procurement explicit zero'
+    const zeroPrompt = 'SYNTHETIC sale-only updated price'
     await execute(user, 'image', await prepare(user, 'image', zeroOffer, 0, zeroPrompt), '1.1', '0', zeroPrompt)
     const currentBalance = snapshot(user)
     for (const original of prior) {
@@ -390,7 +399,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
       assert.equal(money((recovered.total_price || recovered.sale_price).amount), money(original.expected_sale))
     }
     assert.deepEqual(snapshot(user), currentBalance)
-    report.checks.push('Explicit zero cost is preserved; later published costs and sale prices do not rewrite or recharge completed original tasks')
+    report.checks.push('Unknown procurement remains SQL NULL after repricing; later publication does not rewrite or recharge completed original tasks')
     const poorBefore = snapshot(poor), postsBefore = stats().image_posts
     // The zero-balance native gate may also reject catalog reads. Use the
     // already-verified public offer identity and retain this customer's own Key.
@@ -414,7 +423,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert(blocked.status >= 400); assert.equal(stats().video_posts, beforeBlocked)
     report.native_controls.schedulable_restored = (await setAccountSchedulable(core, admin, account.id, true)).schedulable
     const quotaAccount = await core(admin, '/admin/accounts/' + account.id)
-    assert(money(snapshot(user).account_quota) > 1, 'Completed simulated tasks must have consumed shared Account quota')
+    assert(money(snapshot(user).account_quota) > 0, 'Only the native API fixture must have consumed shared Account monetary quota')
     // Preserve the native current-usage gate; this acceptance does not invent
     // a second pre-reservation or a projected-quota accounting contract.
     report.native_controls.quota_limited = (await setAccountQuota(core, admin, quotaAccount, 0.00000001)).extra.quota_limit
@@ -429,10 +438,15 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const quotaPreflight = await core(admin, '/admin/media-workbench/paid-controls/video/check', 'POST', {})
     assert(quotaPreflight.checks.some(check => check.account_id === account.id && check.code === 'quote_account_quota_requires_cost' && check.pass === false), JSON.stringify(quotaPreflight))
     report.native_controls.video_monetary_quota_diagnostic = 'quote_account_quota_requires_cost'
-    // Image still follows its original monetary quota gate.
-    await setAccountQuota(core, admin, quotaAccount, 0.00000001)
+    // The same unexhausted monetary limit rejects unknown-cost image retail.
+    await setAccountQuota(core, admin, quotaAccount, 100)
+    const beforeImageQuota = stats().image_posts
     const imageQuotaDenied = await media(user, 'image', 'quotes', { offer_id: zeroOffer.offer_id, spec: { resolution: '1K', aspect_ratio: '1:1', quality: '', duration_seconds: 0, count: 1, images: 0, videos: 0, audio: 0 } })
     assert(imageQuotaDenied.status >= 400)
+    const imageQuotaPreflight = await core(admin, '/admin/media-workbench/paid-controls/image/check', 'POST', {})
+    assert(imageQuotaPreflight.checks.some(check => check.account_id === account.id && check.code === 'quote_account_quota_requires_cost' && check.pass === false), JSON.stringify(imageQuotaPreflight))
+    assert.equal(stats().image_posts, beforeImageQuota, 'Quota-denied image quote or preflight reached supplier generation')
+    report.native_controls.image_monetary_quota_diagnostic = 'quote_account_quota_requires_cost'
     report.native_controls.quota_restored = (await clearAccountQuota(core, admin, quotaAccount)).extra?.quota_limit ?? null
     const videoKey = user.keys.find(key => key.group_id === videoGroup)
     report.native_controls.key_disabled = (await setKeyStatus(core, user.token, id(videoKey.id), 'inactive')).status

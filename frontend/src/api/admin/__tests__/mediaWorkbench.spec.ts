@@ -81,7 +81,7 @@ it('sends the exact lifecycle CAS and one explicit target without draft publicat
   expect(client.put).not.toHaveBeenCalled()
 })
 
-it('persists independent procurement rules atomically and excludes the server contract marker', async () => {
+it('never submits retired procurement or server-owned cost metadata for either media', async () => {
  const p = copy(imageProduct)
  p.cost_version = 0
  p.cost_rules = [
@@ -92,10 +92,12 @@ it('persists independent procurement rules atomically and excludes the server co
  Object.assign(p.cost_rules[2]!.cost!,{credentials:'SYNTHETIC-DO-NOT-SEND'})
  const payload=draftInput([p]).products[0]!
  expect(payload).not.toHaveProperty('cost_version')
- expect(payload.cost_rules![0]!.cost).toBeNull()
- expect(payload.cost_rules![1]!.cost!.amount).toBe('0')
- expect(payload.cost_rules![2]!.match.output_formats).toEqual(['png'])
- expect(payload.cost_rules![2]!.cost).toEqual({amount:'0.12345678',currency:'CNY',billing_mode:'per_request'})
+ expect(payload).not.toHaveProperty('cost_rules')
+ expect(JSON.stringify(payload)).not.toContain('SYNTHETIC-DO-NOT-SEND')
+ const video = draftInput([{ ...p, media_type: 'video' }]).products[0]!
+ expect(video).not.toHaveProperty('cost_rules')
+ expect(video).not.toHaveProperty('cost_version')
+ expect(video.pricing_rules).toEqual(p.pricing_rules)
  expect(payload.pricing_rules).toEqual(p.pricing_rules)
  await mediaWorkbenchAPI.saveDraft(44,5,[p])
  expect(client.put).toHaveBeenCalledWith('/admin/media-workbench/accounts/44/draft',{expected_record_version:5,draft:{products:[payload]}})

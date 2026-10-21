@@ -430,6 +430,11 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 		return StudioVideoState{}, e
 	}
 	b := q.Binding
+	// Dispatched historical tasks recover above. An old costful quote without a
+	// dispatch cannot start a new supplier request under the sale-only contract.
+	if b.Version != StudioVideoRetailBindingVersion {
+		return StudioVideoState{}, QuoteFailure("account_cost", ErrStudioVideoConflict)
+	}
 	if !r.Store.now().Before(b.ExpiresAt) || r.Store.now().Before(b.CreatedAt) || !key.Group.ModelAllowlist.Allows(b.Offer.SiteModel) || (key.Quota > 0) != b.KeyQuotaEnabled || key.HasRateLimits() != b.KeyRateEnabled {
 		return StudioVideoState{}, ErrStudioVideoConflict
 	}

@@ -44,6 +44,15 @@ const stats = {
 }
 
 describe('UsageStatsCards', () => {
+  it('labels the aggregate as known procurement rather than zero-cost media profit', () => {
+    const wrapper = mount(UsageStatsCards, { props: { stats: { ...stats, total_account_cost: 0 } }, global: { stubs: { Icon: true } } })
+    const cost = wrapper.find('[title*="工作台图片和视频"]')
+    expect(cost.exists()).toBe(true)
+    expect(cost.attributes('title')).toContain('未知采购成本不计入')
+    expect(cost.attributes('title')).toContain('不能据此推算完整利润')
+    expect(cost.text()).toContain('已核算')
+  })
+
   it('shows cache token breakdown values', () => {
     const wrapper = mount(UsageStatsCards, {
       props: {

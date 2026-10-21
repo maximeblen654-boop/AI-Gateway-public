@@ -252,8 +252,21 @@ func TestStudioPaidSnapshotScopesCostAndMapping(t *testing.T) {
 	}
 	admin := mediaworkbench.NewService(repo)
 	product := studioCopyCostProduct(repo.a.Config.Draft.Products[0])
-	product.CostRules[0].Cost.Amount = "0.99"
+	product.CostRules = []mediaworkbench.CostRule{{Cost: &mediaworkbench.Price{Amount: "0.99", Currency: "CNY", BillingMode: "per_request"}}}
 	saved, err := admin.SaveDraft(ctx, 7, repo.a.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Config.Draft.Products[0].CostRules) != 0 {
+		t.Fatal("cost-only draft retained procurement rules")
+	}
+	after, err = p.snapshot(ctx, "image", 1)
+	if err != nil || studioHash(before.grants) != studioHash(after.grants) {
+		t.Fatal("cost-only draft changed current paid grant", err)
+	}
+	product.CostRules = nil
+	product.PricingRules[0].SalePrice.Amount = "0.99"
+	saved, err = admin.SaveDraft(ctx, 7, saved.Config.RecordVersion, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +276,7 @@ func TestStudioPaidSnapshotScopesCostAndMapping(t *testing.T) {
 	}
 	after, err = p.snapshot(ctx, "image", 1)
 	if err != nil || before.fingerprint != after.fingerprint || studioHash(before.grants) == studioHash(after.grants) {
-		t.Fatal("Published cost change did not invalidate product grant", err)
+		t.Fatal("Published sale change did not invalidate product grant", err)
 	}
 	// A closed paid control must still allow ordinary non-paid quote previews.
 	p.image.PaidControl = &StudioPaidControl{Managed: true, Settings: &paidSettingsFake{values: map[string]string{}}}

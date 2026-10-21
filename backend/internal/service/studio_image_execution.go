@@ -112,6 +112,9 @@ func (r *StudioImageRuntime) dispatchExecution(ctx context.Context, c *gin.Conte
 	} else if !os.IsNotExist(e) {
 		return nil, e
 	}
+	if q.Accounting.SourceType != StudioImageRetailUsageMode || q.Accounting.Validate(q) != nil {
+		return nil, QuoteFailure("account_cost", ErrStudioImageAccounting)
+	}
 	if !time.Now().Before(q.ExpiresAt) || time.Now().Before(q.CreatedAt) || (key.Quota > 0) != q.KeyQuotaEnabled || key.HasRateLimits() != q.KeyRateEnabled || key.Group.IsSubscriptionType() != (q.SubscriptionID != nil) {
 		return nil, mediaworkbench.ErrRuntimeBinding
 	}
