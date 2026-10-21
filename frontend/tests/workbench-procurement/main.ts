@@ -52,6 +52,9 @@ const initial: SupplierDetail = {
     published: { revision: 'fixture-published-2', source_draft_revision: 'fixture-draft-2', products: [copy(image), copy(video)], offers: [{ product_id: image.product_id, offer_id: 'fixture-image-offer' }, { product_id: video.product_id, offer_id: 'fixture-wan-offer' }] }
   }
 }
+// Every current synthetic row must also exist in the upstream catalog.
+// Pending models are current but unconfigured, not retired product aliases.
+initial.model_catalog!.models = initial.models.map(model => model.model_id)
 if (scenario === 'missing') initial.media_workbench_v1!.draft.products[0]!.pricing_rules[2]!.sale_price = null
 if (scenario.startsWith('video-retail')) {
   const product = initial.media_workbench_v1!.draft.products.find(p => p.product_id === video.product_id)!
