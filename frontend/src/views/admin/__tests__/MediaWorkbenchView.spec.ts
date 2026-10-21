@@ -72,6 +72,39 @@ it('opens a missing customer sale price at step four and focuses that exact fiel
   expect(wrapper.get('[data-test="price-1"]').classes()).toContain('mw-field-located')
 })
 
+it.each([
+  ['image', 'upstream_model'],
+  ['image', 'draft.products[0].upstream_model'],
+  ['video', 'draft.products.0.upstream_model']
+] as const)('locates a missing %s model at its visible model identity instead of optional formats (%s)', async (mediaType, path) => {
+  const dto = supplier(77, 'FAIL')
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  product.media_type = mediaType
+  if (mediaType === 'video') product.capabilities.durations_seconds = [5]
+  dto.media_workbench_v1!.adapter_bindings = { image: { kind: 'openai_images', revision: 'r1', auth: 'account_apikey', task_flow: 'sync' } }
+  dto.models[0]!.state = 'UPSTREAM_NOT_DISCOVERED'
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'UI_FIXABLE', severity: 'error', code: 'MODEL_NOT_DISCOVERED', scope: product.product_id, path, message: 'Upstream model is absent from the last successful snapshot', action: 'Edit the indicated Draft field and save again' }]
+  const before = copy(dto)
+  api.detail.mockResolvedValue(dto)
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="wizard-step-5"]').trigger('click'); await flushPromises()
+  const summary = wrapper.get('[data-test="selected-model-summary"]')
+  const scroll = vi.fn()
+  summary.element.scrollIntoView = scroll
+  await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
+  expect(summary.element.matches(':focus')).toBe(true)
+  expect(summary.classes()).toContain('mw-field-located')
+  expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: 'center' }))
+  expect(wrapper.get('[data-test="wizard-page-5"]').isVisible()).toBe(true)
+  expect(wrapper.get('.mw-diagnostic').text()).toContain('上游模型列表')
+  expect(wrapper.get('.mw-diagnostic').text()).not.toContain('对应规格或售价')
+  expect(dto).toEqual(before)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  expect(api.publish).not.toHaveBeenCalled()
+  expect(api.sales).not.toHaveBeenCalled()
+})
+
 it('never dirties or saves a product when using the independent profit calculator', async () => {
   await openEditor()
   vi.useFakeTimers()

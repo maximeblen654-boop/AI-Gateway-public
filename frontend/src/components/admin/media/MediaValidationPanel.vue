@@ -38,6 +38,7 @@ function productLabel(diagnostic: Diagnostic) {
   return product ? `所属商品：${product.label}` : diagnostic.scope && diagnostic.scope !== 'account' ? '所属商品暂不可定位，请重新读取草稿核对' : `Account #${props.accountId ?? ''} · 账号级检查`
 }
 function fieldLabel(path: string) {
+  if (path === 'upstream_model' || path.endsWith('.upstream_model')) return '模型选择 · 当前上游模型'
   if (path.includes('edit_execution')) return '参考图编辑 · 单请求能力'
   if (path.includes('execution')) return '文生图 · 单请求能力'
   if (path.includes('cost_rules') || path.includes('cost_coverage')) return '第 4 步 · 采购成本 · 前往填写'

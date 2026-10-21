@@ -4,6 +4,7 @@ import { draftFingerprint } from '@/composables/draftRecovery'
 /** Display only: never substitutes for server validation, CAS or publishing. */
 export function mediaDiagnosticGuidance(diagnostic: Diagnostic): { message: string; action: string } {
   const known: Record<string, [string, string]> = {
+    MODEL_NOT_DISCOVERED: ['最近成功获取的上游模型列表中，没有这个商品绑定的型号。', '请返回模型列表核对当前可用型号，再按实际型号配置商品。'],
     IMAGE2PRO_VIDEO_METADATA_REQUIRED: ['尚未取得这个视频模型的有效能力信息。', '在账号管理刷新模型列表，再保存商品草稿并重新发布。'],
     IMAGE2PRO_VIDEO_MODE_UNSUPPORTED: ['这个模型不支持当前设置的参考素材用法。', '按供应商已确认的能力调整参考素材，再保存并检查。'],
     IMAGE2PRO_SYNC_ACCOUNT_UNSUPPORTED: ['当前账号的图片连接设置尚未确认。', '核对账号连接后，重新保存商品并执行发布检查。'],

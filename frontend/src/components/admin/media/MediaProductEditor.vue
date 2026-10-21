@@ -147,6 +147,8 @@ async function goToStep(step: number) {
   wizardElement.value?.scrollIntoView?.({ block: 'start' })
 }
 function showField(path: string, code?: string) {
+  // Model identity is displayed outside the specification wizard.
+  if (path === 'upstream_model' || path.endsWith('.upstream_model')) return path
   // Some Core capability diagnostics cover a whole section, not an exact field.
   if (path.endsWith('capabilities') && (code === 'VIDEO_REFERENCES_UNSUPPORTED' || code === 'INVALID_REFERENCE_LIMIT' && referenceEditor.value?.error)) path += '.references'
   wizardStep.value = path.includes('pricing_rules') ? 4 : path.includes('references') ? 2 : path.includes('display_name') ? 5 : 1

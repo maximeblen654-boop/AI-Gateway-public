@@ -32,6 +32,16 @@ if (scenario === 'ADMIN_READABLE') {
   dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'IMAGE2PRO_VIDEO_METADATA_REQUIRED', scope: 'canvas-1', path: 'adapter_config.image2pro', message: 'opaque_wire_profile_very_long_revision', action: 'internal_action_only' }]
 }
 
+if (scenario.startsWith('MODEL_DIAGNOSTIC_')) {
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  product.media_type = scenario.endsWith('VIDEO') ? 'video' : 'image'
+  if (product.media_type === 'video') product.capabilities.durations_seconds = [4, 8]
+  dto.models[0]!.state = 'UPSTREAM_NOT_DISCOVERED'
+  dto.model_catalog = { source: 'upstream', synced_at: '2026-10-22T00:00:00Z', models: ['new-model'] }
+  dto.media_workbench_v1!.adapter_bindings = { image: { kind: 'openai_images', revision: 'fixture', auth: 'account_apikey', task_flow: 'sync' } }
+  dto.media_workbench_v1!.validation = { ...dto.media_workbench_v1!.validation, status: 'FAIL', publish_ready: false, diagnostics: [{ class: 'UI_FIXABLE', severity: 'error', code: 'MODEL_NOT_DISCOVERED', scope: product.product_id, path: 'upstream_model', message: 'Upstream model is absent from the last successful snapshot', action: 'Edit the indicated Draft field and save again' }] }
+}
+
 if (videoPolish && !savedFixture) {
   const product = dto.media_workbench_v1!.draft.products[0]!
   product.capabilities.resolutions = ['720p', '1080p', '4K']

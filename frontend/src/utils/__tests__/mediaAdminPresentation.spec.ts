@@ -15,6 +15,14 @@ describe('administrator readable media feedback', () => {
     diagnostic.message = '4K 采购成本尚未填写'; diagnostic.action = '前往第 4 步填写'
     expect(mediaDiagnosticGuidance(diagnostic)).toEqual({ message: diagnostic.message, action: diagnostic.action })
   })
+  it('explains a missing upstream model without directing administrators to formats or prices', () => {
+    const diagnostic: Diagnostic = { class: 'UI_FIXABLE', severity: 'error', code: 'MODEL_NOT_DISCOVERED', scope: 'sample', path: 'upstream_model', message: 'Upstream model is absent from the last successful snapshot', action: 'Edit the indicated Draft field and save again' }
+    const guidance = mediaDiagnosticGuidance(diagnostic)
+    expect(guidance.message).toContain('上游模型列表')
+    expect(guidance.message).toContain('没有这个商品绑定的型号')
+    expect(guidance.action).toContain('返回模型列表')
+    expect(JSON.stringify(guidance)).not.toMatch(/PNG|JPEG|WEBP|规格或售价|MODEL_NOT_DISCOVERED/)
+  })
   it('compares each published product instead of treating one Account revision as all published', () => {
     const first = copy(imageProduct), second = copy(imageProduct)
     second.product_id = 'another-product'; second.display_name = '另一商品'

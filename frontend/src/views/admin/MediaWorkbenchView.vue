@@ -132,7 +132,7 @@
           <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
           <div v-if="detail" class="mw-page-heading mw-account-context mw-product-context">
             <div><p class="mw-eyebrow">配置商品 · {{ product?.media_type === 'video' ? '视频' : '图片' }}</p><h2>{{ product?.display_name || selectedModel || '选择商品类型' }}</h2><p class="mw-muted">Account #{{ detail.id }} · {{ detail.name }}</p></div>
-            <div class="mw-selection-feedback" data-test="selected-model-summary"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span></div>
+            <div class="mw-selection-feedback" data-test="selected-model-summary" data-field="upstream_model" tabindex="-1" role="group" aria-label="当前上游模型"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span></div>
           </div>
           <template v-if="detail && selectedModel">
             <section class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
@@ -658,7 +658,7 @@ async function locate(diagnostic: Diagnostic) {
   await nextTick()
   const priceIndex = /pricing_rules(?:\[|\.)(\d+)/.exec(fieldPath)?.[1]
   const exactPrice = priceIndex === undefined ? undefined : editorElement.value?.querySelector<HTMLElement>(`[data-field="pricing_rules.${priceIndex}.sale_price"]`)
-  const field = ['adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
+  const field = ['adapter_config.execution.max_output_images', 'adapter_config.edit_execution.max_output_images', 'adapter_config.execution', 'adapter_config.edit_execution', 'adapter_config.model_family', 'adapter_config.wire_profile', 'adapter_config.size_mappings', 'capabilities.qualities', 'capabilities.combination_rules', 'pricing_rules', 'capabilities.references', 'capabilities', 'display_name', 'upstream_model', 'site_model', 'product_id', 'media_type'].find(key => fieldPath.includes(key)) ?? 'model'
   const section = exactPrice ?? editorElement.value?.querySelector<HTMLElement>(`[data-field="${field}"]`)
   section?.querySelectorAll('details').forEach(node => { node.open = true })
   let ancestor = section
@@ -666,7 +666,7 @@ async function locate(diagnostic: Diagnostic) {
     if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
     ancestor = ancestor.parentElement ?? undefined
   }
-  const target = section?.matches('input,select') ? section : section?.querySelector<HTMLElement>('input,select,button')
+  const target = section?.matches('input,select,[tabindex]') ? section : section?.querySelector<HTMLElement>('input,select,button')
   target?.focus()
   section?.classList.add('mw-field-located')
   setTimeout(() => section?.classList.remove('mw-field-located'), 2500)
