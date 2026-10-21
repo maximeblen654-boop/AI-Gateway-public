@@ -74,7 +74,7 @@ jobs:
         working-directory: frontend
         run: |
           pnpm exec playwright install --with-deps chromium
-          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts media-limits.spec.ts video-polish.spec.ts
+          pnpm exec playwright test --config playwright.media.config.ts wizard.spec.ts product-management.spec.ts cost-calculator.spec.ts media-limits.spec.ts video-polish.spec.ts diagnostic-navigation.spec.ts acceptance-script.spec.ts media-types.spec.ts
 
       - name: Isolated procurement, publication and Account sales browser acceptance
         working-directory: frontend
@@ -95,7 +95,7 @@ jobs:
         run: pnpm exec vitest run src/__tests__/integration/usage-reasoning-effort.spec.ts
 
       - name: Local fixture isolation checks
-        run: node --test tools/phase5-media-e2e/fixture-config.test.cjs
+        run: node --test tools/phase5-media-e2e/fixture-config.test.cjs tools/native-media-e2e/admin-readonly.test.cjs
 
       - name: Published media BFF contract tests (no supplier calls)
         run: |

@@ -4,7 +4,7 @@ const { chromium, expect } = require('../../frontend/node_modules/@playwright/te
 const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')))
 const compose = JSON.parse(fs.readFileSync(`${root}/compose.json`, 'utf8').replace(/^\uFEFF/, ''))
-assert.equal(compose.services.core.container_name, 'ai-gateway-native-core-20261012')
+assert(['ai-gateway-native-core-20261012', 'ai-gateway-native-prerun-core-20261022'].includes(compose.services.core.container_name), 'explicit isolated Core name required')
 const fixture = JSON.parse(fs.readFileSync(`${root}/evidence/fixture.json`, 'utf8'))
 const base = 'http://127.0.0.1:28100'
 const videoMode = process.argv.includes('--video-seedance') ? 'seedance' : process.argv.includes('--video-compatible') ? 'compatible' : process.argv.includes('--video') ? 'grok' : null

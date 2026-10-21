@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 const root = process.argv[2]
 assert(root && /native-media-20261012$/.test(root.replace(/\\/g, '/')), 'explicit isolated workspace required')
 const compose = JSON.parse(fs.readFileSync(`${root}/compose.json`, 'utf8'))
-assert.equal(compose.services.core.container_name, 'ai-gateway-native-core-20261012')
+assert(['ai-gateway-native-core-20261012', 'ai-gateway-native-prerun-core-20261022'].includes(compose.services.core.container_name), 'explicit isolated Core name required')
 assert.equal(compose.services.postgres.environment.POSTGRES_DB, 'sub2api')
 const origin = 'http://127.0.0.1:28180/api/v1'
 let token = ''

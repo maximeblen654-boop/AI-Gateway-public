@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"time"
 
@@ -560,6 +561,19 @@ func (s *Service) SaveDraft(ctx context.Context, id, expected int64, input Draft
 		return nil, err
 	}
 	c.RemovedDraftProducts = append(c.RemovedDraftProducts, removed...)
+	// MediaTypes records Studio configuration, not native API authorization.
+	// Extend it only for types explicitly submitted by this CAS-protected save;
+	// adapter/model/spec validation still decides whether they may be published.
+	expanded := false
+	for _, p := range input.Products {
+		if p.MediaType != "" && !slices.Contains(c.MediaTypes, p.MediaType) {
+			c.MediaTypes = append(c.MediaTypes, p.MediaType)
+			expanded = true
+		}
+	}
+	if expanded {
+		sort.Strings(c.MediaTypes)
+	}
 	basedOn := ""
 	if c.Published != nil {
 		basedOn = c.Published.Revision

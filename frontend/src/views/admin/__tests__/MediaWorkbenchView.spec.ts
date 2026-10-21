@@ -205,6 +205,11 @@ describe('Media Workbench page flow', () => {
 
   it('appends image and video drafts until a wizard boundary flush without discarding or initializing early', async () => {
     const nil = supplier(); nil.media_workbench_v1 = null; nil.effective_state = 'NOT_INITIALIZED'; nil.effective_sales = false
+    // Real Detail exposes native adapters even before Studio initialization.
+    nil.native_adapters = {
+      image: { kind: 'openai_images', revision: 'fixture', auth: 'account_apikey', task_flow: 'sync', media_type: 'image', max_references: 16, parameters: {} },
+      video: { kind: 'laoli_video', revision: 'fixture', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} }
+    }
     api.detail.mockResolvedValue(nil)
     await mountWorkbench(); await selectAccount()
     await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()

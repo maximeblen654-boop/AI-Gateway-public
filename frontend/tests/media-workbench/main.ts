@@ -1,5 +1,6 @@
 // Browser-only fixture entry. This is never imported by the application entry.
 import { createApp, h } from 'vue'
+import axios from 'axios'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import MediaWorkbenchView from '@/views/admin/MediaWorkbenchView.vue'
@@ -19,12 +20,50 @@ const query = new URLSearchParams(location.search)
 const scenario = query.get('scenario') ?? 'PASS'
 const management = scenario.startsWith('DRAFT_MANAGEMENT')
 const videoPolish = scenario === 'VIDEO_POLISH'
+const mediaTypes = scenario.startsWith('MEDIA_TYPES_')
 const initialDTO = management || videoPolish ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
-const persistent = management || videoPolish || scenario.startsWith('WIZARD')
+const persistent = management || videoPolish || mediaTypes || scenario.startsWith('WIZARD')
 const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
 const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
 const otherAccount = supplier(44)
+if (mediaTypes) {
+  // Synthetic legacy state only: the catalog name never grants a media type.
+  // Account 44 deliberately has the same model and product IDs but image only.
+  const legacyAccount = (account: typeof dto, videoAdapter: boolean) => {
+    const config = account.media_workbench_v1!
+    const image = copy(config.draft.products[0]!)
+    image.display_name = `Account ${account.id} 原有图片商品`
+    image.site_model = 'gpt-image-2.0'
+    image.upstream_model = 'gpt-image-2.0'
+    const seedance = copy(image)
+    seedance.product_id = 'seedance-misclassified'
+    seedance.site_model = 'seedance-video-offer'
+    seedance.display_name = `Account ${account.id} Seedance 误分类草稿`
+    seedance.upstream_model = 'Seedance2.0'
+    seedance.enabled = false
+    seedance.capabilities = {
+      resolutions: ['720p', '1080p'], aspect_ratios: ['16:9', '9:16'], qualities: [], durations_seconds: [],
+      count: { min: 1, max: 1 }, references: { image: { min: 0, max: 2 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 }, total_max: 2 }, combination_rules: []
+    }
+    seedance.pricing_rules = [{ match: {}, sale_price: { amount: '4', currency: 'CNY', billing_mode: 'per_request' } }]
+    seedance.adapter_config = { size_mappings: [] }
+    config.media_types = ['image']
+    config.adapter_bindings = { image: { kind: 'openai_images', revision: 'fixture_images_v1', auth: 'account_apikey', task_flow: 'sync' } }
+    config.draft.products = [image, seedance]
+    config.published!.products = [copy(image)]
+    config.published!.offers = [{ product_id: image.product_id, offer_id: `fixture-frozen-image-${account.id}` }]
+    account.name = videoAdapter ? '历史图片配置 · 双媒体接口' : '仅图片接口 · 同名 Seedance 反例'
+    account.native_adapters = { image: { ...config.adapter_bindings.image!, media_type: 'image', max_references: 4, parameters: {} } }
+    if (videoAdapter) account.native_adapters.video = { kind: 'image2pro_video', revision: 'fixture_video_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} }
+    account.model_catalog = { source: 'upstream', synced_at: '2026-10-22T00:00:00Z', models: ['gpt-image-2.0', 'Seedance2.0'] }
+    account.models = [{ model_id: 'gpt-image-2.0', state: 'PUBLISHED' }, { model_id: 'Seedance2.0', state: 'DRAFT' }]
+    account.discovered_count = 2; account.configured_count = 2; account.pending_count = 0
+    account.product_removal = { [image.product_id]: { allowed: false, reason: '已发布，不能移除。' }, [seedance.product_id]: { allowed: false, reason: '已有规格和售价。' } }
+  }
+  if (!savedFixture) legacyAccount(dto, scenario === 'MEDIA_TYPES_MIXED_ADAPTERS')
+  legacyAccount(otherAccount, false)
+}
 if (scenario === 'ADMIN_READABLE') {
   dto.media_workbench_v1!.published!.published_at = '2026-10-20T01:08:00Z'
   dto.media_workbench_v1!.published!.revision = 'mwp_private_opaque_long_revision'
@@ -155,6 +194,9 @@ if (scenario === 'VALUE_MAPPING') Object.assign(dto.media_workbench_v1!.validati
 // All shell and media API requests terminate in this local Axios adapter.
 apiClient.defaults.adapter = async config => {
   const url = config.url ?? ''
+  // Opt-in diagnostic-script regression: preserve the actual Axios GET
+  // interceptor and XHR path; Playwright supplies only these local responses.
+  if (query.get('networkPaidReads') === '1' && config.method === 'get' && /^\/admin\/media-workbench\/paid-controls\/(image|video)$/.test(url)) return axios.getAdapter('xhr')(config)
   const input = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
   fixtureCalls.push({ method: config.method ?? 'get', url, input })
   let data: unknown = {}
@@ -203,6 +245,13 @@ apiClient.defaults.adapter = async config => {
       }
       const baseVersion = current.record_version
       current.draft.products = copy(input.draft.products)
+      if (mediaTypes) {
+        // Match SaveDraft's union from explicit submitted types in this scenario.
+        // Merely discovering a native adapter must not rewrite stored config.
+        for (const product of current.draft.products) {
+          if (['image', 'video'].includes(product.media_type) && !current.media_types.includes(product.media_type)) current.media_types.push(product.media_type)
+        }
+      }
       if (management) {
         dto.product_removal = Object.fromEntries(dto.media_workbench_v1!.draft.products.map(p => [p.product_id, {
           allowed: p.product_id !== 'canvas-1' && p.capabilities.resolutions.length === 0 && p.pricing_rules.length === 0,

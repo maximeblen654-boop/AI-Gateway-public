@@ -5,6 +5,8 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync, spawn } from 'node:child_process'
 import { withNotices } from '../phase5-candidate/build.mjs'
+import adminReadonly from './admin-readonly.cjs'
+const { scriptHashes, verifiedImageIDs, verifyCandidateProof } = adminReadonly
 
 assert.equal(process.env.GITHUB_ACTIONS, 'true')
 assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
@@ -230,6 +232,10 @@ if (mode === 'load-existing') {
       if (procurementContract) run(process.execPath,['tools/native-media-e2e/workbench-procurement.cjs',root,'verify'])
       run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'close'])
       if (!focusedEntry || catalogRecovery) run(process.execPath,['tools/native-media-e2e/paid-controls.cjs',root,'scale'], {env:{...process.env,NATIVE_CATALOG_RECOVERY:catalogRecovery?'true':'false',NATIVE_MODEL_LIFECYCLE:modelLifecycle?'true':'false'}})
+      // Run the production read-only collector against the final embedded UI
+      // and real isolated API before the overall candidate can become PASS.
+      run(process.execPath, ['--test', 'tools/native-media-e2e/admin-readonly.test.cjs'])
+      run(process.execPath, ['tools/native-media-e2e/admin-readonly-candidate.cjs', root])
       // The old d893 baseline has no sample-evidence UI; require it for repaired sources.
       if(!focusedEntry && fs.readFileSync(path.join(source,'frontend/src/views/admin/ops/components/OpsDashboardHeader.vue'),'utf8').includes('ops-sla-samples')) run(process.execPath,['tools/native-media-e2e/ops-evidence.cjs',root])
     } else if (adminReview) {
@@ -301,7 +307,9 @@ if (mode === 'load-existing') {
     const priorManifest=path.join(out,'manifest-tested-candidate.json')
     if(paidControls && fs.existsSync(priorManifest)){
       const prior=JSON.parse(fs.readFileSync(priorManifest,'utf8'))
-      fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify({...prior,acceptance:'PASS',deployment_state:'CANDIDATE_READY_NOT_DEPLOYED',acceptance_run_id:process.env.GITHUB_RUN_ID,acceptance_script_sha:scriptSha},null,2))
+      const readonlyProof = path.join(evidence, 'native-admin-readonly-proof.json')
+      assert(fs.existsSync(readonlyProof), 'READ_ONLY_PRE_RUN_MISSING')
+      fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify({...prior,admin_readonly:{file:'native-admin-readonly-proof.json',sha256:await hash(readonlyProof)},acceptance:'PASS',deployment_state:'CANDIDATE_READY_NOT_DEPLOYED',acceptance_run_id:process.env.GITHUB_RUN_ID,acceptance_script_sha:scriptSha},null,2))
     }
   } finally {
     proxy.kill()
@@ -330,5 +338,23 @@ if (mode === 'load-existing') {
     const archiveIdentity = JSON.parse(capture('python3', ['tools/native-media-e2e/archive-identity.py', path.join(out, file), image.Id]))
     images.push({ archive_identity: archiveIdentity, component: c, source_sha: componentSource(c), disposition: reuseSidecars && c !== 'core' ? 'reused' : 'built', image_id: image.Id, config_digest: image.Id, run_id: reuseSidecars && c !== 'core' ? '38443205417' : process.env.GITHUB_RUN_ID, artifact: reuseSidecars && c !== 'core' ? { id: '11836997249', name: `native-media-candidate-${reuseSha}` } : { name: `native-media-candidate-${sha}` }, platform: 'linux/amd64', tag: tag(c), tar: file, sha256: await hash(path.join(out, file)), bytes: fs.statSync(path.join(out, file)).size })
   }
-  fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ source_sha: sha, build_run_id: process.env.GITHUB_RUN_ID, acceptance_run_id: process.env.GITHUB_RUN_ID, deployment_state: acceptance.status === 'PASS' ? 'CANDIDATE_READY_NOT_DEPLOYED' : 'CANDIDATE_NOT_ACCEPTED', required_production_flags: { STUDIO_IMAGE_PUBLISHED_SUBMISSION: false, STUDIO_VIDEO_ACCOUNT_SUBMISSION: false, IMAGE_RECEIPT_WORKER_ENABLED: false }, build_script_sha: scriptSha, acceptance_script_sha: scriptSha, acceptance_scope: paidControls ? acceptanceScope : adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', production_action: false, acceptance: acceptance.status, images }, null, 2))
+  let adminReadonlyBinding
+  if (paidControls && acceptance.status === 'PASS') {
+    const file = 'native-admin-readonly-proof.json'
+    const proof = JSON.parse(fs.readFileSync(path.join(out, file)))
+    assert.equal(proof.status, 'PASS'); assert.equal(proof.source_sha, sha)
+    assert.deepEqual(proof.scripts, scriptHashes())
+    for (const component of proof.runtime) assert(verifiedImageIDs(images.find(i => i.component === component.component)).has(component.image_id))
+    adminReadonlyBinding = { file, sha256: await hash(path.join(out, file)) }
+  }
+  fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ admin_readonly: adminReadonlyBinding, source_sha: sha, build_run_id: process.env.GITHUB_RUN_ID, acceptance_run_id: process.env.GITHUB_RUN_ID, deployment_state: acceptance.status === 'PASS' ? 'CANDIDATE_READY_NOT_DEPLOYED' : 'CANDIDATE_NOT_ACCEPTED', required_production_flags: { STUDIO_IMAGE_PUBLISHED_SUBMISSION: false, STUDIO_VIDEO_ACCOUNT_SUBMISSION: false, IMAGE_RECEIPT_WORKER_ENABLED: false }, build_script_sha: scriptSha, acceptance_script_sha: scriptSha, acceptance_scope: paidControls ? acceptanceScope : adminCandidate ? 'admin-media-candidate' : adminReview ? 'admin-ui-implementation-review-not-candidate' : workspaceArtifact ? 'studio-workspace-artifact' : draftManagement ? 'draft-management' : 'standard', production_action: false, acceptance: acceptance.status, images }, null, 2))
+  if (paidControls && acceptance.status === 'PASS') {
+    try { verifyCandidateProof(out, await hash(path.join(out, 'manifest.json')), sha) }
+    catch (error) {
+      const failed = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json')))
+      failed.acceptance = 'FAIL'; failed.deployment_state = 'CANDIDATE_NOT_ACCEPTED'
+      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(failed, null, 2))
+      throw error
+    }
+  }
 } else throw Error('choose build, verify or export')

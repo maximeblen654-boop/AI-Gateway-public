@@ -226,7 +226,7 @@
               <button v-if="canRetryUnconfirmedSave" type="button" class="btn btn-secondary" data-test="retry-unconfirmed-save" @click="retryUnconfirmedSave">重新核对并保存当前草稿</button>
               <button type="button" class="btn btn-secondary" data-test="editor-discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
             </section>
-            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="config?.media_types ?? [product.media_type]" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
@@ -267,7 +267,7 @@
     <MediaDialog :show="!!newProductType" title="另建独立销售商品？" :busy="busy" @close="newProductType = ''">
       <p>当前模型已有 {{ modelProducts.length }} 份商品。已有商品的规格和售价会保留；新商品有独立名称、规格、售价和启用状态。</p>
       <p>文生图与参考图编辑、不同分辨率和比例通常可以放在同一份图片商品中，无需分别新增。</p>
-      <label class="mw-field">新商品类型<select v-model="newProductType" class="input" data-test="new-product-type"><option v-for="type in config?.media_types ?? ['image', 'video']" :key="type" :value="type">{{ type === 'video' ? '视频' : '图片' }}</option></select></label>
+      <label class="mw-field">新商品类型<select v-model="newProductType" class="input" data-test="new-product-type"><option v-for="type in availableMediaTypes" :key="type" :value="type">{{ type === 'video' ? '视频' : '图片' }}</option></select></label>
       <p class="mw-muted">确认后仅在本页新增，仍需保存草稿；不会发布或启售。</p>
       <template #actions><button type="button" class="btn btn-primary" data-test="confirm-add-product" :disabled="managementDisabled || !selectedModelCurrent" @click="confirmAddProduct">确认另建一份</button></template>
     </MediaDialog>
@@ -341,6 +341,11 @@ const { suppliers, detail, config, products, selectedModel, selectedProduct, pro
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval, videoSaleInputs, updateVideoSaleInputs,
   recovery, recoveryWarning, recoveryConflict, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
+// Saved types describe earlier Studio products; native adapters also expose
+// the Account's currently supported configuration paths. Selection is explicit,
+// and Core still validates the exact model, adapter and specification on save.
+const availableMediaTypes = computed(() => ['image', 'video'].filter(type =>
+  config.value?.media_types.includes(type) || Object.prototype.hasOwnProperty.call(detail.value?.native_adapters ?? {}, type)))
 const step = ref('suppliers')
 const search = ref('')
 const filter = ref('')
