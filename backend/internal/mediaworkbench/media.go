@@ -169,6 +169,21 @@ type Catalog struct {
 	Models                []string `json:"models"`
 	AccountIdentitySHA256 string   `json:"account_identity_sha256,omitempty"`
 }
+
+// CatalogChange is bounded discovery metadata stored separately from Catalog
+// and the CAS-owned media configuration. It never participates in dependency hashes.
+type CatalogChange struct {
+	SchemaVersion         int      `json:"schema_version"`
+	AccountIdentitySHA256 string   `json:"account_identity_sha256"`
+	DetectedAt            string   `json:"detected_at"`
+	PreviousSyncedAt      string   `json:"previous_synced_at"`
+	AddedCount            int      `json:"added_count"`
+	MissingCount          int      `json:"missing_count"`
+	AddedModels           []string `json:"added_models"`
+	MissingModels         []string `json:"missing_models"`
+	Truncated             bool     `json:"truncated"`
+}
+
 type CatalogDependency struct {
 	SyncedAt string `json:"synced_at"`
 	SHA256   string `json:"sha256"`
@@ -230,6 +245,7 @@ type Account struct {
 	Schedulable                bool                                       `json:"schedulable"`
 	BaseURL                    string                                     `json:"-"`
 	Catalog                    *Catalog                                   `json:"model_catalog"`
+	CatalogChange              *CatalogChange                             `json:"model_catalog_change,omitempty"`
 	Config                     *Config                                    `json:"media_workbench_v1"`
 	ModelMapping               map[string]string                          `json:"-"`
 	EndpointCapabilities       []string                                   `json:"-"`

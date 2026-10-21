@@ -66,6 +66,7 @@ var schedulerNeutralExtraKeyPrefixes = []string{
 var schedulerNeutralExtraKeys = map[string]struct{}{
 	// Admin/media discovery metadata does not change routing or bucket membership.
 	"upstream_model_catalog_snapshot": {},
+	"studio_model_catalog_change_v1":  {},
 	"codex_usage_updated_at":          {},
 	"codex_credits_snapshot":          {},
 	"codex_referral_snapshot":         {},

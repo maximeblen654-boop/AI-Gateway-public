@@ -106,6 +106,7 @@
             </div>
           </section>
           <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ sourceHost(detail) === 'api.image2pro.top' ? '每5分钟自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
+          <MediaCatalogNotice v-if="detail && sourceHost(detail) === 'api.image2pro.top'" :detail="detail" />
           <div v-if="detail" class="mw-model-toolbar">
             <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
             <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
@@ -312,6 +313,7 @@
 <script setup lang="ts">
 import { mediaPaidAPI, type PaidState, type PaidMedia } from '@/api/admin/mediaPaid'
 import MediaPaidControls from '@/components/admin/media/MediaPaidControls.vue'
+import MediaCatalogNotice from '@/components/admin/media/MediaCatalogNotice.vue'
 import { useAuthStore } from '@/stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'

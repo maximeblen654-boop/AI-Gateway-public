@@ -60,7 +60,14 @@ export interface ProductState {
   product_id: string; display_name: string; upstream_model: string; media_type: string
   published: boolean; published_ready: boolean; state: string; reason: string; action: string
 }
+export interface CatalogChange {
+  schema_version: number
+  detected_at: string; previous_synced_at: string
+  added_count: number; missing_count: number
+  added_models: string[]; missing_models: string[]; truncated: boolean
+}
 export interface SupplierDetail {
+  model_catalog_change?: CatalogChange
   publish_validation?: Validation
   product_states?: ProductState[]
   product_removal?: Record<string, { allowed: boolean; reason: string }>

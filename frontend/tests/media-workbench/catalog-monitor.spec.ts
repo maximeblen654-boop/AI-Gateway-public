@@ -1,0 +1,91 @@
+import { expect, test } from '@playwright/test'
+import { writeFile } from 'node:fs/promises'
+
+for (const width of [1440, 390]) {
+  test(`catalog change copy is read-only and bounded at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4190/') ? route.continue() : route.abort())
+    await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt = value } } }))
+    await page.goto('/tests/media-workbench/index.html?scenario=CATALOG_CHANGE&theme=blue')
+    await page.getByTestId('account-search').fill('#77')
+    await page.getByTestId('supplier-77').click()
+    await expect(page.getByTestId('catalog-change-summary')).toContainText('新增 2 个型号')
+    await expect(page.getByTestId('catalog-affected')).toContainText('2 份已发布商品')
+    await expect(page.getByTestId('catalog-auto-list')).toContainText('成功同步的新型号会自动进入本账号模型列表')
+    await expect(page.getByTestId('catalog-old-model')).toContainText('不代表永久下架')
+    await expect(page.getByTestId('model-gpt-image-2.0')).toBeVisible()
+    await expect(page.getByTestId('model-video-new-id')).toBeVisible()
+    await expect(page.getByTestId('model-gpt-image-2.0').locator('[data-state]')).toHaveAttribute('data-state', 'PENDING')
+    await expect(page.getByTestId('model-video-new-id').locator('[data-state]')).toHaveAttribute('data-state', 'PENDING')
+    await expect(page.getByTestId('model-image-native-1')).toHaveCount(0)
+    const before = await page.evaluate(() => JSON.stringify((window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot()))
+    const savedBefore = JSON.parse(before).media_workbench_v1
+    expect(savedBefore.draft.products).toEqual(expect.arrayContaining([expect.objectContaining({ upstream_model: 'image-native-1', pricing_rules: [expect.objectContaining({ sale_price: { amount: '0.18', currency: 'CNY', billing_mode: 'per_request' } })] })]))
+    await page.getByTestId('catalog-copy').click()
+    await expect(page.getByTestId('catalog-copy-status')).toContainText('已复制')
+    const prompt = await page.evaluate(() => (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt)
+    expect(prompt).toContain('ai-gateway-upstream-change-response')
+    expect(prompt).toContain('不是每次目录同步都要确认')
+    expect(prompt).toContain('配置草稿→校验→发布，不制造源码提交、CI或部署')
+    expect(prompt).toContain('不猜价、不自动替换型号或开启销售')
+    const report = JSON.parse(prompt.split('```json\n\n')[1]!.split('\n\n```')[0]!)
+    expect(report.account_id).toBe(77)
+    expect(report.change.added_models).toEqual(['gpt-image-2.0', 'video-new-id'])
+    expect(report.affected_products.map((item: { media_type: string }) => item.media_type).sort()).toEqual(['image', 'video'])
+    expect(report.site_origin).toBeNull() // This screenshot is an isolated fixture, never production evidence.
+    await writeFile(info.outputPath('copied-catalog-report.json'), JSON.stringify(report, null, 2), 'utf8')
+    const after = await page.evaluate(() => JSON.stringify((window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot()))
+    expect(after).toBe(before)
+    expect(JSON.parse(after).media_workbench_v1).toEqual(savedBefore) // Draft, saved revision, Published prices and sales stay unchanged.
+    expect(JSON.parse(after).product_states).toEqual(JSON.parse(before).product_states)
+    const writes = await page.evaluate(() => (window as unknown as { mediaFixture: { calls: { method: string }[] } }).mediaFixture.calls.filter(call => call.method !== 'get'))
+    expect(writes).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))) })
+    await page.screenshot({ path: info.outputPath(`isolated-catalog-monitor-${width}.png`), fullPage: true })
+    await page.getByTestId('catalog-notice').scrollIntoViewIfNeeded()
+    await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))) })
+    await page.screenshot({ path: info.outputPath(`isolated-catalog-monitor-${width}-viewport.png`), fullPage: false })
+    await page.getByTestId('catalog-notice').screenshot({ path: info.outputPath(`isolated-catalog-monitor-${width}-notice.png`) })
+    expect(errors).toEqual([])
+  })
+}
+
+test('delayed observation stays unknown and clipboard denial keeps the report available', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4190/') ? route.continue() : route.abort())
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Fixture permission denied') } } })
+    document.execCommand = () => false
+  })
+  await page.goto('/tests/media-workbench/index.html?scenario=CATALOG_DELAYED&theme=blue')
+  await page.getByTestId('account-search').fill('#77')
+  await page.getByTestId('supplier-77').click()
+  await expect(page.getByTestId('catalog-delayed')).toContainText('当前页面里的目录信息尚未确认')
+  await expect(page.getByTestId('catalog-delayed')).not.toContainText('目录更新延迟')
+  await expect(page.getByTestId('catalog-change-summary')).toHaveCount(0)
+  await page.getByTestId('catalog-copy').click()
+  await expect(page.getByTestId('catalog-copy-text')).toHaveAttribute('readonly', '')
+  expect(await page.getByTestId('catalog-copy-text').inputValue()).toContain('"stale": true')
+  await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))) })
+  await page.screenshot({ path: info.outputPath('isolated-catalog-delayed-mobile.png'), fullPage: true })
+})
+
+
+test('first successful baseline still produces a usable report for the local Skill', async ({ page }, info) => {
+  await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4190/') ? route.continue() : route.abort())
+  await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt = value } } }))
+  await page.goto('/tests/media-workbench/index.html?scenario=CATALOG_BASELINE&theme=blue')
+  await page.getByTestId('account-search').fill('#77')
+  await page.getByTestId('supplier-77').click()
+  await expect(page.getByTestId('catalog-baseline')).toContainText('建立基线')
+  await page.getByTestId('catalog-copy').click()
+  await expect(page.getByTestId('catalog-copy-status')).toContainText('已复制')
+  const prompt = await page.evaluate(() => (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt)
+  const report = JSON.parse(prompt.split('```json\n\n')[1]!.split('\n\n```')[0]!)
+  expect(report.change).toBeNull()
+  expect(report.affected_products).toHaveLength(2)
+  await writeFile(info.outputPath('copied-baseline-report.json'), JSON.stringify(report, null, 2), 'utf8')
+})

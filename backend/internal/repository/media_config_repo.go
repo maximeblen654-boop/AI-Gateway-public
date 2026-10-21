@@ -26,6 +26,7 @@ const mediaAccountProjection = `SELECT id, name, platform, type, status, schedul
  extra->'upstream_model_catalog_snapshot', extra->'media_workbench_v1',
  jsonb_build_object('model_mapping', credentials->'model_mapping',
  'media_metadata', extra->'upstream_model_metadata',
+ 'model_catalog_change', extra->'studio_model_catalog_change_v1',
  'image2pro_credential_sha256', encode(sha256(convert_to(COALESCE(credentials->>'api_key',''),'UTF8')),'hex'),
  'endpoint_capabilities', COALESCE(credentials->'openai_capabilities', '[]'::jsonb),
  'has_key', length(COALESCE(credentials->>'api_key',''))>0,
@@ -66,6 +67,7 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		}
 	}
 	var local struct {
+		CatalogChange             json.RawMessage                       `json:"model_catalog_change"`
 		Mapping                   map[string]any                        `json:"model_mapping"`
 		MediaMetadata             service.UpstreamModelMetadataSnapshot `json:"media_metadata"`
 		Image2ProCredentialSHA256 string                                `json:"image2pro_credential_sha256"`
@@ -86,6 +88,12 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		return nil, fmt.Errorf("invalid local Account routing projection")
 	}
 	account := service.Account{ID: a.ID, Platform: a.Platform, Type: a.Type, Status: a.Status, Schedulable: a.Schedulable, Credentials: map[string]any{"model_mapping": local.Mapping}, Extra: local.Quota, ExpiresAt: local.ExpiresAt, AutoPauseOnExpired: local.AutoPause, RateLimitResetAt: local.RateLimit, OverloadUntil: local.Overload, TempUnschedulableUntil: local.Temporary}
+	// A damaged or future observation must not break Account routing/config reads.
+	var change *mediaworkbench.CatalogChange
+	if json.Unmarshal(local.CatalogChange, &change) == nil && change != nil && change.SchemaVersion == 1 &&
+		a.Catalog != nil && change.AccountIdentitySHA256 != "" && change.AccountIdentitySHA256 == a.Catalog.AccountIdentitySHA256 {
+		a.CatalogChange = change
+	}
 	a.ModelMapping = account.GetModelMapping()
 	a.EndpointCapabilities = append([]string(nil), local.EndpointCapabilities...)
 	a.Image2ProVideoCapabilities = map[string]videoplan.Image2ProCapabilities{}

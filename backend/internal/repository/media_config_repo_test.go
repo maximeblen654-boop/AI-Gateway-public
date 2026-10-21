@@ -105,3 +105,58 @@ func TestMediaGenericWritesCannotBypassCAS(t *testing.T) {
 		t.Fatalf("generic write was not ignored: %d %v", n, err)
 	}
 }
+
+func TestMediaCatalogChangeProjectionDoesNotAffectRoutingOrDependencies(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	r := NewMediaConfigRepository(db)
+	if !strings.Contains(mediaAccountProjection, "'model_catalog_change', extra->'studio_model_catalog_change_v1'") {
+		t.Fatal("change metadata must use the existing narrow JSON projection")
+	}
+	const catalog = `{"source":"upstream","models":["keep"],"synced_at":"2026-10-21T00:00:00Z","account_identity_sha256":"identity-a"}`
+	const config = `{"schema_version":1,"record_version":1,"published":{"dependencies":{"catalog_sha256":"legacy"},"products":[]}}`
+	var baseline *mediaworkbench.Account
+	for _, tc := range []struct{ name, routing string }{
+		{"old row without change", `{"has_key":true,"endpoint_capabilities":[]}`},
+		{"new notice", `{"has_key":true,"endpoint_capabilities":[],"model_catalog_change":{"schema_version":1,"account_identity_sha256":"identity-a","detected_at":"2026-10-21T00:00:00Z","previous_synced_at":"2026-10-20T00:00:00Z","added_count":1,"missing_count":0,"added_models":["keep"],"missing_models":[],"truncated":false,"api_key":"secret-not-projected"}}`},
+		{"cleared notice", `{"has_key":true,"endpoint_capabilities":[],"model_catalog_change":null}`},
+		{"malformed notice", `{"has_key":true,"endpoint_capabilities":[],"model_catalog_change":{"schema_version":1,"added_count":"invalid"}}`},
+		{"future schema", `{"has_key":true,"endpoint_capabilities":[],"model_catalog_change":{"schema_version":2,"account_identity_sha256":"identity-a"}}`},
+		{"wrong catalog identity", `{"has_key":true,"endpoint_capabilities":[],"model_catalog_change":{"schema_version":1,"account_identity_sha256":"identity-b"}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mock.ExpectQuery(regexp.QuoteMeta(mediaAccountProjection + `WHERE id=$1 AND deleted_at IS NULL`)).WithArgs(int64(7)).
+				WillReturnRows(sqlmock.NewRows(mediaColumns).AddRow(7, "supplier", "openai", "apikey", "active", true, "https://api.image2pro.top/v1", catalog, config, tc.routing))
+			a, err := r.Get(context.Background(), 7)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if baseline == nil {
+				baseline = a
+				if a.CatalogChange != nil || !a.RuntimeReady {
+					t.Fatalf("old row failed compatibility: %+v", a)
+				}
+			}
+			if a.RuntimeReady != baseline.RuntimeReady || a.RoutingFingerprint != baseline.RoutingFingerprint || mediaworkbench.DependenciesFor(a) != mediaworkbench.DependenciesFor(baseline) || mediaworkbench.PublishedDependenciesFor(a) != mediaworkbench.PublishedDependenciesFor(baseline) {
+				t.Fatal("change notice entered runtime readiness, routing, or immutable dependency identity")
+			}
+			body, _ := json.Marshal(a)
+			if strings.Contains(string(body), "secret-not-projected") || strings.Contains(string(body), "api_key") {
+				t.Fatalf("projection leaked an unexpected field: %s", body)
+			}
+			if tc.name == "new notice" {
+				if a.CatalogChange == nil || a.CatalogChange.AddedCount != 1 || len(a.CatalogChange.AddedModels) != 1 || a.CatalogChange.AddedModels[0] != "keep" {
+					t.Fatalf("notice missing from narrow projection: %s", body)
+				}
+			} else if a.CatalogChange != nil || strings.Contains(string(body), "model_catalog_change") {
+				t.Fatalf("absent notice is not omitted for legacy/cleared rows: %s", body)
+			}
+		})
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

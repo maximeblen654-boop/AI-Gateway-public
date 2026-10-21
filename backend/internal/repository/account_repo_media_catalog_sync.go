@@ -52,22 +52,40 @@ func (r *accountRepository) ListStudioModelCatalogSyncAccountIDs(ctx context.Con
 	return ids, rows.Err()
 }
 
-// UpdateStudioModelCatalogSnapshot changes only the observation key. The exact
+// UpdateStudioModelCatalogSnapshot changes only the catalog and change observation keys. The exact
 // request identity and previous catalog are compared atomically so a rotated
 // credential or a newer manual/background sync cannot be overwritten.
 func (r *accountRepository) UpdateStudioModelCatalogSnapshot(ctx context.Context, account *service.Account, catalog *mediaworkbench.Catalog) error {
 	if account == nil || catalog == nil {
 		return service.ErrAccountNilInput
 	}
-	payload, err := json.Marshal(map[string]any{mediaworkbench.CatalogKey: catalog})
-	if err != nil {
-		return err
-	}
 	credentials, err := json.Marshal(account.Credentials)
 	if err != nil {
 		return err
 	}
 	expected, err := json.Marshal(account.Extra[mediaworkbench.CatalogKey])
+	if err != nil {
+		return err
+	}
+	var previous *mediaworkbench.Catalog
+	if json.Unmarshal(expected, &previous) != nil {
+		previous = nil // An invalid/legacy snapshot is not a comparable baseline.
+	}
+	lastBody, err := json.Marshal(account.Extra[mediaworkbench.CatalogChangeKey])
+	if err != nil {
+		return err
+	}
+	var last *mediaworkbench.CatalogChange
+	if json.Unmarshal(lastBody, &last) != nil {
+		last = nil
+	}
+	change, err := mediaworkbench.CatalogChangeFor(previous, catalog, last)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(map[string]any{
+		mediaworkbench.CatalogKey: catalog, mediaworkbench.CatalogChangeKey: change,
+	})
 	if err != nil {
 		return err
 	}

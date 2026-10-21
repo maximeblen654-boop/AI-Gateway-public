@@ -13,7 +13,13 @@ import (
 )
 
 func TestUpdateExtraMediaCatalogSnapshotIsSchedulerNeutral(t *testing.T) {
-	updates := map[string]any{mediaworkbench.CatalogKey: map[string]any{"models": []string{"image-model"}}}
+	updates := map[string]any{
+		mediaworkbench.CatalogKey:       map[string]any{"models": []string{"image-model"}},
+		mediaworkbench.CatalogChangeKey: map[string]any{"schema_version": 1},
+	}
+	require.True(t, isSchedulerNeutralExtraKey(mediaworkbench.CatalogChangeKey))
+	require.False(t, isSchedulerNeutralExtraKey(mediaworkbench.CatalogChangeKey+"_routing"), "only the exact change key is neutral")
+	require.False(t, shouldEnqueueSchedulerOutboxForExtraUpdates(map[string]any{mediaworkbench.CatalogChangeKey: nil}))
 	require.True(t, isSchedulerNeutralExtraKey(mediaworkbench.CatalogKey))
 	require.False(t, shouldEnqueueSchedulerOutboxForExtraUpdates(updates))
 	require.False(t, isSchedulerNeutralExtraKey(mediaworkbench.CatalogKey+"_routing"), "only the exact discovery key is neutral")
@@ -25,7 +31,7 @@ func TestUpdateExtraMediaCatalogSnapshotIsSchedulerNeutral(t *testing.T) {
 	// Only persist JSONB. Any transaction/outbox insertion fails the mock and the
 	// call; without an outbox event the scheduler worker cannot rebuild buckets.
 	mock.ExpectExec(`UPDATE accounts SET extra = COALESCE\(extra, '\{\}'::jsonb\) \|\| \$1::jsonb, updated_at = NOW\(\) WHERE id = \$2 AND deleted_at IS NULL`).
-		WithArgs(`{"upstream_model_catalog_snapshot":{"models":["image-model"]}}`, int64(7)).WillReturnResult(sqlmock.NewResult(0, 1))
+		WithArgs(`{"studio_model_catalog_change_v1":{"schema_version":1},"upstream_model_catalog_snapshot":{"models":["image-model"]}}`, int64(7)).WillReturnResult(sqlmock.NewResult(0, 1))
 	require.NoError(t, repo.UpdateExtra(context.Background(), 7, updates))
 	require.NoError(t, mock.ExpectationsWereMet())
 	// Neutral metadata must not mask a real routing change in the same update.

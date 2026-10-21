@@ -124,6 +124,19 @@ if (scenario === 'CURRENT_UPSTREAM_NAMES') {
  dto.model_catalog={source:'upstream',synced_at:'2026-10-21T07:32:00Z',models:['gpt-image-2.0','gpt-image-2.0-原生4K']}
  dto.models=[{model_id:'image-native-1',state:'UPSTREAM_NOT_DISCOVERED'},{model_id:'gpt-image-2.0',state:'PENDING'},{model_id:'gpt-image-2.0-原生4K',state:'PENDING'}]
 }
+if (['CATALOG_CHANGE', 'CATALOG_DELAYED', 'CATALOG_BASELINE'].includes(scenario)) {
+  const now = new Date()
+  const success = new Date(now.getTime() - (scenario === 'CATALOG_DELAYED' ? 11 : 1) * 60_000).toISOString()
+  dto.host = 'api.image2pro.top'
+  dto.model_catalog = { source: 'upstream', synced_at: success, models: ['gpt-image-2.0', 'video-new-id'] }
+  dto.model_catalog_change = { schema_version: 1, detected_at: success, previous_synced_at: new Date(now.getTime() - 16 * 60_000).toISOString(), added_count: 2, missing_count: 2, added_models: ['gpt-image-2.0', 'video-new-id'], missing_models: ['image-native-1', 'video-old-id'], truncated: false }
+  dto.models = [{ model_id: 'image-native-1', state: 'UPSTREAM_NOT_DISCOVERED' }, { model_id: 'gpt-image-2.0', state: 'PENDING' }, { model_id: 'video-new-id', state: 'PENDING' }]
+  dto.product_states = [
+    { product_id: 'canvas-1', display_name: '隔离图片商品', upstream_model: 'image-native-1', media_type: 'image', published: true, published_ready: false, state: 'UPSTREAM_REMOVED', reason: '本次目录未返回此型号', action: '先核对目录及文档，不猜替代型号' },
+    { product_id: 'fixture-video', display_name: '隔离视频商品', upstream_model: 'video-old-id', media_type: 'video', published: true, published_ready: false, state: 'UPSTREAM_REMOVED', reason: '本次目录未返回此型号', action: '先核对目录及文档，不猜替代型号' }
+  ]
+}
+if (scenario === 'CATALOG_BASELINE') delete dto.model_catalog_change
 if (['SELLING', 'PUBLISHED_NOT_READY', 'ACCOUNT_RUNTIME_BLOCKED'].includes(scenario)) { dto.effective_state = scenario; dto.effective_sales = scenario === 'SELLING' }
 if (scenario === 'VALUE_MAPPING') Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, {
   code: 'MISSING_VALUE_MAPPING', path: 'draft.products[0].adapter_config.size_mappings',
