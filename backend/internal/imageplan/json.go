@@ -3,8 +3,11 @@
 package imageplan
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -14,6 +17,12 @@ import (
 const Generations = "/v1/images/generations"
 const Edits = "/v1/images/edits"
 
+// Image2ProSyncProtocol is set only by the server's dedicated compiler. It is
+// not inferred from a browser field, model name or ordinary Images request.
+const Image2ProSyncProtocol = "image2pro_sync_json_v1"
+
+const image2ProSyncMaxBodyBytes = 24 << 20
+
 func IsImageModel(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
 	return strings.HasPrefix(model, "gpt-image-") || model == "grok-imagine" || model == "grok-imagine-edit" || strings.HasPrefix(model, "grok-imagine-image")
@@ -21,6 +30,7 @@ func IsImageModel(model string) bool {
 
 type JSONFields struct {
 	LegacyStringReferences bool
+	Image2ProReferences    bool
 	Endpoint               string
 	Model                  string
 	ExplicitModel          bool
@@ -56,6 +66,7 @@ type AssetSlot struct {
 	Representation string `json:"representation"`
 }
 type Plan struct {
+	Protocol   string         `json:"protocol,omitempty"`
 	Method     string         `json:"method"`
 	Path       string         `json:"path"`
 	Encoding   string         `json:"encoding"`
@@ -72,14 +83,30 @@ func (p Plan) MaterializeJSON() []byte { return append([]byte(nil), p.body...) }
 // CompileJSON exercises the dispatch parser and model rewrite with caller-owned
 // bytes. Media validation supplies only synthetic fields and asset placeholders.
 func CompileJSON(body []byte, upstream, endpoint string) (Plan, error) {
-	p := Plan{Method: "POST", Path: endpoint, Encoding: "application/json", Omitted: []string{}, AssetSlots: []AssetSlot{}}
+	return compileJSON(body, upstream, endpoint, "")
+}
+
+// CompileImage2ProJSON implements only the documented synchronous JSON contract.
+// The public model ID remains the frozen Account catalog identity.
+func CompileImage2ProJSON(body []byte, upstream, endpoint string) (Plan, error) {
+	if len(body) > image2ProSyncMaxBodyBytes {
+		return Plan{}, fmt.Errorf("Image2Pro synchronous JSON exceeds 24 MiB")
+	}
+	if upstream == "" || strings.TrimSpace(upstream) != upstream || len(upstream) > 256 {
+		return Plan{}, fmt.Errorf("invalid Image2Pro public model ID")
+	}
+	return compileJSON(body, upstream, endpoint, Image2ProSyncProtocol)
+}
+
+func compileJSON(body []byte, upstream, endpoint, protocol string) (Plan, error) {
+	p := Plan{Protocol: protocol, Method: "POST", Path: endpoint, Encoding: "application/json", Omitted: []string{}, AssetSlots: []AssetSlot{}}
 	if endpoint != Generations && endpoint != Edits {
 		return p, fmt.Errorf("unsupported endpoint")
 	}
 	if !gjson.ValidBytes(body) {
 		return p, fmt.Errorf("invalid JSON")
 	}
-	fields := JSONFields{Endpoint: endpoint, N: 1}
+	fields := JSONFields{Endpoint: endpoint, N: 1, Image2ProReferences: protocol == Image2ProSyncProtocol}
 	if err := ParseJSON(body, &fields); err != nil {
 		return p, err
 	}
@@ -92,7 +119,11 @@ func CompileJSON(body []byte, upstream, endpoint string) (Plan, error) {
 	}
 	p.body = forwarded
 	if len(fields.InputImageURLs) > 0 {
-		p.AssetSlots = append(p.AssetSlots, AssetSlot{Kind: "image", Count: len(fields.InputImageURLs), Representation: "image_url"})
+		representation := "image_url"
+		if protocol == Image2ProSyncProtocol {
+			representation = "string"
+		}
+		p.AssetSlots = append(p.AssetSlots, AssetSlot{Kind: "image", Count: len(fields.InputImageURLs), Representation: representation})
 	}
 	for _, field := range []string{"size", "quality", "style", "images", "mask", "stream"} {
 		if _, ok := p.Fields[field]; !ok {
@@ -103,6 +134,9 @@ func CompileJSON(body []byte, upstream, endpoint string) (Plan, error) {
 }
 
 func ParseJSON(body []byte, req *JSONFields) error {
+	if req.Image2ProReferences {
+		return parseImage2ProJSON(body, req)
+	}
 	if modelResult := gjson.GetBytes(body, "model"); modelResult.Exists() {
 		req.Model = strings.TrimSpace(modelResult.String())
 		req.ExplicitModel = req.Model != ""
@@ -208,4 +242,113 @@ func HasNativeOptions(exists func(path string) bool) bool {
 		}
 	}
 	return false
+}
+
+// The allowlist follows the captured public synchronous image documentation,
+// not the ordinary OpenAI image schema. Unconfirmed extension fields are refused.
+func parseImage2ProJSON(body []byte, req *JSONFields) error {
+	if len(body) > image2ProSyncMaxBodyBytes {
+		return fmt.Errorf("Image2Pro synchronous JSON exceeds 24 MiB")
+	}
+	root := gjson.ParseBytes(body)
+	if !gjson.ValidBytes(body) || !root.IsObject() || (req.Endpoint != Generations && req.Endpoint != Edits) {
+		return fmt.Errorf("invalid Image2Pro synchronous request")
+	}
+	var fieldErr error
+	seen := map[string]bool{}
+	root.ForEach(func(key, _ gjson.Result) bool {
+		name := key.String()
+		if seen[name] {
+			fieldErr = fmt.Errorf("duplicate Image2Pro field %s", name)
+			return false
+		}
+		seen[name] = true
+		switch name {
+		case "model", "prompt", "n", "size", "aspect_ratio", "ratio", "resolution", "image_size",
+			"input_image", "reference_image", "image", "images", "mask", "response_format", "client_request_id", "clientRequestId":
+			return true
+		default:
+			fieldErr = fmt.Errorf("unsupported Image2Pro synchronous field %s", name)
+			return false
+		}
+	})
+	if fieldErr != nil {
+		return fieldErr
+	}
+	for _, name := range []string{"model", "prompt"} {
+		value := root.Get(name)
+		if value.Type != gjson.String || strings.TrimSpace(value.String()) == "" {
+			return fmt.Errorf("Image2Pro %s is required", name)
+		}
+	}
+	req.Model = root.Get("model").String()
+	if strings.TrimSpace(req.Model) != req.Model || len(req.Model) > 256 {
+		return fmt.Errorf("invalid Image2Pro public model ID")
+	}
+	req.ExplicitModel, req.Prompt, req.N = true, strings.TrimSpace(root.Get("prompt").String()), 1
+	if n := root.Get("n"); n.Exists() {
+		value, err := strconv.ParseInt(n.Raw, 10, 32)
+		if n.Type != gjson.Number || err != nil || value < 1 || value > 4 {
+			return fmt.Errorf("Image2Pro n must be an integer from 1 to 4")
+		}
+		req.N = int(value)
+	}
+	for _, name := range []string{"size", "aspect_ratio", "ratio", "resolution", "image_size", "response_format", "client_request_id", "clientRequestId"} {
+		if value := root.Get(name); value.Exists() && (value.Type != gjson.String || strings.TrimSpace(value.String()) == "") {
+			return fmt.Errorf("invalid Image2Pro %s", name)
+		}
+	}
+	req.Size = root.Get("size").String()
+	req.ExplicitSize = req.Size != ""
+	req.ResponseFormat = root.Get("response_format").String()
+	// The workbench never sells a forced response encoding: data may contain
+	// either URLs or Base64 independently of this request option.
+	if req.ResponseFormat != "" && req.ResponseFormat != "url" {
+		return fmt.Errorf("Image2Pro response_format must be url or omitted")
+	}
+	for _, name := range []string{"input_image", "reference_image", "image", "images"} {
+		value := root.Get(name)
+		if !value.Exists() {
+			continue
+		}
+		values := []gjson.Result{value}
+		if value.IsArray() {
+			values = value.Array()
+		}
+		for _, item := range values {
+			if item.Type != gjson.String || !validImage2ProReference(item.String()) {
+				return fmt.Errorf("Image2Pro references must be HTTPS URLs or image Data URLs")
+			}
+			req.InputImageURLs = append(req.InputImageURLs, item.String())
+		}
+	}
+	if len(req.InputImageURLs) > 16 {
+		return fmt.Errorf("Image2Pro accepts at most 16 reference images")
+	}
+	if req.IsEdits() && len(req.InputImageURLs) == 0 {
+		return fmt.Errorf("Image2Pro edits requires a reference image")
+	}
+	if mask := root.Get("mask"); mask.Exists() {
+		if mask.Type != gjson.String || !validImage2ProReference(mask.String()) {
+			return fmt.Errorf("Image2Pro mask must be an HTTPS URL or image Data URL")
+		}
+		req.HasMask, req.MaskImageURL = true, mask.String()
+	}
+	return nil
+}
+
+func validImage2ProReference(value string) bool {
+	if len(value) > image2ProSyncMaxBodyBytes || strings.TrimSpace(value) != value || value == "" {
+		return false
+	}
+	if strings.HasPrefix(value, "data:image/") {
+		header, encoded, ok := strings.Cut(value, ";base64,")
+		if !ok || len(header) <= len("data:image/") || encoded == "" {
+			return false
+		}
+		decoded, err := base64.StdEncoding.Strict().DecodeString(encoded)
+		return err == nil && len(decoded) > 0
+	}
+	u, err := url.Parse(value)
+	return err == nil && u.Scheme == "https" && u.Hostname() != "" && u.User == nil && u.Fragment == ""
 }

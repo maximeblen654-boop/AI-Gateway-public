@@ -1,0 +1,15 @@
+{
+  "source": "https://image2pro.top/api-docs (2026-10-19 snapshot, synthetic model/protocol identities; no live availability claim)",
+  "model": "public-video-fixture",
+  "metadata": {
+    "type": "video", "protocol": "opaque-fixture-protocol-tag",
+    "modes": ["text", "reference", "keyframe"],
+    "max_images": 8, "max_audio_references": 3, "max_video_references": 1,
+    "supports_audio_reference": true,
+    "duration_min": 4, "duration_max": 12, "aspect_ratios": ["16:9", "9:16"], "size": "1080P",
+    "reference_audio_max_bytes": 14000000, "reference_video_max_bytes": 49000000
+  },
+  "request": {"model":"public-video-fixture","prompt":"A steady camera follows the subject.","duration":5,"ratio":"16:9","images":["data:image/png;base64,iVBORw0KGgo="],"audios":[{"mediaId":"audio-fixture-id"}],"videos":[{"mediaId":"video-fixture-id"}]},
+  "processing": {"id":"a1b2c3d4e5f6789012345678","object":"video","model":"public-video-fixture","status":"processing","created_at":1792368000000,"updated_at":1792368000000,"url":null,"error":null},
+  "completed": {"id":"a1b2c3d4e5f6789012345678","object":"video","model":"public-video-fixture","status":"completed","url":"https://media.example/original.mp4","error":null}
+}

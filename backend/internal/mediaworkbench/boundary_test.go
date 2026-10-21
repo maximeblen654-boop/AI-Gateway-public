@@ -13,6 +13,8 @@ import (
 // the validator/plan source restricted to pure dependencies as a second guard.
 func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 	allowed := map[string]bool{
+		"bytes": true, "encoding/base64": true, "io": true, // in-memory strict JSON and Data URI decoding only
+		"github.com/Wei-Shaw/sub2api/internal/imagecontract": true, // pure reviewed endpoint identity
 		"context": true, "embed": true, "reflect": true, "crypto/sha256": true, "encoding/json": true, "errors": true, "fmt": true, "net/url": true, "regexp": true, "slices": true, "sort": true, "strings": true, "time": true,
 		"github.com/Wei-Shaw/sub2api/internal/pkg/errors": true,
 		"github.com/Wei-Shaw/sub2api/internal/imageplan":  true,
@@ -27,7 +29,7 @@ func TestValidationHasNoNetworkOrCredentialDependencies(t *testing.T) {
 		"strconv":                       true, // pure integer parsing of pixel dimensions and ratios
 		"sync":                          true, // request-local in-memory mutual exclusion; no I/O or admission dependency
 	}
-	for _, dir := range []string{".", "../imageplan", "../videoplan"} {
+	for _, dir := range []string{".", "../imageplan", "../videoplan", "../imagecontract"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil {
 			t.Fatal(err)

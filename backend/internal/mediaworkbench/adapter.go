@@ -10,12 +10,16 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
 
 func VideoProfileModel(p Product) (videoplan.Model, bool) {
 	profile := p.AdapterConfig.WireProfile
+	if profile == "image2pro" {
+		return image2ProVideoModel(p)
+	}
 	// An explicit wire profile must not turn a known model's declared product
 	// capabilities into its own authority, bypassing fixed reference/duration limits.
 	if known, ok := videoplan.DocumentedModel(p.SiteModel); ok && known.Upstream == p.UpstreamModel {
@@ -94,6 +98,9 @@ type AdapterBinding struct {
 // Descriptors expose the installed native adapters, not supplier-tested model
 // capabilities. Unsupported contracts remain explicit and cannot publish.
 func Descriptor(kind string) (AdapterDescriptor, bool) {
+	if kind == "image2pro_video" {
+		return AdapterDescriptor{Kind: kind, Revision: videoplan.Image2ProRevision, MediaType: "video", Auth: "account_apikey", Transport: "https_json", TaskFlow: "async", MaxReferences: 13, Parameters: map[string]Parameter{"model": {Mode: CodeEnum, ValueType: "account_public_video_model"}, "resolution": {Mode: FixedByModel, ValueType: "metadata.size"}, "aspect_ratio": {Mode: CodeEnum, WireField: "ratio"}, "duration_seconds": {Mode: CodeEnum, WireField: "duration"}, "count": {Mode: FixedByModel, ValueType: "one"}, "quality": {Mode: Unsupported}, "reference_images": {Mode: Derived, WireField: "images[]"}, "reference_audio": {Mode: Derived, WireField: "audios[].mediaId"}, "reference_video": {Mode: Derived, WireField: "videos[].mediaId"}}}, true
+	}
 	if kind == "grok_video" {
 		d, _ := Descriptor("laoli_video")
 		d.Kind, d.Revision, d.Auth, d.MaxReferences = kind, videoplan.GrokRevision, "account_native", 1
@@ -152,6 +159,11 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 		// its host, model name or public docs.
 		if a.Config != nil {
 			if b, ok := a.Config.AdapterBindings[mediaType]; ok {
+				if mediaType == "video" && nativeAdapterKind(a, "video") == "image2pro_video" && (b.Kind == "laoli_video" || b.Kind == "unbound_video") {
+					d, _ := Descriptor("image2pro_video")
+					out[mediaType] = AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}
+					continue
+				}
 				if b.Kind == "unbound_"+mediaType && nativeAdapterKind(a, mediaType) != "" {
 					// An old draft may have recorded the temporary unbound marker
 					// before the Account's native adapter became available. Resolve
@@ -184,6 +196,9 @@ func bindingsFor(a *Account, mediaTypes []string) map[string]AdapterBinding {
 // Account platform/type already selects the native gateway protocol. This is
 // a local adapter inventory, not a claim that a supplier/model was probed.
 func nativeAdapterKind(a *Account, mediaType string) string {
+	if mediaType == "video" && a.Platform == "openai" && a.Type == "apikey" && imagecontract.IsImage2ProBase(a.BaseURL) {
+		return "image2pro_video"
+	}
 	if mediaType == "video" && a.Platform == "grok" && (a.Type == "apikey" || a.Type == "oauth") {
 		return "grok_video"
 	}
@@ -226,7 +241,7 @@ func SupportsAccount(a *Account) bool {
 
 func adapterOwnsPlatform(kind, platform string) bool {
 	switch kind {
-	case "openai_images", "openai_images_oauth", "laoli_video", "seedance_video":
+	case "openai_images", "openai_images_oauth", "laoli_video", "seedance_video", "image2pro_video":
 		return platform == "openai"
 	case "grok_images", "grok_video":
 		return platform == "grok"
@@ -245,6 +260,13 @@ func inheritNativeProduct(a *Account, p *Product) {
 	// save. Real Account aliases remain untouched.
 	if p != nil && p.UpstreamModel != "" && strings.HasPrefix(p.SiteModel, "media-") && p.SiteModel == p.ProductID {
 		p.SiteModel = p.UpstreamModel
+	}
+	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "image2pro_video" {
+		inheritImage2ProVideo(a, p)
+		return
+	}
+	if p.MediaType == "image" && inheritImage2ProSyncProduct(a, p) {
+		return
 	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "grok_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "grok"
@@ -285,12 +307,13 @@ type SizeMapping struct {
 	WireSize    string `json:"wire_size"`
 }
 type ImageConfig struct {
-	Version       int                   `json:"version,omitempty"`
-	SizeMappings  []SizeMapping         `json:"size_mappings"`
-	WireProfile   string                `json:"wire_profile,omitempty"`
-	ModelFamily   string                `json:"model_family,omitempty"`
-	Execution     *ImageExecutionConfig `json:"execution,omitempty"`
-	EditExecution *ImageExecutionConfig `json:"edit_execution,omitempty"`
+	Version       int                              `json:"version,omitempty"`
+	SizeMappings  []SizeMapping                    `json:"size_mappings"`
+	WireProfile   string                           `json:"wire_profile,omitempty"`
+	ModelFamily   string                           `json:"model_family,omitempty"`
+	Execution     *ImageExecutionConfig            `json:"execution,omitempty"`
+	EditExecution *ImageExecutionConfig            `json:"edit_execution,omitempty"`
+	Image2Pro     *videoplan.Image2ProCapabilities `json:"image2pro,omitempty"`
 }
 
 // ImageExecutionConfig records only capabilities that were explicitly
@@ -415,6 +438,9 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 		return imageplan.Plan{Method: v.Method, Path: v.Path, Encoding: "application/json", Fields: fields, Omitted: []string{}, AssetSlots: []imageplan.AssetSlot{}}, nil
 	}
 
+	if p.AdapterConfig.ModelFamily == "image2pro_json" {
+		return compileImage2ProSyncPlan(p, spec)
+	}
 	fields := map[string]any{"model": p.SiteModel, "prompt": "<dry-run-prompt>", "n": spec.Count}
 	if spec.OutputFormat != "" {
 		if !validOutputFormat(spec.OutputFormat) || (p.AdapterConfig.ModelFamily != "" && p.AdapterConfig.ModelFamily != "openai_json") {
@@ -498,7 +524,14 @@ func DependenciesFor(a *Account) Dependencies {
 	if a.Config != nil && directProducts(a.Config.Draft.Products) {
 		mapping = "studio-exact-v1"
 	}
-	return Dependencies{AccountID: a.ID, RoutingSHA256: hash([]string{a.Platform, a.Type, endpoint, a.RoutingFingerprint}), CatalogSHA256: hash(a.Catalog), MappingSHA256: mapping, BindingSHA256: hash(bindings), RegistryRevision: RegistryRevision}
+	catalogHash := hash(a.Catalog)
+	if len(a.Image2ProVideoCapabilities) > 0 {
+		catalogHash = hash(struct {
+			Catalog *Catalog
+			Video   map[string]videoplan.Image2ProCapabilities
+		}{a.Catalog, a.Image2ProVideoCapabilities})
+	}
+	return Dependencies{AccountID: a.ID, RoutingSHA256: hash([]string{a.Platform, a.Type, endpoint, a.RoutingFingerprint}), CatalogSHA256: catalogHash, MappingSHA256: mapping, BindingSHA256: hash(bindings), RegistryRevision: RegistryRevision}
 }
 
 func directProducts(products []Product) bool {
@@ -526,12 +559,27 @@ func dependenciesForProducts(a *Account, products []Product) Dependencies {
 		d.MappingSHA256 = hash(a.ModelMapping)
 	}
 	models := map[string]bool{}
+	videoMetadata := map[string]*videoplan.Image2ProCapabilities{}
 	for _, p := range products {
 		if p.Enabled {
 			models[p.UpstreamModel] = a.Catalog != nil && slices.Contains(a.Catalog.Models, p.UpstreamModel)
+			if p.AdapterConfig.WireProfile == "image2pro" {
+				if c, ok := a.Image2ProVideoCapabilities[p.UpstreamModel]; ok {
+					c = c.Normalize()
+					videoMetadata[p.UpstreamModel] = &c
+				} else {
+					videoMetadata[p.UpstreamModel] = nil
+				}
+			}
 		}
 	}
 	d.CatalogSHA256 = publishedCatalogPrefix + hash(models)
+	if len(videoMetadata) > 0 {
+		d.CatalogSHA256 = publishedCatalogPrefix + hash(struct {
+			Models map[string]bool
+			Video  map[string]*videoplan.Image2ProCapabilities
+		}{models, videoMetadata})
+	}
 	return d
 }
 

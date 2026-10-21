@@ -72,6 +72,7 @@
               <p class="mw-muted">发布仅影响勾选商品；销售开关影响此 Account 的全部已发布工作台商品。</p>
               <p class="mw-publication-note">发布配置不会自动开启销售</p>
               <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
+              <p class="mw-muted" data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}</p>
             </div>
             <div class="mw-account-actions">
               <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
@@ -84,7 +85,7 @@
           <section class="mw-product-management" aria-label="配置与销售状态" data-test="publication-layers">
             <strong>分别核对配置与销售状态</strong>
             <p>草稿：{{ config ? saveStateLabel : '尚未建立' }} · 草稿校验：{{ draftValidationLabel }}</p>
-            <p>发布状态：{{ config?.published ? '已发布' : '尚未发布' }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
+            <p data-test="publication-status">发布状态：{{ publicationLabel }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
             <p data-test="global-paid-status">图片生成服务：{{ paidStatusLabel('image') }} · 视频生成服务：{{ paidStatusLabel('video') }}</p>
             <p v-if="config?.sales.enabled && paidStates.video?.mode === 'managed-v1' && !paidStates.video.effective_enabled" class="mw-muted" data-test="video-service-closed">销售已开启，但视频生成服务尚未开放。</p>
             <p class="mw-muted">草稿校验通过只说明保存的草稿通过检查。商品的已发布配置、Account 销售、全局付费开关和客户原生权限仍分别生效；全局开关请返回来源与账号查看。</p>
@@ -206,6 +207,8 @@
             <section v-if="product || recovery" aria-live="polite" class="mw-save-draft" data-test="autosave-status">
               <p>{{ recovery && !dirty && saveState === 'saved' ? '服务器草稿已确认；仍有本地内容待处理' : saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
               <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
+              <p class="mw-muted" data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}。保存草稿不等于发布。</p>
+              <p data-test="publication-status">{{ publicationLabel }}</p>
               <p v-if="recoveryWarning" role="alert" class="mw-field-error" data-test="recovery-warning">{{ recoveryWarning }}</p>
               <div v-if="recovery" class="mw-banner" data-test="draft-recovery">
                 <label v-if="productRecoveries.length > 1">此商品有 {{ productRecoveries.length }} 份独立恢复副本<select class="input" data-test="recovery-copy-select" :value="selectedRecoveryKey" :disabled="busy" @change="chooseProductRecovery(($event.target as HTMLSelectElement).value)"><option v-for="entry in productRecoveries" :key="entry.key" :value="entry.key">{{ new Date(entry.value.updated_at).toLocaleString() }} · {{ entry.value.product.display_name }} · 页面 {{ entry.value.editor_id?.slice(-8) || '旧副本' }}</option></select></label>
@@ -319,6 +322,7 @@ import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
 import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
 import { formatDateTimeLocalInput } from '@/utils/format'
+import { mediaPublicationLabel } from '@/utils/mediaAdminPresentation'
 import '@/styles/media-workbench.css'
 
 const costOpen = ref(false)
@@ -357,6 +361,12 @@ const draftLastSavedLabel = computed(() => {
   const savedAt = Date.parse(config.value?.draft.updated_at ?? '')
   return Number.isFinite(savedAt) && savedAt > 0 ? formatDateTimeLocalInput(savedAt / 1000).replace('T', ' ') : '尚未保存'
 })
+const lastPublishedLabel = computed(() => {
+  if (!config.value?.published) return '尚未发布'
+  const publishedAt = Date.parse(config.value.published.published_at ?? '')
+  return Number.isFinite(publishedAt) && publishedAt > 0 ? formatDateTimeLocalInput(publishedAt / 1000).replace('T', ' ') : '已有发布配置，发布时间未记录'
+})
+const publicationLabel = computed(() => dirty.value ? '有未保存修改，当前输入尚未发布' : saveState.value !== 'saved' && config.value ? '当前保存结果尚未确认，不能据此判断已发布' : mediaPublicationLabel(config.value?.draft.products ?? [], config.value?.published?.products))
 const newProductType = ref('')
 const removeProductId = ref('')
 const removalTarget = computed(() => products.value.find(p => p.product_id === removeProductId.value))

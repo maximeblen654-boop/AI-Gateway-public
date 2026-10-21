@@ -109,22 +109,6 @@ func imageReceiptFlatGroupCard(model string, group *Group, resolved *ResolvedPri
 	return found
 }
 
-func imageReceiptReferenceCost(model, pricingModel string, group *Group, resolved *ResolvedPricing, count int, multiplier float64) (*CostBreakdown, bool, error) {
-	card := imageReceiptFlatGroupCard(model, group, resolved)
-	if !isImage2ProModel(model) || pricingModel != model || card == nil || card.PerRequestPrice == nil || *card.PerRequestPrice < 0 || card.ImageReferencePrice == nil || resolved.ImageReferencePrice == nil {
-		return nil, false, errors.New("explicit reference image customer price unavailable")
-	}
-	unit := *card.ImageReferencePrice
-	if unit != *resolved.ImageReferencePrice || math.IsNaN(unit) || math.IsInf(unit, 0) || unit < 0 || (unit == 0 && model != "canvas-image-07") || math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 || count < 1 {
-		return nil, false, errors.New("invalid reference image customer price")
-	}
-	cost := &CostBreakdown{TotalCost: unit * float64(count), ActualCost: unit * float64(count) * multiplier, BillingMode: string(resolved.Mode)}
-	if math.IsNaN(cost.ActualCost) || math.IsInf(cost.ActualCost, 0) {
-		return nil, false, errors.New("invalid reference image customer cost")
-	}
-	return cost, model == "canvas-image-07" && unit == 0, nil
-}
-
 var imageReceiptKeyPattern = regexp.MustCompile(`^img_[a-f0-9]{32}$`)
 var imageReceiptMu sync.Mutex
 var imageReceiptReads = make(chan struct{}, 2)
@@ -343,8 +327,12 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 		imageReceiptMu.Unlock()
 		return nil, readErr
 	}
+	if isImage2ProModel(parsed.Model) {
+		imageReceiptMu.Unlock()
+		return nil, ErrImage2ProLegacyAdmission
+	}
 	upstreamModel := account.GetMappedModel(firstNonEmpty(in.ChannelMappedModel, parsed.Model))
-	if upstreamModel != parsed.Model && !isImage2ProModel(parsed.Model) {
+	if upstreamModel != parsed.Model {
 		imageReceiptMu.Unlock()
 		return nil, errors.New("receipt requires original public model")
 	}
@@ -362,26 +350,7 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 		imageReceiptMu.Unlock()
 		return nil, err
 	}
-	hasReferences := len(parsed.InputImageURLs) > 0
-	if isImage2ProModel(parsed.Model) {
-		var request struct {
-			Images []json.RawMessage `json:"images"`
-		}
-		if json.Unmarshal(body, &request) != nil {
-			imageReceiptMu.Unlock()
-			return nil, errors.New("invalid reference image request")
-		}
-		hasReferences = len(request.Images) > 0
-		if hasReferences != (len(parsed.InputImageURLs) > 0) || (hasReferences && parsed.Endpoint != openAIImagesEditsEndpoint) {
-			imageReceiptMu.Unlock()
-			return nil, errors.New("reference image request binding mismatch")
-		}
-	}
 	pricingModel := forwardResultBillingModel(parsed.Model, upstreamModel)
-	if isImage2ProModel(parsed.Model) {
-		// Customer aliases have their own explicit native Group price.
-		pricingModel = parsed.Model
-	}
 	switch in.BillingModelSource {
 	case BillingModelSourceRequested:
 		pricingModel = in.OriginalModel
@@ -411,13 +380,6 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 	}
 	cost := s.calculateOpenAIImageCost(ctx, pricingModel, in.APIKey, &OpenAIForwardResult{Model: parsed.Model, UpstreamModel: upstreamModel, ImageCount: billingCount, ImageSize: parsed.SizeTier}, imageMult)
 	allowZero := imageReceiptAllowsZeroPrice(parsed.Model, pricingModel, in.APIKey.Group, resolved)
-	if isImage2ProModel(parsed.Model) && hasReferences {
-		cost, allowZero, err = imageReceiptReferenceCost(parsed.Model, pricingModel, in.APIKey.Group, resolved, billingCount, imageMult)
-		if err != nil {
-			imageReceiptMu.Unlock()
-			return nil, err
-		}
-	}
 	if cost == nil || math.IsNaN(cost.ActualCost) || math.IsInf(cost.ActualCost, 0) || cost.ActualCost < 0 || (cost.ActualCost == 0 && (!allowZero || cost.TotalCost != 0)) || s.usageBillingRepo == nil {
 		imageReceiptMu.Unlock()
 		return nil, errors.New("receipt billing unavailable")
@@ -430,16 +392,6 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 	groupSnapshot.AccountGroups = nil // Nested accounts may contain credentials.
 	r := &imageReceiptRecord{BillingCount: billingCount, ExpectedCount: expectedCount, ClientKey: key, UserID: in.APIKey.UserID, APIKeyID: in.APIKey.ID, AccountID: account.ID, BaseURL: base, CredentialFingerprint: imageReceiptFingerprint(token), PayloadHash: hash, Model: parsed.Model, UpstreamModel: upstreamModel, Size: parsed.Size, SizeTier: parsed.SizeTier, CreatedAt: now, Status: "unknown", BillingState: "not_billed", Cost: cost, Multiplier: imageMult, AccountRate: account.BillingRateMultiplier(), Group: &groupSnapshot, QuotaPlatform: in.QuotaPlatform, Channel: in.ChannelUsageFields}
 	r.KeyQuota, r.KeyRate5h, r.KeyRate1d, r.KeyRate7d = in.APIKey.Quota, in.APIKey.RateLimit5h, in.APIKey.RateLimit1d, in.APIKey.RateLimit7d
-	if isImage2ProModel(parsed.Model) {
-		if err = prepareImage2ProReceipt(r, account, parsed, body); err != nil {
-			imageReceiptMu.Unlock()
-			return nil, err
-		}
-		if err = imageReceiptStorePreflight(int64(len(r.RequestBody)) + imageReceiptResultReserve); err != nil {
-			imageReceiptMu.Unlock()
-			return nil, err
-		}
-	}
 	if os.Getenv("IMAGE_RECEIPT_ASYNC_ENABLED") == "true" && IsDurableImageModel(parsed.Model) {
 		r.Protocol, r.CreatePath, r.IdempotencyKey = "durable-async-v1", imageReceiptAsyncPath(parsed.Endpoint), key
 		r.RequestBody = append([]byte(nil), body...)
@@ -485,10 +437,6 @@ func (s *OpenAIGatewayService) DispatchImageReceipt(ctx context.Context, c *gin.
 		return nil, err
 	}
 	// No request cancellation from a disconnected bridge; total duration remains bounded.
-	if r.Protocol == image2ProReceiptProtocol {
-		s.startImage2ProReceipt(path, in.APIKey, in.APIKeyService)
-		return receiptView(r), nil
-	}
 	if r.Protocol == "durable-async-v1" {
 		return s.advanceAsyncImageReceipt(context.WithoutCancel(ctx), path, r, in.APIKey, in.APIKeyService, true)
 	}

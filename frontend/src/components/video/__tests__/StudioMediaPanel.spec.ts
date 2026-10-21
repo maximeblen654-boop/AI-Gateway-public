@@ -618,3 +618,35 @@ describe('One product entry with independent specification Offers',()=>{
   expect(api.request).toHaveBeenCalledWith('image','quotes',expect.objectContaining({offer_id:'4k',spec:expect.objectContaining({resolution:'4K'})}));expect(api.generate).not.toHaveBeenCalled()
  })
 })
+
+
+describe('Image2Pro provider attachment preparation', () => {
+ it.each(['image','audio','video'] as const)('binds %s preparation to the exact offer before quoting and never generates', async referenceKind => {
+  const refs={image:{min:0,max:1},audio:{min:0,max:1},video:{min:0,max:1},total_max:3}
+  api.catalog.mockResolvedValue([{...offer,input_mode:'image2pro',spec:{...offer.spec,references:refs}}]);api.history.mockResolvedValue([])
+  api.request.mockImplementation(async (_kind:string,path:string) => {
+   if(path==='readiness')return {paid_enabled:true}
+   if(path==='prepare')return {preparation_id:'isolated-image2pro-preparation'}
+   if(path==='quotes')throw new Error('Stop after inspecting the quoted request')
+   throw new Error('Unexpected request')
+  })
+  wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-prompt"]').setValue('Synthetic provider quotation')
+  const mime={image:'image/png',audio:'audio/mpeg',video:'video/mp4'}[referenceKind]
+  await pick([new File(['synthetic reference'],`reference.${referenceKind==='image'?'png':referenceKind==='audio'?'mp3':'mp4'}`,{type:mime})])
+  api.request.mockClear()
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request.mock.calls.map(call=>call[1])).toEqual(['prepare','quotes'])
+  expect(api.request.mock.calls[0]![2]).toMatchObject({offer_id:'offer',model:'synthetic-video',assets:[{kind:referenceKind}]})
+  expect(api.request.mock.calls[1]![2]).toMatchObject({offer_id:'offer',model:'synthetic-video',preparation_id:'isolated-image2pro-preparation',assets:[{kind:referenceKind}]})
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('does not create an attachment preparation for a text-only Image2Pro quote', async () => {
+  api.catalog.mockResolvedValue([{...offer,input_mode:'image2pro'}]);api.history.mockResolvedValue([])
+  api.request.mockImplementation(async (_kind:string,path:string)=>{if(path==='readiness')return {paid_enabled:true};throw new Error('Stop after quotation')})
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('Text only')
+  api.request.mockClear();await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(api.request.mock.calls.map(call=>call[1])).toEqual(['quotes'])
+  expect(api.request.mock.calls[0]![2]).not.toHaveProperty('preparation_id');expect(api.generate).not.toHaveBeenCalled()
+ })
+})

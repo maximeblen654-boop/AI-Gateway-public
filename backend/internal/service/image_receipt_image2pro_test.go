@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -29,27 +29,38 @@ func image2ProFixture(t *testing.T) (*OpenAIGatewayService, *APIKey, *Account, *
 	r.Model, r.UpstreamModel = "canvas-image-01", "无限制-Seedream-5-Pro"
 	body := []byte(`{"model":"canvas-image-01","prompt":"fixture","n":1}`)
 	r.PayloadHash = HashUsageRequestPayload(body)
-	require.NoError(t, prepareImage2ProReceipt(r, account, &OpenAIImagesRequest{Model: r.Model, N: 1, Endpoint: openAIImagesGenerationsEndpoint}, body))
+	// Historical fixture only: today's entry is forbidden from creating these
+	// records. Recovery must preserve the original serialized request identity.
+	r.RequestBody, _ = json.Marshal(map[string]any{"model": r.UpstreamModel, "prompt": "fixture", "n": 1})
+	r.UpstreamPayloadHash = HashUsageRequestPayload(r.RequestBody)
+	r.Protocol, r.CreatePath, r.IdempotencyKey = image2ProReceiptProtocol, openAIImagesGenerationsEndpoint, r.ClientKey
+	r.ReceiptID, r.Status = "local_"+r.ClientKey, "queued"
+	r.BillingRecoveryVersion, r.AccountQuotaEnabled = 1, account.HasAnyQuotaLimit()
 	require.NoError(t, saveImageReceipt(path, r))
 	return s, key, account, r, path
 }
 
-func TestImage2ProModelRoutingDoesNotUseOldAsync(t *testing.T) {
+func TestImage2ProLegacyAliasesRejectNewReceiptWithoutClaimOrPOST(t *testing.T) {
 	for _, model := range imagecontract.Image2ProModels {
-		s, key, account, r, path := image2ProFixture(t)
-		_, _, _, _, _ = s, key, account, r, path
-		r.Model, r.UpstreamModel = model.ID, model.UpstreamID
-		body, _ := json.Marshal(map[string]any{"model": model.ID, "prompt": "fixture", "n": 1})
-		parsed := &OpenAIImagesRequest{Model: model.ID, N: 1, Endpoint: openAIImagesGenerationsEndpoint}
-		require.NoError(t, prepareImage2ProReceipt(r, account, parsed, body))
-		require.True(t, IsStudioReceiptModel(model.ID))
-		require.False(t, IsDurableImageModel(model.ID))
-		require.Equal(t, "/v1/images/generations", r.CreatePath)
-		var upstream map[string]any
-		require.NoError(t, json.Unmarshal(r.RequestBody, &upstream))
-		require.Equal(t, model.UpstreamID, upstream["model"])
-		account.Credentials["base_url"] = "https://different.example"
-		require.Error(t, prepareImage2ProReceipt(r, account, parsed, body))
+		t.Run(model.ID, func(t *testing.T) {
+			s, key, account, r, path := image2ProFixture(t)
+			require.NoError(t, os.Remove(path))
+			account.Credentials["model_mapping"] = map[string]any{model.ID: model.UpstreamID}
+			upstream := &receiptUpstreamStub{run: func(*http.Request) (*http.Response, error) { t.Fatal("retired alias cannot generate"); return nil, nil }}
+			s.httpUpstream = upstream
+			body, _ := json.Marshal(map[string]any{"model": model.ID, "prompt": "synthetic", "n": 1})
+			parsed := &OpenAIImagesRequest{Model: model.ID, N: 1, Endpoint: openAIImagesGenerationsEndpoint}
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, openAIImagesGenerationsEndpoint, nil)
+			c.Request.Header.Set(ImageReceiptHeader, r.ClientKey)
+			_, err := s.DispatchImageReceipt(t.Context(), c, account, body, parsed, &OpenAIRecordUsageInput{APIKey: key, User: key.User, Account: account})
+			require.ErrorIs(t, err, ErrImage2ProLegacyAdmission)
+			_, err = os.Stat(path)
+			require.ErrorIs(t, err, os.ErrNotExist)
+			_, err = os.Stat(imageReceiptClaimPath(r.UserID, r.ClientKey))
+			require.ErrorIs(t, err, os.ErrNotExist)
+			require.Zero(t, upstream.calls)
+		})
 	}
 }
 
@@ -83,72 +94,48 @@ func TestImage2ProSaveAndExplicitTestsCannotGenerate(t *testing.T) {
 	require.False(t, MeteredAccountTestsDisabled(&Account{Type: AccountTypeAPIKey, Credentials: map[string]any{"base_url": "https://api.image2pro.top.evil.example"}}))
 }
 
-// A real local HTTP server delays its response after the worker has durably
-// accepted the task. Returning to/disconnecting the caller cannot cancel it.
-func TestImage2ProDelayedHTTPResponseSurvivesCallerReturn(t *testing.T) {
+func TestImage2ProLegacyQueuedReceiptCannotStartFirstPOST(t *testing.T) {
 	s, key, _, r, path := image2ProFixture(t)
-	result := receiptPNG(t)
-	started, release := make(chan struct{}), make(chan struct{})
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.Method != "POST" || req.URL.Path != "/v1/images/generations" {
-			http.Error(w, "wrong route", 400)
-			return
-		}
-		if _, err := os.Stat(path + ".sync-dispatch"); err != nil {
-			http.Error(w, "missing durable marker", 500)
-			return
-		}
-		close(started)
-		<-release
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(result)
-	}))
-	defer upstream.Close()
-	target, _ := url.Parse(upstream.URL)
-	s.httpUpstream = &receiptUpstreamStub{run: func(req *http.Request) (*http.Response, error) {
-		copy := req.Clone(req.Context())
-		u := *req.URL
-		u.Scheme, u.Host = target.Scheme, target.Host
-		copy.URL = &u
-		return http.DefaultClient.Do(copy)
+	upstream := &receiptUpstreamStub{run: func(*http.Request) (*http.Response, error) {
+		t.Fatal("old queued receipt must not generate")
+		return nil, nil
 	}}
+	s.httpUpstream = upstream
 	s.startImage2ProReceipt(path, key, nil)
-	select {
-	case <-started:
-	case <-time.After(5 * time.Second):
-		t.Fatal("worker did not start")
-	}
-	stored, err := readImageReceipt(path)
-	require.NoError(t, err)
-	require.Equal(t, "not_billed", stored.BillingState)
-	close(release)
 	require.Eventually(t, func() bool {
 		imageReceiptMu.Lock()
 		defer imageReceiptMu.Unlock()
-		saved, e := readImageReceipt(path)
-		return e == nil && saved.BillingState == "billed"
-	}, 5*time.Second, 10*time.Millisecond)
-	restarted := restartReceiptService(s)
-	view, err := restarted.GetImageReceipt(context.Background(), key, r.ClientKey, nil)
+		saved, err := readImageReceipt(path)
+		return err == nil && saved.Status == "failed"
+	}, time.Second, 10*time.Millisecond)
+	stored, err := readImageReceipt(path)
 	require.NoError(t, err)
-	require.Equal(t, "completed", view.Status)
-	require.NoError(t, validateReceiptImageResult(view.Result))
-	require.NotContains(t, string(view.Result), "image2pro")
-	for range 3 {
-		require.NoError(t, restarted.runImage2ProReceipt(context.Background(), path, key, nil))
-	}
-	require.Equal(t, 1, s.httpUpstream.(*receiptUpstreamStub).calls)
+	require.Equal(t, "legacy_submission_disabled_not_billed", stored.ErrorCode)
+	require.Equal(t, "not_billed", stored.BillingState)
+	require.Equal(t, r.UpstreamPayloadHash, stored.UpstreamPayloadHash)
+	require.Equal(t, r.RequestBody, stored.RequestBody)
+	_, err = os.Stat(path + ".sync-dispatch")
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.Zero(t, upstream.calls)
+	require.NoError(t, s.runImage2ProReceipt(t.Context(), path, key, nil))
+	require.Zero(t, upstream.calls)
 }
 
 func TestImage2ProLostSynchronousResponseNeverResubmitsOrBills(t *testing.T) {
 	s, key, _, r, path := image2ProFixture(t)
-	s.httpUpstream = &receiptUpstreamStub{run: func(*http.Request) (*http.Response, error) { return nil, io.ErrUnexpectedEOF }}
+	s.httpUpstream = &receiptUpstreamStub{run: func(*http.Request) (*http.Response, error) {
+		t.Fatal("historical unknown result cannot be resubmitted")
+		return nil, nil
+	}}
+	r.DispatchStartedAt, r.Attempts = time.Now().Add(-17*time.Minute), 1
+	require.NoError(t, saveImageReceipt(path, r))
+	require.NoError(t, os.WriteFile(path+".sync-dispatch", []byte("historical-dispatch"), 0600))
 	require.NoError(t, s.runImage2ProReceipt(context.Background(), path, key, nil))
 	restarted := restartReceiptService(s)
 	for range 3 {
 		require.NoError(t, restarted.runImage2ProReceipt(context.Background(), path, key, nil))
 	}
-	require.Equal(t, 1, s.httpUpstream.(*receiptUpstreamStub).calls)
+	require.Zero(t, s.httpUpstream.(*receiptUpstreamStub).calls)
 	stored, err := readImageReceipt(path)
 	require.NoError(t, err)
 	require.Equal(t, "not_billed", stored.BillingState)
@@ -160,7 +147,7 @@ func TestImage2ProLostSynchronousResponseNeverResubmitsOrBills(t *testing.T) {
 	stored, err = readImageReceipt(path)
 	require.NoError(t, err)
 	require.Equal(t, "upstream_original_result_required", stored.ErrorCode)
-	require.Equal(t, 1, s.httpUpstream.(*receiptUpstreamStub).calls)
+	require.Zero(t, s.httpUpstream.(*receiptUpstreamStub).calls)
 	_ = r
 }
 
@@ -296,4 +283,43 @@ func TestImage2ProURLAndBase64Projection(t *testing.T) {
 	require.NotContains(t, string(out), "private")
 	_, err = normalizeImage2ProResult(context.Background(), []byte(`{"data":[{"b64_json":"`+strings.Repeat("a", 20)+`"}]}`), nil)
 	require.Error(t, err)
+}
+
+// Only historical unit fixtures write a saved response. Production recovery
+// reads the original bytes and never starts a retired supplier submission.
+func persistImage2ProResponse(path string, data []byte) error {
+	if len(data) == 0 || int64(len(data)) > imageReceiptResultReserve {
+		return errors.New("invalid upstream image response")
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), ".image-response-")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() { _ = os.Remove(tmp) }()
+	if err = f.Chmod(0600); err == nil {
+		_, err = f.Write(data)
+	}
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	if err = os.Rename(tmp, path+".upstream"); err != nil {
+		return err
+	}
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dir.Close() }()
+	return dir.Sync()
 }

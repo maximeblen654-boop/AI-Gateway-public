@@ -12,6 +12,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
 
 type mediaConfigRepository struct{ db *sql.DB }
@@ -24,6 +25,8 @@ const mediaAccountProjection = `SELECT id, name, platform, type, status, schedul
  COALESCE(credentials->>'base_url', ''),
  extra->'upstream_model_catalog_snapshot', extra->'media_workbench_v1',
  jsonb_build_object('model_mapping', credentials->'model_mapping',
+ 'media_metadata', extra->'upstream_model_metadata',
+ 'image2pro_credential_sha256', encode(sha256(convert_to(COALESCE(credentials->>'api_key',''),'UTF8')),'hex'),
  'endpoint_capabilities', COALESCE(credentials->'openai_capabilities', '[]'::jsonb),
  'has_key', length(COALESCE(credentials->>'api_key',''))>0,
  'has_token', length(COALESCE(credentials->>'access_token',''))>0,
@@ -63,19 +66,21 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		}
 	}
 	var local struct {
-		Mapping              map[string]any `json:"model_mapping"`
-		EndpointCapabilities []string       `json:"endpoint_capabilities"`
-		HasKey               bool           `json:"has_key"`
-		HasToken             bool           `json:"has_token"`
-		HasServiceAccount    bool           `json:"has_service_account"`
-		ExpiresAt            *time.Time     `json:"expires_at"`
-		AutoPause            bool           `json:"auto_pause_on_expired"`
-		RateLimit            *time.Time     `json:"rate_limit_reset_at"`
-		Overload             *time.Time     `json:"overload_until"`
-		Temporary            *time.Time     `json:"temp_unschedulable_until"`
-		Parent               *int64         `json:"parent_account_id"`
-		Proxy                *int64         `json:"proxy_id"`
-		Quota                map[string]any `json:"quota"`
+		Mapping                   map[string]any                        `json:"model_mapping"`
+		MediaMetadata             service.UpstreamModelMetadataSnapshot `json:"media_metadata"`
+		Image2ProCredentialSHA256 string                                `json:"image2pro_credential_sha256"`
+		EndpointCapabilities      []string                              `json:"endpoint_capabilities"`
+		HasKey                    bool                                  `json:"has_key"`
+		HasToken                  bool                                  `json:"has_token"`
+		HasServiceAccount         bool                                  `json:"has_service_account"`
+		ExpiresAt                 *time.Time                            `json:"expires_at"`
+		AutoPause                 bool                                  `json:"auto_pause_on_expired"`
+		RateLimit                 *time.Time                            `json:"rate_limit_reset_at"`
+		Overload                  *time.Time                            `json:"overload_until"`
+		Temporary                 *time.Time                            `json:"temp_unschedulable_until"`
+		Parent                    *int64                                `json:"parent_account_id"`
+		Proxy                     *int64                                `json:"proxy_id"`
+		Quota                     map[string]any                        `json:"quota"`
 	}
 	if err := json.Unmarshal(routing, &local); err != nil {
 		return nil, fmt.Errorf("invalid local Account routing projection")
@@ -83,6 +88,19 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 	account := service.Account{ID: a.ID, Platform: a.Platform, Type: a.Type, Status: a.Status, Schedulable: a.Schedulable, Credentials: map[string]any{"model_mapping": local.Mapping}, Extra: local.Quota, ExpiresAt: local.ExpiresAt, AutoPauseOnExpired: local.AutoPause, RateLimitResetAt: local.RateLimit, OverloadUntil: local.Overload, TempUnschedulableUntil: local.Temporary}
 	a.ModelMapping = account.GetModelMapping()
 	a.EndpointCapabilities = append([]string(nil), local.EndpointCapabilities...)
+	a.Image2ProVideoCapabilities = map[string]videoplan.Image2ProCapabilities{}
+	if local.HasKey && local.MediaMetadata.Image2ProSource.Matches(a.ID, a.Platform, a.Type, a.BaseURL, local.Image2ProCredentialSHA256) {
+		for id, entry := range local.MediaMetadata.Models {
+			if entry.MediaType == "video" && id == entry.ID && entry.Image2ProVideo != nil && entry.Image2ProVideo.Valid() && a.Catalog != nil {
+				for _, model := range a.Catalog.Models {
+					if model == id {
+						a.Image2ProVideoCapabilities[id] = entry.Image2ProVideo.Normalize()
+						break
+					}
+				}
+			}
+		}
+	}
 	// A shadow Account has no independent credential owner in this phase.
 	// Reuse the native cooldown/expiry/quota gate without exposing its inputs.
 	hasCredential := local.HasKey && a.Type == service.AccountTypeAPIKey || local.HasToken && (a.Type == service.AccountTypeOAuth || a.Type == service.AccountTypeSetupToken) || local.HasServiceAccount && a.Type == service.AccountTypeServiceAccount

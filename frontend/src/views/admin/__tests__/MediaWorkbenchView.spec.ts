@@ -1123,3 +1123,40 @@ describe('account selection feedback and request identity', () => {
     expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
   })
 })
+
+
+describe('publication time and plain-language status', () => {
+  it('uses the actual server publication time and never displays revision strings as the version', async () => {
+    const dto = supplier()
+    dto.media_workbench_v1!.published!.published_at = '2026-10-20T01:08:00Z'
+    dto.media_workbench_v1!.published!.revision = 'mwp_LONG_INTERNAL_REVISION_NEVER_NEEDED_BY_ADMIN'
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    expect(wrapper.get('[data-test="published-time"]').text()).toContain('2026-10-20 09:08')
+    expect(wrapper.get('[data-test="published-time"]').text()).toContain('保存草稿不等于发布')
+    expect(wrapper.get('[data-test="publication-status"]').text()).toContain('与已发布配置一致')
+    expect(wrapper.text()).not.toContain('mwp_LONG_INTERNAL_REVISION')
+    expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+  })
+  it('does not mistake selective publication or a save time for publication of another product', async () => {
+    const dto = supplier(), second = copy(imageProductForReadability())
+    function imageProductForReadability() { return dto.media_workbench_v1!.draft.products[0]! }
+    second.product_id = 'not-published'; second.display_name = '尚未发布的商品'
+    dto.media_workbench_v1!.draft.products.push(second)
+    api.detail.mockResolvedValue(dto)
+    await mountWorkbench(); await selectAccount()
+    expect(wrapper.get('[data-test="publication-status"]').text()).toContain('仍有配置待发布')
+    expect(wrapper.get('[data-test="published-time"]').text()).toContain('发布时间未记录')
+    expect(wrapper.get('[data-test="published-time"]').text()).not.toContain('2026-10-05')
+  })
+  it('keeps raw diagnostics in closed technical details and shows readable guidance', async () => {
+    const dto = supplier(77, 'FAIL')
+    dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'IMAGE2PRO_VIDEO_METADATA_REQUIRED', scope: 'canvas-1', path: 'adapter_config.image2pro', message: 'opaque_wire_profile_very_long_revision', action: 'internal_action_only' }]
+    api.detail.mockResolvedValue(dto)
+    await openEditor()
+    expect(wrapper.get('.mw-diagnostic').text()).toContain('刷新模型列表')
+    expect(wrapper.get('.mw-diagnostic').text()).not.toMatch(/opaque|IMAGE2PRO|internal_action/)
+    expect(wrapper.get('[data-test="diagnostic-technical-details"]').attributes('open')).toBeUndefined()
+    expect(wrapper.get('[data-test="adapter-status"]').attributes('open')).toBeUndefined()
+  })
+})

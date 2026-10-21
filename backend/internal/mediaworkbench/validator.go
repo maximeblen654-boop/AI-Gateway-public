@@ -168,7 +168,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				add("NEEDS_DEVELOPMENT", "ADAPTER_UNKNOWN", pid, "adapter_bindings", "The Account platform does not own this builder")
 			}
 			if p.MediaType == "image" {
-				configuredProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == "openai_json" && p.AdapterConfig.WireProfile == ""
+				configuredProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 1 && (p.AdapterConfig.ModelFamily == "openai_json" || p.AdapterConfig.ModelFamily == "image2pro_json") && p.AdapterConfig.WireProfile == ""
 				legacyProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)
 				inheritedProfile := p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && nativeAdapterKind(a, "image") == "openai_images"
 				nativeProfile := p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == nativeAdapterKind(a, "image") && binding.Kind != "openai_images"
@@ -201,6 +201,10 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				}
 			}
 		}
+		if p.MediaType == "image" {
+			v.Diagnostics = append(v.Diagnostics, validateImage2ProSyncProduct(a, p)...)
+		}
+		v.Diagnostics = append(v.Diagnostics, validateImage2ProVideoProduct(a, p)...)
 		if known && p.MediaType == "video" {
 			m, ok := VideoProfileModel(p)
 			if !ok || p.AdapterConfig.ModelFamily != "" || p.Capabilities.Count != (Range{Min: 1, Max: 1}) || len(p.Capabilities.Qualities) > 0 || len(p.AdapterConfig.SizeMappings) > 0 {
@@ -212,8 +216,12 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 					}
 				}
 				for _, v := range p.Capabilities.Resolutions {
-					if !slices.Contains(m.Resolutions, v) {
-						add("UI_FIXABLE", "VIDEO_RESOLUTION_UNSUPPORTED", pid, "capabilities", "Resolution is outside this adapter contract")
+					valid := slices.Contains(m.Resolutions, v)
+					if m.Mode == "image2pro" && m.Image2Pro != nil {
+						valid = strings.EqualFold(m.Image2Pro.Size, v)
+					}
+					if !valid {
+						add("UI_FIXABLE", "VIDEO_RESOLUTION_UNSUPPORTED", pid, "capabilities", "当前分辨率不在这个模型已确认的范围内")
 					}
 				}
 				for _, v := range p.Capabilities.AspectRatios {

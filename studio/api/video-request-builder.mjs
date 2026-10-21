@@ -32,21 +32,26 @@ function httpsSource(source) {
 }
 
 /** Call only after a server-side asset lookup and current-user ownership check. */
-export function makeVerifiedAssetReceipt({ ownerId, type, mimeType, size, bytes, source, durationSeconds } = {}) {
+export function makeVerifiedAssetReceipt({ ownerId, type, mimeType, size, bytes, source, mediaId, expiresAt, durationSeconds } = {}) {
   if (typeof ownerId !== 'string' || !ownerId || !mediaTypes.has(type) ||
       !mimeTypes[type].has(mimeType) || !Number.isSafeInteger(size) || size < 1) {
     fail('Invalid verified asset metadata');
   }
-  if ((bytes === undefined) === (source === undefined)) fail('Asset needs exactly one server source');
+  if ([bytes, source, mediaId].filter(value => value !== undefined).length !== 1) fail('Asset needs exactly one server source');
   if (bytes !== undefined && (!(bytes instanceof Uint8Array) || bytes.byteLength !== size)) {
     fail('Asset bytes do not match verified size');
   }
   if (source !== undefined) httpsSource(source);
+  if (mediaId !== undefined && (type === 'image' || typeof mediaId !== 'string' ||
+      !/^[A-Za-z0-9._:-]{1,256}$/.test(mediaId) || typeof expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())) {
+    fail('Invalid or expired model-bound media receipt');
+  }
   if (durationSeconds !== undefined && (!Number.isFinite(durationSeconds) || durationSeconds <= 0)) {
     fail('Invalid asset duration');
   }
   const receipt = Object.freeze({ ownerId, type, mimeType, size, durationSeconds });
-  receiptPayloads.set(receipt, bytes === undefined ? { source } : { bytes: Uint8Array.from(bytes) });
+  receiptPayloads.set(receipt, mediaId !== undefined ? { mediaId, expiresAt } : bytes === undefined ? { source } : { bytes: Uint8Array.from(bytes) });
   return receipt;
 }
 
@@ -136,7 +141,7 @@ export function CompilePlan(input) {
 // Only BFF callers use an authenticated Core catalog profile. The browser route
 // cannot supply this argument; Core independently resolves and checks the offer.
 export function CompilePublishedPlan(input, profile) {
-  if (!profile || profile.apiModelId !== input.model || !catalog.wireProfiles[profile.inputMode]) fail('Invalid Published profile');
+  if (!profile || profile.apiModelId !== input.model || (profile.inputMode !== 'image2pro' && !catalog.wireProfiles[profile.inputMode])) fail('Invalid Published profile');
   const limits = profile.mediaLimits;
   const model = {...profile, requiredAnyMedia: profile.requiredAnyMedia || [],
     mediaLimits: {image:limits.Image ?? limits.image, video:limits.Video ?? limits.video, audio:limits.Audio ?? limits.audio, total:limits.Total ?? limits.total}};
@@ -157,6 +162,7 @@ function compile(input, modelOverride) {
   }
   const counts = assertAssets(assets, ownerId, model);
   assertPromptReferences(prompt, counts);
+  if (model.inputMode === 'image2pro') return compileImage2Pro(input, model);
   if (model.inputMode === 'seedance') {
     const content = [{ type: 'text', text: prompt }];
     for (const asset of assets) {
@@ -197,6 +203,49 @@ function compile(input, modelOverride) {
   return snapshot;
 }
 
+// This provider's published REST contract is independent of Laoli wire fields.
+// The protocol tag is an opaque supplier identity; it never grants capabilities.
+function compileImage2Pro(input, model) {
+  const caps = model.image2pro;
+  const { model: modelId, prompt, duration, resolution, ratio, assets } = input;
+  if (!caps || typeof caps.protocol !== 'string' || !caps.protocol.trim() ||
+      !Number.isInteger(caps.duration_min) || !Number.isInteger(caps.duration_max) ||
+      duration < caps.duration_min || duration > caps.duration_max ||
+      !Array.isArray(caps.aspect_ratios) || !caps.aspect_ratios.includes(ratio) ||
+      typeof caps.size !== 'string' || !caps.size ||
+      caps.size.toLowerCase() !== resolution.toLowerCase()) fail('Unconfirmed Image2Pro video capabilities');
+  const counts = { image: 0, audio: 0, video: 0 }, images = [], audios = [], videos = [];
+  for (const asset of assets) {
+    const payload = receiptPayloads.get(asset);
+    counts[asset.type]++;
+    if (asset.type === 'image') {
+      if (asset.size >= 15_000_000) fail('Image2Pro image exceeds documented limit');
+      if (payload.bytes) images.push(`data:${asset.mimeType};base64,${Buffer.from(payload.bytes).toString('base64')}`);
+      else if (payload.source) images.push(httpsSource(payload.source));
+      else fail('Image2Pro images require verified image bytes or HTTPS source');
+    } else {
+      if (!payload.mediaId || !Number.isFinite(Date.parse(payload.expiresAt)) || Date.parse(payload.expiresAt) <= Date.now()) fail('Image2Pro attachment is missing or expired');
+      const limit = asset.type === 'audio' ? caps.reference_audio_max_bytes : caps.reference_video_max_bytes;
+      if (!Number.isSafeInteger(limit) || limit < 1 || asset.size > limit) fail('Image2Pro attachment exceeds model byte limit');
+      (asset.type === 'audio' ? audios : videos).push({ mediaId: payload.mediaId });
+    }
+  }
+  if (!Number.isInteger(caps.max_images) || counts.image > caps.max_images || counts.image > 9 ||
+      !Number.isInteger(caps.max_audio_references) || counts.audio > caps.max_audio_references || counts.audio > 3 ||
+      !Number.isInteger(caps.max_video_references) || counts.video > caps.max_video_references || counts.video > 1 ||
+      counts.audio > 0 && caps.supports_audio_reference !== true) fail('Image2Pro model reference capability mismatch');
+  if (Array.isArray(caps.modes) && caps.modes.length && !caps.modes.includes(assets.length ? 'reference' : 'text')) fail('Image2Pro mode is not supported by this model');
+  const body = { model: model.upstreamModelId || modelId, prompt, duration, ratio };
+  if (images.length) body.images = images;
+  if (audios.length) body.audios = audios;
+  if (videos.length) body.videos = videos;
+  if (Buffer.byteLength(JSON.stringify(body), 'utf8') > 24 * 1024 * 1024) fail('Image2Pro video JSON exceeds local wire budget');
+  const plan = { version: 'video_json_plan_v1', adapterRevision: 'core_image2pro_video_r1',
+    method: 'POST', path: '/v1/videos', encoding: 'application/json',
+    contractRevision: 'image2pro_public_video_20261019_r1', fields: body };
+  const snapshot = JSON.parse(JSON.stringify(plan)); snapshot.planHash = planHash(snapshot); return snapshot;
+}
+
 function planHash(plan) {
   const { planHash: ignored, ...content } = plan;
   return createHash('sha256').update(JSON.stringify(content)).digest('hex');
@@ -208,6 +257,7 @@ export function Materialize(plan) {
   if (!plan || plan.version !== 'video_json_plan_v1' ||
       !((plan.adapterRevision === 'laoli_video_json_v136_r1' && plan.path === '/v1/videos') ||
       (plan.adapterRevision === 'core_grok_video_r1' && plan.path === '/v1/videos/generations') ||
+      (plan.adapterRevision === 'core_image2pro_video_r1' && plan.path === '/v1/videos') ||
       (plan.adapterRevision === 'core_seedance_video_r1' && plan.path === '/v1/contents/generations/tasks')) ||
       plan.method !== 'POST' ||
       plan.encoding !== 'application/json' || planHash(plan) !== plan.planHash) {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +14,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
 
 const (
@@ -28,23 +31,53 @@ const (
 )
 
 type UpstreamModelMetadata struct {
-	ID                       string                     `json:"id"`
-	DisplayName              string                     `json:"display_name,omitempty"`
-	Description              string                     `json:"description,omitempty"`
-	Reasoning                *bool                      `json:"reasoning,omitempty"`
-	DefaultReasoningLevel    string                     `json:"default_reasoning_level,omitempty"`
-	SupportedReasoningLevels []string                   `json:"supported_reasoning_levels,omitempty"`
-	InputModalities          []string                   `json:"input_modalities,omitempty"`
-	ContextWindow            int64                      `json:"context_window,omitempty"`
-	MaxContextWindow         int64                      `json:"max_context_window,omitempty"`
-	MaxOutputTokens          int64                      `json:"max_output_tokens,omitempty"`
-	CodexToolCapabilities    map[string]json.RawMessage `json:"codex_tool_capabilities,omitempty"`
+	MediaType                string                           `json:"media_type,omitempty"`
+	Image2ProVideo           *videoplan.Image2ProCapabilities `json:"image2pro_video,omitempty"`
+	ID                       string                           `json:"id"`
+	DisplayName              string                           `json:"display_name,omitempty"`
+	Description              string                           `json:"description,omitempty"`
+	Reasoning                *bool                            `json:"reasoning,omitempty"`
+	DefaultReasoningLevel    string                           `json:"default_reasoning_level,omitempty"`
+	SupportedReasoningLevels []string                         `json:"supported_reasoning_levels,omitempty"`
+	InputModalities          []string                         `json:"input_modalities,omitempty"`
+	ContextWindow            int64                            `json:"context_window,omitempty"`
+	MaxContextWindow         int64                            `json:"max_context_window,omitempty"`
+	MaxOutputTokens          int64                            `json:"max_output_tokens,omitempty"`
+	CodexToolCapabilities    map[string]json.RawMessage       `json:"codex_tool_capabilities,omitempty"`
+}
+
+const UpstreamImage2ProMetadataSourceVersion = "account_image2pro_metadata_v1"
+
+// This proof binds only a successful public model-list observation. It never
+// stores a supplier key and cannot authorize a different Account or credential.
+type UpstreamImage2ProMetadataSource struct {
+	Version          string `json:"version"`
+	AccountID        int64  `json:"account_id"`
+	Endpoint         string `json:"endpoint"`
+	CredentialSHA256 string `json:"credential_sha256"`
+	ObservedAt       string `json:"observed_at"`
+}
+
+func NewUpstreamImage2ProMetadataSource(account *Account, at time.Time) *UpstreamImage2ProMetadataSource {
+	if account == nil || account.ID <= 0 || account.Platform != PlatformOpenAI || account.Type != AccountTypeAPIKey || !imagecontract.IsImage2ProBase(account.GetOpenAIBaseURL()) || account.GetOpenAIProtocolAPIKey() == "" {
+		return nil
+	}
+	return &UpstreamImage2ProMetadataSource{Version: UpstreamImage2ProMetadataSourceVersion, AccountID: account.ID, Endpoint: "https://api.image2pro.top/v1", CredentialSHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(account.GetOpenAIProtocolAPIKey()))), ObservedAt: at.UTC().Format(time.RFC3339)}
+}
+
+func (source *UpstreamImage2ProMetadataSource) Matches(accountID int64, platform, accountType, base, credentialSHA256 string) bool {
+	if source == nil || source.Version != UpstreamImage2ProMetadataSourceVersion || accountID <= 0 || source.AccountID != accountID || platform != PlatformOpenAI || accountType != AccountTypeAPIKey || !imagecontract.IsImage2ProBase(base) || source.Endpoint != "https://api.image2pro.top/v1" || !videoDigest(source.CredentialSHA256) || source.CredentialSHA256 != credentialSHA256 {
+		return false
+	}
+	_, e := time.Parse(time.RFC3339, source.ObservedAt)
+	return e == nil
 }
 
 type UpstreamModelMetadataSnapshot struct {
-	Source   string                           `json:"source"`
-	SyncedAt string                           `json:"synced_at"`
-	Models   map[string]UpstreamModelMetadata `json:"models"`
+	Image2ProSource *UpstreamImage2ProMetadataSource `json:"image2pro_source,omitempty"`
+	Source          string                           `json:"source"`
+	SyncedAt        string                           `json:"synced_at"`
+	Models          map[string]UpstreamModelMetadata `json:"models"`
 }
 
 type UpstreamModelCatalog struct {
@@ -234,9 +267,13 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 		}
 		account.Extra["upstream_model_catalog_snapshot"] = snapshot
 	}
+	var mediaSource *UpstreamImage2ProMetadataSource
+	if liveListAvailable {
+		mediaSource = NewUpstreamImage2ProMetadataSource(account, time.Now().UTC())
+	}
 	catalog := &UpstreamModelCatalog{Models: models, Metadata: make(map[string]UpstreamModelMetadata)}
 	if len(body) > 0 {
-		_, directMetadata, parseErr := extractUpstreamModelCatalog(body, account != nil && account.IsGrok())
+		_, directMetadata, parseErr := extractUpstreamModelCatalogForAccount(body, account != nil && account.IsGrok(), mediaSource != nil)
 		if parseErr == nil {
 			catalog.Metadata = directMetadata
 		}
@@ -250,10 +287,13 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 	// omit context windows in public registries. Keep them out of completeness checks
 	// so they do not mask successful agent-model capability sync.
 	capabilityIDs := capabilitySyncModelIDs(enrichIDs)
+	// Media capability has its own public metadata completeness contract. Never
+	// ask a text-model registry to synthesize its duration, protocol or references.
+	capabilityIDs = excludeMediaCapabilityIDs(capabilityIDs, catalog.Metadata, account)
 
 	source := "upstream"
 	if upstreamCatalogNeedsRegistry(capabilityIDs, catalog.Metadata) {
-		if registryMetadata, registryErr := s.fetchModelsDevMetadata(ctx, account, enrichIDs); registryErr == nil {
+		if registryMetadata, registryErr := s.fetchModelsDevMetadata(ctx, account, capabilityIDs); registryErr == nil {
 			for modelID, fallback := range registryMetadata {
 				current := catalog.Metadata[modelID]
 				merged, changed := mergeUpstreamModelMetadata(current, fallback)
@@ -272,8 +312,31 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 	}
 
 	completeMetadata := completeUpstreamModelMetadataSubset(capabilityIDs, catalog.Metadata)
+	if completeMetadata == nil {
+		completeMetadata = map[string]UpstreamModelMetadata{}
+	}
+	mediaSeen := false
+	for id, entry := range catalog.Metadata {
+		if entry.MediaType != "video" && entry.MediaType != "image" {
+			continue
+		}
+		mediaSeen = true
+		if entry.MediaType == "video" && entry.Image2ProVideo != nil && entry.Image2ProVideo.Valid() {
+			completeMetadata[id] = entry
+		}
+	}
+	if account != nil && liveListAvailable {
+		if previous := account.GetUpstreamModelMetadataSnapshot(); previous != nil {
+			for _, entry := range previous.Models {
+				if entry.MediaType == "video" || entry.MediaType == "image" {
+					mediaSeen = true
+					break
+				}
+			}
+		}
+	}
 	persistedCapabilities := false
-	if len(completeMetadata) > 0 && account != nil && account.ID > 0 && s.accountRepo != nil {
+	if (len(completeMetadata) > 0 || mediaSeen) && account != nil && account.ID > 0 && s.accountRepo != nil {
 		// Retain known metadata only for models still listed or explicitly mapped.
 		if previous := account.GetUpstreamModelMetadataSnapshot(); previous != nil {
 			retainedModels := capabilityIDs
@@ -288,6 +351,23 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 				if !exists {
 					continue
 				}
+				// A successful fresh list revokes missing/incomplete media capability.
+				// Historical frozen orders retain their separate original snapshot.
+				if old.MediaType == "video" || old.MediaType == "image" {
+					if liveListAvailable {
+						continue
+					}
+					// A failed live list cannot rebind a retained media entry to
+					// today's new endpoint or key. Retain only its original proof.
+					currentSource := NewUpstreamImage2ProMetadataSource(account, time.Now().UTC())
+					if currentSource != nil && previous.Image2ProSource.Matches(account.ID, account.Platform, account.Type, account.GetOpenAIBaseURL(), currentSource.CredentialSHA256) {
+						if _, ok := completeMetadata[modelID]; !ok {
+							completeMetadata[modelID] = old
+						}
+						mediaSource = previous.Image2ProSource
+					}
+					continue
+				}
 				if entry, ok := completeMetadata[modelID]; ok {
 					if entry.CodexToolCapabilities == nil {
 						entry.CodexToolCapabilities = make(map[string]json.RawMessage)
@@ -300,9 +380,10 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 			}
 		}
 		snapshot := UpstreamModelMetadataSnapshot{
-			Source:   source,
-			SyncedAt: time.Now().UTC().Format(time.RFC3339),
-			Models:   completeMetadata,
+			Image2ProSource: mediaSource,
+			Source:          source,
+			SyncedAt:        time.Now().UTC().Format(time.RFC3339),
+			Models:          completeMetadata,
 		}
 		if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{UpstreamModelMetadataExtraKey: snapshot}); err != nil {
 			return nil, newUpstreamModelSyncInternalError("Failed to save upstream model metadata", err)
@@ -393,7 +474,7 @@ func upstreamCatalogNeedsRegistry(models []string, metadata map[string]UpstreamM
 }
 
 func upstreamModelMetadataIsUseful(metadata UpstreamModelMetadata) bool {
-	return strings.TrimSpace(metadata.DisplayName) != "" ||
+	return metadata.MediaType == "video" || metadata.MediaType == "image" || strings.TrimSpace(metadata.DisplayName) != "" ||
 		strings.TrimSpace(metadata.Description) != "" ||
 		metadata.Reasoning != nil ||
 		len(metadata.SupportedReasoningLevels) > 0 ||
@@ -1264,6 +1345,7 @@ type upstreamModelEntryMetadata struct {
 
 type upstreamModelCapabilityEntry struct {
 	upstreamModelEntry
+	Metadata                 json.RawMessage            `json:"metadata"`
 	DisplayName              string                     `json:"display_name"`
 	Description              string                     `json:"description"`
 	Reasoning                *bool                      `json:"reasoning"`
@@ -1287,6 +1369,10 @@ func extractGrokUpstreamModelIDs(body []byte) ([]string, error) {
 }
 
 func extractUpstreamModelCatalog(body []byte, grok bool) ([]string, map[string]UpstreamModelMetadata, error) {
+	return extractUpstreamModelCatalogForAccount(body, grok, false)
+}
+
+func extractUpstreamModelCatalogForAccount(body []byte, grok, image2Pro bool) ([]string, map[string]UpstreamModelMetadata, error) {
 	entries, err := extractUpstreamModelRawEntries(body)
 	if err != nil {
 		return nil, nil, err
@@ -1308,7 +1394,7 @@ func extractUpstreamModelCatalog(body []byte, grok bool) ([]string, map[string]U
 			continue
 		}
 		models = append(models, modelID)
-		entry := upstreamMetadataFromCapabilityEntry(modelID, capability)
+		entry := upstreamMetadataFromCapabilityEntry(modelID, capability, image2Pro)
 		var fields map[string]json.RawMessage
 		if err := json.Unmarshal(raw, &fields); err == nil {
 			entry.CodexToolCapabilities = make(map[string]json.RawMessage)
@@ -1339,7 +1425,7 @@ func extractUpstreamModelRawEntries(body []byte) ([]json.RawMessage, error) {
 	return entries, nil
 }
 
-func upstreamMetadataFromCapabilityEntry(modelID string, entry upstreamModelCapabilityEntry) UpstreamModelMetadata {
+func upstreamMetadataFromCapabilityEntry(modelID string, entry upstreamModelCapabilityEntry, image2Pro bool) UpstreamModelMetadata {
 	levels := reasoningLevelsFromRawEntries(entry.SupportedReasoningLevels)
 	if len(levels) == 0 {
 		levels = reasoningLevelsFromModelsDevOptions(entry.ReasoningOptions)
@@ -1372,7 +1458,21 @@ func upstreamMetadataFromCapabilityEntry(modelID string, entry upstreamModelCapa
 	if displayName == "" && strings.TrimSpace(entry.Name) != "" && strings.TrimSpace(entry.Name) != modelID {
 		displayName = strings.TrimSpace(entry.Name)
 	}
+	var mediaType string
+	var videoCaps *videoplan.Image2ProCapabilities
+	if len(entry.Metadata) > 0 {
+		var marker struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(entry.Metadata, &marker) == nil && (marker.Type == "video" || marker.Type == "image") {
+			mediaType = marker.Type
+			if mediaType == "video" && image2Pro {
+				videoCaps, _ = videoplan.DecodeImage2ProCapabilities(entry.Metadata)
+			}
+		}
+	}
 	return UpstreamModelMetadata{
+		MediaType: mediaType, Image2ProVideo: videoCaps,
 		ID:                       modelID,
 		DisplayName:              displayName,
 		Description:              strings.TrimSpace(entry.Description),
@@ -1602,4 +1702,21 @@ func dedupeAndSortModelIDs(models []string) []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+func excludeMediaCapabilityIDs(ids []string, metadata map[string]UpstreamModelMetadata, account *Account) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		entry := metadata[id]
+		if entry.MediaType == "image" || entry.MediaType == "video" {
+			continue
+		}
+		if account != nil {
+			if old, ok := account.GetUpstreamModelMetadata(id); ok && (old.MediaType == "image" || old.MediaType == "video") {
+				continue
+			}
+		}
+		out = append(out, id)
+	}
+	return out
 }

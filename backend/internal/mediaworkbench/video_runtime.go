@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -160,6 +161,11 @@ func CompilePublishedVideoPlan(r ResolvedVideoOffer, body []byte) (videoplan.Pla
 		return p, e
 	}
 	resolution, ratio, duration, images, videos, audio, e := videoplan.InspectForModel(m, body)
+	// This provider fixes output size in model metadata, rather than a request
+	// field. Preserve the exact sold specification; only letter case is equal.
+	if e == nil && m.Mode == "image2pro" && strings.EqualFold(resolution, r.Spec.Resolution) {
+		resolution = r.Spec.Resolution
+	}
 	actual := Spec{Count: 1, Resolution: resolution, AspectRatio: ratio, DurationSeconds: duration, Images: images, Videos: videos, Audio: audio}
 	if e != nil || actual != r.Spec {
 		return videoplan.Plan{}, ErrRuntimeBinding

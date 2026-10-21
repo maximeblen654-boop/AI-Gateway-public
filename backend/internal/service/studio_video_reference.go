@@ -32,14 +32,17 @@ type StudioVideoReferenceAsset struct {
 }
 
 type StudioVideoReferenceReceipt struct {
-	AssetRef        string  `json:"asset_ref"`
-	Kind            string  `json:"kind"`
-	MimeType        string  `json:"mime_type"`
-	Size            int     `json:"size"`
-	SHA256          string  `json:"sha256"`
-	DurationSeconds float64 `json:"duration_seconds,omitempty"`
-	Source          string  `json:"source"`
-	UploadID        string  `json:"upload_id"`
+	AssetRef        string    `json:"asset_ref"`
+	Kind            string    `json:"kind"`
+	MimeType        string    `json:"mime_type"`
+	Size            int       `json:"size"`
+	SHA256          string    `json:"sha256"`
+	DurationSeconds float64   `json:"duration_seconds,omitempty"`
+	Source          string    `json:"source"`
+	UploadID        string    `json:"upload_id"`
+	SourceKind      string    `json:"source_kind,omitempty"`
+	MediaID         string    `json:"media_id,omitempty"`
+	ExpiresAt       time.Time `json:"expires_at,omitempty"`
 }
 type StudioVideoReferencePreparationResult struct {
 	PreparationID string                        `json:"preparation_id"`
@@ -54,7 +57,7 @@ func validateStudioVideoReferenceInput(a StudioVideoReferenceAsset) ([]byte, err
 	if a.Kind != "image" && a.Kind != "video" && a.Kind != "audio" {
 		return nil, errors.New("invalid reference kind")
 	}
-	allowedMIME := map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true, "video/mp4": true, "video/quicktime": true, "video/webm": true, "audio/mpeg": true, "audio/mp3": true, "audio/x-m4a": true, "audio/mp4": true, "audio/wav": true, "audio/x-wav": true, "audio/ogg": true}
+	allowedMIME := map[string]bool{"image/png": true, "image/jpeg": true, "image/webp": true, "video/mp4": true, "video/quicktime": true, "video/webm": true, "audio/mpeg": true, "audio/mp3": true, "audio/x-m4a": true, "audio/mp4": true, "audio/wav": true, "audio/x-wav": true, "audio/ogg": true, "audio/webm": true, "audio/aac": true, "audio/flac": true}
 	if !allowedMIME[a.MimeType] || !strings.HasPrefix(a.MimeType, a.Kind+"/") || len(a.SHA256) != 64 || strings.Trim(strings.ToLower(a.SHA256), "0123456789abcdef") != "" || a.Size < 8 || a.Size > 100_000_000 {
 		return nil, errors.New("invalid reference metadata")
 	}
@@ -70,7 +73,7 @@ func validateStudioVideoReferenceInput(a StudioVideoReferenceAsset) ([]byte, err
 
 func validateStudioVideoReferenceReceipt(in StudioVideoReferenceAsset, out StudioVideoReferenceReceipt) error {
 	if out.AssetRef != in.AssetRef || out.Kind != in.Kind || out.MimeType != in.MimeType || out.Size != in.Size ||
-		out.SHA256 != in.SHA256 || out.DurationSeconds != in.DurationSeconds || strings.TrimSpace(out.Source) == "" || !strings.HasPrefix(out.Source, "https://") || strings.TrimSpace(out.UploadID) == "" {
+		out.SHA256 != in.SHA256 || out.DurationSeconds != in.DurationSeconds || out.SourceKind != "" || out.MediaID != "" || !out.ExpiresAt.IsZero() || strings.TrimSpace(out.Source) == "" || !strings.HasPrefix(out.Source, "https://") || strings.TrimSpace(out.UploadID) == "" {
 		return errors.New("invalid reference upload receipt")
 	}
 	if in.DurationSeconds > 0 && out.DurationSeconds > 0 && in.DurationSeconds != out.DurationSeconds {
@@ -111,6 +114,18 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 	if a.GetOpenAIProtocolAPIKey() == "" || a.GetOpenAIBaseURL() == "" || !a.IsSchedulable() {
 		return empty, ErrStudioVideoInvalidOrder
 	}
+	isImage2Pro := resolved.Offer.Adapter.Kind == "image2pro_video"
+	if isImage2Pro {
+		if err := validateImage2ProReferenceAssets(resolved.Offer, spec, assets); err != nil {
+			return empty, err
+		}
+	}
+	validateReceipt := validateStudioVideoReferenceReceipt
+	if isImage2Pro {
+		validateReceipt = func(input StudioVideoReferenceAsset, receipt StudioVideoReferenceReceipt) error {
+			return validateImage2ProReferenceReceipt(input, receipt, r.Store.now())
+		}
+	}
 	uploader := r.ReferenceUploader
 	if uploader == nil {
 		if r.Core.httpUpstream == nil {
@@ -149,11 +164,11 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 	prep := StudioVideoReferencePreparation{Version: StudioVideoReferencePreparationVersion, ID: prepID, Owner: owner, OfferID: offerID,
 		PublishedRevision: resolved.PublishedRevision, AdapterRevision: resolved.Offer.Adapter.Revision, AccountID: resolved.Offer.AccountID,
 		EndpointFingerprint: endpointFingerprint, CredentialFingerprint: videoCredentialFingerprint(a), ProxyFingerprint: proxyFingerprint,
-		SalePrice: resolved.Offer.SalePrice, Spec: spec, AssetIntentHash: intentHash, Status: "uploading", Receipts: nil, Assets: make([]StudioVideoReferenceIntentAsset, 0, len(assets)), ExpiresAt: time.Now().UTC().Add(2 * time.Minute)}
+		SalePrice: resolved.Offer.SalePrice, Spec: spec, AssetIntentHash: intentHash, Status: "uploading", Receipts: nil, Assets: make([]StudioVideoReferenceIntentAsset, 0, len(assets)), ExpiresAt: r.Store.now().Add(2 * time.Minute)}
 	for _, input := range assets {
 		prep.Assets = append(prep.Assets, StudioVideoReferenceIntentAsset{AssetRef: input.AssetRef, Kind: input.Kind, MimeType: input.MimeType, SHA256: input.SHA256, Size: input.Size, DurationSeconds: input.DurationSeconds})
 	}
-	accounting, err := r.referenceAccounting(ctx, a, owner, resolved, time.Now().UTC())
+	accounting, err := r.referenceAccounting(ctx, a, owner, resolved, r.Store.now())
 	if err != nil {
 		return empty, err
 	}
@@ -170,10 +185,35 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 		if e != nil || currentCost != existing.Accounting {
 			return empty, ErrStudioVideoConflict
 		}
+		freshPreparation := prep
 		prep = existing
 		prepID = existing.ID
 		if prep.Status == "ready" {
-			return StudioVideoReferencePreparationResult{PreparationID: prep.ID, Receipts: prep.Receipts}, nil
+			if !isImage2Pro || image2ProPreparationCurrent(prep, r.Store.now()) {
+				return StudioVideoReferencePreparationResult{PreparationID: prep.ID, Receipts: prep.Receipts}, nil
+			}
+			if r.Store.now().Before(prep.ExpiresAt) {
+				return empty, ErrStudioVideoConflict
+			}
+			if prep.FinalQuoteToken != "" {
+				// A quoted preparation is immutable history, including an unknown
+				// dispatch. An explicit preparation creates a separate generation.
+				freshPreparation.Generation = existing.Generation + 1
+				freshPreparation.ID = "prep_" + studioHash(struct {
+					Intent, Previous string
+					Generation       int
+				}{intentHash, existing.ID, freshPreparation.Generation})
+				prep = freshPreparation
+				prepID = prep.ID
+				if err := r.Store.IssueReferencePreparation(prep); err != nil {
+					return empty, err
+				}
+			} else {
+				// No quote or task can reference this unfinished preparation yet.
+				prep.Receipts = nil
+				prep.Status = "uploading"
+				prep.ExpiresAt = r.Store.now().Add(2 * time.Minute)
+			}
 		}
 	} else if !os.IsNotExist(readErr) {
 		return empty, readErr
@@ -189,21 +229,40 @@ func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner S
 			return empty, err
 		}
 		if i < len(prep.Receipts) {
-			if err := validateStudioVideoReferenceReceipt(input, prep.Receipts[i]); err != nil {
+			if err := validateReceipt(input, prep.Receipts[i]); err != nil {
 				return empty, err
 			}
 			continue
 		}
-		receipt, err := uploader.Upload(ctx, a, owner, resolved.Offer, input, content)
+		var receipt StudioVideoReferenceReceipt
+		if isImage2Pro && input.Kind == "image" {
+			receipt = image2ProInlineReceipt(input)
+		} else {
+			receipt, err = uploader.Upload(ctx, a, owner, resolved.Offer, input, content)
+		}
 		if err != nil {
 			return empty, err
 		}
-		if err := validateStudioVideoReferenceReceipt(input, receipt); err != nil {
+		if isImage2Pro && receipt.SourceKind == "" {
+			return empty, ErrStudioVideoConflict
+		}
+		if err := validateReceipt(input, receipt); err != nil {
 			return empty, err
 		}
 		prep.Receipts = append(prep.Receipts, receipt)
 		if err := r.Store.UpdateReferencePreparation(prep); err != nil {
 			return empty, err
+		}
+	}
+	if isImage2Pro {
+		prep.ExpiresAt = r.Store.now().Add(2 * time.Minute)
+		for _, receipt := range prep.Receipts {
+			if !receipt.ExpiresAt.IsZero() && receipt.ExpiresAt.Before(prep.ExpiresAt) {
+				prep.ExpiresAt = receipt.ExpiresAt
+			}
+		}
+		if !r.Store.now().Before(prep.ExpiresAt) {
+			return empty, ErrStudioVideoConflict
 		}
 	}
 	prep.Status = "ready"

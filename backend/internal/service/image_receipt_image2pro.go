@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,50 +10,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
-
-	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 )
 
 const image2ProReceiptProtocol = "image2pro-sync-v1"
 
-func prepareImage2ProReceipt(r *imageReceiptRecord, account *Account, parsed *OpenAIImagesRequest, body []byte) error {
-	model, ok := imagecontract.LookupImage2ProModel(parsed.Model)
-	if !ok || !imagecontract.IsImage2ProBase(account.GetOpenAIBaseURL()) || r.UpstreamModel != model.UpstreamID || parsed.Multipart || parsed.N != 1 || parsed.HasMask {
-		return errors.New("image product route or operation unavailable")
-	}
-	if parsed.Endpoint == openAIImagesEditsEndpoint && !model.References {
-		return errors.New("image product does not support references")
-	}
-	var payload map[string]json.RawMessage
-	if json.Unmarshal(body, &payload) != nil {
-		return errors.New("invalid image product request")
-	}
-	for field := range payload {
-		switch field {
-		case "model", "prompt", "n", "images":
-		default:
-			return errors.New("unreviewed image product parameter")
-		}
-	}
-	// Only reviewed fields are sent. Native size/encoding defaults remain owned
-	// by the supplier; the UI must not promise an exact size it cannot enforce.
-	payload["model"], _ = json.Marshal(model.UpstreamID)
-	r.RequestBody, _ = json.Marshal(payload)
-	r.UpstreamPayloadHash = HashUsageRequestPayload(r.RequestBody)
-	r.Protocol, r.CreatePath, r.IdempotencyKey = image2ProReceiptProtocol, parsed.Endpoint, r.ClientKey
-	r.ReceiptID, r.Status = "local_"+r.ClientKey, "queued"
-	r.BillingRecoveryVersion = 1
-	r.AccountQuotaEnabled = account.HasAnyQuotaLimit()
-	return nil
-}
+var ErrImage2ProLegacyAdmission = errors.New("该图片入口已停止创建新任务，请重新保存并发布商品后使用图片工作台。")
 
-// POST acceptance is independent of the browser/bridge lifetime. A permanent
-// dispatch marker also prevents replay after a crash, including after the
-// supplier's two-hour dedup TTL. Only a saved response may be retried/recovered.
+// Historical receipts recover only their original persisted response/result.
+// This entry never starts a supplier generation, including queued old records.
 func (s *OpenAIGatewayService) startImage2ProReceipt(path string, key *APIKey, quota APIKeyQuotaUpdater) {
 	imageReceiptMu.Lock()
 	defer imageReceiptMu.Unlock()
@@ -118,77 +83,13 @@ func (s *OpenAIGatewayService) runImage2ProReceipt(ctx context.Context, path str
 		} else if !os.IsNotExist(e) {
 			return e
 		}
-		// Deterministic local rejection precedes the permanent dispatch marker.
-		// Only outcomes after the first network attempt can be upstream-unknown.
-		reject := func() error {
-			r.Status, r.ErrorCode = "failed", "local_preflight_failed_not_billed"
-			return saveImage2ProProgress(path, r)
-		}
-		if !imagecontract.IsImage2ProBase(r.BaseURL) || account.Status != StatusActive || (account.ExpiresAt != nil && account.ExpiresAt.Before(time.Now())) {
-			return reject()
-		}
-		token, _, e := s.GetAccessToken(ctx, account)
-		if e != nil || imageReceiptFingerprint(token) != r.CredentialFingerprint {
-			return reject()
-		}
-		base, e := s.validateUpstreamBaseURL(r.BaseURL)
-		if e != nil {
-			return reject()
-		}
-		req, e := http.NewRequestWithContext(WithHTTPUpstreamRedirectsDisabled(ctx), http.MethodPost, buildOpenAIImagesURL(base, r.CreatePath), bytes.NewReader(r.RequestBody))
-		if e != nil {
-			return reject()
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Idempotency-Key", r.IdempotencyKey)
-		req.GetBody = nil
-		claim, e := os.OpenFile(path+".sync-dispatch", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if e != nil {
-			if !os.IsExist(e) {
-				return e
-			}
+		if !r.DispatchStartedAt.IsZero() || r.Attempts > 0 {
 			return markImage2ProAwaitingOriginal(path, r)
 		}
-		e = claim.Sync()
-		_ = claim.Close()
-		if e != nil {
-			return e
-		}
-		r.DispatchStartedAt, r.Status = time.Now().UTC(), "processing"
-		r.Attempts++
-		r.NextPollAt = r.DispatchStartedAt.Add(16 * time.Minute)
-		// Directory fsync covers the no-replay marker before the network call.
-		if e = saveImage2ProProgress(path, r); e != nil {
-			return e
-		}
-		proxy := ""
-		if account.Proxy != nil {
-			proxy = account.Proxy.URL()
-		}
-		resp, e := s.doOpenAIUpstream(req, proxy, account)
-		if e != nil {
-			r.Status, r.ErrorCode = "unknown", "upstream_original_result_required"
-			r.NextPollAt = time.Now().UTC().Add(time.Hour)
-			return saveImage2ProProgress(path, r)
-		}
-		defer func() { _ = resp.Body.Close() }()
-		data, e = io.ReadAll(io.LimitReader(resp.Body, imageReceiptResultReserve+1))
-		if e != nil || int64(len(data)) > imageReceiptResultReserve {
-			r.Status, r.ErrorCode = "unknown", "upstream_original_result_required"
-			return saveImage2ProProgress(path, r)
-		}
-		if resp.StatusCode != http.StatusOK {
-			r.Status, r.ErrorCode = "unknown", "upstream_original_result_required"
-			// These statuses are documented rejection paths, never replayed.
-			if resp.StatusCode == 400 || resp.StatusCode == 401 || resp.StatusCode == 402 || resp.StatusCode == 403 || resp.StatusCode == 404 || resp.StatusCode == 422 {
-				r.Status, r.ErrorCode = "failed", "upstream_rejected_not_billed"
-			}
-			return saveImage2ProProgress(path, r)
-		}
-		if e = persistImage2ProResponse(path, data); e != nil {
-			return e
-		}
+		// No saved response and no previous dispatch: retire this queued record
+		// locally. Do not create a marker, fetch a token, or send a replacement.
+		r.Status, r.ErrorCode = "failed", "legacy_submission_disabled_not_billed"
+		return saveImage2ProProgress(path, r)
 	} else if readErr != nil {
 		return readErr
 	}
@@ -238,43 +139,6 @@ func readImage2ProResponse(path string) ([]byte, error) {
 		return nil, errors.New("invalid saved image response")
 	}
 	return os.ReadFile(path + ".upstream")
-}
-
-func persistImage2ProResponse(path string, data []byte) error {
-	if len(data) == 0 || int64(len(data)) > imageReceiptResultReserve {
-		return errors.New("invalid upstream image response")
-	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".image-response-")
-	if err != nil {
-		return err
-	}
-	tmp := f.Name()
-	defer func() { _ = os.Remove(tmp) }()
-	if err = f.Chmod(0600); err == nil {
-		_, err = f.Write(data)
-	}
-	if err == nil {
-		err = f.Sync()
-	}
-	closeErr := f.Close()
-	if err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return err
-	}
-	if err = os.Rename(tmp, path+".upstream"); err != nil {
-		return err
-	}
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	dir, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = dir.Close() }()
-	return dir.Sync()
 }
 
 func normalizeImage2ProResult(ctx context.Context, data []byte, fetchURL func(context.Context, string) ([]byte, error)) ([]byte, error) {

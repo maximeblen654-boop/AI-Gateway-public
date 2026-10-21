@@ -11,7 +11,12 @@ export function createVideoAssetResolver({ intake, tasks }) {
     if (!configured) throw Error('unsupported_model');
     const model = configured.video_profile ?? contract.models.find(m => m.apiModelId === modelId);
     if (!model || model.documentedStatus !== 'enabled') throw Error('unsupported_model');
-    const limits = model.mediaLimits;
+    const declaredLimits = model.mediaLimits;
+    const limits = { image: declaredLimits?.image ?? declaredLimits?.Image,
+      video: declaredLimits?.video ?? declaredLimits?.Video,
+      audio: declaredLimits?.audio ?? declaredLimits?.Audio,
+      total: declaredLimits?.total ?? declaredLimits?.Total };
+    if (Object.values(limits).some(value => !Number.isInteger(value) || value < 0 || value > 30)) throw Error('unsupported_model');
     const counts = {image: 0, video: 0, audio: 0};
     if (!Array.isArray(requested) || requested.length > 30 || requested.length > limits.total) throw Error('media_reference_limit_exceeded');
     for (const ref of requested) {
@@ -30,7 +35,8 @@ export function createVideoAssetResolver({ intake, tasks }) {
     const fullSpec = { resolution: spec.resolution, duration_seconds: spec.duration_seconds,
       aspect_ratio: spec.aspect_ratio, quality: '', count: 1,
       images: stored.filter(a => a.kind === 'image').length, videos: stored.filter(a => a.kind === 'video').length, audio: stored.filter(a => a.kind === 'audio').length };
-    if (model.inputMode !== 'references') {
+    const preparedProfile = model.inputMode === 'references' || model.inputMode === 'image2pro';
+    if (!preparedProfile) {
       if (preparationId || prepare) throw Error('account_bound_reference_upload_unavailable');
       return stored.map(a => intake.inlineReceipt(session.ownerId, a.asset_ref));
     }
@@ -41,8 +47,15 @@ export function createVideoAssetResolver({ intake, tasks }) {
     if (prepare) {
       // Compile locally before any network action; Core also validates Published.
       const compile = input => configured.video_profile ? CompilePublishedPlan(input, configured.video_profile) : CompilePlan(input);
+      // These inert receipts only validate the shape before a bounded upload.
+      // Core independently binds the actual attachment to Account/model/owner.
+      const preview = stored.map((a, index) => makeVerifiedAssetReceipt({ownerId:String(session.ownerId),
+        type:a.kind,mimeType:a.mime_type,size:a.size,durationSeconds:a.duration_seconds,
+        ...(model.inputMode !== 'image2pro' ? {source:'https://prepare.invalid/asset'} :
+          a.kind === 'image' ? {bytes:Buffer.from(a.bytes_base64,'base64')} :
+          {mediaId:`prepare-preview-${index}`,expiresAt:new Date(Date.now()+60_000).toISOString()})}));
       compile({ownerId: String(session.ownerId), model: modelId, prompt: 'Reference preparation', duration: spec.duration_seconds,
-        resolution: spec.resolution, ratio: spec.aspect_ratio, assets: stored.map(a => makeVerifiedAssetReceipt({ownerId:String(session.ownerId),type:a.kind,mimeType:a.mime_type,size:a.size,source:'https://prepare.invalid/asset',durationSeconds:a.duration_seconds}))});
+        resolution: spec.resolution, ratio: spec.aspect_ratio, assets: preview});
       const prepared = await tasks.prepareReferences(session, {offer_id:offerId,model:modelId,spec:fullSpec,assets:stored});
       preparationId = prepared.preparation_id;
     }
@@ -55,6 +68,17 @@ export function createVideoAssetResolver({ intake, tasks }) {
     return { preparationId, assets: p.result.receipts.map((r, i) => {
       const a = metadata[i];
       if (Object.keys(a).some(k => r[k] !== a[k])) throw Error('account_video_preparation_mismatch');
+      if (model.inputMode === 'image2pro') {
+        if (r.source || r.upload_id) throw Error('account_video_preparation_mismatch');
+        if (a.kind === 'image') {
+          if (r.source_kind !== 'inline' || r.media_id) throw Error('account_video_preparation_mismatch');
+          return makeVerifiedAssetReceipt({ownerId:String(session.ownerId),type:a.kind,mimeType:a.mime_type,
+            size:a.size,bytes:Buffer.from(stored[i].bytes_base64,'base64'),durationSeconds:a.duration_seconds});
+        }
+        if (r.source_kind !== 'media_id') throw Error('account_video_preparation_mismatch');
+        return makeVerifiedAssetReceipt({ownerId:String(session.ownerId),type:a.kind,mimeType:a.mime_type,
+          size:a.size,mediaId:r.media_id,expiresAt:r.expires_at,durationSeconds:a.duration_seconds});
+      }
       return makeVerifiedAssetReceipt({ownerId:String(session.ownerId),type:r.kind,mimeType:r.mime_type,size:r.size,source:r.source,durationSeconds:r.duration_seconds});
     }) };
   };

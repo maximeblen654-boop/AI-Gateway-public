@@ -231,18 +231,25 @@ func CompilePublishedImagePlanForCount(r ResolvedImageOffer, prompt string, refe
 	fields := dry.Fields
 	fields["prompt"] = prompt
 	if len(references) > 0 {
-		images := make([]map[string]string, len(references))
-		for i, v := range references {
-			if v == "" {
-				return dry, fmt.Errorf("missing reference")
+		if dry.Protocol == imageplan.Image2ProSyncProtocol {
+			fields["images"] = append([]string(nil), references...)
+		} else {
+			images := make([]map[string]string, len(references))
+			for i, v := range references {
+				if v == "" {
+					return dry, fmt.Errorf("missing reference")
+				}
+				images[i] = map[string]string{"image_url": v}
 			}
-			images[i] = map[string]string{"image_url": v}
+			fields["images"] = images
 		}
-		fields["images"] = images
 	}
 	body, err := json.Marshal(fields)
 	if err != nil {
 		return dry, err
+	}
+	if dry.Protocol == imageplan.Image2ProSyncProtocol {
+		return imageplan.CompileImage2ProJSON(body, r.Offer.UpstreamModel, dry.Path)
 	}
 	return imageplan.CompileJSON(body, r.Offer.UpstreamModel, dry.Path)
 }

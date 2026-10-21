@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -20,6 +21,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
+
+// A private context marker preserves the protocol frozen into this quote. The
+// Account host alone must never reinterpret an older published request body.
+type studioImageProtocolContextKey struct{}
 
 type StudioImageRuntime struct {
 	PaidControl *StudioPaidControl
@@ -194,6 +199,13 @@ func (r *StudioImageRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 }
 
 func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q StudioImageQuote, taskID, prompt string, references []string, key *APIKey) (*StudioImageReceipt, error) {
+	protocol := ""
+	if q.Binding.Offer.ResolvedConfig.Version == 1 && q.Binding.Offer.ResolvedConfig.ModelFamily == "image2pro_json" {
+		protocol = imageplan.Image2ProSyncProtocol
+	}
+	// Only the protocol bound by the verified quote may select the dedicated
+	// compiler. Current validation rejects old Image2Pro profiles before sending.
+	ctx = context.WithValue(ctx, studioImageProtocolContextKey{}, protocol)
 	if q.Execution != nil {
 		return r.dispatchExecution(ctx, c, q, taskID, prompt, references, key)
 	}
@@ -383,7 +395,12 @@ func (r *StudioImageRuntime) settle(ctx context.Context, receipt *StudioImageRec
 	return receipt, r.Store.Save(receipt)
 }
 func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, outer *gin.Context, a *Account, body []byte, endpoint string) (data []byte, upstreamID string, callErr error) {
-	plan, err := imageplan.CompileJSON(body, gjson.GetBytes(body, "model").String(), endpoint)
+	compile := imageplan.CompileJSON
+	if ctx.Value(studioImageProtocolContextKey{}) == imageplan.Image2ProSyncProtocol &&
+		a != nil && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey && imagecontract.IsImage2ProBase(a.GetOpenAIBaseURL()) {
+		compile = imageplan.CompileImage2ProJSON
+	}
+	plan, err := compile(body, gjson.GetBytes(body, "model").String(), endpoint)
 	if err != nil {
 		return nil, "", err
 	}

@@ -30,6 +30,7 @@ type Model struct {
 	Required    []string                                 `json:"requiredAnyMedia"`
 	Limits      struct{ Image, Video, Audio, Total int } `json:"mediaLimits"`
 	PromptMax   int                                      `json:"promptMaxLength"`
+	Image2Pro   *Image2ProCapabilities                   `json:"image2pro,omitempty"`
 }
 type Wire struct {
 	Duration   string         `json:"duration"`
@@ -76,6 +77,9 @@ func Lookup(id string) (Model, bool) {
 // absent: administrators may configure discovered models against this fixed
 // protocol vocabulary without changing source or contract.json.
 func ValidWireProfile(profile string) bool {
+	if profile == "image2pro" {
+		return true
+	}
 	_, ok := registry.Profiles[profile]
 	return ok
 }
@@ -111,6 +115,9 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 	var p Plan
 	if m.Status != "enabled" || m.Upstream != upstream || len(body) > 128*1024*1024 {
 		return p, ErrPlan
+	}
+	if m.Mode == "image2pro" {
+		return compileImage2ProPlan(m, upstream, body)
 	}
 	if m.Mode == "seedance" {
 		return compileSeedancePlan(m, upstream, body)
@@ -216,7 +223,7 @@ func compileSeedancePlan(m Model, upstream string, body []byte) (Plan, error) {
 	return Plan{Version: "video_wire_plan_v1", AdapterRevision: "core_seedance_video_r1", ContractRevision: registry.Revision, Method: "POST", Path: "/v1/contents/generations/tasks", Body: append([]byte(nil), body...), RequestHash: digest(body)}, nil
 }
 func (p Plan) Materialize() ([]byte, string, error) {
-	validPath := p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations" || p.AdapterRevision == "core_seedance_video_r1" && p.Path == "/v1/contents/generations/tasks"
+	validPath := p.AdapterRevision == Image2ProRevision && p.ContractRevision == Image2ProContractRevision && p.Path == "/v1/videos" || p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations" || p.AdapterRevision == "core_seedance_video_r1" && p.Path == "/v1/contents/generations/tasks"
 	if p.Version != "video_wire_plan_v1" || !validPath || p.Method != "POST" || !json.Valid(p.Body) || digest(p.Body) != p.RequestHash {
 		return nil, "", ErrPlan
 	}
@@ -238,6 +245,9 @@ func PreviewWithMedia(modelID, upstream, resolution, ratio string, duration, ima
 func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
 	if m.Status != "enabled" || m.Upstream != upstream || !ValidWireProfile(m.Mode) || images < 0 || videos < 0 || audio < 0 || images > m.Limits.Image || videos > m.Limits.Video || audio > m.Limits.Audio || images+videos+audio > m.Limits.Total || images+videos+audio > 30 {
 		return Plan{}, ErrPlan
+	}
+	if m.Mode == "image2pro" {
+		return previewImage2Pro(m, resolution, ratio, duration, images, videos, audio)
 	}
 	if m.Mode == "seedance" {
 		if videos != 0 {
@@ -300,6 +310,9 @@ func InspectForModel(m Model, body []byte) (resolution, ratio string, duration, 
 	if m.Status != "enabled" || !ValidWireProfile(m.Mode) {
 		err = ErrPlan
 		return
+	}
+	if m.Mode == "image2pro" {
+		return inspectImage2Pro(m, body)
 	}
 	if m.Mode == "seedance" {
 		var fields struct {

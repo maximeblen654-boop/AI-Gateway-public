@@ -147,6 +147,15 @@ export function persistedFingerprint(products: Product[], dto: SupplierDetail): 
       // this default only when its returned value is exactly the derived one.
       if (persisted?.version === 1 && persisted.wire_profile === expected) { p.adapter_config.version = 1; p.adapter_config.wire_profile = expected }
     }
+    const returned = dto.media_workbench_v1?.draft.products.find(item => item.product_id === p.product_id && item.media_type === p.media_type && item.site_model === p.site_model && item.upstream_model === p.upstream_model)
+    if (p.media_type === 'video' && kind === 'image2pro_video' && returned?.adapter_config.version === 1 && returned.adapter_config.wire_profile === 'image2pro') {
+      if (!p.adapter_config.wire_profile || p.adapter_config.wire_profile === 'image2pro') {
+        p.adapter_config.version = 1; p.adapter_config.wire_profile = 'image2pro'
+      }
+    }
+    if (p.media_type === 'image' && kind === 'openai_images' && returned?.adapter_config.version === 1 && returned.adapter_config.model_family === 'image2pro_json' && !p.adapter_config.wire_profile && ['', 'openai_json', 'image2pro_json'].includes(p.adapter_config.model_family ?? '')) {
+      p.adapter_config.version = 1; p.adapter_config.model_family = 'image2pro_json'
+    }
     if (p.media_type === 'image' && !p.adapter_config.model_family && !p.adapter_config.wire_profile && ['grok_images', 'gemini_images', 'openai_images_oauth'].includes(kind ?? '')) {
       p.adapter_config.version = 1; p.adapter_config.model_family = kind
     }

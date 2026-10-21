@@ -52,7 +52,7 @@ export interface MediaConfig {
   sales: { enabled: boolean }
   draft: { revision: string; updated_at: string; products: Product[]; save_receipt?: SaveReceipt }
   validation: Validation
-  published: { revision: string; source_draft_revision: string; products?: Product[]; offers?: unknown[] } | null
+  published: { revision: string; source_draft_revision: string; published_at?: string; products?: Product[]; offers?: unknown[] } | null
   procurement?: { entries: { product_id: string; cost: Price; source: string }[] }
 }
 export interface ProductState {

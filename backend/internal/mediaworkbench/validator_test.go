@@ -287,6 +287,8 @@ func TestValidateUsesAccountCatalogForDirectCanonicalModel(t *testing.T) {
 		"canvas-image-14": "Banana-2-Pro",
 	}
 	p := validProduct()
+	// New Image2Pro publications use the reviewed current protocol, not a retired profile.
+	p.AdapterConfig.Version, p.AdapterConfig.ModelFamily = 1, image2ProSyncFamily
 	v, offers := Validate(&r.a, Draft{Revision: "r", Products: []Product{p}}, time.Now())
 	if !v.PublishReady || v.Status != "PASS" || len(offers) == 0 || hasCode(v, "MODEL_MAPPING_MISMATCH", "UI_FIXABLE") {
 		t.Fatalf("direct canonical catalog model was rejected: status=%s ready=%t diagnostics=%+v", v.Status, v.PublishReady, v.Diagnostics)

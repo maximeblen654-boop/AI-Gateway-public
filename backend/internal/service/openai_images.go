@@ -105,6 +105,7 @@ type OpenAIImagesRequest struct {
 	bodyHash           string
 	// Set only by the server-side published-plan compiler, never JSON input.
 	publishedUpstreamModel string
+	publishedImageProtocol string
 }
 
 func (r *OpenAIImagesRequest) ModerationBody() []byte {
@@ -222,7 +223,10 @@ func (s *OpenAIGatewayService) ParsePublishedImagePlan(plan imageplan.Plan) (*Op
 		(plan.Path != imageplan.Generations && plan.Path != imageplan.Edits) {
 		return nil, fmt.Errorf("invalid compiled image plan")
 	}
-	parsed, err := parseOpenAIImagesRequest(plan.Path, plan.Encoding, plan.MaterializeJSON())
+	if plan.Protocol != "" && plan.Protocol != imageplan.Image2ProSyncProtocol {
+		return nil, fmt.Errorf("unsupported compiled image protocol")
+	}
+	parsed, err := parseOpenAIImagesRequestWithProtocol(plan.Path, plan.Encoding, plan.MaterializeJSON(), plan.Protocol)
 	if err == nil {
 		parsed.publishedUpstreamModel = parsed.Model
 	}
@@ -230,15 +234,20 @@ func (s *OpenAIGatewayService) ParsePublishedImagePlan(plan imageplan.Plan) (*Op
 }
 
 func parseOpenAIImagesRequest(endpoint, contentType string, body []byte) (*OpenAIImagesRequest, error) {
+	return parseOpenAIImagesRequestWithProtocol(endpoint, contentType, body, "")
+}
+
+func parseOpenAIImagesRequestWithProtocol(endpoint, contentType string, body []byte, protocol string) (*OpenAIImagesRequest, error) {
 	if endpoint == "" {
 		return nil, fmt.Errorf("unsupported images endpoint")
 	}
 
 	req := &OpenAIImagesRequest{
-		Endpoint:    endpoint,
-		ContentType: contentType,
-		N:           1,
-		Body:        body,
+		Endpoint:               endpoint,
+		ContentType:            contentType,
+		N:                      1,
+		Body:                   body,
+		publishedImageProtocol: protocol,
 	}
 	if len(body) > 0 {
 		sum := sha256.Sum256(body)
@@ -270,7 +279,9 @@ func parseOpenAIImagesRequest(endpoint, contentType string, body []byte) (*OpenA
 }
 
 func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
-	fields := imageplan.JSONFields{Endpoint: req.Endpoint, N: req.N, LegacyStringReferences: IsDurableImageModel(gjson.GetBytes(body, "model").String()) || isImage2ProModel(gjson.GetBytes(body, "model").String())}
+	fields := imageplan.JSONFields{Endpoint: req.Endpoint, N: req.N,
+		Image2ProReferences:    req.publishedImageProtocol == imageplan.Image2ProSyncProtocol,
+		LegacyStringReferences: IsDurableImageModel(gjson.GetBytes(body, "model").String()) || isImage2ProModel(gjson.GetBytes(body, "model").String())}
 	if err := imageplan.ParseJSON(body, &fields); err != nil {
 		return err
 	}
@@ -616,7 +627,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		// The admin validator and live API-key dispatch use the same pure plan.
 		// Materialization preserves the original rewritten bytes, including any
 		// caller fields outside the media-workbench configuration surface.
-		plan, compileErr := imageplan.CompileJSON(body, upstreamModel, parsed.Endpoint)
+		compile := imageplan.CompileJSON
+		if parsed.publishedImageProtocol == imageplan.Image2ProSyncProtocol && parsed.publishedUpstreamModel != "" && isStudioNativeExecution(ctx) {
+			compile = imageplan.CompileImage2ProJSON
+		}
+		plan, compileErr := compile(body, upstreamModel, parsed.Endpoint)
 		if compileErr != nil {
 			// Keep the legacy API-key forwarding contract for streaming edits. The
 			// parser normally validates this shape before dispatch, but callers that

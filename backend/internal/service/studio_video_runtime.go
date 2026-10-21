@@ -195,7 +195,7 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 	if e != nil || aCurrent == nil {
 		return "", q, QuoteFailure("account", ErrStudioVideoInvalidOrder)
 	}
-	if !preflight && preparationID == "" && gjson.GetBytes(body, "references.#").Int() > 0 {
+	if !preflight && preparationID == "" && (gjson.GetBytes(body, "references.#").Int() > 0 || resolved.Offer.Adapter.Kind == "image2pro_video" && spec.Images+spec.Audio+spec.Videos > 0) {
 		return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 	}
 	var preparation *StudioVideoReferencePreparation
@@ -203,7 +203,15 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 		if e := r.Store.init(); e != nil {
 			return "", q, e
 		}
-		unlock, e := studioFileLock(r.Store.path("reference-lock", preparationID))
+		lockID := preparationID
+		if resolved.Offer.Adapter.Kind == "image2pro_video" {
+			candidate, err := r.Store.ReferencePreparation(preparationID, owner)
+			if err != nil {
+				return "", q, QuoteFailure("reference_preparation", err)
+			}
+			lockID = "prep_" + candidate.AssetIntentHash
+		}
+		unlock, e := studioFileLock(r.Store.path("reference-lock", lockID))
 		if e != nil {
 			return "", q, e
 		}
@@ -220,35 +228,42 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		preparation = &prep
+		if resolved.Offer.Adapter.Kind == "image2pro_video" {
+			if e := validateImage2ProPreparedBody(prep, body, r.Store.now()); e != nil {
+				return "", q, QuoteFailure("reference_preparation", e)
+			}
+		}
 		if prep.FinalQuoteToken != "" {
 			if prep.FinalRequestHash != plan.RequestHash {
 				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 			}
 			old, err := r.Store.Quote(prep.FinalQuoteToken, owner)
-			if err != nil || !time.Now().Before(old.Binding.ExpiresAt) {
+			if err != nil || !r.Store.now().Before(old.Binding.ExpiresAt) {
 				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 			}
 			return prep.FinalQuoteToken, old, nil
 		}
-		var refs []struct {
-			Type   string `json:"type"`
-			Source string `json:"source"`
-		}
-		if !gjson.ValidBytes(body) || !gjson.GetBytes(body, "references").Exists() || gjson.GetBytes(body, "references.#").Int() != int64(len(prep.Receipts)) || json.Unmarshal([]byte(gjson.GetBytes(body, "references").Raw), &refs) != nil || len(refs) != len(prep.Receipts) {
-			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
-		}
-		if len(prep.Assets) != len(prep.Receipts) {
-			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
-		}
-		for i, receipt := range prep.Receipts {
-			asset := prep.Assets[i]
-			if asset.AssetRef != receipt.AssetRef || asset.Kind != receipt.Kind || asset.MimeType != receipt.MimeType || asset.Size != receipt.Size || asset.SHA256 != receipt.SHA256 || refs[i].Type != receipt.Kind || refs[i].Source != receipt.Source || refs[i].Source == "" {
+		if resolved.Offer.Adapter.Kind != "image2pro_video" {
+			var refs []struct {
+				Type   string `json:"type"`
+				Source string `json:"source"`
+			}
+			if !gjson.ValidBytes(body) || !gjson.GetBytes(body, "references").Exists() || gjson.GetBytes(body, "references.#").Int() != int64(len(prep.Receipts)) || json.Unmarshal([]byte(gjson.GetBytes(body, "references").Raw), &refs) != nil || len(refs) != len(prep.Receipts) {
 				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
+			}
+			if len(prep.Assets) != len(prep.Receipts) {
+				return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
+			}
+			for i, receipt := range prep.Receipts {
+				asset := prep.Assets[i]
+				if asset.AssetRef != receipt.AssetRef || asset.Kind != receipt.Kind || asset.MimeType != receipt.MimeType || asset.Size != receipt.Size || asset.SHA256 != receipt.SHA256 || refs[i].Type != receipt.Kind || refs[i].Source != receipt.Source || refs[i].Source == "" {
+					return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
+				}
 			}
 		}
 	}
 	a := aCurrent
-	now := time.Now().UTC()
+	now := r.Store.now()
 	id, e := studioRandom()
 	if e != nil {
 		return "", q, e
@@ -269,6 +284,9 @@ func (r *StudioVideoRuntime) issueQuote(ctx context.Context, owner StudioImageOw
 			return "", q, QuoteFailure("reference_preparation", ErrStudioVideoConflict)
 		}
 		b.Accounting = preparation.Accounting
+		if resolved.Offer.Adapter.Kind == "image2pro_video" && preparation.ExpiresAt.Before(b.ExpiresAt) {
+			b.ExpiresAt = preparation.ExpiresAt
+		}
 	}
 	q = StudioVideoQuote{Binding: b, BindingHash: b.Hash(), Plan: plan}
 	if _, release, e := r.account(ctx, b, true, false); e != nil {
@@ -412,7 +430,7 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 		return StudioVideoState{}, e
 	}
 	b := q.Binding
-	if !time.Now().Before(b.ExpiresAt) || time.Now().Before(b.CreatedAt) || !key.Group.ModelAllowlist.Allows(b.Offer.SiteModel) || (key.Quota > 0) != b.KeyQuotaEnabled || key.HasRateLimits() != b.KeyRateEnabled {
+	if !r.Store.now().Before(b.ExpiresAt) || r.Store.now().Before(b.CreatedAt) || !key.Group.ModelAllowlist.Allows(b.Offer.SiteModel) || (key.Quota > 0) != b.KeyQuotaEnabled || key.HasRateLimits() != b.KeyRateEnabled {
 		return StudioVideoState{}, ErrStudioVideoConflict
 	}
 	if !r.PaidControl.AllowsOffer(ctx, "video", b.Offer.AccountID, b.Offer.OfferID) {
@@ -449,10 +467,13 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	dispatchCtx = context.WithValue(dispatchCtx, videoAdapterContextKey{}, q.Binding.Offer.Adapter.Kind)
 	data, _, e := r.request(dispatchCtx, a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
 	if e != nil {
+		if b.Offer.Adapter.Kind == "image2pro_video" {
+			return r.videoState(t, "", "unknown"), errors.Join(ErrStudioVideoUnknown, e)
+		}
 		return r.videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
 	upstream := videoTaskID(data)
-	if !studioImageTaskID.MatchString(upstream) {
+	if !studioImageTaskID.MatchString(upstream) || b.Offer.Adapter.Kind == "image2pro_video" && !image2ProTaskID.MatchString(upstream) {
 		return r.videoState(t, "", "unknown"), ErrStudioVideoUnknown
 	}
 	if e = r.Store.Accept(id, upstream); e != nil {
@@ -613,6 +634,9 @@ type videoAdapterContextKey struct{}
 type seedanceRawStatusContextKey struct{}
 
 func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
+	if adapter, _ := ctx.Value(videoAdapterContextKey{}).(string); adapter == "image2pro_video" {
+		return r.requestImage2Pro(ctx, a, method, path, body)
+	}
 	if adapter, _ := ctx.Value(videoAdapterContextKey{}).(string); adapter == "seedance_video" {
 		return r.requestSeedance(ctx, a, method, path, body)
 	}

@@ -51,6 +51,9 @@ func NewHTTPAccountBoundReferenceUploader(core *OpenAIGatewayService) *HTTPAccou
 
 func (u *HTTPAccountBoundReferenceUploader) Upload(ctx context.Context, account *Account, owner StudioImageOwner, offer mediaworkbench.Offer, input StudioVideoReferenceAsset, content []byte) (StudioVideoReferenceReceipt, error) {
 	var out StudioVideoReferenceReceipt
+	if offer.Adapter.Kind == "image2pro_video" {
+		return u.uploadImage2ProReference(ctx, account, owner, offer, input, content)
+	}
 	_ = offer
 	if u == nil || u.Core == nil || account == nil || owner.UserID <= 0 || len(content) != input.Size || account.GetOpenAIProtocolAPIKey() == "" {
 		return out, ErrStudioVideoReferenceUploadUnavailable

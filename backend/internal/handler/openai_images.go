@@ -266,6 +266,10 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				ChannelUsageFields: clientRequestedUsageFields(c, channelMapping, requestModel, account.GetMappedModel(firstReceiptModel(channelMapping.MappedModel, requestModel))),
 			})
 			if receiptErr != nil {
+				if errors.Is(receiptErr, service.ErrImage2ProLegacyAdmission) {
+					h.errorResponse(c, http.StatusBadRequest, "image_product_updated", "该图片入口已停止创建新任务，请重新保存并发布商品后使用图片工作台。")
+					return
+				}
 				if writeImageReceiptPriceCapError(c, receiptErr) {
 					return
 				}

@@ -185,3 +185,24 @@ it('shows the actual tail difference in long names without unbounded text', () =
   expect(difference.local).toContain('本地');expect(difference.server).toContain('服务器')
   expect(difference.local.length).toBeLessThan(180);expect(difference.server.length).toBeLessThan(180)
 })
+
+
+describe('Image2Pro server-owned save defaults', () => {
+  it.each(['image', 'video'] as const)('confirms exact %s defaults without accepting a newer price or another product', media => {
+    const dto = supplier(), submitted = copy(imageProduct), persisted = copy(imageProduct)
+    submitted.media_type = persisted.media_type = media
+    dto.native_adapters = { [media]: { kind: media === 'image' ? 'openai_images' : 'image2pro_video', revision: 'private-internal', auth: '', task_flow: '', media_type: media, max_references: 9, parameters: {} } }
+    persisted.adapter_config.version = 1
+    if (media === 'image') { submitted.adapter_config.model_family = 'openai_json'; persisted.adapter_config.model_family = 'image2pro_json' }
+    else { submitted.capabilities.resolutions = ['720p']; persisted.capabilities.resolutions = ['720p']; persisted.adapter_config.wire_profile = 'image2pro' }
+    dto.media_workbench_v1!.draft.products = [persisted]
+    expect(persistedFingerprint([submitted], dto)).toBe(draftFingerprint([persisted]))
+    const changed = copy(submitted); changed.pricing_rules[0]!.sale_price!.amount = '99'
+    expect(persistedFingerprint([changed], dto)).not.toBe(draftFingerprint([persisted]))
+    dto.media_workbench_v1!.draft.products = [{ ...persisted, product_id: 'another' }]
+    expect(persistedFingerprint([submitted], dto)).not.toBe(draftFingerprint([persisted]))
+    dto.media_workbench_v1!.draft.products = [persisted]
+    submitted.adapter_config.wire_profile = 'explicit-other-protocol'
+    expect(persistedFingerprint([submitted], dto)).not.toBe(draftFingerprint([persisted]))
+  })
+})

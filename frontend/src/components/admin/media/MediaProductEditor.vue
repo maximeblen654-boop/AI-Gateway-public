@@ -1,7 +1,7 @@
 <template>
-    <details class="mw-adapter-status" data-test="adapter-status" :open="adapterDiagnostics.length > 0">
+    <details class="mw-adapter-status" data-test="adapter-status">
       <summary>{{ adapterStatus.title }}</summary><p class="mw-muted">{{ adapterStatus.description }}</p>
-      <p v-for="diagnostic in adapterDiagnostics" :key="diagnostic.code + diagnostic.path" class="mw-muted">{{ diagnostic.code }}：{{ diagnostic.message }} {{ diagnostic.action }}</p>
+      <p v-for="diagnostic in adapterDiagnostics" :key="diagnostic.code + diagnostic.path" class="mw-muted">{{ mediaDiagnosticGuidance(diagnostic).message }} {{ mediaDiagnosticGuidance(diagnostic).action }}</p>
     </details>
   <fieldset ref="wizardElement" :disabled="disabled" class="mw-product-fields mw-wizard" :style="{ '--mw-step-index': wizardStep - 1 }">
     <nav class="mw-wizard-steps" aria-label="当前模型配置步骤">
@@ -96,6 +96,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { NativeAdapter, AdapterBinding, Diagnostic, Product } from '@/api/admin/mediaWorkbench'
+import { mediaDiagnosticGuidance } from '@/utils/mediaAdminPresentation'
 import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
@@ -161,9 +162,9 @@ async function commitPending(): Promise<boolean> {
 defineExpose({ showField, invalidateSaleUndo, commitPending })
 const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
 const adapterStatus = computed(() => {
-  if (adapterDiagnostics.value.length) return { title: '当前工作台适配尚未接通', description: '上次服务端校验发现以下适配缺口。请交由技术维护者处理；填写协议名称不能使未实现的接口获得支持。' }
-  if (props.nativeAdapter) return { title: '已接入 Sub2API 原生媒体执行', description: '调用合同、认证和模型映射由现有账号提供，无需选择协议。请配置准备出售的规格和售价；保存时由服务端校验，接入状态不代表供应商已实测。' }
-  if (!props.binding || props.binding.kind.startsWith('unbound')) return { title: '适配器能力待确认', description: '可以整理商品草稿，接口是否可用由后台校验；未确认前不能发布。' }
+  if (adapterDiagnostics.value.length) return { title: '连接配置需要处理', description: '后台检查发现以下问题。请按提示处理后重新保存并检查；目前不能据此开启销售。' }
+  if (props.nativeAdapter) return { title: '已识别账号连接方式', description: '连接方式由账号设置自动确定，无需手工选择。请配置准备出售的规格和售价，保存后执行检查；识别成功不代表已完成真实生成。' }
+  if (!props.binding || props.binding.kind.startsWith('unbound')) return { title: '连接能力待确认', description: '可以整理商品草稿，接口是否可用由后台校验；未确认前不能发布。' }
   return { title: '接口配置已记录，可继续整理商品', description: '保存草稿后请查看后台校验结果；这不代表供应商已实测。技术维护入口位于向导外。' }
 })
 function configuredValues(key: PricingDimension): (string | number)[] {

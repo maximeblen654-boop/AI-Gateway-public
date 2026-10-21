@@ -1,0 +1,25 @@
+import { test, expect } from '@playwright/test'
+
+test.use({ timezoneId: 'Asia/Shanghai' })
+
+for (const width of [1440, 390]) test(`plain-language connection and publication state ${width}`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/tests/media-workbench/index.html?scenario=ADMIN_READABLE&mode=light')
+  await page.getByTestId('account-search').fill('#77')
+  await page.getByTestId('supplier-77').click()
+  await expect(page.getByTestId('published-time')).toContainText('2026-10-20 09:08')
+  await expect(page.getByTestId('publication-status')).toContainText('待发布')
+  await page.getByTestId('model-image-native-1').click()
+  await expect(page.getByTestId('published-time')).toContainText('保存草稿不等于发布')
+  await expect(page.locator('.mw-diagnostic')).toContainText('刷新模型列表')
+  await expect(page.locator('.mw-diagnostic')).not.toContainText('IMAGE2PRO')
+  await expect(page.getByTestId('diagnostic-technical-details')).not.toHaveAttribute('open', '')
+  await expect(page.getByTestId('adapter-status')).not.toHaveAttribute('open', '')
+  await expect(page.getByText('opaque_wire_profile_very_long_revision', { exact: true })).not.toBeVisible()
+  await page.screenshot({ path: info.outputPath(`admin-readable-${width}.png`), fullPage: true, animations: 'disabled' })
+  expect(errors).toEqual([])
+  const writes = await page.evaluate(() => (window as unknown as { mediaFixture: { calls: { method: string }[] } }).mediaFixture.calls.filter(call => call.method !== 'get'))
+  expect(writes).toEqual([])
+})

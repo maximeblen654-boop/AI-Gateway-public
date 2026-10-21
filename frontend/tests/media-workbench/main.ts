@@ -25,6 +25,13 @@ const persistent = management || videoPolish || scenario.startsWith('WIZARD')
 const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
 const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
 const otherAccount = supplier(44)
+if (scenario === 'ADMIN_READABLE') {
+  dto.media_workbench_v1!.published!.published_at = '2026-10-20T01:08:00Z'
+  dto.media_workbench_v1!.published!.revision = 'mwp_private_opaque_long_revision'
+  dto.media_workbench_v1!.draft.products[0]!.display_name = '新供应商图片（隔离配置）'
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'IMAGE2PRO_VIDEO_METADATA_REQUIRED', scope: 'canvas-1', path: 'adapter_config.image2pro', message: 'opaque_wire_profile_very_long_revision', action: 'internal_action_only' }]
+}
+
 if (videoPolish && !savedFixture) {
   const product = dto.media_workbench_v1!.draft.products[0]!
   product.capabilities.resolutions = ['720p', '1080p', '4K']

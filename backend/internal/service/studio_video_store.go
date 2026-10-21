@@ -28,6 +28,7 @@ type StudioVideoReferencePreparation struct {
 	Accounting            AccountAccountingSnapshot         `json:"account_accounting"`
 	FinalQuoteToken       string                            `json:"final_quote_token,omitempty"`
 	FinalRequestHash      string                            `json:"final_request_hash,omitempty"`
+	Generation            int                               `json:"generation,omitempty"`
 	Version               string                            `json:"version"`
 	ID                    string                            `json:"id"`
 	Owner                 StudioImageOwner                  `json:"owner"`
@@ -91,7 +92,7 @@ func (s *StudioVideoStore) Issue(q StudioVideoQuote) (string, error) {
 	return token, s.put("quote", token, q)
 }
 func (s *StudioVideoStore) IssueReferencePreparation(p StudioVideoReferencePreparation) error {
-	if p.Version != StudioVideoReferencePreparationVersion || p.ID == "" || p.Owner.UserID <= 0 || p.AccountID <= 0 || p.AssetIntentHash == "" || p.Status == "" || time.Now().UTC().After(p.ExpiresAt) {
+	if p.Version != StudioVideoReferencePreparationVersion || p.ID == "" || p.Owner.UserID <= 0 || p.AccountID <= 0 || p.AssetIntentHash == "" || p.Status == "" || !s.now().Before(p.ExpiresAt) {
 		return ErrStudioVideoConflict
 	}
 	return s.put("reference-preparation", p.ID, p)
@@ -114,44 +115,55 @@ func (s *StudioVideoStore) ReferencePreparation(id string, owner StudioImageOwne
 	if id == "" || owner.UserID <= 0 || studioRead(s.path("reference-preparation", id), &p) != nil {
 		return p, ErrStudioVideoConflict
 	}
-	if p.Version != StudioVideoReferencePreparationVersion || p.ID != id || p.Owner != owner || time.Now().UTC().After(p.ExpiresAt) {
+	if p.Version != StudioVideoReferencePreparationVersion || p.ID != id || p.Owner != owner || !s.now().Before(p.ExpiresAt) {
 		return StudioVideoReferencePreparation{}, ErrStudioVideoConflict
 	}
 	return p, nil
 }
+
+// FindReferencePreparation runs under the caller's stable intent lock. New
+// preparation generations never replace a previously quoted record; retries
+// select the latest durable generation, including an interrupted upload.
 func (s *StudioVideoStore) FindReferencePreparation(owner StudioImageOwner, offerID, intentHash string, spec mediaworkbench.Spec) (StudioVideoReferencePreparation, error) {
-	var p StudioVideoReferencePreparation
+	var selected StudioVideoReferencePreparation
 	if owner.UserID <= 0 || intentHash == "" {
-		return p, ErrStudioVideoConflict
+		return selected, ErrStudioVideoConflict
 	}
-	err := studioRead(s.path("reference-preparation", "prep_"+intentHash), &p)
-	if os.IsNotExist(err) {
-		// Historical random-ID records are read as-is, including expired upload facts.
-		entries, listErr := os.ReadDir(s.Root)
-		if listErr != nil {
-			return p, listErr
+	found := false
+	entries, e := os.ReadDir(s.Root)
+	if e != nil {
+		return selected, e
+	}
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() || !strings.HasPrefix(entry.Name(), "video-reference-preparation-") {
+			continue
 		}
-		for _, entry := range entries {
-			if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), "video-reference-preparation-") {
-				var old StudioVideoReferencePreparation
-				if e := studioRead(filepath.Join(s.Root, entry.Name()), &old); e != nil {
-					return p, e
-				}
-				if old.Owner == owner && old.OfferID == offerID && old.AssetIntentHash == intentHash && old.Spec == spec {
-					p = old
-					err = nil
-					break
-				}
-			}
+		var candidate StudioVideoReferencePreparation
+		if e := studioRead(filepath.Join(s.Root, entry.Name()), &candidate); e != nil {
+			return selected, e
+		}
+		if candidate.Owner != owner || candidate.OfferID != offerID || candidate.AssetIntentHash != intentHash || candidate.Spec != spec {
+			continue
+		}
+		if candidate.Version != StudioVideoReferencePreparationVersion || candidate.Generation < 0 || candidate.ID == "" {
+			return selected, ErrStudioVideoConflict
+		}
+		if !found || candidate.Generation > selected.Generation {
+			selected = candidate
+			found = true
+			continue
+		}
+		if candidate.Generation == selected.Generation && candidate.Generation > 0 && candidate.ID != selected.ID {
+			return selected, ErrStudioVideoConflict
+		}
+		if candidate.Generation == 0 && candidate.ID == "prep_"+intentHash {
+			selected = candidate
 		}
 	}
-	if err != nil {
-		return p, err
+	if !found {
+		return selected, os.ErrNotExist
 	}
-	if p.Version != StudioVideoReferencePreparationVersion || p.Owner != owner || p.OfferID != offerID || p.AssetIntentHash != intentHash || p.Spec != spec {
-		return StudioVideoReferencePreparation{}, ErrStudioVideoConflict
-	}
-	return p, nil
+	return selected, nil
 }
 func (s *StudioVideoStore) Quote(token string, owner StudioImageOwner) (StudioVideoQuote, error) {
 	var q StudioVideoQuote

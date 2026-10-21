@@ -1,7 +1,7 @@
 <template>
   <section class="mw-validation" :data-status="state" aria-live="polite">
     <h3>{{ label }}</h3>
-    <p v-if="saveState === 'saved'">草稿已保存。当前 Published 和历史订单保持原版本。</p>
+    <p v-if="saveState === 'saved'">草稿已保存，但尚未因此发布。客户当前使用的配置和历史订单保持不变。</p>
     <p v-if="state === 'PASS'">后台检查通过；未发送真实生成请求。</p>
     <p v-else-if="state === 'UNKNOWN'">整份草稿检查暂不可用。已确认保存后，可明确选择商品，在发布时单独检查。</p>
     <p v-else-if="state === 'STALE'">整份草稿检查结果不属于当前版本。先保存未保存修改，再明确选择商品进行发布检查。</p>
@@ -10,20 +10,22 @@
         <button type="button" class="mw-diagnostic" @click="emit('locate', diagnostic)">
           <strong data-test="diagnostic-product">{{ productLabel(diagnostic) }}</strong>
           <small>{{ fieldLabel(diagnostic.path) }}</small>
-          <span>{{ diagnostic.class === 'NEEDS_DEVELOPMENT' ? '需要开发' : diagnostic.class === 'UI_FIXABLE' ? '可在此修改' : '检查信息' }} · {{ diagnostic.code }}</span>
-          <strong>{{ diagnostic.message }}</strong><small>{{ diagnostic.action }}</small>
+          <span>{{ diagnostic.class === 'NEEDS_DEVELOPMENT' ? '需要技术处理' : diagnostic.class === 'UI_FIXABLE' ? '可在此修改' : '检查信息' }}</span>
+          <strong>{{ mediaDiagnosticGuidance(diagnostic).message }}</strong><small>{{ mediaDiagnosticGuidance(diagnostic).action }}</small>
           <small v-if="diagnostic.match">适用条件：{{ matchLabel(diagnostic.match) }}</small>
           <small v-for="(spec, specIndex) in diagnostic.specs ?? []" :key="specIndex" data-test="diagnostic-spec">待修正规格：{{ specLabel(spec) }}</small>
           <small v-if="(diagnostic.spec_count ?? 0) > (diagnostic.specs?.length ?? 0)">共 {{ diagnostic.spec_count }} 个请求组合待修正，上方仅展示前 {{ diagnostic.specs?.length }} 个；请在所属商品的第 4 步补齐覆盖。</small>
         </button>
       </li>
     </ul>
+    <details v-if="diagnostics.length" data-test="diagnostic-technical-details"><summary>技术详情（供维护者排查）</summary><pre>{{ JSON.stringify(diagnostics.map(({ code, path, message, action }) => ({ code, path, message, action })), null, 2) }}</pre></details>
     <button v-if="development.length" type="button" class="btn btn-secondary" data-test="copy-codex" @click="copy">复制给 Codex</button>
     <details v-if="validation?.previews"><summary>请求编译示例（最多 64 条）</summary><p class="mw-muted">这是有界抽样，不是完整可售规格。选择范围和价格覆盖以商品规格、组合限制及服务端发布结果为准。</p><pre>{{ JSON.stringify(validation.previews, null, 2) }}</pre></details>
   </section>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
+import { mediaDiagnosticGuidance } from '@/utils/mediaAdminPresentation'
 import type { Diagnostic, Match, Validation } from '@/api/admin/mediaWorkbench'
 const props = defineProps<{ validation?: Validation; current: boolean; unavailable: boolean; saveState: string; diagnostics: Diagnostic[]; accountId?: number; modelId: string; products?: { product_id: string; label: string }[] }>()
 const emit = defineEmits<{ locate: [diagnostic: Diagnostic]; message: [value: string] }>()
