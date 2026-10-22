@@ -35,7 +35,14 @@ const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  const account=await core(admin,'/admin/accounts/'+fixture.accounts.openai);assert(account.name.startsWith('Synthetic '))
  await core(admin,'/admin/accounts/'+fixture.accounts.openai,'PUT',{credentials:{...account.credentials,api_key:'synthetic-native-only',base_url:'https://api.image2pro.top/v1'},upstream_billing_probe_enabled:false})
  let detail=await core(admin,accountPath),config=detail.media_workbench_v1
- detail=await core(admin,accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products:config.draft.products}});config=detail.media_workbench_v1
+ // The preceding format scenario uses the localhost contract. This synthetic
+ // Account now uses Image2Pro, whose contract only accepts automatic format.
+ const products=structuredClone(config.draft.products)
+ report.format_fixture_reset=products.filter(p=>p.media_type==='image'&&p.capabilities.output_formats?.length).map(p=>({product_id:p.product_id,previous_formats:p.capabilities.output_formats}))
+ for(const product of products)if(product.media_type==='image')delete product.capabilities.output_formats
+ detail=await core(admin,accountPath+'/draft','PUT',{expected_record_version:config.record_version,draft:{products}});config=detail.media_workbench_v1
+ assert.deepEqual(config.draft.products.map(p=>p.product_id),products.map(p=>p.product_id))
+ for(const product of products){const saved=config.draft.products.find(p=>p.product_id===product.product_id);assert.deepEqual(saved.capabilities,product.capabilities);assert.deepEqual(saved.pricing_rules,product.pricing_rules)}
  assert.equal(config.validation.publish_ready,true,JSON.stringify(config.validation))
  await core(admin,accountPath+'/publish','POST',{expected_record_version:config.record_version,expected_draft_revision:config.draft.revision})
  const paid='/admin/media-workbench/paid-controls/image',check=await core(admin,paid+'/check','POST',{});assert.equal(check.pass,true,JSON.stringify(check))
