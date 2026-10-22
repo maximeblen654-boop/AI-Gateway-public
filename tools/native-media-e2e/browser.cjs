@@ -63,7 +63,13 @@ const report = { cases: [], http: [] }
     if (video) {
       await expect(w('video-sale-editor')).toBeVisible()
       await w('sale-resolution-720p').click()
-      await w('video-sale-5').fill('2.00')
+      // Only resolution pricing is selected in this flow.  Duration remains a
+      // shared dimension, so the editor exposes one wildcard row (`0`) rather
+      // than manufacturing a separate input for the configured 5-second value.
+      await expect(w('shared-video-resolution')).toHaveCount(0)
+      await expect(w('video-sale-0')).toBeVisible()
+      await expect(w('video-sale-5')).toHaveCount(0)
+      await w('video-sale-0').fill('2.00')
       await expect(w('procurement-cost-0')).toHaveCount(0)
     } else {
       for (let i = 0; i < 3; i++) await w(`price-${i}`).fill(geometry ? ['0.70','0.90','1.10'][i] : '0.70')
