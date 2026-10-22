@@ -216,6 +216,27 @@ describe('media editors follow one-way props', () => {
     expect(wrapper.get('[data-test="pricing-preview"]').text()).toContain('总价：1.2 CNY')
     wrapper.unmount()
   })
+  it('does not require one price per duration when duration pricing is unchecked', async () => {
+    const product = copy(imageProduct)
+    product.media_type = 'video'
+    product.capabilities.resolutions = ['720p']
+    product.capabilities.aspect_ratios = ['16:9']
+    product.capabilities.durations_seconds = [4, 8, 12]
+    product.capabilities.count = { min: 1, max: 1 }
+    product.pricing_rules = [{ match: {}, sale_price: null }]
+    const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['video'], disabled: false } })
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click')
+    expect(wrapper.get('[data-test="expected-prices"]').text()).toContain('1 个价格')
+    expect(wrapper.get('[data-test="same-price-specs"]').text()).toContain('未按任何规格拆分价格')
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
+    expect(wrapper.findAll('input[data-test^="video-sale-"]')).toHaveLength(1)
+    expect(wrapper.get('[data-test="video-sale-0"]').attributes('aria-label')).toContain('全部时长')
+    await wrapper.get('[data-test="video-sale-0"]').setValue('3')
+    await wrapper.get('[data-test="video-sale-0"]').trigger('blur')
+    const latest = wrapper.emitted('update:product')!.at(-1)![0] as Product
+    expect(latest.pricing_rules).toEqual([{ match: {}, sale_price: { amount: '3', currency: 'CNY', billing_mode: 'per_request' } }])
+    wrapper.unmount()
+  })
   it('requires confirmation and clears conflicting prices when dimensions merge', async () => {
     const product = copy(imageProduct)
     product.pricing_rules = ['1K', '4K'].map((resolution, i) => ({ match: { resolution: [resolution] }, sale_price: { amount: String(i + 1), currency: 'CNY', billing_mode: 'per_request' } }))

@@ -36,6 +36,15 @@ describe('video sale groups', () => {
     expect(videoGroups(next, '4K')![0]!.rows.map(r => r.price?.amount)).toEqual(['2', '2', '2', '2'])
     expect(p.pricing_rules).toHaveLength(1)
   })
+  it('keeps one shared row when duration is not a pricing dimension', () => {
+    const p = product(); p.pricing_rules[0]!.sale_price = price('2')
+    const groups = videoGroups(p, '720p', { splitDuration: false })!
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.rows).toEqual([{ duration: 0, duration_values: [4, 6, 9, 12], price: price('2'), ambiguous: false }])
+    const next = setVideoSale(p, '', {}, 0, '3')
+    expect(next.pricing_rules).toEqual([{ match: {}, sale_price: price('3') }])
+    expect(videoGroups(next, '720p', { splitDuration: false })![0]!.rows[0]!.price?.amount).toBe('3')
+  })
   it('fills by position rather than seconds and never replaces a later explicit value', () => {
     const result = arithmeticFill([{ duration: 4, price: price('2') }, { duration: 6, price: price('4') }, { duration: 9, price: price('99') }, { duration: 12, price: null }])
     expect(result).toEqual({ delta: '2', retained: 3, changes: [{ duration: 12, amount: '8' }] })

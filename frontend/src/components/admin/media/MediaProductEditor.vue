@@ -61,7 +61,7 @@
       <div class="mw-matrix-summary" aria-live="polite" data-test="expected-prices"><strong>{{ expectedPriceCount === undefined ? '暂时无法计算价格行数' : `下一步预计需要填写 ${expectedPriceCount} 个价格` }}</strong><p class="mw-muted">{{ expectedPriceCount === undefined ? '请先修正规格、素材上限或未完成的组合限制；已有价格保留。' : '已排除禁止组合；购买数量不会展开成价格行。' }}</p></div>
     </section>
     <section v-show="wizardStep === 4" data-field="pricing_rules" data-test="wizard-page-4">
-      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :active="wizardStep === 4" :account-id="accountId" :admin-id="adminId" :product="product" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
+      <MediaVideoSaleEditor ref="videoSaleEditor" v-if="product.media_type === 'video'" :active="wizardStep === 4" :account-id="accountId" :admin-id="adminId" :product="product" :pricing-dimensions="activePricingDimensions" :disabled="disabled" :pending-video-sales="pendingVideoSales" @pending-video-sales="emit('pending-video-sales', $event)" @update:product="emit('update:product', $event)" />
       <MediaPricingEditor v-else :product="product" :labels="priceRows.map(pricingRuleLabel)" :disabled="disabled" @update:product="emit('update:product', $event)" />
     </section>
     <section v-show="wizardStep === 5" data-test="wizard-page-5">
@@ -181,7 +181,10 @@ const expectedPriceCount = computed(() => {
   if (wizardStep.value !== 3) return undefined
   const product = calculationProduct.value
   if (product.media_type === 'video') {
-    const groups = product.capabilities.resolutions.map(resolution => videoGroups(product, resolution))
+    const splitDuration = activePricingDimensions.value.includes('duration_seconds')
+    const splitResolution = activePricingDimensions.value.includes('resolution')
+    const resolutions = splitResolution ? product.capabilities.resolutions : ['']
+    const groups = resolutions.map(resolution => videoGroups(product, resolution, { splitDuration }))
     return groups.some(value => !value) ? undefined : groups.reduce((total, value) => total + value!.reduce((count, group) => count + group.rows.length, 0), 0)
   }
   const specs = allowedSpecs(product.capabilities)

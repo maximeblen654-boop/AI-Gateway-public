@@ -13,10 +13,12 @@ export function videoGroupKey(match: Match): string {
 }
 // Partition only dimensions whose rule membership differs. This keeps shared
 // conditions compact, but aligns different duration-specific partitions safely.
-export function videoGroups(product: Product, resolution: string) {
-  const specs = allowedSpecs(product.capabilities)?.filter(s => s.resolution === resolution)
+export function videoGroups(product: Product, resolution: string, options: { splitDuration?: boolean } = {}) {
+  const splitDuration = options.splitDuration ?? true
+  const splitResolution = resolution !== ''
+  const specs = allowedSpecs(product.capabilities)?.filter(s => !splitResolution || s.resolution === resolution)
   if (!specs) return undefined
-  const rules = product.pricing_rules.filter(rule => !rule.match.resolution?.length || rule.match.resolution.includes(resolution))
+  const rules = product.pricing_rules.filter(rule => !splitResolution || !rule.match.resolution?.length || rule.match.resolution.includes(resolution))
   const cells = new Map<string, Match>()
   const membersByCell = new Map<string, Map<number, MatrixSpec[]>>()
   let visibleRows = 0
@@ -54,14 +56,28 @@ export function videoGroups(product: Product, resolution: string) {
     }
     durations.get(spec.duration_seconds)!.push(spec)
   }
-  return [...cells].map(([key, match]) => ({ key, match, rows: [...product.capabilities.durations_seconds].sort((a, b) => a - b).flatMap(duration => {
-    const members = membersByCell.get(key)?.get(duration) ?? []
-    if (!members.length) return []
-    const matched = members.map(spec => rules.filter(rule => matchesSpec(rule.match, spec)))
-    const prices = matched.map(rows => rows.length === 1 ? rows[0]!.sale_price : null)
-    const ambiguous = matched.some(rows => rows.length > 1) || prices.some(price => JSON.stringify(price) !== JSON.stringify(prices[0]))
-    return [{ duration, price: ambiguous ? null : prices[0]!, ambiguous }]
-  }) })).filter(group => group.rows.length)
+  return [...cells].map(([key, match]) => {
+    const durationMap = membersByCell.get(key) ?? new Map<number, MatrixSpec[]>()
+    const durations = [...durationMap.keys()].sort((a, b) => a - b)
+    const rows = splitDuration
+      ? durations.flatMap(duration => {
+        const members = durationMap.get(duration) ?? []
+        if (!members.length) return []
+        const matched = members.map(spec => rules.filter(rule => matchesSpec(rule.match, spec)))
+        const prices = matched.map(rows => rows.length === 1 ? rows[0]!.sale_price : null)
+        const ambiguous = matched.some(rows => rows.length > 1) || prices.some(price => JSON.stringify(price) !== JSON.stringify(prices[0]))
+        return [{ duration, price: ambiguous ? null : prices[0]!, ambiguous }]
+      })
+      : (() => {
+        const members = durations.flatMap(duration => durationMap.get(duration) ?? [])
+        if (!members.length) return []
+        const matched = members.map(spec => rules.filter(rule => matchesSpec(rule.match, spec)))
+        const prices = matched.map(rows => rows.length === 1 ? rows[0]!.sale_price : null)
+        const ambiguous = matched.some(rows => rows.length > 1) || prices.some(price => JSON.stringify(price) !== JSON.stringify(prices[0]))
+        return [{ duration: 0, duration_values: durations, price: ambiguous ? null : prices[0]!, ambiguous }]
+      })()
+    return { key, match, rows }
+  }).filter(group => group.rows.length)
 }
 
 /** Subtract the exact edited cell; retain each untouched part of a shared rule. */
@@ -74,7 +90,13 @@ export function setVideoSales(product: Product, edits: VideoSaleEdit[]): Product
   const specs = allowedSpecs(product.capabilities)
   if (!specs) throw new Error('请先修正规格范围。')
   for (const { resolution, group, duration, amount } of edits) {
-    const target: Match = { ...clone(group), resolution: [resolution], duration_seconds: [duration] }
+    const sharedResolution = resolution === ''
+    const sharedDuration = duration <= 0
+    const target: Match = { ...clone(group) }
+    if (!sharedResolution) target.resolution = [resolution]
+    else delete target.resolution
+    if (!sharedDuration) target.duration_seconds = [duration]
+    else delete target.duration_seconds
     const targetSpecs = specs.filter(spec => matchesSpec(target, spec))
     if (!targetSpecs.length) throw new Error('此规格不在合法售价范围内，未修改草稿。')
     const rules: PricingRule[] = []
@@ -82,7 +104,8 @@ export function setVideoSales(product: Product, edits: VideoSaleEdit[]): Product
     for (const rule of next.pricing_rules) {
       if (!targetSpecs.some(spec => matchesSpec(rule.match, spec))) { rules.push(rule); continue }
       let rest = clone(rule.match)
-      for (const key of ['resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const) {
+      const dimensions = sharedDuration ? ['resolution', 'aspect_ratio', 'quality'] as const : ['resolution', 'duration_seconds', 'aspect_ratio', 'quality'] as const
+      for (const key of dimensions) {
         const domain = key === 'resolution' ? product.capabilities.resolutions : key === 'duration_seconds' ? product.capabilities.durations_seconds : key === 'aspect_ratio' ? product.capabilities.aspect_ratios : product.capabilities.qualities
         const original = (rest[key]?.length ? rest[key] : domain) as (string | number)[]
         const selection = (target[key]?.length ? target[key] : domain) as (string | number)[]

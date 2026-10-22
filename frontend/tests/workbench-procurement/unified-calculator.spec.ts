@@ -7,6 +7,14 @@ async function openVideo(page: Page, scenario = 'video-retail') {
   await page.getByTestId('account-search').fill('#44')
   await page.getByTestId('supplier-44').click()
   await page.getByTestId('model-WAN3.0-可参考视频').click()
+  // A detailed video price matrix is opt-in.  The fixture starts with a
+  // uniform price domain, so select the two dimensions this scenario is
+  // explicitly testing before opening the price editor.
+  if (scenario === 'video-retail') {
+    await page.getByTestId('wizard-step-3').click()
+    await page.getByTestId('pricing-dimension-resolution').check()
+    await page.getByTestId('pricing-dimension-duration_seconds').check()
+  }
   await page.getByTestId('wizard-step-4').click()
 }
 for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 650 }, { width: 390, height: 844 }]) {
@@ -71,12 +79,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 650
 }
 test('editing a shared video price preserves the other resolution and duration', async ({ page }) => {
   await openVideo(page, 'video-retail-shared')
-  await expect(page.getByTestId('video-sale-4')).toHaveValue('3')
-  await page.getByTestId('video-sale-4').fill('7')
-  await expect(page.getByTestId('video-sale-5')).toHaveValue('3')
-  await page.getByTestId('sale-resolution-4K').click()
-  await expect(page.getByTestId('video-sale-4')).toHaveValue('3')
-  await expect(page.getByTestId('video-sale-15')).toHaveValue('3')
+  await expect(page.locator('input[data-test^="video-sale-"]')).toHaveCount(1)
+  await expect(page.getByTestId('video-sale-0')).toHaveValue('3')
+  await page.getByTestId('video-sale-0').fill('7')
+  await expect(page.getByTestId('video-sale-0')).toHaveValue('7')
+  await expect(page.getByTestId('sale-resolution-4K')).toHaveCount(0)
 })
 
 test('video sale autosave serializes newer prices without procurement or publication writes', async ({ page }) => {

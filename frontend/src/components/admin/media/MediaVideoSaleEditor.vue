@@ -1,10 +1,13 @@
 <template>
   <section class="mw-video-sales" data-test="video-sale-editor">
     <div class="mw-pricing-dimensions" role="group" aria-label="售价分辨率">
-      <button v-for="resolution in product.capabilities.resolutions" :key="resolution" type="button" class="btn" :class="selectedResolution === resolution ? 'btn-primary' : 'btn-secondary'" :aria-pressed="selectedResolution === resolution" :data-test="`sale-resolution-${resolution}`" @click="selectResolution(resolution)">{{ resolution }} <small>{{ progress.get(resolution) }}</small></button>
+      <template v-if="resolutionPricing">
+        <button v-for="resolution in product.capabilities.resolutions" :key="resolution" type="button" class="btn" :class="selectedResolution === resolution ? 'btn-primary' : 'btn-secondary'" :aria-pressed="selectedResolution === resolution" :data-test="`sale-resolution-${resolution}`" @click="selectResolution(resolution)">{{ resolution }} <small>{{ progress.get(resolution) }}</small></button>
+      </template>
     </div>
+    <p v-if="!resolutionPricing" class="mw-muted" data-test="shared-video-resolution">所有分辨率共用同一售价。</p>
     <div class="mw-video-price-actions" data-test="video-sale-tools">
-      <button type="button" class="btn btn-secondary" :disabled="disabled || !current || current.rows.some(row => row.ambiguous)" data-test="arithmetic-preview" @click="previewFill">按等差补齐售价</button>
+      <button type="button" class="btn btn-secondary" :disabled="disabled || !durationPricing || !current || current.rows.some(row => row.ambiguous)" data-test="arithmetic-preview" @click="previewFill">按等差补齐售价</button>
       <button v-if="undo" type="button" class="mw-link" :disabled="disabled || !canUndo" data-test="arithmetic-undo" @click="undoFill">撤销最近一次补齐</button>
       <button type="button" class="btn btn-secondary" :disabled="disabled || !pricedRules && !inputs.length" data-test="clear-video-sales" @click="openClear">清空当前商品全部售价</button>
     </div>
@@ -13,7 +16,7 @@
       <label v-if="groups.length > 1" class="mw-field">售价子分组<select :value="selectedGroup" class="input" data-test="sale-subgroup" @change="selectGroup($event)"><option v-for="group in groups" :key="group.key" :value="group.key">{{ groupLabel(group.match) }}</option></select></label>
       <p class="mw-muted">{{ current ? groupLabel(current.match) : '请先配置合法分辨率与时长。' }} · 以下为整条视频售价，不再乘秒数。</p>
       <div v-if="current" class="mw-video-price-list">
-        <label v-for="row in current.rows" :key="`${selectedResolution}:${current.key}:${row.duration}`" class="mw-video-price-line" :data-duration="row.duration"><strong>{{ row.duration }} 秒</strong><span><input class="input" inputmode="decimal" maxlength="128" :aria-label="`${selectedResolution} ${row.duration} 秒客户售价`" :value="inputValue(row.duration, row.price?.amount ?? '')" :aria-invalid="!!decimalError(inputValue(row.duration, row.price?.amount ?? ''), true)" :disabled="disabled || row.ambiguous" :data-test="`video-sale-${row.duration}`" @input="setPrice(row.duration, ($event.target as HTMLInputElement).value)" @blur="commitPending()" @keydown.enter.prevent="commitPending()" /><small>CNY / 条</small><small v-if="row.ambiguous">存在重叠售价，请先核对规则。</small><small v-else-if="decimalError(inputValue(row.duration, row.price?.amount ?? ''), true)">{{ decimalError(inputValue(row.duration, row.price?.amount ?? ''), true) }}</small></span></label>
+        <label v-for="row in current.rows" :key="`${selectedResolution}:${current.key}:${row.duration}`" class="mw-video-price-line" :data-duration="row.duration"><strong>{{ durationLabel(row) }}</strong><span><input class="input" inputmode="decimal" maxlength="128" :aria-label="`${selectedResolution} ${durationLabel(row)}客户售价`" :value="inputValue(row.duration, row.price?.amount ?? '')" :aria-invalid="!!decimalError(inputValue(row.duration, row.price?.amount ?? ''), true)" :disabled="disabled || row.ambiguous" :data-test="`video-sale-${row.duration}`" @input="setPrice(row.duration, ($event.target as HTMLInputElement).value)" @blur="commitPending()" @keydown.enter.prevent="commitPending()" /><small>CNY / 条</small><small v-if="row.ambiguous">存在重叠售价，请先核对规则。</small><small v-else-if="decimalError(inputValue(row.duration, row.price?.amount ?? ''), true)">{{ decimalError(inputValue(row.duration, row.price?.amount ?? ''), true) }}</small></span></label>
       </div>
       <p v-if="undo && !canUndo" class="mw-muted">本批次填入的售价均已改变，或商品规格已变化；保留最新输入。</p>
     </template>
@@ -36,21 +39,36 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { draftInput, type Match, type Product } from '@/api/admin/mediaWorkbench'
+import type { PricingDimension } from './pricingMatrix'
 import MediaDialog from './MediaDialog.vue'
 import { mediaSpecLabel } from './mediaSpecLabel'
 import { decimalError } from './costCalculator'
 import { arithmeticFill, setVideoSales, videoGroups, videoGroupKey, videoSaleInputKey, type VideoSaleInput } from './videoSaleGroups'
 
-const props = withDefaults(defineProps<{ product: Product; active?: boolean; disabled?: boolean; pendingVideoSales?: VideoSaleInput[]; accountId?: number; adminId?: number }>(), { active: true })
+const props = withDefaults(defineProps<{ product: Product; active?: boolean; disabled?: boolean; pendingVideoSales?: VideoSaleInput[]; accountId?: number; adminId?: number; pricingDimensions?: PricingDimension[] }>(), { active: true })
 const emit = defineEmits<{ 'update:product': [product: Product]; 'pending-video-sales': [inputs: VideoSaleInput[]] }>()
 const selectedResolution = ref(''), selectedGroup = ref(''), message = ref('')
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const inputs = ref<VideoSaleInput[]>([])
 const calculationProduct = computed(() => clone(props.product))
+// A duration row is only required when the draft actually contains a
+// duration-specific rule.  A wildcard video price is one shared price for all
+// enabled durations; the editor must not manufacture one input per duration.
+// When mounted directly the editor keeps its historical, fully-detailed view.
+// The wizard passes the checked pricing dimensions explicitly, so a wildcard
+// rule in a real product is rendered as one shared row instead of inventing
+// one row per capability value.
+const effectivePricingDimensions = computed<PricingDimension[]>(() => props.pricingDimensions ?? ['resolution', 'duration_seconds'])
+const durationPricing = computed(() => effectivePricingDimensions.value.includes('duration_seconds'))
+const resolutionPricing = computed(() => effectivePricingDimensions.value.includes('resolution'))
 // Text edits do not invalidate either the rows or the progress badges.
 // Keep this component and its raw input/conflict state mounted when another
 // wizard step is visible. Pending inputs still require current-domain checks.
-const groupsByResolution = computed(() => !props.active && !inputs.value.length ? new Map<string, ReturnType<typeof videoGroups>>() : new Map(calculationProduct.value.capabilities.resolutions.map(resolution => [resolution, videoGroups(calculationProduct.value, resolution)])))
+const groupsByResolution = computed(() => {
+  if (!props.active && !inputs.value.length) return new Map<string, ReturnType<typeof videoGroups>>()
+  const resolutions = resolutionPricing.value ? calculationProduct.value.capabilities.resolutions : ['']
+  return new Map(resolutions.map(resolution => [resolution, videoGroups(calculationProduct.value, resolution, { splitDuration: durationPricing.value })]))
+})
 const progress = computed(() => new Map([...groupsByResolution.value].map(([resolution, groups]) => {
   const rows = groups?.flatMap(group => group.rows) ?? []
   return [resolution, `${rows.filter(row => row.price && !decimalError(row.price.amount, true)).length}/${rows.length}`]
@@ -69,9 +87,17 @@ watch(() => props.pendingVideoSales, value => {
   scheduleCommit()
 }, { immediate: true })
 watch(context, () => { if (readopt.value) { readopt.value = undefined; message.value = 'Account 或商品已变化，请重新核对本地输入。' } }, { flush: 'sync' })
-watch(() => props.product.capabilities.resolutions, values => { if (!values.includes(selectedResolution.value)) selectedResolution.value = values[0] ?? '' }, { immediate: true })
+watch([() => props.product.capabilities.resolutions, resolutionPricing], ([values, split]) => { if (split) { if (!values.includes(selectedResolution.value)) selectedResolution.value = values[0] ?? '' } else selectedResolution.value = '' }, { immediate: true })
 watch(groups, values => { if (values && !values.some(group => group.key === selectedGroup.value)) selectedGroup.value = values[0]?.key ?? '' }, { immediate: true })
 const groupLabel = (match: Match) => Object.keys(match).length ? mediaSpecLabel(match) : '所有已配置比例、画质与素材共享'
+function durationLabel(row: { duration: number; duration_values?: number[] }) {
+  if (row.duration > 0) return `${row.duration} 秒`
+  const values = row.duration_values ?? []
+  return values.length ? `全部时长（${values.join('、')} 秒）` : '全部时长'
+}
+function inputDurationLabel(input: Pick<VideoSaleInput, 'duration'>) {
+  return input.duration > 0 ? `${input.duration} 秒` : '全部时长'
+}
 function inputValue(duration: number, fallback: string) { return current.value ? inputMap.value.get(videoSaleInputKey({ resolution: selectedResolution.value, group: current.value.match, duration })) ?? fallback : fallback }
 function publishInputs() { emit('pending-video-sales', clone(inputs.value)) }
 function targetRow(input: VideoSaleInput) {
@@ -87,7 +113,7 @@ function conflictReason(input: VideoSaleInput) {
   return ''
 }
 const conflicts = computed(() => inputs.value.flatMap(input => { const reason = conflictReason(input); return reason ? [{ input, reason }] : [] }))
-const inputLabel = (input: VideoSaleInput) => `${input.resolution} · ${groupLabel(input.group)} · ${input.duration} 秒`
+const inputLabel = (input: VideoSaleInput) => `${input.resolution || '所有分辨率'} · ${groupLabel(input.group)} · ${inputDurationLabel(input)}`
 const priceLabel = (price: VideoSaleInput['source_price']) => price ? `${price.amount} ${price.currency} / ${price.billing_mode === 'per_request' ? '条' : price.billing_mode}` : '未设置售价'
 function specSummary(value: string) {
   try {
@@ -174,6 +200,7 @@ const undoable = computed(() => {
 })
 const canUndo = computed(() => undoable.value.length > 0)
 async function previewFill() {
+  if (!durationPricing.value) { message.value = '当前使用统一时长售价，不需要按等差补齐。勾选“时长不同，价格不同”后再使用此工具。'; return }
   if (!await commitPending()) return
   message.value = ''
   try { if (!current.value) return; preview.value = arithmeticFill(current.value.rows); previewSource = fingerprint(); previewResolution = selectedResolution.value; previewGroup = selectedGroup.value }
