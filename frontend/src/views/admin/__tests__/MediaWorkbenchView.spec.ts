@@ -442,7 +442,7 @@ describe('Media Workbench page flow', () => {
     await wrapper.get('.mw-diagnostic').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="product-select"]').element).toHaveProperty('value', blank.product_id)
     expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
-    const priceSelector = mediaType === 'video' ? '[data-test="video-sale-5"]' : '[data-test="price-0"]'
+    const priceSelector = mediaType === 'video' ? 'input[data-test^="video-sale-"]' : '[data-test="price-0"]'
     expect(wrapper.get(priceSelector).element).toHaveProperty('value', '')
     await wrapper.get('[data-test="product-select"]').setValue(first.product_id); await flushPromises()
     await wrapper.get('[data-test="wizard-step-4"]').trigger('click')
@@ -844,11 +844,20 @@ describe('video sale buffers at workbench save and navigation boundaries', () =>
     return dto
   }
 
+  async function openDetailedVideoPricing() {
+    await wrapper.get('[data-test="wizard-step-3"]').trigger('click'); await flushPromises()
+    await wrapper.get('[data-test="pricing-dimension-duration_seconds"]').setValue(true); await flushPromises()
+    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    // Selecting a pricing dimension is itself a valid draft edit and may
+    // autosave. Reset the spy so each test measures the buffered sale input.
+    api.saveDraft.mockClear()
+  }
+
   it('applies the current video input before an explicit server save', async () => {
     const dto = videoSupplier()
     api.detail.mockResolvedValue(dto); mockSave(dto)
     await openEditor()
-    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await openDetailedVideoPricing()
     await wrapper.get('[data-test="video-sale-5"]').setValue('12.50')
     expect(api.saveDraft).not.toHaveBeenCalled()
     expect(wrapper.get('[data-test="pending-video-sales"]').text()).toContain('尚未应用草稿')
@@ -865,7 +874,7 @@ describe('video sale buffers at workbench save and navigation boundaries', () =>
     const dto = videoSupplier()
     api.detail.mockResolvedValue(dto); mockSave(dto)
     await openEditor()
-    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await openDetailedVideoPricing()
     await wrapper.get('[data-test="video-sale-5"]').setValue('0')
     await wrapper.get('.mw-back').trigger('click'); await flushPromises()
     expect(wrapper.get('[data-test="editor-page"]').exists()).toBe(true)
@@ -886,7 +895,7 @@ describe('video sale buffers at workbench save and navigation boundaries', () =>
     const dto = videoSupplier()
     api.detail.mockResolvedValue(dto); mockSave(dto)
     await openEditor()
-    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await openDetailedVideoPricing()
     await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
     await wrapper.get('[data-test="new-independent-product"]').trigger('click')
     let confirm = wrapper.get('[data-test="confirm-add-product"]').element as HTMLButtonElement
@@ -932,7 +941,7 @@ describe('video sale buffers at workbench save and navigation boundaries', () =>
     }
     const key = recoveryCopyKey(value.identity, editorId)!
     localStorage.setItem(key, encodeDraftRecovery(value)); window.dispatchEvent(new StorageEvent('storage', { key })); await flushPromises()
-    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await openDetailedVideoPricing()
     await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
     await wrapper.get(`[data-test="recover-unsubmitted"][data-product-id="${product.product_id}"]`).trigger('click'); await flushPromises()
     expect((wrapper.get('[data-test="display-name"]').element as HTMLInputElement).value).toBe('画布图片')
@@ -950,7 +959,7 @@ describe('video sale buffers at workbench save and navigation boundaries', () =>
     await wrapper.get('[data-test="remove-blank-product"]').trigger('click')
     await wrapper.get('[data-test="confirm-remove-product"]').trigger('click'); await flushPromises()
     expect((wrapper.get('[data-test="product-select"]').element as HTMLSelectElement).value).toBe('canvas-1')
-    await wrapper.get('[data-test="wizard-step-4"]').trigger('click'); await flushPromises()
+    await openDetailedVideoPricing()
     api.saveDraft.mockClear()
     await wrapper.get('[data-test="video-sale-5"]').setValue('12.')
     await wrapper.get('[data-test="undo-removal-blank-1"]').trigger('click'); await flushPromises()
