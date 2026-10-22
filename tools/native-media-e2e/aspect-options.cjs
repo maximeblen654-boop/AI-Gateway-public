@@ -2,6 +2,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict')
 const {execFileSync}=require('node:child_process'),{createHash,randomUUID}=require('node:crypto')
 const {chromium,expect}=require('../../frontend/node_modules/@playwright/test')
+const selectPublishedProduct=require('./product-picker.cjs')
 const root=process.argv[2],phase=process.argv[3],base='http://127.0.0.1:28100'
 assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted');assert.equal(process.env.NATIVE_WORKSPACE_ARTIFACT,'true');assert.notEqual(process.env.NATIVE_WORKSPACE_DEV_SERVER,'true')
 assert(root&&root.endsWith('/native-media-20261012'));assert(['configure','execute'].includes(phase))
@@ -95,7 +96,7 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
     await customerPage();await customer.getByTestId(edit?'studio-mode-edit':'studio-mode-text').click();await customer.getByTestId('studio-model-toggle').click()
     const catalog=await media('catalog');assert.equal(catalog.status,200)
     const offer=catalog.body.offers.find(o=>o.product_id===report.saved_product.product_id&&o.spec.resolution.includes('1K'));assert(offer)
-    await customer.locator(`[data-offer-id="${offer.offer_id}"]`).click()
+    await selectPublishedProduct(customer,catalog.body.offers,offer)
     await customer.getByTestId('studio-resolution').click();await customer.locator('#studio-resolution-menu [data-value]').filter({hasText:/^1K$/}).click()
     const writesBefore=customerWrites.length,pickerSupplier=stats().image_posts
     await customer.getByTestId('studio-ratio-toggle').click()
@@ -108,8 +109,14 @@ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),png=Buffer.fr
     await customer.getByTestId('studio-output-format').click();await customer.locator(`#studio-output-format-menu [data-value="${format}"]`).click()
     if(edit)await customer.getByTestId('studio-asset-input').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:png})
     await customer.getByTestId('studio-prompt').fill('SYNTHETIC custom ratio '+result.mode+' '+format+' '+randomUUID())
+    const quoteSelection=customer.waitForRequest(r=>r.url().endsWith('/studio-v2/api/image/quotes')&&r.method()==='POST')
     const quoting=customer.waitForResponse(r=>r.url().endsWith('/studio-v2/api/image/prepare')&&r.request().method()==='POST')
     await customer.getByTestId('studio-quote').click();const quoted=await quoting;result.quote=await quoted.json();assert.equal(quoted.status(),200,JSON.stringify(result.quote));assert.equal(Number(result.quote.sale_price.amount),0.7);result.task_id=result.quote.task_id;assert.equal(result.quote.spec.output_format,format==='auto'?undefined:format);assert.equal(result.quote.spec.aspect_ratio,'7:5')
+    result.quote_selection=(await quoteSelection).postDataJSON()
+    assert.equal(offer.product_id,report.saved_product.product_id,'Expected Offer must belong to the configured product')
+    assert.equal(result.quote_selection.offer_id,offer.offer_id,'Quote request must bind the exact selected 1K price Offer')
+    assert.equal(result.quote.offer_id,offer.offer_id,'Prepared task must retain the exact selected price Offer')
+    assert.equal(result.quote_selection.spec.resolution,'1K');assert.equal(result.quote.spec.resolution,'1K')
     fs.writeFileSync(reportPath,JSON.stringify(report,null,2));assert.deepEqual(ledger(),result.before.ledger);assert.equal(stats().image_posts,result.before.supplier.image_posts)
     await customer.getByTestId('studio-confirm-generate').click();await expect(customer.getByTestId('studio-status')).toContainText('生成完成',{timeout:60000});await expect(customer.getByTestId('studio-result-image')).toHaveCount(1)
     const downloadEvent=customer.waitForEvent('download');await customer.getByTestId('studio-download').click();const download=await downloadEvent
