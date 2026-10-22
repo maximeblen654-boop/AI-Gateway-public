@@ -9,7 +9,17 @@ module.exports=async({fixture,dc,api,current,check,change,media,page,base,accoun
  const catalog=JSON.parse(query(`SELECT extra->'upstream_model_catalog_snapshot' FROM accounts WHERE id=${id} AND name LIKE 'Synthetic %'`))
  const config=structuredClone((await api(accountPath)).media_workbench_v1)
  assert(config.published.dependencies.catalog_sha256.startsWith('published-models-v1:'))
- const setCatalog=v=>assert(query(`UPDATE accounts SET extra=jsonb_set(extra,'{upstream_model_catalog_snapshot}',${sqlJSON(v)}) WHERE id=${id} AND name LIKE 'Synthetic %' RETURNING id`).split(/\r?\n/).includes(String(id)))
+ // A changed observation time is harmless only while it remains trustworthy
+ // and fresh. The earlier Image2Pro fixture activates the runtime freshness gate.
+ // Timestamp every isolated injection, including model deletion and restoration,
+ // with the database clock so Ensure cannot refresh away an expired test case.
+ const setCatalog=v=>{
+  const syncedAt=query(`SELECT to_char((clock_timestamp() - interval '1 second') AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`)
+  assert(Number.isFinite(Date.parse(syncedAt)),'isolated catalog clock must be valid')
+  const next={...v,synced_at:syncedAt}
+  assert(query(`UPDATE accounts SET extra=jsonb_set(extra,'{upstream_model_catalog_snapshot}',${sqlJSON(next)}) WHERE id=${id} AND name LIKE 'Synthetic %' RETURNING id`).split(/\r?\n/).includes(String(id)))
+  assert.deepEqual(JSON.parse(query(`SELECT extra->'upstream_model_catalog_snapshot' FROM accounts WHERE id=${id} AND name LIKE 'Synthetic %'`)),next,'isolated catalog injection must be read back exactly')
+ }
  await page.goto(base+'/video-studio')
  const {expect}=require('../../frontend/node_modules/@playwright/test')
  await expect.poll(async()=>(await media('image','catalog')).status).toBe(200)
@@ -18,8 +28,8 @@ module.exports=async({fixture,dc,api,current,check,change,media,page,base,accoun
  const stable=await check('image'),quotes=[]
  for(const images of [0,1,16]){const q=await quote(images);assert.equal(q.status,200,JSON.stringify(q));quotes.push(q.body)}
  for(const [label,next] of [
-  ['timestamp',{...catalog,synced_at:'2030-01-01T00:00:00Z'}],
-  ['unrelated model',{...catalog,synced_at:'2030-01-02T00:00:00Z',models:[...catalog.models,'Nano-banana-2.1-unpublished']}],
+  ['timestamp',{...catalog}],
+  ['unrelated model',{...catalog,models:[...catalog.models,'Nano-banana-2.1-unpublished']}],
   ['ordering',{...catalog,models:[...catalog.models].reverse()}]
  ]){
   setCatalog(next);assert.equal((await current('image')).effective_enabled,true,label)
