@@ -135,3 +135,100 @@ func TestImage2ProVideoPreservesPricedResolutionSpelling(t *testing.T) {
 		t.Fatal("different resolution substituted")
 	}
 }
+
+func seedance2VideoFixture(t *testing.T) (*Service, *memoryRepo, Product) {
+	t.Helper()
+	svc, repo, p := image2ProVideoFixture(t)
+	raw, err := os.ReadFile("../videoplan/testdata/image2pro_seedance2_video.json")
+	must(t, err)
+	var f struct {
+		Model    string
+		Metadata json.RawMessage
+	}
+	must(t, json.Unmarshal(raw, &f))
+	caps, err := videoplan.DecodeImage2ProCapabilities(f.Metadata)
+	must(t, err)
+	p.SiteModel, p.UpstreamModel = f.Model, f.Model
+	p.Capabilities.Resolutions = []string{"supplier-default"}
+	p.Capabilities.DurationsSeconds = []int{4, 15}
+	p.Capabilities.References = References{Image: Range{Max: 9}, Audio: Range{Max: 3}, TotalMax: 12}
+	p.PricingRules[0].Match.Resolution = []string{"supplier-default"}
+	repo.a.Catalog.Models = []string{f.Model}
+	repo.a.Image2ProVideoCapabilities = map[string]videoplan.Image2ProCapabilities{f.Model: *caps}
+	return svc, repo, p
+}
+
+func TestSeedance2SingleProductLabelPreviewOfferAndCompile(t *testing.T) {
+	svc, repo, p := seedance2VideoFixture(t)
+	d, err := svc.SaveDraft(t.Context(), 7, 0, DraftInput{Products: []Product{p}})
+	must(t, err)
+	if !d.Config.Validation.PublishReady {
+		t.Fatalf("%+v", d.Config.Validation.Diagnostics)
+	}
+	saved := d.Config.Draft.Products[0]
+	if saved.AdapterConfig.Image2Pro.Size != "" || saved.Capabilities.Resolutions[0] != "supplier-default" || saved.PricingRules[0].SalePrice.Amount != "4" {
+		t.Fatal("save invented supplier size or changed pricing")
+	}
+	spec := Spec{Count: 1, Resolution: "supplier-default", AspectRatio: "16:9", DurationSeconds: 15, Audio: 1}
+	preview, err := compilePlan(saved, spec)
+	must(t, err)
+	for _, key := range []string{"resolution", "size", "mode", "n"} {
+		if _, present := preview.Fields[key]; present {
+			t.Fatal("undocumented field", key)
+		}
+	}
+	d, err = svc.Publish(t.Context(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+	must(t, err)
+	d, err = svc.SetSales(t.Context(), 7, d.Config.RecordVersion, true)
+	must(t, err)
+	offer := d.Config.Published.Offers[0]
+	resolved, err := ResolvePublishedVideoOffer(&repo.a, offer.OfferID, spec)
+	must(t, err)
+	_, err = CompilePublishedVideoPlan(resolved, []byte(`{"model":"Seedance2.0","prompt":"synthetic","duration":15,"ratio":"16:9","audios":[{"mediaId":"audio-fixture"}]}`))
+	must(t, err)
+	for _, label := range []string{"480P", "SUPPLIER-DEFAULT"} {
+		wrong := spec
+		wrong.Resolution = label
+		if _, err := ResolvePublishedVideoOffer(&repo.a, offer.OfferID, wrong); err == nil {
+			t.Fatal("unpriced label accepted", label)
+		}
+	}
+	if _, err := CompilePublishedVideoPlan(resolved, []byte(`{"model":"Seedance2.0","prompt":"synthetic","duration":4,"ratio":"16:9","audios":[{"mediaId":"audio-fixture"}]}`)); err == nil {
+		t.Fatal("different duration substituted after quote")
+	}
+	caps := repo.a.Image2ProVideoCapabilities[p.UpstreamModel]
+	caps.MaxAudioReferences = 2
+	repo.a.Image2ProVideoCapabilities[p.UpstreamModel] = caps
+	if _, err := ResolvePublishedVideoOffer(&repo.a, offer.OfferID, spec); err == nil {
+		t.Fatal("metadata drift retained old grant")
+	}
+}
+
+func TestSeedance2RejectsAmbiguousLabelsAndOutOfContractProducts(t *testing.T) {
+	for _, scenario := range []string{"multiple labels", "no label", "duration", "ratio", "video", "size"} {
+		t.Run(scenario, func(t *testing.T) {
+			svc, repo, p := seedance2VideoFixture(t)
+			switch scenario {
+			case "multiple labels":
+				p.Capabilities.Resolutions = []string{"supplier-default", "480P"}
+			case "no label":
+				p.Capabilities.Resolutions = nil
+			case "duration":
+				p.Capabilities.DurationsSeconds = []int{30}
+			case "ratio":
+				p.Capabilities.AspectRatios = []string{"1:1"}
+			case "video":
+				p.Capabilities.References.Video.Max = 1
+			case "size":
+				c := repo.a.Image2ProVideoCapabilities[p.UpstreamModel]
+				c.Size = "480P"
+				repo.a.Image2ProVideoCapabilities[p.UpstreamModel] = c
+			}
+			d, err := svc.SaveDraft(t.Context(), 7, 0, DraftInput{Products: []Product{p}})
+			must(t, err)
+			if d.Config.Validation.PublishReady {
+				t.Fatal("invalid product accepted", scenario)
+			}
+		})
+	}
+}

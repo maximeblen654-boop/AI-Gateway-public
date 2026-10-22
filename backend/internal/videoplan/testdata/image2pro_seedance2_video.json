@@ -1,0 +1,11 @@
+{
+  "source": "https://image2pro.top/api-docs and public model catalog observed 2026-10-23; capability fields only, no generation claim",
+  "model": "Seedance2.0",
+  "metadata": {
+    "type": "video",
+    "protocol": "seedance2-video",
+    "supports_audio_reference": true,
+    "max_audio_references": 3,
+    "reference_audio_max_bytes": 15728640
+  }
+}

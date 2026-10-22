@@ -49,6 +49,78 @@ func TestImage2ProMediaMetadataPersistsIndependentlyOfCodexAndClearsMissing(t *t
 	require.NotContains(t, string(encoded), "duration_min")
 }
 
+func TestSeedance2ObservedMetadataSyncPersistsWithoutSupplierSize(t *testing.T) {
+	raw, err := os.ReadFile("../videoplan/testdata/image2pro_seedance2_video.json")
+	require.NoError(t, err)
+	var f struct {
+		Model    string
+		Metadata json.RawMessage
+	}
+	require.NoError(t, json.Unmarshal(raw, &f))
+	body, err := json.Marshal(map[string]any{"data": []any{map[string]any{"id": f.Model, "metadata": f.Metadata}}})
+	require.NoError(t, err)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(body)))}}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	a := &Account{ID: 77, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "fixture-key", "base_url": "https://api.image2pro.top/v1"}}
+	catalog, err := svc.SyncUpstreamModelCatalog(t.Context(), a)
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 1, "no registry fallback or generation")
+	require.NotNil(t, catalog.Metadata[f.Model].Image2ProVideo)
+	stored, ok := a.GetUpstreamModelMetadata(f.Model)
+	require.True(t, ok)
+	require.Empty(t, stored.Image2ProVideo.Size)
+	require.Equal(t, 15, stored.Image2ProVideo.DurationMax)
+	require.Equal(t, 9, stored.Image2ProVideo.MaxImages)
+	require.True(t, a.GetUpstreamModelMetadataSnapshot().Image2ProSource.Matches(77, PlatformOpenAI, AccountTypeAPIKey, a.GetOpenAIBaseURL(), fmt.Sprintf("%x", sha256.Sum256([]byte("fixture-key")))))
+}
+
+func TestImage2ProObservedEntireMediaCatalogPreservesExactIDsAndTypes(t *testing.T) {
+	raw, err := os.ReadFile("../videoplan/testdata/image2pro_public_media_20261023.json")
+	require.NoError(t, err)
+	var fixture struct {
+		Data []struct {
+			ID       string
+			Metadata struct {
+				Type     string
+				Protocol string
+			}
+		}
+	}
+	require.NoError(t, json.Unmarshal(raw, &fixture))
+	require.Len(t, fixture.Data, 21)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(raw)))}}}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	a := &Account{ID: 77, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "fixture-key", "base_url": "https://api.image2pro.top/v1"}}
+	catalog, err := svc.SyncUpstreamModelCatalog(t.Context(), a)
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 1, "media discovery must not generate or fetch text registry")
+	require.Len(t, catalog.Metadata, 21)
+	wantIDs := make([]string, 0, len(fixture.Data))
+	counts := map[string]int{}
+	for _, expected := range fixture.Data {
+		wantIDs = append(wantIDs, expected.ID)
+		counts[expected.Metadata.Type]++
+		entry, found := catalog.Metadata[expected.ID]
+		require.True(t, found, expected.ID)
+		require.Equal(t, expected.ID, entry.ID)
+		require.Equal(t, expected.Metadata.Type, entry.MediaType)
+		if entry.MediaType == "video" {
+			require.NotNil(t, entry.Image2ProVideo, expected.ID)
+			require.True(t, entry.Image2ProVideo.Valid(), expected.ID)
+			require.Equal(t, expected.Metadata.Protocol, entry.Image2ProVideo.Protocol)
+			stored, found := a.GetUpstreamModelMetadata(expected.ID)
+			require.True(t, found, expected.ID)
+			require.Equal(t, entry.Image2ProVideo, stored.Image2ProVideo)
+		} else {
+			require.Nil(t, entry.Image2ProVideo, expected.ID)
+		}
+	}
+	require.ElementsMatch(t, wantIDs, catalog.Models)
+	require.Equal(t, map[string]int{"image": 19, "video": 2}, counts)
+}
+
 func TestImage2ProMetadataSourceBindsAccountEndpointAndCredential(t *testing.T) {
 	a := &Account{ID: 107, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "fixture-key", "base_url": "https://api.image2pro.top/v1/"}}
 	proof := NewUpstreamImage2ProMetadataSource(a, time.Now())

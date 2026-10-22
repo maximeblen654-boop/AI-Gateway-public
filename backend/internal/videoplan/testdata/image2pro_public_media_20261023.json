@@ -1,0 +1,26 @@
+{
+  "source": "https://image2pro.top public catalog observed 2026-10-23; exact IDs and capability fields only; no price or generation claim",
+  "data": [
+    {"id":"无限制-Seedream-5-Pro","metadata":{"type":"image"}},
+    {"id":"无限制-Seedream-5-Pro-2K","metadata":{"type":"image"}},
+    {"id":"无限制-Qwen-2.1NEW","metadata":{"type":"image"}},
+    {"id":"完全无限制-Z-Image","metadata":{"type":"image"}},
+    {"id":"无限制-NovelAI-V5","metadata":{"type":"image"}},
+    {"id":"无限制-NovelAI-V4.5","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.5-sunburst","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.5-flare","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.0","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.0-原生4K","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.5-原生4K","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.5-不超分","metadata":{"type":"image"}},
+    {"id":"gpt-image-2.0-不超分","metadata":{"type":"image"}},
+    {"id":"Nano-banana-2.1","metadata":{"type":"image"}},
+    {"id":"Nano-banana-Pro","metadata":{"type":"image"}},
+    {"id":"Nano-banana-2","metadata":{"type":"image"}},
+    {"id":"Grok-image-2.0","metadata":{"type":"image"}},
+    {"id":"Flash会员专属","metadata":{"type":"image"}},
+    {"id":"Kolors-极速生图","metadata":{"type":"image"}},
+    {"id":"无限制-MAX-Video","metadata":{"type":"video","protocol":"agnes","modes":["text","keyframe","reference"],"max_images":5,"max_audio_references":3,"max_video_references":0,"supports_audio_reference":true,"duration_min":4,"duration_max":12,"aspect_ratios":["21:9","16:9","4:3","1:1","3:4","9:16"],"size":"720P","reference_audio_max_bytes":15728640,"reference_video_max_bytes":31457280}},
+    {"id":"Seedance2.0","metadata":{"type":"video","protocol":"seedance2-video","max_audio_references":3,"supports_audio_reference":true,"reference_audio_max_bytes":15728640}}
+  ]
+}

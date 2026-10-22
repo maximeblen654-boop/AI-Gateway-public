@@ -113,8 +113,11 @@ func TestStudioModelCatalogSyncFreshness(t *testing.T) {
 		age     time.Duration
 		mutate  func(*mediaworkbench.Catalog)
 		fetches int32
+		current bool
 	}{
-		{name: "recent success reused", age: 5*time.Minute - time.Nanosecond},
+		{name: "recent success reused", age: 2*time.Minute - time.Nanosecond, current: true},
+		{name: "refresh before admission expiry", age: 2 * time.Minute, fetches: 1, current: true},
+		{name: "last valid instant still refreshed", age: 5*time.Minute - time.Nanosecond, fetches: 1, current: true},
 		{name: "exactly expired", age: 5 * time.Minute, fetches: 1},
 		{name: "older success", age: 6 * time.Minute, fetches: 1},
 		{name: "future timestamp rejected", age: -time.Second, fetches: 1},
@@ -134,6 +137,7 @@ func TestStudioModelCatalogSyncFreshness(t *testing.T) {
 			}
 			var calls atomic.Int32
 			s.fetcher = studioCatalogFetchFunc(func(context.Context, *Account) ([]string, error) { calls.Add(1); return []string{"new-model"}, nil })
+			require.Equal(t, tc.current, s.Current(a), "read-only admission keeps its original five-minute limit")
 			require.NoError(t, s.Ensure(t.Context(), 7))
 			require.Equal(t, tc.fetches, calls.Load())
 			require.Equal(t, int(tc.fetches), r.writes)
@@ -362,6 +366,121 @@ func TestStudioModelCatalogSyncPeriodicLoopRefreshesExpiredOnly(t *testing.T) {
 	require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
 	s.Stop()
 	require.EqualValues(t, 1, calls.Load())
+}
+
+func TestStudioModelCatalogSyncScheduledRefreshHasNoNaturalExpiryGap(t *testing.T) {
+	a := studioCatalogAccount(77)
+	s, r := newStudioCatalogSyncTest(t, a)
+	base := s.now()
+	clock := base.Add(time.Second)
+	s.now = func() time.Time { return clock }
+	setStudioCatalogSnapshot(t, s, a, clock)
+	config := cloneStudioCatalogAccount(a).Extra[mediaworkbench.ExtraKey]
+	var calls int
+	s.fetcher = studioCatalogFetchFunc(func(context.Context, *Account) ([]string, error) {
+		calls++
+		// A completed observation is later than the scheduler tick that started it.
+		clock = clock.Add(25 * time.Second)
+		return []string{"old-model"}, nil
+	})
+	for tick := 1; tick <= 12; tick++ {
+		clock = base.Add(time.Duration(tick) * s.interval)
+		require.True(t, s.Current(a), "catalog expired before scheduled tick %d", tick)
+		require.NoError(t, s.RunDue(t.Context()))
+		require.True(t, s.Current(a), "refresh completed with stale evidence at tick %d", tick)
+		clock = base.Add(time.Duration(tick+1)*s.interval - time.Nanosecond)
+		require.True(t, s.Current(a), "healthy sequential refresh left an expiry gap after tick %d", tick)
+	}
+	require.Positive(t, calls)
+	require.Less(t, calls, 12, "unchanged fresh snapshots must not cause a supplier request each tick")
+	require.Equal(t, calls, r.writes)
+	require.Equal(t, config, cloneStudioCatalogAccount(a).Extra[mediaworkbench.ExtraKey])
+}
+
+func TestStudioModelCatalogSyncFailedEarlyRefreshKeepsOriginalEvidenceAndExpiry(t *testing.T) {
+	a := studioCatalogAccount(77)
+	s, r := newStudioCatalogSyncTest(t, a)
+	clock := s.now()
+	s.now = func() time.Time { return clock }
+	setStudioCatalogSnapshot(t, s, a, clock)
+	original := a.Extra[mediaworkbench.CatalogKey]
+	s.fetcher = studioCatalogFetchFunc(func(context.Context, *Account) ([]string, error) {
+		return nil, errors.New("temporary supplier failure")
+	})
+	clock = clock.Add(3 * time.Minute)
+	require.ErrorIs(t, s.RunDue(t.Context()), ErrStudioModelCatalogUnavailable)
+	require.True(t, s.Current(a), "early refresh failure must not rewrite the last success")
+	require.Equal(t, original, a.Extra[mediaworkbench.CatalogKey])
+	require.Zero(t, r.writes)
+	clock = clock.Add(2 * time.Minute)
+	require.False(t, s.Current(a), "failed refresh must not extend the original five-minute limit")
+}
+
+func TestStudioModelCatalogSyncEarlyRefreshFailureReusesOnlyCurrentBoundEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		age    time.Duration
+		change func(*Account)
+		allow  bool
+	}{
+		{name: "still valid snapshot", age: 3 * time.Minute, allow: true},
+		{name: "exact hard expiry", age: 5 * time.Minute},
+		{name: "credential changed during refresh", age: 3 * time.Minute, change: func(a *Account) { a.Credentials["api_key"] = "new-synthetic-key" }},
+		{name: "supplier changed during refresh", age: 3 * time.Minute, change: func(a *Account) { a.Credentials["base_url"] = "https://other.example/v1" }},
+		{name: "new malformed snapshot", age: 3 * time.Minute, change: func(a *Account) { a.Extra[mediaworkbench.CatalogKey] = map[string]any{"synced_at": "invalid"} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := studioCatalogAccount(77)
+			s, r := newStudioCatalogSyncTest(t, a)
+			setStudioCatalogSnapshot(t, s, a, s.now().Add(-tc.age))
+			var calls int
+			s.fetcher = studioCatalogFetchFunc(func(context.Context, *Account) ([]string, error) {
+				calls++
+				if tc.change != nil {
+					r.mu.Lock()
+					tc.change(a)
+					r.mu.Unlock()
+				}
+				return nil, errors.New("temporary supplier failure")
+			})
+			attempts := 2
+			if tc.change != nil {
+				attempts = 1
+			}
+			for range attempts {
+				err := s.Ensure(t.Context(), 77)
+				if tc.allow {
+					require.NoError(t, err, "valid existing evidence is reloaded and checked after an early refresh failure")
+				} else {
+					require.ErrorIs(t, err, ErrStudioModelCatalogUnavailable)
+				}
+			}
+			require.Equal(t, 1, calls, "unchanged identity shares the bounded failure backoff")
+			require.Zero(t, r.writes)
+		})
+	}
+}
+
+func TestStudioModelCatalogSyncDoesNotReuseValidEvidenceAfterCancellationOrStop(t *testing.T) {
+	t.Run("stopped service", func(t *testing.T) {
+		a := studioCatalogAccount(77)
+		s, _ := newStudioCatalogSyncTest(t, a)
+		setStudioCatalogSnapshot(t, s, a, s.now().Add(-3*time.Minute))
+		s.Stop()
+		require.ErrorIs(t, s.Ensure(t.Context(), 77), ErrStudioModelCatalogUnavailable)
+	})
+	t.Run("canceled caller", func(t *testing.T) {
+		a := studioCatalogAccount(77)
+		s, _ := newStudioCatalogSyncTest(t, a)
+		setStudioCatalogSnapshot(t, s, a, s.now().Add(-3*time.Minute))
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		s.fetcher = studioCatalogFetchFunc(func(context.Context, *Account) ([]string, error) {
+			cancel()
+			return nil, errors.New("temporary supplier failure")
+		})
+		require.ErrorIs(t, s.Ensure(ctx, 77), ErrStudioModelCatalogUnavailable)
+	})
 }
 
 func TestStudioModelCatalogSyncRunDueContinuesSequentiallyAfterFailure(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 
 const (
 	studioModelCatalogMaxAge         = 5 * time.Minute
+	studioModelCatalogRefreshAge     = 2 * time.Minute
 	studioModelCatalogTimeout        = 25 * time.Second
 	studioModelCatalogFailureBackoff = time.Minute
 )
@@ -78,7 +79,7 @@ func NewStudioModelCatalogSync(accountRepo AccountRepository, fetcher *AccountTe
 	return &StudioModelCatalogSync{
 		repo: repo, fetcher: catalogFetcher, parentCtx: ctx, cancel: cancel,
 		failures: make(map[int64]studioModelCatalogFailure), now: time.Now,
-		interval: studioModelCatalogMaxAge, requestTimeout: studioModelCatalogTimeout,
+		interval: studioModelCatalogRefreshAge / 2, requestTimeout: studioModelCatalogTimeout,
 	}
 }
 
@@ -148,17 +149,21 @@ func (s *StudioModelCatalogSync) RunDue(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ErrStudioModelCatalogUnavailable
 		}
-		if err := s.Ensure(ctx, id); err != nil && firstErr == nil {
+		if err := s.ensure(ctx, id, false); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
 	return firstErr
 }
 
-// Ensure is for new quotes only. A current successful observation is reused for
-// five minutes. Historical task recovery must use its frozen identity instead.
+// Ensure is for new quotes only. Refresh starts after two minutes, ahead of the
+// five-minute admission limit. Historical task recovery uses its frozen identity.
 // The caller reloads the Account/catalog after this returns successfully.
 func (s *StudioModelCatalogSync) Ensure(ctx context.Context, accountID int64) error {
+	return s.ensure(ctx, accountID, true)
+}
+
+func (s *StudioModelCatalogSync) ensure(ctx context.Context, accountID int64, allowCurrentOnRefreshFailure bool) error {
 	if s == nil || s.repo == nil || s.fetcher == nil || accountID <= 0 || ctx.Err() != nil {
 		return ErrStudioModelCatalogUnavailable
 	}
@@ -169,6 +174,17 @@ func (s *StudioModelCatalogSync) Ensure(ctx context.Context, accountID int64) er
 	case <-ctx.Done():
 		return ErrStudioModelCatalogUnavailable
 	case r := <-result:
+		if r.Err != nil && allowCurrentOnRefreshFailure && ctx.Err() == nil && s.parentCtx.Err() == nil {
+			// A failed early refresh must not shorten the existing admission limit.
+			// Reload before accepting: the Account or snapshot may have changed in flight.
+			latest, err := s.repo.GetByID(ctx, accountID)
+			if err == nil && latest != nil && studioModelCatalogSyncEligible(latest) {
+				identity, identityErr := studioModelCatalogAccountIdentity(latest)
+				if identityErr == nil && studioModelCatalogFresh(latest, identity, s.now()) && ctx.Err() == nil && s.parentCtx.Err() == nil {
+					return nil
+				}
+			}
+		}
 		return r.Err
 	}
 }
@@ -197,7 +213,7 @@ func (s *StudioModelCatalogSync) ensureAccount(accountID int64) error {
 		return ErrStudioModelCatalogUnavailable
 	}
 	now := s.now()
-	if studioModelCatalogFresh(account, identity, now) {
+	if studioModelCatalogFreshWithin(account, identity, now, studioModelCatalogRefreshAge) {
 		return nil
 	}
 
@@ -288,6 +304,12 @@ func studioModelCatalogAccountIdentity(a *Account) (string, error) {
 }
 
 func studioModelCatalogFresh(a *Account, identity string, now time.Time) bool {
+	return studioModelCatalogFreshWithin(a, identity, now, studioModelCatalogMaxAge)
+}
+
+// Refresh ahead of the five-minute admission limit. A tick may be earlier than
+// the prior request's completion; waiting for expiry can otherwise skip a cycle.
+func studioModelCatalogFreshWithin(a *Account, identity string, now time.Time, maxAge time.Duration) bool {
 	body, err := json.Marshal(a.Extra[mediaworkbench.CatalogKey])
 	if err != nil {
 		return false
@@ -297,7 +319,7 @@ func studioModelCatalogFresh(a *Account, identity string, now time.Time) bool {
 		return false
 	}
 	at, err := time.Parse(time.RFC3339Nano, catalog.SyncedAt)
-	return err == nil && !at.After(now) && now.Sub(at) < studioModelCatalogMaxAge
+	return err == nil && !at.After(now) && now.Sub(at) < maxAge
 }
 
 // Manual sync and the background observer use the same conditional catalog
@@ -334,7 +356,8 @@ func (s *AccountTestService) persistUpstreamModelCatalogSnapshot(ctx context.Con
 	return nil
 }
 
-// Current checks existing local evidence only. Status reads never fetch or write.
+// Current checks existing local evidence only, with the five-minute hard limit.
+// Status reads never fetch or write.
 func (s *StudioModelCatalogSync) Current(account *Account) bool {
 	if s == nil || account == nil {
 		return false

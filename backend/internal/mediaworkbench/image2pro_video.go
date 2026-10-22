@@ -3,6 +3,7 @@ package mediaworkbench
 import (
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
@@ -14,6 +15,16 @@ func image2ProVideoModel(p Product) (videoplan.Model, bool) {
 	}
 	c2 := c.Normalize()
 	m := videoplan.Model{ID: p.SiteModel, Upstream: p.UpstreamModel, Status: "enabled", Mode: "image2pro", PromptMax: 6000, Image2Pro: &c2, Resolutions: []string{c2.Size}, Ratios: append([]string(nil), c2.AspectRatios...)}
+	if c2.Size == "" {
+		if len(p.Capabilities.Resolutions) != 1 {
+			return videoplan.Model{}, false
+		}
+		label := p.Capabilities.Resolutions[0]
+		if label == "" || len(label) > 32 || strings.TrimSpace(label) != label {
+			return videoplan.Model{}, false
+		}
+		m.Resolutions = []string{label}
+	}
 	for d := c2.DurationMin; d <= c2.DurationMax; d++ {
 		m.Durations = append(m.Durations, d)
 	}

@@ -212,8 +212,16 @@ function compileImage2Pro(input, model) {
       !Number.isInteger(caps.duration_min) || !Number.isInteger(caps.duration_max) ||
       duration < caps.duration_min || duration > caps.duration_max ||
       !Array.isArray(caps.aspect_ratios) || !caps.aspect_ratios.includes(ratio) ||
-      typeof caps.size !== 'string' || !caps.size ||
-      caps.size.toLowerCase() !== resolution.toLowerCase()) fail('Unconfirmed Image2Pro video capabilities');
+      typeof caps.size !== 'string') fail('Unconfirmed Image2Pro video capabilities');
+  if (caps.protocol === 'seedance2-video') {
+    if (caps.size !== '' || caps.duration_min < 4 || caps.duration_max > 15 ||
+        caps.max_video_references !== 0 || caps.reference_video_max_bytes !== 0 ||
+        !Array.isArray(caps.modes) || !caps.modes.length || caps.modes.some(mode => !['text', 'reference'].includes(mode)) ||
+        caps.aspect_ratios.some(value => !['16:9', '9:16'].includes(value)) ||
+        !Array.isArray(model.resolutions) || model.resolutions.length !== 1 ||
+        typeof model.resolutions[0] !== 'string' || !model.resolutions[0] || model.resolutions[0].length > 32 ||
+        model.resolutions[0].trim() !== model.resolutions[0] || resolution !== model.resolutions[0]) fail('Unconfirmed Image2Pro video capabilities');
+  } else if (!caps.size || caps.size.toLowerCase() !== resolution.toLowerCase()) fail('Unconfirmed Image2Pro video capabilities');
   const counts = { image: 0, audio: 0, video: 0 }, images = [], audios = [], videos = [];
   for (const asset of assets) {
     const payload = receiptPayloads.get(asset);

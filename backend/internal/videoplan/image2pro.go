@@ -14,7 +14,7 @@ const Image2ProContractRevision = "image2pro_public_video_20261019_r1"
 const Image2ProInlineImageLimit = 15_000_000
 
 // Image2ProCapabilities is the public /v1/models metadata allowlist. Protocol
-// is an opaque supplier identity, never a model ID or a capability switch.
+// selects documented defaults only for an exact protocol, never a model name.
 type Image2ProCapabilities struct {
 	Protocol               string   `json:"protocol"`
 	Modes                  []string `json:"modes"`
@@ -31,8 +31,29 @@ type Image2ProCapabilities struct {
 }
 
 func (c Image2ProCapabilities) Valid() bool {
-	if strings.TrimSpace(c.Protocol) == "" || len(c.Protocol) > 256 || len(c.Modes) == 0 || len(c.Modes) > 16 || c.MaxImages < 0 || c.MaxImages > 9 || c.MaxAudioReferences < 0 || c.MaxAudioReferences > 3 || c.MaxVideoReferences < 0 || c.MaxVideoReferences > 1 || c.DurationMin < 1 || c.DurationMax < c.DurationMin || c.DurationMax > 120 || len(c.AspectRatios) == 0 || len(c.AspectRatios) > 32 || strings.TrimSpace(c.Size) == "" || len(c.Size) > 32 || strings.TrimSpace(c.Size) != c.Size {
+	if strings.TrimSpace(c.Protocol) == "" || len(c.Protocol) > 256 {
 		return false
+	}
+	if len(c.Modes) == 0 || len(c.Modes) > 16 || c.MaxImages < 0 || c.MaxImages > 9 || c.MaxAudioReferences < 0 || c.MaxAudioReferences > 3 || c.MaxVideoReferences < 0 || c.MaxVideoReferences > 1 || c.DurationMin < 1 || c.DurationMax < c.DurationMin || c.DurationMax > 120 || len(c.AspectRatios) == 0 || len(c.AspectRatios) > 32 || len(c.Size) > 32 || strings.TrimSpace(c.Size) != c.Size {
+		return false
+	}
+	if c.Protocol != "seedance2-video" && c.Size == "" {
+		return false
+	}
+	if c.Protocol == "seedance2-video" {
+		if c.Size != "" || c.DurationMin < 4 || c.DurationMax > 15 || c.MaxVideoReferences != 0 || c.ReferenceVideoMaxBytes != 0 {
+			return false
+		}
+		for _, mode := range c.Modes {
+			if mode != "text" && mode != "reference" {
+				return false
+			}
+		}
+		for _, ratio := range c.AspectRatios {
+			if ratio != "16:9" && ratio != "9:16" {
+				return false
+			}
+		}
 	}
 	if c.SupportsAudioReference != (c.MaxAudioReferences > 0) || c.MaxAudioReferences > 0 && c.ReferenceAudioMaxBytes <= 0 || c.MaxVideoReferences > 0 && c.ReferenceVideoMaxBytes <= 0 {
 		return false
@@ -61,20 +82,39 @@ func (c Image2ProCapabilities) Normalize() Image2ProCapabilities {
 	return c
 }
 
-// DecodeImage2ProCapabilities requires the fields needed by this adapter. A
-// missing capability cannot acquire a guessed default or a model-name fallback.
+// Only seedance2-video's documented protocol constants may fill absent fields.
+// Explicit invalid values are never replaced; supplier output size stays unknown.
 func DecodeImage2ProCapabilities(raw []byte) (*Image2ProCapabilities, error) {
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(raw, &fields) != nil {
 		return nil, ErrPlan
 	}
-	for _, k := range []string{"protocol", "modes", "max_images", "duration_min", "duration_max", "aspect_ratios", "size"} {
+	var c Image2ProCapabilities
+	if json.Unmarshal(raw, &c) != nil {
+		return nil, ErrPlan
+	}
+	required := []string{"protocol", "modes", "max_images", "duration_min", "duration_max", "aspect_ratios", "size"}
+	if c.Protocol == "seedance2-video" {
+		required = []string{"protocol"}
+		defaults := map[string]any{"modes": []string{"text", "reference"}, "max_images": 9, "duration_min": 4, "duration_max": 15, "aspect_ratios": []string{"16:9", "9:16"}}
+		for key, value := range defaults {
+			if _, present := fields[key]; !present {
+				fields[key], _ = json.Marshal(value)
+			}
+		}
+	}
+	for _, k := range required {
 		if len(fields[k]) == 0 || bytes.Equal(fields[k], []byte("null")) {
 			return nil, ErrPlan
 		}
 	}
-	var c Image2ProCapabilities
-	if json.Unmarshal(raw, &c) != nil || !c.Valid() {
+	for _, key := range []string{"protocol", "modes", "max_images", "max_audio_references", "max_video_references", "supports_audio_reference", "duration_min", "duration_max", "aspect_ratios", "size", "reference_audio_max_bytes", "reference_video_max_bytes"} {
+		if value, present := fields[key]; present && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return nil, ErrPlan
+		}
+	}
+	normalized, _ := json.Marshal(fields)
+	if json.Unmarshal(normalized, &c) != nil || !c.Valid() {
 		return nil, ErrPlan
 	}
 	c = c.Normalize()
@@ -186,7 +226,8 @@ func validImage2ProMediaID(id string) bool {
 func validateImage2ProRequest(m Model, body []byte) (image2ProVideoRequest, error) {
 	f, e := decodeImage2ProRequest(body)
 	c := m.Image2Pro
-	if e != nil || c == nil || !c.Valid() || m.Status != "enabled" || m.Mode != "image2pro" || f.Model != m.Upstream || strings.TrimSpace(f.Prompt) == "" || m.PromptMax > 0 && len([]rune(f.Prompt)) > m.PromptMax || !slices.Contains(m.Durations, f.Duration) || f.Duration < c.DurationMin || f.Duration > c.DurationMax || !slices.Contains(m.Resolutions, c.Normalize().Size) || !slices.Contains(m.Ratios, f.Ratio) || !slices.Contains(c.AspectRatios, f.Ratio) {
+	_, resolutionOK := image2ProResolution(m)
+	if e != nil || c == nil || !c.Valid() || !resolutionOK || m.Status != "enabled" || m.Mode != "image2pro" || f.Model != m.Upstream || strings.TrimSpace(f.Prompt) == "" || m.PromptMax > 0 && len([]rune(f.Prompt)) > m.PromptMax || !slices.Contains(m.Durations, f.Duration) || f.Duration < c.DurationMin || f.Duration > c.DurationMax || !slices.Contains(m.Ratios, f.Ratio) || !slices.Contains(c.AspectRatios, f.Ratio) {
 		return f, ErrPlan
 	}
 	ni, nv, na := len(f.Images), len(f.Videos), len(f.Audios)
@@ -229,7 +270,8 @@ func compileImage2ProPlan(m Model, upstream string, body []byte) (Plan, error) {
 }
 
 func previewImage2Pro(m Model, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
-	if m.Image2Pro == nil || !strings.EqualFold(resolution, m.Image2Pro.Size) {
+	configured, ok := image2ProResolution(m)
+	if !ok || (m.Image2Pro.Size == "" && resolution != configured) || (m.Image2Pro.Size != "" && !strings.EqualFold(resolution, configured)) {
 		return Plan{}, ErrPlan
 	}
 	f := image2ProVideoRequest{Model: m.Upstream, Prompt: "<dry-run-prompt>", Duration: duration, Ratio: ratio}
@@ -255,5 +297,23 @@ func inspectImage2Pro(m Model, body []byte) (resolution, ratio string, duration,
 		err = e
 		return
 	}
-	return m.Image2Pro.Normalize().Size, f.Ratio, f.Duration, len(f.Images), len(f.Videos), len(f.Audios), nil
+	resolution, _ = image2ProResolution(m)
+	return resolution, f.Ratio, f.Duration, len(f.Images), len(f.Videos), len(f.Audios), nil
+}
+
+func image2ProResolution(m Model) (string, bool) {
+	if m.Image2Pro == nil {
+		return "", false
+	}
+	if m.Image2Pro.Size != "" {
+		size := m.Image2Pro.Normalize().Size
+		return size, slices.Contains(m.Resolutions, size)
+	}
+	// No wire size exists for this protocol. One explicit product label keeps
+	// Preview/Inspect/Offer unambiguous without claiming a supplier resolution.
+	if m.Image2Pro.Protocol != "seedance2-video" || len(m.Resolutions) != 1 {
+		return "", false
+	}
+	label := m.Resolutions[0]
+	return label, label != "" && len(label) <= 32 && strings.TrimSpace(label) == label
 }

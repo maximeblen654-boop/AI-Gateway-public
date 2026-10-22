@@ -12,6 +12,14 @@ function freeze<T extends object>(value: T): T {
   return Object.freeze(value)
 }
 describe('media editors follow one-way props', () => {
+  it('does not emit or normalize historical quantities when the current media type is selected again', async () => {
+    const original = freeze(copy(imageProduct))
+    const wrapper = mount(MediaTechnicalEditor, { props: { product: original, mediaTypes: ['image', 'video'], disabled: false } })
+    await wrapper.get('[data-field="media_type"]').trigger('change')
+    expect(wrapper.emitted('update:product')).toBeUndefined()
+    expect(original.capabilities.count).toEqual({ min: 1, max: 1 })
+    wrapper.unmount()
+  })
   it('preserves historical counts on read and only applies 1..10 to an explicit draft edit', async () => {
     const product = copy(imageProduct)
     const wrapper = mount(MediaProductEditor, { props: { product, mediaTypes: ['image'], disabled: false } })

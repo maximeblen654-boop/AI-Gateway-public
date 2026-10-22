@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { CompilePublishedPlan, Materialize, makeVerifiedAssetReceipt } from './video-request-builder.mjs';
 
 // Independent assertions transcribed from the public 2026-10-19 REST contract.
@@ -94,4 +95,44 @@ test('frozen Image2Pro plan cannot be silently changed to another model or proto
     const plan = CompilePublishedPlan(input(), profile()); mutate(plan);
     assert.throws(() => Materialize(plan));
   }
+});
+
+const seedanceObserved = JSON.parse(readFileSync(new URL('../../backend/internal/videoplan/testdata/image2pro_seedance2_video.json', import.meta.url), 'utf8'));
+function seedanceProfile() {
+  return { ...profile(), upstreamModelId: seedanceObserved.model,
+    durationSeconds: [4, 5, 15], resolutions: ['supplier-default'],
+    mediaLimits: { image: 9, audio: 3, video: 0, total: 12 },
+    image2pro: { ...seedanceObserved.metadata, modes: ['reference', 'text'], max_images: 9,
+      duration_min: 4, duration_max: 15, aspect_ratios: ['16:9', '9:16'], size: '',
+      max_video_references: 0, reference_video_max_bytes: 0 } };
+}
+test('Seedance2 observed metadata uses one product label and documented wire fields', () => {
+  assert.equal(seedanceObserved.metadata.size, undefined);
+  assert.equal(seedanceObserved.metadata.modes, undefined);
+  for (const duration of [4, 15]) {
+    const plan = CompilePublishedPlan({ ...input(), resolution: 'supplier-default', duration,
+      assets: [image(), attachment('audio')] }, seedanceProfile());
+    const wire = Materialize(plan), body = JSON.parse(wire.bytes);
+    assert.equal(body.model, seedanceObserved.model);
+    assert.equal(body.duration, duration);
+    assert.deepEqual(Object.keys(body).sort(), ['audios', 'duration', 'images', 'model', 'prompt', 'ratio']);
+    assert.deepEqual(body.audios, [{ mediaId: 'verified-audio' }]);
+    assert.deepEqual(Materialize(JSON.parse(JSON.stringify(plan))), wire);
+  }
+});
+test('Seedance2 refuses ambiguous pricing labels and unsupported capability expansion', () => {
+  const request = { ...input(), resolution: 'supplier-default' };
+  for (const mutate of [p => { p.resolutions = ['supplier-default', '480P']; },
+    p => { p.resolutions = []; }, p => { p.image2pro.size = '480P'; },
+    p => { p.image2pro.duration_min = 3; }, p => { p.image2pro.duration_max = 30; },
+    p => { p.image2pro.modes = ['keyframe']; }, p => { p.image2pro.aspect_ratios.push('1:1'); },
+    p => { p.image2pro.max_video_references = 1; }, p => { p.image2pro.reference_video_max_bytes = 1; }]) {
+    const p = seedanceProfile(); mutate(p);
+    assert.throws(() => CompilePublishedPlan(request, p));
+  }
+  for (const change of [{ resolution: '480P' }, { resolution: 'SUPPLIER-DEFAULT' }, { duration: 3 },
+    { duration: 16 }, { ratio: '1:1' }, { assets: [attachment('video')] }]) {
+    assert.throws(() => CompilePublishedPlan({ ...request, ...change }, seedanceProfile()));
+  }
+  assert.throws(() => CompilePublishedPlan({ ...request, assets: [attachment('audio', { ownerId: 'other' })] }, seedanceProfile()));
 });

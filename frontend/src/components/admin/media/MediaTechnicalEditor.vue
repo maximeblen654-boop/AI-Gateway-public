@@ -97,6 +97,7 @@ function edit(change: (next: Product) => void) {
   emit('update:product', next)
 }
 async function setMediaType(event: Event) {
+  if (text(event) === props.product.media_type) return
   edit(next => { next.media_type = text(event); next.capabilities.count = { min: 1, max: next.media_type === 'video' ? 1 : 10 } })
   await nextTick()
   ;(event.target as HTMLSelectElement).value = props.product.media_type

@@ -217,7 +217,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				}
 				for _, v := range p.Capabilities.Resolutions {
 					valid := slices.Contains(m.Resolutions, v)
-					if m.Mode == "image2pro" && m.Image2Pro != nil {
+					if m.Mode == "image2pro" && m.Image2Pro != nil && m.Image2Pro.Size != "" {
 						valid = strings.EqualFold(m.Image2Pro.Size, v)
 					}
 					if !valid {
