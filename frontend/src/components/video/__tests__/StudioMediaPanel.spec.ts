@@ -652,11 +652,12 @@ describe('Image2Pro provider attachment preparation', () => {
 })
 
 describe('Video history covers and leaving the workspace',()=>{
- it('shows the cat only for terminal video failures and keeps receipt text outside the cover',async()=>{
+ it('shares the image failure artwork for terminal video failures and keeps receipt text outside the cover',async()=>{
   const failed:StudioTask={...prepared,status:'released',billingState:'pending'}
   api.history.mockResolvedValue([failed]);wrapper=mount(StudioMediaPanel);await flushPromises()
   const card=wrapper.get(`[data-task-id="${failed.id}"]`)
-  expect(card.find('[data-testid="studio-failed-cover"]').exists()).toBe(true)
+  expect(card.get('[data-testid="studio-failed-cover"]').attributes('src')).toContain('studio-image-failed-whale.png')
+  expect(card.get('[data-testid="studio-failed-cover"]').attributes('alt')).toBe('生成失败')
   expect(card.get('.studio-work-preview').text()).toBe('')
   expect(card.get('.studio-work-state').text()).toBe('生成失败，费用已释放')
   expect(card.find('[data-testid="studio-history-retention"]').exists()).toBe(false)
@@ -711,6 +712,57 @@ describe('Generation effort cover',()=>{
   await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises()
   expect(wrapper.findAll('[data-task-id]')).toHaveLength(states.length)
   expect(wrapper.find('[data-testid="studio-generating-cover"]').exists()).toBe(false)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
+
+describe('Illustrated task state covers',()=>{
+ it.each([
+  ['failed','not_charged','未收费'],['failed','billed','费用已结算'],
+  ['failed','pending','费用状态待确认'],['released','pending','费用已释放']
+ ])('shows image failure artwork for %s/%s with the actual receipt outside',async(status,billingState,receipt)=>{
+  const task:StudioTask={...prepared,kind:'image',id:'img_'+'9'.repeat(32),status,billingState}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'image',id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  if(wrapper.find('[data-testid="studio-failed-toggle"]').exists())await wrapper.get('[data-testid="studio-failed-toggle"]').trigger('click')
+  const card=wrapper.get('[data-task-id="'+task.id+'"]')
+  expect(card.get('[data-testid="studio-image-failed-cover"]').attributes('src')).toContain('studio-image-failed-whale.png')
+  expect(card.find('[data-testid="studio-failed-cover"]').exists()).toBe(false)
+  expect(card.get('.studio-work-preview').text()).toBe('')
+  expect(card.get('.studio-work-state').text()).toContain(receipt)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['image','video'] as const)('uses the shared pending-quote artwork for %s without submitting generation',async kind=>{
+  const task:StudioTask={...prepared,kind,id:(kind==='image'?'img_':'op_')+'7'.repeat(kind==='image'?32:64)}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  const card=wrapper.get('[data-task-id="'+task.id+'"]')
+  expect(card.get('[data-testid="studio-quote-ready-cover"]').attributes('src')).toContain('studio-quote-ready-whale.png')
+  expect(card.find('[data-testid="studio-generating-cover"]').exists()).toBe(false)
+  await card.trigger('click');await flushPromises()
+  expect(wrapper.get('[data-testid="studio-generate"]').text()).toContain('确认报价并生成')
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['image','video'] as const)('removes the %s waiting artwork when a quote expires on the existing clock',async kind=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-23T08:00:00Z'))
+  const task:StudioTask={...prepared,kind,expiresAt:'2026-10-23T08:00:01Z',id:(kind==='image'?'img_':'op_')+'6'.repeat(kind==='image'?32:64)}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  const card=wrapper.get('[data-task-id="'+task.id+'"]')
+  expect(card.find('[data-testid="studio-quote-ready-cover"]').exists()).toBe(true)
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(card.find('[data-testid="studio-quote-ready-cover"]').exists()).toBe(false)
+  expect(card.get('.studio-work-placeholder').text()).toBe('报价已失效')
+  expect(card.get('.studio-work-state').text()).toBe('报价已失效')
+  expect(wrapper.get('[data-testid="studio-generate"]').attributes('disabled')).toBeDefined()
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['image','video'] as const)('does not label %s uncertain, queued, or billing states as quote-ready or failed',async kind=>{
+  const tasks=['unknown','queued','billing_pending','reserve_pending','recovery_blocked','partial'].map((status,i)=>({...prepared,kind,id:(kind==='image'?'img_':'op_')+String(i+20).padStart(kind==='image'?32:64,'0'),status,resultCount:status==='partial'?1:0}))
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,view:'compose'}));api.history.mockResolvedValue(tasks);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises()
+  expect(wrapper.findAll('[data-task-id]')).toHaveLength(tasks.length)
+  expect(wrapper.find('[data-testid="studio-quote-ready-cover"]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid="studio-image-failed-cover"]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid="studio-failed-cover"]').exists()).toBe(false)
   expect(api.generate).not.toHaveBeenCalled()
  })
 })

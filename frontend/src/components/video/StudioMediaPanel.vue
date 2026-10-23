@@ -21,17 +21,18 @@
       <p class="studio-retention-note">新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
-          <span class="studio-work-preview" :class="{ 'is-video-failed': task.kind === 'video' && taskFailed(task) }">
+          <span class="studio-work-preview" :class="{ 'is-state-cover': task.status === 'processing' || taskFailed(task) || quotePending(task) }">
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-backdrop" :src="resultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-image" :src="resultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
             <StudioVideoCover v-else-if="task.kind === 'video' && readableResults(task)" :src="resultUrl(task)" :alt="taskModel(task) + ' 的视频封面'" />
-            <img v-else-if="task.status === 'processing'" class="studio-generating-cover" :src="generatingCover" alt="在努力啦..." loading="lazy" decoding="async" data-testid="studio-generating-cover" />
-            <img v-else-if="task.kind === 'video' && taskFailed(task)" class="studio-video-failed-cover" :src="videoFailureCover" alt="" data-testid="studio-failed-cover" />
+            <img v-else-if="task.status === 'processing'" class="studio-state-cover studio-generating-cover" :src="generatingCover" alt="在努力啦..." loading="lazy" decoding="async" data-testid="studio-generating-cover" />
+            <img v-else-if="taskFailed(task)" class="studio-state-cover" :src="failureCover" alt="生成失败" loading="lazy" decoding="async" :data-testid="task.kind === 'image' ? 'studio-image-failed-cover' : 'studio-failed-cover'" />
+            <img v-else-if="quotePending(task)" class="studio-state-cover" :src="quoteReadyCover" alt="报价已锁定，等待确认生成" loading="lazy" decoding="async" data-testid="studio-quote-ready-cover" />
             <span v-else class="studio-work-placeholder"><Icon :name="placeholderIcon(task)" aria-hidden="true" /><span>{{ placeholderText(task) }}</span></span>
           </span>
           <span class="studio-work-title"><strong>{{ taskModel(task) }}</strong><time>{{ taskDate(task) }}</time></span>
           <span class="studio-work-meta">{{ specText(task) }}</span>
-          <span class="studio-work-state" :class="{ 'is-failed': task.kind === 'video' && taskFailed(task) }">{{ task.kind === 'video' && taskFailed(task) ? failureSummary(task) : statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
+          <span class="studio-work-state" :class="{ 'is-failed': taskFailed(task) }">{{ taskFailed(task) ? failureSummary(task) : task.status === 'prepared' && quoteExpired(task) ? '报价已失效' : statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
         </button>
       </div>
       <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
@@ -123,7 +124,8 @@ import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
 import StudioVideoCover from './StudioVideoCover.vue'
-import videoFailureCover from '@/assets/studio-video-failed-cat.jpg'
+import failureCover from '@/assets/studio-image-failed-whale.png'
+import quoteReadyCover from '@/assets/studio-quote-ready-whale.png'
 import generatingCover from '@/assets/studio-generating-effort.png'
 import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
@@ -175,10 +177,12 @@ const outputFormatLabels:Record<string,string>={auto:'由模型决定',png:'PNG'
 const outputFormats=computed(()=>kind.value==='image' ? (offer.value?.spec.output_formats||[]).filter(value=>['png','jpeg','webp'].includes(value)) : [])
 watch(outputFormats,formats=>{if(offer.value&&outputFormat.value!=='auto'&&!formats.includes(outputFormat.value)){outputFormat.value='auto';intent=undefined}},{flush:'sync'})
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
+const quoteExpired=(task:StudioTask)=>!Number.isFinite(Date.parse(task.expiresAt)) || clock.value>=Date.parse(task.expiresAt)
+const quotePending=(task:StudioTask)=>task.status==='prepared' && !quoteExpired(task)
 const taskFailed=(task:StudioTask)=>['failed','released'].includes(task.status)
 const failureSummary=(task:StudioTask)=>task.billingState==='not_charged'?'生成失败，未收费':task.status==='released'?'生成失败，费用已释放':task.billingState==='billed'?'生成失败，费用已结算':'生成失败，费用状态待确认'
 const placeholderIcon=(task:StudioTask)=>taskFailed(task)?'exclamationCircle':resultExpired(task)?'clock':task.kind==='video'?(needsRecovery(task)?'clock':'play'):'grid'
-const placeholderText=(task:StudioTask)=>resultExpired(task)?'原片已到期':taskFailed(task)?'生成失败':task.kind==='video'&&needsRecovery(task)?(['processing','queued'].includes(task.status)?'等待视频生成':'结果待确认'):statusText(task.status)
+const placeholderText=(task:StudioTask)=>task.status==='prepared' && quoteExpired(task)?'报价已失效':resultExpired(task)?'原片已到期':taskFailed(task)?'生成失败':task.kind==='video'&&needsRecovery(task)?(['processing','queued'].includes(task.status)?'等待视频生成':'结果待确认'):statusText(task.status)
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
 const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
 const failedHistoryCount=computed(()=>historyScope.value.filter(isFailedTask).length)
@@ -248,7 +252,7 @@ watch(selectedSpec,syncSelectedOffer)
 
 const unmatchedSpec=computed(()=>!!offer.value?.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value))
 const incompatible=computed(()=>!offer.value || unmatchedSpec.value || kind.value==='image' && (imageMode.value==='edit' ? !assets.value.some(a=>a.kind==='image') : assets.value.length>0) || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
-const expired=computed(()=>!active.value || !Number.isFinite(Date.parse(active.value.expiresAt)) || clock.value>=Date.parse(active.value.expiresAt))
+const expired=computed(()=>!active.value || quoteExpired(active.value))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
 let generation=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
 // Only local HTTP submission activity; it never asserts supplier acceptance.

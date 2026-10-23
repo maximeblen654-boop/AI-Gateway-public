@@ -142,3 +142,48 @@ for(const width of [1440,390])for(const kind of ['image','video'] as const)test(
  expect(await page.evaluate(()=>(window as any).studioFixture.calls.filter((call:any)=>call.method==='POST'))).toHaveLength(0)
  await page.screenshot({path:info.outputPath(`effort-delivered-${kind}-${width}.png`),fullPage:true})
 })
+
+
+for(const [width,height,theme] of [[1440,900,'light'],[390,844,'light'],[1366,650,'dark']] as const)test('state covers share one surface at '+width+' '+theme,async({page},info)=>{
+ await page.setViewportSize({width,height});await page.emulateMedia({reducedMotion:'reduce'})
+ const taskId=(kind:string,n:number)=>(kind==='image'?'img_':'op_')+String(n).padStart(kind==='image'?32:64,'0')
+ const make=(kind:string,n:number,status:string)=>({contract:kind==='image'?'published_image_binding_v1':'account_video_v1',[kind==='image'?'task_id':'operation_id']:taskId(kind,n),status,created_at:'2026-10-23T04:00:00Z',expires_at:n===6?'2026-01-01T00:00:00Z':'2099-01-01T00:00:00Z',offer_id:kind==='image'?'image-standard':'video-standard',model:'synthetic-'+kind,spec:{resolution:kind==='image'?'1K':'720p',aspect_ratio:'16:9',count:1,...(kind==='video'?{duration_seconds:5}:{})},quantity:1,sale_price:price,unit_price:price,delivered_count:0,billing_state:'pending'})
+ const tasks={image:['prepared','processing','failed','unknown','queued','prepared'].map((s,i)=>make('image',i+1,s)),video:['prepared','processing','released','unknown','queued','prepared'].map((s,i)=>make('video',i+1,s))}
+ await page.addInitScript(({tasks})=>{sessionStorage.setItem('studio-media-view-9001',JSON.stringify({kind:'image',view:'compose'}));sessionStorage.setItem('studio-visual-fixture-state-covers',JSON.stringify(tasks))},{tasks})
+ await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort())
+ await page.goto('/tests/studio-workspace/index.html?scenario=state-covers&theme='+theme)
+ await page.getByTestId('studio-mode-history').click()
+ const background='rgb(246, 243, 237)'
+ for(const kind of ['image','video']){
+  for(const [n,selector] of [[1,'studio-quote-ready-cover'],[2,'studio-generating-cover'],[3,kind==='image'?'studio-image-failed-cover':'studio-failed-cover']] as const){
+   const card=page.locator('[data-task-id="'+taskId(kind,n)+'"]'),cover=card.getByTestId(selector)
+   await cover.scrollIntoViewIfNeeded();await expect(cover).toBeVisible();await expect(cover).toHaveJSProperty('complete',true)
+   expect(await cover.evaluate((e:HTMLImageElement)=>e.naturalWidth)).toBeGreaterThan(1000)
+   expect(await cover.evaluate(e=>getComputedStyle(e).objectFit)).toBe('contain')
+   expect(await cover.evaluate(e=>getComputedStyle(e).backgroundColor)).toBe(background)
+   expect(await card.locator('.studio-work-preview').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe(background)
+   // Actual alpha in every source proves there is no separately colored opaque rectangle.
+   const alpha=await cover.evaluate((e:HTMLImageElement)=>{const c=document.createElement('canvas');c.width=e.naturalWidth;c.height=e.naturalHeight;const ctx=c.getContext('2d')!;ctx.drawImage(e,0,0);return [[0,0],[c.width-1,0],[0,c.height-1],[c.width-1,c.height-1]].map(([x,y])=>ctx.getImageData(x!,y!,1,1).data[3])})
+   expect(alpha[0]).toBe(0);expect(alpha.filter(a=>a===0).length).toBeGreaterThanOrEqual(2)
+  }
+  for(const n of [4,5,6])await expect(page.locator('[data-task-id="'+taskId(kind,n)+'"] .studio-state-cover')).toHaveCount(0)
+  await expect(page.locator('[data-task-id="'+taskId(kind,6)+'"] .studio-work-state')).toHaveText('报价已失效')
+ }
+ const failedImage=page.locator('[data-task-id="'+taskId('image',3)+'"]').getByTestId('studio-image-failed-cover')
+ const failedVideo=page.locator('[data-task-id="'+taskId('video',3)+'"]').getByTestId('studio-failed-cover')
+ expect(await failedVideo.getAttribute('src')).toBe(await failedImage.getAttribute('src'))
+ expect(await failedVideo.getAttribute('src')).toContain('studio-image-failed-whale')
+ const gallery=page.getByTestId('studio-history')
+ await gallery.evaluate(e=>{e.scrollLeft=0});await page.evaluate(()=>scrollTo(0,0))
+ await page.screenshot({path:info.outputPath('states-image-'+width+'-'+theme+'.png'),fullPage:true})
+ if(width>700){
+  await gallery.evaluate((e,id)=>{const card=e.querySelector<HTMLElement>('[data-task-id="'+id+'"]')!;e.scrollLeft+=card.getBoundingClientRect().left-e.getBoundingClientRect().left-2},taskId('video',1))
+  await page.screenshot({path:info.outputPath('states-video-'+width+'-'+theme+'.png'),fullPage:true})
+ }
+ const quoted=page.locator('[data-task-id="'+taskId('image',1)+'"]')
+ await quoted.click();await expect(page.getByTestId('studio-generate')).toBeVisible()
+ await expect(page.getByTestId('studio-status')).toContainText('报价已锁定')
+ await expect(page.getByTestId('studio-waiting')).toHaveCount(0)
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+ expect(await page.evaluate(()=>(window as any).studioFixture.calls.filter((c:any)=>c.method==='POST'))).toHaveLength(0)
+})
