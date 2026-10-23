@@ -2,12 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { decodeVideoCover, validVideoCover, VIDEO_COVER_MAX_BYTES } from './video-cover.mjs';
 
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const MIME = new Set(['video/mp4', 'video/webm']);
 const RETENTION_MS = 48 * 3600000;
+const COVER_FILE = /^cover-v1-[a-f0-9]{64}\.jpg$/;
+const COVER_TEMP = /^\.cover-[a-f0-9-]{36}\.tmp$/;
+// Shared across store instances in this process (including concurrent logins).
+const covers = new Map();
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const timestamp = value => typeof value === 'string' && ISO_TIME.test(value) ? Date.parse(value)
   : typeof value === 'number' && Number.isSafeInteger(value) && Math.abs(value) <= 8.64e15 ? value : NaN;
@@ -107,6 +112,81 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
         maxBuffer: 128 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch { fail('video_result_decode_failed'); }
   }
+  function coverSource(identity) {
+    safeDirectory(root);
+    const meta = metadata(identity);
+    if (meta?.expired) fail('video_result_expired');
+    if (!meta || meta.missing) fail('video_cover_unavailable');
+    const directory = location(identity), stat = originalStat(directory);
+    if (!stat || stat.size !== meta.size) fail('video_cover_unavailable');
+    return { meta, directory, stat, file: path.join(directory, 'original.bin'),
+      coverFile: path.join(directory, `cover-v1-${meta.sha256}.jpg`) };
+  }
+  const sameSource = (a, b) => a.dev === b.dev && a.ino === b.ino &&
+    a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
+  function cachedCover(source) {
+    let stat;
+    try { stat = fs.lstatSync(source.coverFile); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    if (!stat.isFile() || stat.isSymbolicLink()) fail('video_cover_unavailable');
+    try {
+      const bytes = fileBytes(source.coverFile, VIDEO_COVER_MAX_BYTES);
+      return validVideoCover(bytes) ? bytes : null;
+    } catch { return null; }
+  }
+  async function cover(identity) {
+    const source = coverSource(identity), cached = cachedCover(source);
+    if (cached) return { bytes: cached, expiresAt: source.meta.expiresAt };
+    const key = source.coverFile;
+    if (covers.has(key)) return covers.get(key);
+    if (covers.size >= 100) fail('video_cover_unavailable');
+    const pending = Promise.resolve().then(async () => {
+      // Recheck after queueing and hold a non-symlink source descriptor through
+      // hashing and decoding. Cache hits never read the full original bytes.
+      const before = coverSource(identity), hit = cachedCover(before);
+      if (hit) return { bytes: hit, expiresAt: before.meta.expiresAt };
+      const handle = await fs.promises.open(before.file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+      let temp;
+      try {
+        const stat = await handle.stat();
+        if (!stat.isFile() || !sameSource(stat, before.stat)) fail('video_cover_unavailable');
+        const hash = createHash('sha256');
+        let size = 0;
+        for await (const chunk of handle.createReadStream({ autoClose: false, start: 0 })) {
+          size += chunk.length;
+          if (size > before.meta.size) fail('video_cover_unavailable');
+          hash.update(chunk);
+        }
+        if (size !== before.meta.size || hash.digest('hex') !== before.meta.sha256) fail('video_cover_unavailable');
+        const bytes = await decodeVideoCover({ ffmpegPath, file: before.file, fd: handle.fd });
+        if (!validVideoCover(bytes)) fail('video_cover_unavailable');
+        const after = coverSource(identity);
+        if (!sameSource(stat, after.stat) || !sameSource(stat, await handle.stat()) ||
+            after.meta.sha256 !== before.meta.sha256) fail('video_cover_unavailable');
+        if (usage() + bytes.length > maxStoreBytes) fail('video_cover_unavailable');
+        temp = path.join(after.directory, `.cover-${randomUUID()}.tmp`);
+        writeDurable(temp, bytes);
+        // Atomic replacement also repairs a corrupt disposable sidecar. Refuse
+        // symlinks rather than following an attacker-controlled destination.
+        if (fs.existsSync(after.coverFile)) {
+          const old = fs.lstatSync(after.coverFile);
+          if (!old.isFile() || old.isSymbolicLink()) fail('video_cover_unavailable');
+        }
+        fs.renameSync(temp, after.coverFile);
+        temp = undefined;
+        syncDirectory(after.directory);
+        const current = coverSource(identity);
+        if (!sameSource(stat, current.stat)) fail('video_cover_unavailable');
+        return { bytes, expiresAt: current.meta.expiresAt };
+      } finally {
+        await handle.close();
+        if (temp) try { fs.unlinkSync(temp); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      }
+    });
+    covers.set(key, pending);
+    pending.finally(() => { if (covers.get(key) === pending) covers.delete(key); }).catch(() => {});
+    return pending;
+  }
   function validate(file, bytes, mimeType) {
     if (mimeType === 'video/mp4' ? bytes.toString('ascii', 4, 8) !== 'ftyp'
       : !bytes.subarray(0, 4).equals(Buffer.from('1a45dfa3', 'hex'))) fail('video_result_type_mismatch');
@@ -137,7 +217,7 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
       const dir = path.join(root, name);
       safeDirectory(dir);
       for (const entry of fs.readdirSync(dir)) {
-        if (!['original.bin', 'meta.json'].includes(entry)) fail('video_result_unsafe_path');
+        if (!['original.bin', 'meta.json'].includes(entry) && !COVER_FILE.test(entry) && !COVER_TEMP.test(entry)) fail('video_result_unsafe_path');
         const stat = fs.lstatSync(path.join(dir, entry));
         if (!stat.isFile() || stat.isSymbolicLink()) fail('video_result_unsafe_path');
         total += stat.size;
@@ -234,18 +314,22 @@ export function createVideoResultStore({ rootDir, maxResultBytes = 100_000_000,
         if (!/^[a-f0-9]{64}$/.test(name)) fail('video_result_unsafe_path');
         const directory = path.join(root, name), meta = readMeta(directory);
         if (meta.version !== 3 || now() < timestamp(meta.expiresAt)) continue;
-        const stat = originalStat(directory);
-        if (!stat) continue;
-        try { fs.unlinkSync(path.join(directory, 'original.bin')); }
-        catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-        // Keep meta.json as the immutable expiry tombstone. Count only bytes
-        // actually removed, including when a subsequent directory fsync fails.
-        stats.deleted++;
-        stats.deletedBytes += stat.size;
+        for (const file of ['original.bin', ...fs.readdirSync(directory).filter(entry => COVER_FILE.test(entry) || COVER_TEMP.test(entry))]) {
+          let stat;
+          try {
+            stat = fs.lstatSync(path.join(directory, file));
+            if (!stat.isFile() || stat.isSymbolicLink()) fail('video_result_unsafe_path');
+            fs.unlinkSync(path.join(directory, file));
+          } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+          // deleted remains the original count for existing cleanup callers.
+          if (file === 'original.bin') stats.deleted++;
+          stats.deletedBytes += stat.size;
+        }
+        // Keep meta.json as the immutable expiry tombstone.
         syncDirectory(directory);
       } catch { stats.failed++; }
     }
     return stats;
   }
-  return Object.freeze({ load, put, metadata, has, cleanup, maxResultBytes });
+  return Object.freeze({ load, put, metadata, has, cleanup, cover, maxResultBytes });
 }

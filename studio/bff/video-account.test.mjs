@@ -311,3 +311,31 @@ test('video history keeps unsubmitted quotes local and fails uncertain for an un
  }
  assert.deepEqual(f.counts(),{posts:1,captures:0,quoteCalls:1});assert.equal(f.downloads(),0);
 });
+
+test('Account covers use only captured native snapshots and local originals; GET/HEAD cannot recover, download or settle',async t=>{
+ const f=fixture(t),r=f.make();
+ const op=await r.prepare(session,{clientKey:'local-cover',offerId:'offer1',request:request()});
+ await r.dispatch(session,op.operation_id);
+ const before={...f.counts(),downloads:f.downloads(),releases:f.releases(),captureRequests:f.captureRequests()};
+ const c=createOperationJournal({rootDir:f.root}).getForOwner(1,op.operation_id).children[0],calls=[];
+ let state='captured',mismatch=false;
+ const runtime=createAccountVideoRuntime({rootDir:f.root,resultStore:f.store,call:async(s,method,operation,_payload,keyRef)=>{
+  calls.push(operation);assert.equal(s.ownerId,1);assert.equal(method,'GET');assert.equal(keyRef,2);
+  assert.equal(operation,`tasks/${c.childId}/snapshot`,'cover must not poll supplier task status');
+  return {payload:{contract:VIDEO_CONTRACT,task_id:c.childId,binding_hash:mismatch?'f'.repeat(64):c.account.binding_hash,request_hash:c.bodySha256,status:state}};
+ }});
+ const opened=await runtime.cover(session,op.operation_id);
+ assert.equal(opened.status,200);assert.equal(opened.response.headers.get('Content-Type'),'image/jpeg');
+ assert.equal(opened.response.headers.get('Cache-Control'),'private, no-store');
+ const bytes=Buffer.from(await opened.response.arrayBuffer());assert.equal(bytes.readUInt16BE(0),0xffd8);assert.ok(bytes.length<256*1024);
+ const head=await runtime.cover(session,op.operation_id,{method:'HEAD'});
+ assert.equal(head.response.headers.get('Content-Length'),String(bytes.length));assert.equal((await head.response.arrayBuffer()).byteLength,0);
+ const allowedCalls=calls.length;
+ await assert.rejects(runtime.cover({ownerId:9},op.operation_id));assert.equal(calls.length,allowedCalls);
+ await assert.rejects(runtime.cover(session,op.operation_id,{index:1}),/video_cover_unavailable/);
+ for(const status of ['accepted','released','unknown']){state=status;await assert.rejects(runtime.cover(session,op.operation_id),/download_not_ready/);}
+ state='captured';mismatch=true;await assert.rejects(runtime.cover(session,op.operation_id),/Recovery identity mismatch/);mismatch=false;
+ const originalDirectory=path.join(f.originalRoot,fs.readdirSync(f.originalRoot)[0]);fs.unlinkSync(path.join(originalDirectory,'original.bin'));
+ await assert.rejects(runtime.cover(session,op.operation_id),/video_cover_unavailable/);
+ assert.deepEqual({...f.counts(),downloads:f.downloads(),releases:f.releases(),captureRequests:f.captureRequests()},before);
+});

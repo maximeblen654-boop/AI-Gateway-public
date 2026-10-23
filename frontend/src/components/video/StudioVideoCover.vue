@@ -1,95 +1,53 @@
 <template>
   <span ref="root" class="studio-video-cover">
-    <img v-if="poster" :src="poster" :alt="alt" data-testid="studio-video-cover-image" />
-    <span v-else class="studio-work-placeholder" data-testid="studio-video-cover-fallback">
+    <img v-if="visible && !failed" :key="attempt" v-show="loaded" :src="src" :alt="alt" decoding="async" data-testid="studio-video-cover-image" @load="loaded = true" @error="unavailable" />
+    <span v-if="!loaded" class="studio-work-placeholder" data-testid="studio-video-cover-fallback">
       <Icon :name="failed ? 'play' : 'refresh'" aria-hidden="true" />
       <span>{{ failed ? '打开查看视频' : '封面加载中' }}</span>
     </span>
-    <span v-if="poster" class="studio-video-cover-play" aria-hidden="true"><Icon name="play" /></span>
+    <span v-if="loaded" class="studio-video-cover-play" aria-hidden="true"><Icon name="play" /></span>
   </span>
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
+import { recoverStudioMediaRead } from '@/api/studioMedia'
 
 const props = defineProps<{ src: string; alt: string }>()
 const root = ref<HTMLElement | null>(null)
-const poster = ref('')
-const failed = ref(false)
-let visible = false
+const visible = ref(false), loaded = ref(false), failed = ref(false), attempt = ref(0)
 let observer: IntersectionObserver | undefined
-let dispose: (() => void) | undefined
+let generation = 0, recovered = false, recovering = false
 
-function extractFrame() {
-  dispose?.()
-  poster.value = ''
-  failed.value = false
-  if (!visible || !props.src) return
-
-  // Read the existing authenticated original. No generation or persistent cache.
-  const video = document.createElement('video')
-  video.muted = true
-  video.playsInline = true
-  video.preload = 'auto'
-  let disposed = false
-  let positioned = false
-  const cleanup = () => {
-    if (disposed) return
-    disposed = true
-    clearTimeout(timeout)
-    video.removeEventListener('loadedmetadata', position)
-    video.removeEventListener('loadeddata', capture)
-    video.removeEventListener('seeked', capture)
-    video.removeEventListener('error', unavailable)
-    video.pause()
-    video.removeAttribute('src')
-    video.load()
+async function unavailable() {
+  if (recovering) return
+  loaded.value = false
+  if (recovered) { failed.value = true; return }
+  recovered = true
+  recovering = true
+  const current = generation
+  try {
+    await recoverStudioMediaRead(props.src)
+    if (current === generation) attempt.value++
+  } catch {
+    if (current === generation) failed.value = true
+  } finally {
+    if (current === generation) recovering = false
   }
-  const unavailable = () => { failed.value = true; cleanup() }
-  const capture = () => {
-    if (disposed || !positioned || video.seeking || video.readyState < 2) return
-    try {
-      if (!video.videoWidth || !video.videoHeight) return unavailable()
-      const canvas = document.createElement('canvas')
-      const scale = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight))
-      canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
-      canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
-      const context = canvas.getContext('2d')
-      if (!context) return unavailable()
-      context.drawImage(video, 0, 0, canvas.width, canvas.height)
-      poster.value = canvas.toDataURL('image/jpeg', 0.85)
-      cleanup()
-    } catch { unavailable() }
-  }
-  const position = () => {
-    if (disposed) return
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return unavailable()
-    positioned = true
-    // Skip a potentially black opening frame, including very short clips.
-    try { video.currentTime = Math.min(1, video.duration / 2) } catch { unavailable() }
-  }
-  const timeout = setTimeout(unavailable, 15000)
-  dispose = cleanup
-  video.addEventListener('loadedmetadata', position)
-  video.addEventListener('loadeddata', capture)
-  video.addEventListener('seeked', capture)
-  video.addEventListener('error', unavailable)
-  video.src = props.src
 }
 
+watch(() => props.src, () => { generation++; recovered = false; recovering = false; loaded.value = false; failed.value = false; attempt.value++ })
 onMounted(() => {
-  if (typeof window.IntersectionObserver !== 'function') { visible = true; extractFrame(); return }
+  if (typeof window.IntersectionObserver !== 'function') { visible.value = true; return }
   observer = new IntersectionObserver(entries => {
     if (!entries.some(entry => entry.isIntersecting)) return
-    visible = true
+    visible.value = true
     observer?.disconnect()
-    extractFrame()
-  })
+  }, { rootMargin: '150px' })
   if (root.value) observer.observe(root.value)
 })
-watch(() => props.src, extractFrame)
-onBeforeUnmount(() => { observer?.disconnect(); dispose?.() })
+onBeforeUnmount(() => { generation++; observer?.disconnect() })
 </script>
 
 <style scoped>

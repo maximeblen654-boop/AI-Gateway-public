@@ -9,7 +9,7 @@ for(const viewport of [{width:1440,height:900},{width:1366,height:650},{width:39
  await expect(page.getByTestId('studio-output-format')).toContainText('JPEG')
  const button=page.getByTestId('studio-quote')
  await expect(page.locator('#studio-output-format-menu')).toHaveCount(0)
- if(viewport.width<700)await button.scrollIntoViewIfNeeded()
+ await button.scrollIntoViewIfNeeded()
  const box=await button.boundingBox();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(viewport.height+1)
  await page.screenshot({path:info.outputPath(`native-format-${viewport.width}.png`)})
  await page.getByTestId('studio-prompt').fill('Non-paid isolated format quote')

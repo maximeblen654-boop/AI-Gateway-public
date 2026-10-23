@@ -120,6 +120,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const c=child(session,id),uid=owner(session);
     const ledger={
       async getSettlement(){const s=await current(session,c);return {ownerId:uid,childId:c.childId,status:s.status==='captured'?'captured':s.status==='released'?'released':'held'};},
+      async getSettlementSnapshot(){const s=await current(session,c,true);return {ownerId:uid,childId:c.childId,status:s.status==='captured'?'captured':s.status==='released'?'released':'held'};},
       async capture({evidence}){if(!digest(evidence.resultHash)||evidence.bindingHash!==c.account.binding_hash)fail('Durable result proof required');return settled(session,c,'capture',{result_hash:evidence.resultHash,...(evidence.resultRetention?{result_retention:evidence.resultRetention}:{})});},
       async release(){return settled(session,c,'release',{});},
     };
@@ -152,6 +153,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const value=view(get(session,id));return {...value,status:s.status,...(!value.result_retention&&s.result_retention?{result_retention:s.result_retention}:{})};
   }
   async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};if(options?.index)fail('Invalid child index');return delivery(session,id).openOriginal(owner(session),id,0,options);}
+  async function cover(session,id,options){const op=get(session,id);if(op.version!==2||options?.index)fail('video_cover_unavailable');return delivery(session,id).openCover(owner(session),id,0,options);}
   async function history(session){
     const operations=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];
     if(old.some(op=>operations.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');
@@ -173,5 +175,5 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     }));
     return [...items,...old.map(view)];
   }
-  return {catalog,readiness,prepare,prepareReferences,getPreparation,dispatch,recover,original,history};
+  return {catalog,readiness,prepare,prepareReferences,getPreparation,dispatch,recover,original,cover,history};
 }

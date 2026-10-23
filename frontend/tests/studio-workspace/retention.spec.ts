@@ -13,6 +13,7 @@ async function open(page: Page, scenario = 'retention') {
   await page.getByTestId('studio-mode-history').click()
 }
 async function select(page: Page, kind: 'image' | 'video', n: number) {
+  if(await page.locator('.studio-back').isVisible())await page.locator('.studio-back').click()
   await page.locator(`[data-task-id="${id(kind, n)}"]`).click()
   await expect(page.getByTestId('studio-task-id')).toContainText(id(kind, n))
   await page.getByTestId('studio-result-retention').scrollIntoViewIfNeeded()

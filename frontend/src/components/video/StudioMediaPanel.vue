@@ -1,7 +1,7 @@
 <template>
-  <section ref="panelRoot" class="studio-workspace" :class="{ 'is-history': historyMode }" data-testid="studio-media-panel">
+  <section ref="panelRoot" class="studio-workspace" :class="{ 'is-history': historyMode, 'has-active': !!active }" data-testid="studio-media-panel">
     <aside class="studio-rail" aria-label="创作工作台导航">
-      <a href="/dashboard" @click.prevent="dashboardConfirm = true" class="studio-brand-mark" aria-label="AI Gateway，返回控制台"><StudioMark /></a>
+      <a href="/dashboard" @click.prevent="dashboardConfirm = true" class="studio-brand-mark" aria-label="AI Gateway，返回控制台"><StudioMark /><span>AI Gateway</span></a>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'text' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'text'" :disabled="busy" data-testid="studio-mode-text" @click="changeMode('text')"><Icon name="grid" /><span>文生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'edit' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'edit'" :disabled="busy" data-testid="studio-mode-edit" @click="changeMode('edit')"><Icon name="edit" /><span>图生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'video' }" :aria-pressed="!historyMode && kind === 'video'" :disabled="busy" data-testid="studio-mode-video" @click="changeMode('video')"><Icon name="play" /><span>视频</span></button>
@@ -14,17 +14,74 @@
         <div v-if="!active && historyMode" class="studio-new-menu-wrap"><button class="studio-button studio-header-new" :disabled="busy" :aria-expanded="createMenuOpen" data-testid="studio-header-new" @click="createMenuOpen = !createMenuOpen"><Icon name="plus" />新建创作</button><div v-if="createMenuOpen" class="studio-new-menu" role="menu"><button role="menuitem" @click="startNew('text')"><Icon name="grid" />文生图</button><button role="menuitem" @click="startNew('edit')"><Icon name="edit" />图生图</button><button role="menuitem" @click="startNew('video')"><Icon name="play" />视频</button></div></div>
         <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
+      <p v-if="selectionUnavailable || activeQuoteUnavailable" role="status" class="studio-notice" data-testid="studio-model-unavailable">此模型暂不可用，请选择其他模型</p>
+      <p v-if="notice" role="status" class="studio-notice">{{ notice }}</p>
+      <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
+      <p v-if="readinessState === 'disabled'" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
+      <p v-if="assetMessage && !showUploader" class="studio-error" role="alert" data-testid="studio-asset-feedback">{{ assetMessage }}</p>
+      <div v-show="!active" class="studio-body">
+      <section v-if="!historyMode" v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
+        <h2 class="studio-composer-caption">{{ modeLabel }}<span>让想法有画面</span></h2>
+        <div class="studio-composer" ref="composerRoot" @keydown.esc="closeControl" @dragover.prevent @drop.prevent="drop">
+          <fieldset :disabled="!!active">
+            <legend class="studio-sr-only">{{ modeLabel }}创作设置</legend>
+            <div v-if="kind === 'video'" class="studio-floating-model studio-video-model" :class="{ 'model-open': openControl === 'model' }">
+              <p class="studio-field-label">生成模型</p><button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon v-if="openControl === 'model'" :name="modelMenuSide === 'above' ? 'chevronUp' : 'chevronDown'" :data-direction="modelMenuSide" data-testid="studio-model-direction" aria-hidden="true" /><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" data-testid="studio-model-selector-icon"><path d="m8 9 4-4 4 4m-8 6 4 4 4-4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <Transition name="studio-pop"><div v-show="openControl === 'model'" ref="modelMenu" class="studio-popover studio-model-menu" id="studio-model-menu" :style="modelMenuStyle"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">关闭<Icon name="x" /></button></div></Transition>
+            </div>
+            <div v-if="showUploader" class="studio-asset-uploader" data-testid="studio-asset-uploader" @paste.stop="paste">
+              <div class="studio-assets-heading"><p class="studio-field-label">{{ kind === 'image' ? '参考图片' : '参考素材' }}</p><button v-if="uploads.length" type="button" class="studio-text-button" :aria-expanded="!assetsCollapsed" aria-controls="studio-asset-list" data-testid="studio-assets-toggle" @click="toggleAssets">{{ assetsCollapsed ? '展开素材' : '收起素材' }}<Icon :name="assetsCollapsed ? 'chevronDown' : 'chevronUp'" /></button></div>
+              <p class="studio-asset-limits" data-testid="studio-asset-limits">{{ referenceHint }}</p>
+              <button type="button" class="studio-upload-trigger" :class="{ 'has-assets': uploads.length }" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" aria-describedby="studio-asset-feedback" @click="fileInput?.click()"><Icon name="plus" /><span>{{ uploads.length ? '继续添加素材' : kind === 'image' ? '添加参考图片' : '添加参考素材' }}</span><small>{{ accept ? '点击选择或拖入文件' : '当前模型不支持参考素材' }}</small></button>
+              <input ref="fileInput" type="file" :accept="accept" :disabled="!offer || !accept || busy || !!active" multiple class="studio-sr-only" aria-describedby="studio-asset-feedback" data-testid="studio-asset-input" @change="upload" />
+              <p v-if="assetMessage" id="studio-asset-feedback" class="studio-asset-feedback" role="alert" data-testid="studio-asset-feedback">{{ assetMessage }}</p>
+              <p v-if="uploads.length" class="studio-asset-summary" role="status" data-testid="studio-asset-summary">{{ assetSummary }}<span v-if="failedAssets"> · {{ failedAssets }} 项上传失败，请{{ assetsCollapsed ? '展开后' : '' }}移除并重新添加</span><span v-if="pendingAssets"> · {{ pendingAssets }} 项上传中</span></p>
+              <div v-if="uploads.length" v-show="!assetsCollapsed" ref="assetList" id="studio-asset-list" class="studio-assets" data-testid="studio-assets">
+                <div v-for="(item,i) in uploads" :key="item.id" class="studio-asset" :class="{ 'is-media': item.kind !== 'image' }" :data-testid="`studio-asset-${item.status}`">
+                  <img v-if="item.previewUrl && item.kind === 'image'" :src="item.previewUrl" :alt="item.file.name || `参考图片 ${i+1}`" data-testid="studio-asset-thumbnail" />
+                  <div class="studio-asset-info"><span class="studio-asset-kind">{{ assetTypeNames[item.kind] }}</span><strong>{{ item.file.name || `参考素材 ${i+1}` }}</strong><small v-if="item.status === 'pending'">上传中…</small><small v-else-if="item.status === 'success'">上传成功</small><small v-else>上传失败{{ item.error ? `：${item.error}` : '' }}</small></div>
+                  <button type="button" :disabled="!!active" :data-testid="`studio-asset-remove-${item.id}`" :aria-label="`移除素材 ${item.file.name}`" @click="removeAsset(item)"><Icon name="x" /></button>
+                  <video v-if="item.previewUrl && item.kind === 'video'" :src="item.previewUrl" controls preload="metadata" :aria-label="`预览 ${item.file.name}`" data-testid="studio-asset-video" />
+                  <audio v-if="item.previewUrl && item.kind === 'audio'" :src="item.previewUrl" controls preload="metadata" :aria-label="`试听 ${item.file.name}`" data-testid="studio-asset-audio" />
+                </div>
+                <button type="button" class="studio-text-button" :disabled="!!active" data-testid="studio-assets-clear" @click="clearAssets">清空全部</button>
+              </div>
+            </div>
+            <div class="studio-writing"><label for="studio-prompt" class="studio-field-label">{{ kind === 'video' ? '视频描述' : '画面描述' }}</label><textarea :disabled="busy" id="studio-prompt" ref="promptInput" v-model="prompt" :placeholder="kind === 'video' ? '描述画面、动作与镜头，以及参考素材的使用方式…' : '描述你想生成的画面、风格与细节…'" rows="5" data-testid="studio-prompt" /></div>
+            <div v-if="kind === 'image'" class="studio-floating-model" :class="{ 'model-open': openControl === 'model' }">
+              <p class="studio-field-label">生成模型</p><button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon v-if="openControl === 'model'" :name="modelMenuSide === 'above' ? 'chevronUp' : 'chevronDown'" :data-direction="modelMenuSide" data-testid="studio-model-direction" aria-hidden="true" /><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" data-testid="studio-model-selector-icon"><path d="m8 9 4-4 4 4m-8 6 4 4 4-4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <Transition name="studio-pop"><div v-show="openControl === 'model'" ref="modelMenu" class="studio-popover studio-model-menu" id="studio-model-menu" :style="modelMenuStyle"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">关闭<Icon name="x" /></button></div></Transition>
+            </div>
+            <div class="studio-composer-bottom"><div class="studio-specs">
+
+              <div v-if="ratioOptions.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in ratioOptions" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="choosePublishedRatio(r); closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
+              <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="resolutionOptions" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="choosePublishedSpec('resolution', String($event))" @update:open="openControl = $event ? 'resolution' : null" />
+              <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="qualityOptions" :disabled="busy" :open="openControl === 'quality'" @update:model-value="choosePublishedSpec('quality', String($event))" @update:open="openControl = $event ? 'quality' : null" />
+              <StudioSpecPicker v-if="kind === 'image' && outputFormats.length" id="studio-output-format" label="输出格式" :model-value="outputFormat" :options="['auto', ...outputFormats]" :option-labels="outputFormatLabels" :disabled="busy" :open="openControl === 'format'" @update:model-value="outputFormat = $event as StudioOutputFormat|'auto'" @update:open="openControl = $event ? 'format' : null" />
+              <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="choosePublishedSpec('count', Number($event))" @update:open="openControl = $event ? 'count' : null" />
+              <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="durationOptions" :disabled="busy" :open="openControl === 'duration'" @update:model-value="choosePublishedSpec('duration_seconds', Number($event))" @update:open="openControl = $event ? 'duration' : null" />
+              <span class="studio-range">{{ kind === 'video' ? '每次 1 条视频' : countOptions.length ? `可选 ${countOptions[0]}–${countOptions[countOptions.length-1]} 张` : '' }}</span>
+            </div><button v-if="!active" class="studio-button studio-primary studio-quote" :disabled="busy || catalogLoading || selectionUnavailable || !offer || incompatible || hasUnreadyAssets || invalidCount || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '获取报价' }}<Icon name="arrowUp" /></button></div>
+          </fieldset>
+        </div>
+        <div class="studio-input-feedback"><p v-if="!visibleOffers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限{{ kind === 'image' && imageMode === 'edit' ? '，或不支持参考图' : '' }}。</p><p v-if="kind === 'image' && offer && invalidCount && !active" id="studio-count-error" role="alert" data-testid="studio-count-error">{{ countOptions.length ? `请选择商品允许的生成数量（${countOptions[0]}～${countOptions[countOptions.length-1]} 张）。` : '当前商品没有有效的数量范围，请选择其他商品或刷新目录。' }}</p><p v-if="offer && incompatible && !active" :role="kind === 'image' && imageMode === 'edit' && !assets.length ? undefined : 'alert'">{{ kind === 'image' && imageMode === 'edit' && !assets.length ? '请先添加参考图片，再描述想生成的画面。' : unmatchedSpec ? '当前规格组合不可售，请调整参数或参考素材。' : '当前模型不支持这些素材类型或数量，请调整素材。' }}</p><p v-if="(offer?.input_mode === 'references' || offer?.input_mode === 'image2pro' && assets.some(a => a.kind !== 'image')) && assets.length && !active">获取报价时会将引用素材上传到所选供应商，确认生成前不会创建生成任务。</p></div>
+        <p class="studio-composer-hint">确认本次价格后生成 · {{ kind === 'video' ? '视频每次生成一条' : '结果自动保存到任务历史' }}</p>
+      </section>
+      <section class="studio-browse" aria-label="作品与任务">
       <div class="studio-section-heading">
         <h2>{{ historyMode ? '我的任务' : '最近的创作' }}<span v-if="displayHistory.length">{{ displayHistory.length }}</span></h2>
         <div class="studio-history-tools"><button class="studio-text-button" data-testid="studio-refresh-models" :disabled="busy || catalogLoading" @click="refreshCatalog"><Icon name="refresh" :class="{ spinning: catalogLoading }" />刷新模型</button><button v-if="failedHistoryCount" class="studio-failed-toggle" :aria-pressed="showFailed" data-testid="studio-failed-toggle" @click="showFailed = !showFailed">{{ showFailed ? '隐藏失败任务' : '显示失败任务' }}（{{ failedHistoryCount }}）</button><button v-if="!historyMode && history.length > 2" class="studio-text-button" @click="openHistory">全部任务<Icon name="arrowRight" /></button><label v-if="historyMode" class="studio-kind-filter"><span>历史类型</span><select :disabled="busy || historyLoading" v-model="historyFilter" data-testid="studio-kind" @change="loadHistory"><option value="all">全部（图片 + 视频）</option><option value="image">仅图片</option><option value="video">仅视频</option></select></label><button class="studio-text-button" :disabled="busy || querying || historyLoading" @click="reloadHistory"><Icon name="refresh" :class="{ spinning: historyLoading }" />刷新记录</button></div>
+      </div>
+      <div v-if="historyMode" class="studio-history-filters">
+        <label class="studio-history-search"><span class="studio-sr-only">搜索模型或规格</span><input v-model="historySearch" placeholder="搜索模型或规格" data-testid="studio-history-search" type="search" /></label>
+        <label class="studio-kind-filter"><span>状态</span><select v-model="historyStatus" data-testid="studio-history-status"><option value="all">全部状态</option><option value="completed">已完成</option><option value="pending">进行中 / 待确认</option><option value="prepared">待生成</option><option value="failed">生成失败</option></select></label>
       </div>
       <p class="studio-retention-note">新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
           <span class="studio-work-preview" :class="{ 'is-state-cover': task.status === 'processing' || taskFailed(task) || task.status === 'prepared' }">
-            <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-backdrop" :src="resultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-image" :src="resultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
-            <StudioVideoCover v-else-if="task.kind === 'video' && readableResults(task)" :src="resultUrl(task)" :alt="taskModel(task) + ' 的视频封面'" />
+            <StudioVideoCover v-else-if="task.kind === 'video' && readableResults(task)" :src="studioCoverUrl(task, clock)" :alt="taskModel(task) + ' 的视频封面'" />
             <img v-else-if="task.status === 'processing'" class="studio-state-cover studio-generating-cover" :src="generatingCover" alt="在努力啦..." loading="lazy" decoding="async" data-testid="studio-generating-cover" />
             <img v-else-if="taskFailed(task)" class="studio-state-cover" :src="failureCover" alt="生成失败" loading="lazy" decoding="async" :data-testid="task.kind === 'image' ? 'studio-image-failed-cover' : 'studio-failed-cover'" />
             <img v-else-if="quotePending(task)" class="studio-state-cover" :src="quoteReadyCover" alt="报价已锁定，等待确认生成" loading="lazy" decoding="async" data-testid="studio-quote-ready-cover" />
@@ -36,70 +93,49 @@
           <span class="studio-work-state" :class="{ 'is-failed': taskFailed(task) }">{{ taskFailed(task) ? failureSummary(task) : taskStatusText(task) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
         </button>
       </div>
-      <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
-      <p v-if="selectionUnavailable || activeQuoteUnavailable" role="status" class="studio-notice" data-testid="studio-model-unavailable">此模型暂不可用，请选择其他模型</p>
-      <p v-if="notice" role="status" class="studio-notice">{{ notice }}</p>
-      <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
-      <p v-if="readinessState === 'disabled'" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
+      <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (historySearch || historyStatus !== 'all' ? '试试调整搜索内容或筛选条件。' : failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '试试调整筛选条件。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
+      </section>
+      </div>
       <section v-if="active" ref="taskDetail" class="studio-task-detail" data-testid="studio-task" aria-label="当前任务">
+        <button class="studio-text-button studio-back" :disabled="busy" @click="backToList"><Icon name="arrowLeft" />{{ historyMode ? '返回任务历史' : '返回创作' }}</button>
         <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>{{ active.status === 'prepared' ? '报价规格' : '生成规格' }}：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : taskStatusText(active) }}</span></div>
-        <div class="studio-price-line"><p data-testid="studio-price">{{ active.status === 'prepared' ? '本次报价' : '冻结报价' }} <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.status === 'prepared'">尚未生成</span><span v-else-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
+        <div class="studio-price-line"><p data-testid="studio-price">{{ active.status === 'prepared' ? '本次报价' : '冻结报价' }} <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.status === 'prepared'">尚未生成</span><span v-else-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}</span><span v-else-if="active.billingState === 'billed'">已结算，金额待确认</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
         <p v-if="active.status === 'prepared'" class="studio-quote-expiry">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
         <p v-else-if="!taskFailed(active)" class="studio-retention-note" data-testid="studio-result-retention" role="status">{{ retentionText(active) }}<template v-if="resultExpired(active)">任务与结算记录保留。</template></p>
         <p v-if="active.status === 'partial'" class="studio-partial" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
+        <img v-if="!hasResults(active) && (active.status === 'processing' || taskFailed(active) || active.status === 'prepared')" class="studio-detail-state-cover" :src="taskFailed(active) ? failureCover : active.status === 'processing' ? generatingCover : quoteExpired(active) ? quoteExpiredCover : quoteReadyCover" :alt="taskStatusText(active)" />
         <div v-if="waiting" class="studio-waiting" data-testid="studio-waiting" :class="{ 'is-uncertain': uncertain && !submitting[active.id] }">
           <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
           <div><strong>{{ submitting[active.id] ? '提交处理中' : taskStatusText(active) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
         </div>
         <div v-if="taskFailed(active)" role="alert" class="studio-task-failure" data-testid="studio-task-failure"><Icon name="exclamationCircle" aria-hidden="true" /><div><strong>这次没能生成成功</strong><p>{{ failureSummary(active) }}。原任务已保留，不会自动再次生成。</p></div></div>
-        <p v-if="active.failureCode === 'upstream_http_502_no_delivery'" class="studio-error" data-testid="studio-http-failure">图片服务返回 HTTP 502，未取得图片的执行单元已终结，不会补扣这些单元的费用。已交付作品仍按实际结算回执计费。</p>
+        <p v-if="active.failureCode === 'upstream_http_502_no_delivery'" class="studio-error" data-testid="studio-http-failure">图片服务暂时异常，未完成的图片不会收费，已交付图片按实际结果结算。</p>
         <p v-if="taskFeedback?.message" role="status" class="studio-query-feedback" data-testid="studio-query-feedback"><time :datetime="new Date(taskFeedback.at).toISOString()">{{ new Date(taskFeedback.at).toLocaleTimeString() }}</time> · {{ taskFeedback.message }}</p>
         <p v-if="taskFeedback?.error" role="alert" class="studio-error" data-testid="studio-query-error">{{ taskFeedback.error }}</p>
         <div v-if="hasResults(active)" class="studio-results" data-testid="studio-results">
           <figure v-for="i in active.resultCount" :key="`${active.id}-${i}`">
             <div class="studio-result-stage" :class="{ 'is-image': active.kind === 'image' }">
-              <span v-if="resultExpired(active)" class="studio-result-unavailable" role="status">原片已到期</span>
+              <span v-if="resultExpired(active) || expiredResults[`${active.id}-${i}`]" class="studio-result-unavailable" role="status">原片已到期</span>
               <template v-else>
                 <span v-if="loadingResults[`${active.id}-${i}`]" class="studio-result-loading" role="status">正在加载已保存原片…</span>
                 <img :key="`image-${resultRead}-${i}`" v-if="active.kind === 'image'" :src="resultUrl(active,i-1)" :alt="`生成图片 ${i}`" data-testid="studio-result-image" @load="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
                 <video :key="`video-${resultRead}-${i}`" v-else :src="resultUrl(active,i-1)" controls preload="metadata" data-testid="studio-result-video" @loadedmetadata="resultLoaded(active,i)" @error="resultUnavailable(active,i)" />
               </template>
             </div>
-            <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="resultExpired(active)" role="status" class="studio-result-unavailable">原片已到期</span><span v-else-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="resultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download" @click="guardDownload($event,active)"><Icon name="download" /><span>下载原片</span></a></figcaption><StudioImageExport v-if="active.kind === 'image' && readableResults(active) && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="resultUrl(active,i-1)" :filename="`${active.id}-${i}`" @click.capture="guardDownload($event,active)" />
+            <figcaption>
+              <span class="studio-result-label">原始结果 {{ i }}</span>
+              <span v-if="resultExpired(active) || expiredResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片已到期</span>
+              <template v-else>
+                <span v-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">{{ resultMessages[`${active.id}-${i}`] || '原片加载失败，请重试' }} <button type="button" class="studio-text-button" :data-testid="`studio-result-retry-${i}`" @click="retryResultRead(active,i)">重新加载</button></span>
+                <a class="studio-download" :href="resultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download" @click="guardDownload($event,active)"><Icon name="download" /><span>下载原片</span></a>
+              </template>
+            </figcaption><StudioImageExport v-if="active.kind === 'image' && readableResults(active) && !expiredResults[`${active.id}-${i}`] && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="resultUrl(active,i-1)" :filename="`${active.id}-${i}`" @click.capture="guardDownload($event,active)" />
           </figure>
         </div>
         <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">{{ expired ? '报价已失效' : '确认报价并生成' }}<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" :class="{ 'studio-primary': active.status === 'prepared' && expired }" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? (expired ? '重新报价' : '调整输入并重新报价') : '继续创作' }}</button></div>
-        <details class="studio-task-id"><summary>任务详情</summary><p data-testid="studio-task-id">任务：{{ active.id }}</p></details>
+        <span hidden data-testid="studio-task-id">{{ active.id }}</span>
       </section>
-      <section v-if="!historyMode" v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
-        <p v-if="history.length || active" class="studio-composer-caption"><StudioMark /><span>{{ active ? '本次输入已冻结，调整输入请新建任务。' : '让想法有画面。' }}</span></p>
-        <div class="studio-composer" ref="composerRoot" @keydown.esc="closeControl" @dragover.prevent @drop.prevent="drop">
-          <fieldset :disabled="!!active">
-            <legend class="studio-sr-only">{{ modeLabel }}创作设置</legend>
-            <div class="studio-floating-model" :class="{ 'model-open': openControl === 'model' }">
-              <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon v-if="openControl === 'model'" :name="modelMenuSide === 'above' ? 'chevronUp' : 'chevronDown'" :data-direction="modelMenuSide" data-testid="studio-model-direction" aria-hidden="true" /><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" data-testid="studio-model-selector-icon"><path d="m8 9 4-4 4 4m-8 6 4 4 4-4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-              <Transition name="studio-pop"><div v-show="openControl === 'model'" ref="modelMenu" class="studio-popover studio-model-menu" id="studio-model-menu" :style="modelMenuStyle"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">关闭<Icon name="x" /></button></div></Transition>
-            </div>
-            <div class="studio-writing"><label for="studio-prompt" class="studio-sr-only">提示词</label><textarea :disabled="busy" id="studio-prompt" ref="promptInput" v-model="prompt" :placeholder="imageMode === 'edit' && kind === 'image' ? '想怎样改变这张图？描述你的想法…' : '写下你想看到的画面…'" rows="2" data-testid="studio-prompt" /></div>
-            <div v-if="showUploader" class="studio-asset-uploader" data-testid="studio-asset-uploader" @paste.stop="paste">
-              <input ref="fileInput" type="file" :accept="accept" :disabled="!offer || !accept || busy || !!active" multiple class="studio-sr-only" data-testid="studio-asset-input" @change="upload" />
-              <div v-if="uploads.length" class="studio-assets" data-testid="studio-assets"><div v-for="(item,i) in uploads" :key="item.id" class="studio-asset" :data-testid="`studio-asset-${item.status}`"><img v-if="item.previewUrl" :src="item.previewUrl" :alt="item.file.name || `参考素材 ${i+1}`" data-testid="studio-asset-thumbnail" /><span v-else class="studio-asset-kind">{{ item.kind }}</span><span><strong>{{ item.file.name || `参考素材 ${i+1}` }}</strong><small v-if="item.status === 'pending'">上传中…</small><small v-else-if="item.status === 'success'">上传成功</small><small v-else>上传失败{{ item.error ? `：${item.error}` : '' }}</small></span><button type="button" :disabled="!!active" :data-testid="`studio-asset-remove-${item.id}`" aria-label="移除素材" @click="removeAsset(item)"><Icon name="x" /></button></div><button type="button" class="studio-text-button" :disabled="!!active" data-testid="studio-assets-clear" @click="clearAssets">清空全部</button></div>
-            </div>
-            <div class="studio-composer-bottom"><div class="studio-specs">
-              <button v-if="showUploader" type="button" class="studio-attachment" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" :title="accept ? '添加素材，也可拖入或粘贴图片' : '当前模型不支持参考素材'" @click="fileInput?.click()"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 13 6.5-6.5a2.8 2.8 0 0 1 4 4L10 19a4.3 4.3 0 0 1-6-6l9-9a1.4 1.4 0 0 1 2 2L6 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-              <div v-if="ratioOptions.length" class="studio-ratio-control"><button ref="ratioTrigger" class="studio-chip" :disabled="busy" data-testid="studio-ratio-toggle" :aria-expanded="openControl === 'ratio'" aria-controls="studio-ratio-menu" @click="toggleControl('ratio')"><span class="studio-ratio-icon" :style="ratioShape(ratio)"></span>{{ ratio }}<Icon name="chevronDown" /></button><Transition name="studio-pop"><div v-if="openControl === 'ratio'" id="studio-ratio-menu" class="studio-popover studio-ratio-menu" role="group" aria-label="选择画面比例"><button v-for="r in ratioOptions" :key="r" :aria-pressed="ratio === r" :class="{ chosen: ratio === r }" :data-ratio="r" @click="choosePublishedRatio(r); closeControl()"><span class="studio-ratio-icon" :style="ratioShape(r)"></span>{{ r }}</button></div></Transition></div>
-              <StudioSpecPicker v-if="offer?.spec.resolution?.length" id="studio-resolution" label="分辨率" :model-value="resolution" :options="resolutionOptions" :disabled="busy" :open="openControl === 'resolution'" @update:model-value="choosePublishedSpec('resolution', String($event))" @update:open="openControl = $event ? 'resolution' : null" />
-              <StudioSpecPicker v-if="kind === 'image' && offer?.spec.quality?.length" id="studio-quality" label="画质" :model-value="quality" :options="qualityOptions" :disabled="busy" :open="openControl === 'quality'" @update:model-value="choosePublishedSpec('quality', String($event))" @update:open="openControl = $event ? 'quality' : null" />
-              <StudioSpecPicker v-if="kind === 'image' && outputFormats.length" id="studio-output-format" label="输出格式" :model-value="outputFormat" :options="['auto', ...outputFormats]" :option-labels="outputFormatLabels" :disabled="busy" :open="openControl === 'format'" @update:model-value="outputFormat = $event as StudioOutputFormat|'auto'" @update:open="openControl = $event ? 'format' : null" />
-              <StudioSpecPicker v-if="kind === 'image'" id="studio-count" label="数量" unit="张" :columns="5" :model-value="count" :options="countOptions" :disabled="busy" :invalid="invalidCount" :describedby="invalidCount ? 'studio-count-error' : undefined" :open="openControl === 'count'" @update:model-value="choosePublishedSpec('count', Number($event))" @update:open="openControl = $event ? 'count' : null" />
-              <StudioSpecPicker v-else id="studio-duration" label="时长" unit="秒" :model-value="duration" :options="durationOptions" :disabled="busy" :open="openControl === 'duration'" @update:model-value="choosePublishedSpec('duration_seconds', Number($event))" @update:open="openControl = $event ? 'duration' : null" />
-              <span class="studio-range">{{ kind === 'video' ? '每次 1 条视频' : countOptions.length ? `可选 ${countOptions[0]}–${countOptions[countOptions.length-1]} 张` : '' }}</span>
-            </div><button v-if="!active" class="studio-button studio-primary studio-quote" :disabled="busy || catalogLoading || selectionUnavailable || !offer || incompatible || invalidCount || !prompt.trim()" data-testid="studio-quote" @click="quote">{{ busy ? '处理中…' : '开始生成' }}<Icon name="arrowUp" /></button></div>
-          </fieldset>
-        </div>
-        <div class="studio-input-feedback"><p v-if="!visibleOffers.length">暂无可用模型：模型可能尚未配置、已暂停或没有访问权限{{ kind === 'image' && imageMode === 'edit' ? '，或不支持参考图' : '' }}。</p><p v-if="kind === 'image' && offer && invalidCount && !active" id="studio-count-error" role="alert" data-testid="studio-count-error">{{ countOptions.length ? `请选择商品允许的生成数量（${countOptions[0]}～${countOptions[countOptions.length-1]} 张）。` : '当前商品没有有效的数量范围，请选择其他商品或刷新目录。' }}</p><p v-if="offer && incompatible && !active" :role="kind === 'image' && imageMode === 'edit' && !assets.length ? undefined : 'alert'">{{ kind === 'image' && imageMode === 'edit' && !assets.length ? '点击回形针添加参考图，也可直接拖入或粘贴。' : unmatchedSpec ? '当前规格组合不可售，请调整参数或参考素材。' : '当前模型不支持这些素材类型或数量，请调整素材。' }}</p><p v-if="(offer?.input_mode === 'references' || offer?.input_mode === 'image2pro' && assets.some(a => a.kind !== 'image')) && assets.length && !active">获取报价时会将引用素材上传到所选供应商，确认生成前不会创建生成任务。</p></div>
-        <p class="studio-composer-hint">确认本次价格后生成 · {{ kind === 'video' ? '视频每次生成一条' : '结果自动保存到任务历史' }}</p>
-      </section>
+
     </div>
   </section>
 
@@ -120,7 +156,7 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
+import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
@@ -143,9 +179,21 @@ onBeforeUnmount(releaseLeavingPreviews)
 type UploadState = 'pending' | 'success' | 'failure'
 type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
 const uploads=ref<StudioAssetUpload[]>([])
+const assetsCollapsed=ref(false), assetMessage=ref(''), assetList=ref<HTMLElement|null>(null)
+const assetTypeNames={image:'图片',video:'视频',audio:'音频'}
+const failedAssets=computed(()=>uploads.value.filter(item=>item.status==='failure').length)
+const pendingAssets=computed(()=>uploads.value.filter(item=>item.status==='pending').length)
+const hasUnreadyAssets=computed(()=>uploads.value.some(item=>item.status!=='success'))
+const assetSummary=computed(()=>(['image','video','audio'] as const).map(type=>{const n=uploads.value.filter(item=>item.kind===type).length;return n?`${assetTypeNames[type]} ${n} ${type==='image'?'张':'段'}`:''}).filter(Boolean).join(' · '))
+function toggleAssets(){
+ assetsCollapsed.value=!assetsCollapsed.value
+ if(assetsCollapsed.value)assetList.value?.querySelectorAll<HTMLMediaElement>('video,audio').forEach(media=>media.pause())
+}
+
 const resolution=ref(''), ratio=ref(''), quality=ref(''), outputFormat=ref<StudioOutputFormat|'auto'>('auto'), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(true), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 type HistoryFilter = 'all'|'image'|'video'
+const historySearch=ref(''), historyStatus=ref<'all'|'completed'|'pending'|'prepared'|'failed'>('all')
 const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|'format'|null>(null)
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
@@ -153,6 +201,8 @@ const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.valu
 const activeQuoteUnavailable=computed(()=>!!active.value && active.value.status==='prepared' && (invalidatedQuotes.value.has(active.value.id)||unavailableOffers.value.has(`${active.value.kind}:${active.value.offerId}`)))
 const unavailableResults=ref<Record<string,boolean>>({})
 const loadingResults=ref<Record<string,boolean>>({})
+const expiredResults=ref<Record<string,boolean>>({}), resultMessages=ref<Record<string,string>>({})
+const retriedResults=new Set<string>(), retryingResults=new Map<string,number>()
 const dashboardConfirm=ref(false)
 const quoteConfirm=ref(false), fileInput=ref<HTMLInputElement|null>(null)
 const taskDetail=ref<HTMLElement|null>(null)
@@ -188,7 +238,16 @@ const placeholderText=(task:StudioTask)=>task.status==='prepared' && quoteExpire
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
 const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
 const failedHistoryCount=computed(()=>historyScope.value.filter(isFailedTask).length)
-const filteredHistory=computed(()=>showFailed.value ? historyScope.value : historyScope.value.filter(task=>!isFailedTask(task)))
+const filteredHistory=computed(()=>historyScope.value.filter(task=>{
+ const status=historyMode.value?historyStatus.value:'all'
+ if(status==='all'&&!showFailed.value&&isFailedTask(task))return false
+ if(status==='completed'&&!['completed','partial'].includes(task.status))return false
+ if(status==='pending'&&!needsRecovery(task))return false
+ if(status==='prepared'&&task.status!=='prepared')return false
+ if(status==='failed'&&!taskFailed(task))return false
+ const query=historyMode.value?historySearch.value.trim().toLocaleLowerCase():''
+ return !query||`${taskModel(task)} ${specText(task)} ${taskDate(task)}`.toLocaleLowerCase().includes(query)
+}))
 const displayHistory=computed(()=>historyMode.value?filteredHistory.value:filteredHistory.value.slice(0,3))
 const canStartNew=computed(()=>!!active.value)
 const hasResults=(task:StudioTask)=>['completed','partial'].includes(task.status) && task.resultCount>0
@@ -203,15 +262,15 @@ function retentionText(task:StudioTask){
 }
 function guardDownload(event:MouseEvent,task:StudioTask){if(studioResultExpired(task)){event.preventDefault();event.stopImmediatePropagation();clock.value=Date.now()}}
 const needsRecovery=(task:StudioTask)=>['unknown','queued','processing','billing_pending','reserve_pending','recovery_blocked'].includes(task.status)
-const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleDateString('zh-CN',{month:'short',day:'numeric'}) : '时间待确认'
+const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? new Date(task.createdAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}) : '时间待确认'
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
-function hidePreviewBackdrop(event:Event){(event.target as HTMLImageElement).style.display='none'}
 async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value==='model')positionModelMenu();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus({preventScroll:true})}
 function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:previous==='ratio'?ratioTrigger:null)?.value?.focus()})}
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}
 function focusPrompt(){historyMode.value=false;createMenuOpen.value=false;void nextTick(()=>promptInput.value?.focus())}
-async function openHistory(){if(busy.value)return;historyMode.value=true;historyFilter.value='all';createMenuOpen.value=false;openControl.value=null;await loadHistory()}
+function backToList(){if(busy.value)return;active.value=null;quoteConfirm.value=false;resultRead.value++;remember()}
+async function openHistory(){if(busy.value)return;backToList();historyMode.value=true;createMenuOpen.value=false;openControl.value=null;await loadHistory()}
 async function startNew(mode:'text'|'edit'|'video'){createMenuOpen.value=false;await changeMode(mode)}
 async function changeMode(mode:'text'|'edit'|'video'){
  if(busy.value)return
@@ -226,6 +285,18 @@ async function changeMode(mode:'text'|'edit'|'video'){
 }
 const countOptions=computed(()=>specOptions('count').map(Number))
 const invalidCount=computed(()=>kind.value==='image' && !countOptions.value.includes(count.value))
+const referenceHint=computed(()=>{
+ if(!offer.value)return '请先选择生成模型。'
+ const compatible=productReferenceOffers(offer.value,referenceOffers.value,selectedSpec.value)
+ const allowed=(['image','video','audio'] as const).flatMap(type=>{
+  const max=Math.max(0,...compatible.map(o=>o.spec.references[type].max))
+  return max?[`${assetTypeNames[type]}最多 ${max} ${type==='image'?'张':'段'}`]:[]
+ })
+ if(!allowed.length)return '此模型当前规格仅支持文字描述。'
+ const total=Math.max(0,...compatible.map(o=>o.spec.references.total_max))
+ const required=kind.value==='image'&&imageMode.value==='edit'||compatible.length>0&&compatible.every(o=>Object.values({image:o.spec.references.image,video:o.spec.references.video,audio:o.spec.references.audio}).some(r=>r.min>0))
+ return `${allowed.join(' · ')}${allowed.length>1?` · 合计最多 ${total} 项`:''}。${required?'需添加符合模型要求的素材。':'不添加素材也可以创作。'}`
+})
 const accept=computed(()=>{const compatible=offer.value?productReferenceOffers(offer.value,referenceOffers.value,selectedSpec.value):[];return (['image','video','audio'] as const).filter(type=>compatible.some(o=>o.spec.references[type].max>0)).map(type=>`${type}/*`).join(',')})
 const assets=computed(()=>uploads.value.flatMap(item=>item.receipt ? [item.receipt] : []))
 const publishedRatioOffers=computed(()=>ratioOfferOptions(offer.value,visibleOffers.value,{resolution:resolution.value,quality:quality.value,count:count.value,images:assets.value.filter(item=>item.kind==='image').length,videos:assets.value.filter(item=>item.kind==='video').length,audio:assets.value.filter(item=>item.kind==='audio').length,...(outputFormat.value!=='auto'?{output_format:outputFormat.value}:{})}))
@@ -279,7 +350,32 @@ const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerI
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.kind==='image'&&typeof task.spec.output_format==='string'?outputFormatLabels[task.spec.output_format]||task.spec.output_format:'',task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
 function remember(){try{if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,view:active.value?'task':'compose',attempted:[...attempted]}))}catch{/* Durable server history remains available when browser storage is unavailable. */}}
 function resultLoaded(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=false}
-function resultUnavailable(task:StudioTask,index:number){const key=`${task.id}-${index}`;loadingResults.value[key]=false;unavailableResults.value[key]=true}
+function resultUnavailable(task:StudioTask,index:number){
+ const key=`${task.id}-${index}`
+ if(retryingResults.get(key)===resultRead.value)return
+ if(task.kind==='video'&&!retriedResults.has(key)&&!resultExpired(task)){void retryResultRead(task,index);return}
+ loadingResults.value[key]=false;unavailableResults.value[key]=true
+}
+async function retryResultRead(task:StudioTask,index:number){
+ const key=`${task.id}-${index}`
+ if(retryingResults.get(key)===resultRead.value||resultExpired(task)||expiredResults.value[key])return
+ const selection=resultRead.value
+ retriedResults.add(key);retryingResults.set(key,selection)
+ loadingResults.value[key]=true;unavailableResults.value[key]=false;delete resultMessages.value[key]
+ const current=()=>mounted&&active.value?.id===task.id&&active.value.kind===task.kind&&selection===resultRead.value
+ try{
+  if(task.kind==='video')await recoverStudioMediaRead(resultUrl(task,index-1))
+  else await ensureStudioSession()
+  if(!current())return
+  if(resultExpired(task)){loadingResults.value[key]=false;return}
+  resultRead.value++
+ }catch(e){
+  if(!current())return
+  loadingResults.value[key]=false
+  if(e instanceof StudioError&&e.code==='result_expired')expiredResults.value[key]=true
+  else {unavailableResults.value[key]=true;resultMessages.value[key]=e instanceof StudioError&&e.code==='login_required'?'登录状态已失效，请重新登录后重试':'原片加载失败，请重试'}
+ }finally{if(retryingResults.get(key)===selection)retryingResults.delete(key)}
+}
 function accepted(task:StudioTask,select=true){
  if(!mounted)return
  if(task.status==='prepared'&&attempted.has(task.id))task={...task,status:'unknown'}
@@ -370,10 +466,10 @@ function assetError(error:unknown){
  }
  return error instanceof StudioError && error.code==='asset_type_mismatch' ? '素材类型不受支持。' : studioErrorMessage(error)
 }
-function assetPreview(file:File){return file.type.startsWith('image/') && typeof URL.createObjectURL==='function' ? URL.createObjectURL(file) : undefined}
+function assetPreview(file:File){return !!assetKind(file) && typeof URL.createObjectURL==='function' ? URL.createObjectURL(file) : undefined}
 function revokePreview(item:StudioAssetUpload){if(item.previewUrl&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(item.previewUrl)}
-function removeAsset(item:StudioAssetUpload){if(active.value)return;item.controller?.abort();revokePreview(item);uploads.value=uploads.value.filter(candidate=>candidate.id!==item.id)}
-function clearAssets(){if(active.value)return;uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)});uploads.value=[];notice.value='';error.value='';intent=undefined}
+function removeAsset(item:StudioAssetUpload){if(active.value)return;item.controller?.abort();revokePreview(item);uploads.value=uploads.value.filter(candidate=>candidate.id!==item.id);assetMessage.value='';intent=undefined;if(!uploads.value.length)assetsCollapsed.value=false}
+function clearAssets(){if(active.value)return;uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)});uploads.value=[];assetsCollapsed.value=false;assetMessage.value='';notice.value='';error.value='';intent=undefined}
 function addUpload(file:File):StudioAssetUpload{
  const kind=assetKind(file), item:StudioAssetUpload={id:crypto.randomUUID(),file,kind:kind||'image',status:'failure',previewUrl:assetPreview(file)}
  if(!offer.value){item.error='请先选择模型。';uploads.value.push(item);return item}
@@ -383,19 +479,20 @@ function addUpload(file:File):StudioAssetUpload{
 function currentUpload(item:StudioAssetUpload){return uploads.value.find(candidate=>candidate.id===item.id)}
 async function uploadOne(item:StudioAssetUpload){const current=currentUpload(item);if(!mounted||!current||current.status!=='pending')return;const controller=new AbortController();current.controller=controller;try{
  await ensureStudioSession();if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;const receipt=await uploadStudioAsset(current.file,current.kind,controller.signal);if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return;current.receipt=receipt;current.status='success';notice.value='素材已私有保存，顺序如上。'
- }catch(e){if(!mounted||currentUpload(item)!==current||controller.signal.aborted||e instanceof DOMException&&e.name==='AbortError')return;current.status='failure';current.error=assetError(e);error.value=current.error;notice.value=''}}
+ }catch(e){if(!mounted||currentUpload(item)!==current||controller.signal.aborted||e instanceof DOMException&&e.name==='AbortError')return;current.status='failure';current.error=assetError(e);assetMessage.value=current.error;notice.value=''}}
 async function enqueueFiles(files:File[]){
  if(!files.length||busy.value||active.value)return
  const current=offer.value
- if(!current){error.value='请先选择模型。';return}
+ if(!current){assetMessage.value='请先选择模型。';return}
+ if(files.some(file=>!assetKind(file))){assetMessage.value='请选择图片、视频或音频文件。';return}
  const existing=uploads.value.filter(item=>item.status!=='failure')
  const projectedCount=(type:StudioAssetReceipt['kind'])=>existing.filter(item=>item.kind===type).length+files.filter(file=>assetKind(file)===type).length
  const selection={...selectedSpec.value,images:projectedCount('image'),videos:projectedCount('video'),audio:projectedCount('audio')}
  const editing=kind.value==='image'&&files.some(file=>assetKind(file)==='image'),pool=editing?referenceOffers.value:visibleOffers.value
  const compatible=productReferenceOffers(current,pool,selection).filter(candidate=>supportsProductReferences(candidate,[candidate],selection))
  const target=resolveProductOffer(current,pool,selection)||compatible.find(candidate=>candidate.offer_id===current.offer_id)||(compatible.length===1?compatible[0]:undefined)
- if(!target){error.value='已达到该模型的素材数量上限或当前规格不支持这些素材，请调整本次选择。';return}
- busy.value=true;error.value='';notice.value='素材上传中…'
+ if(!target){assetMessage.value='已达到该模型的素材数量上限或当前规格不支持这些素材，请调整本次选择。';return}
+ busy.value=true;error.value='';assetMessage.value='';notice.value='素材上传中…'
  if(editing){offerId.value=target.offer_id;imageMode.value='edit';intent=undefined}
  const pending=files.map(addUpload).filter(item=>item.status==='pending')
  let cursor=0
@@ -405,7 +502,7 @@ async function enqueueFiles(files:File[]){
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
-async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value)return;syncSelectedOffer();if(offer.value.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)||incompatible.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
+async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value)return;syncSelectedOffer();if(offer.value.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)||incompatible.value||hasUnreadyAssets.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
  const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={...(kind.value==='image'&&outputFormat.value!=='auto'&&outputFormats.value.includes(outputFormat.value)?{output_format:outputFormat.value}:{}),resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
  if(kind.value==='video'){

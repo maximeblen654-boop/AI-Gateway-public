@@ -24,9 +24,9 @@ for(const viewport of [{width:1440,height:900},{width:1366,height:650},{width:39
  expect(quoted.body.offer_id).toBe('ratio-2');expect(quoted.body.spec.aspect_ratio).toBe('7:5')
 })
 
-test('mobile published ratio picker supports touch selection without quoting',async({browser})=>{
+test('mobile published ratio picker supports touch selection without quoting',async({browser,baseURL})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true})
- const page=await context.newPage();await page.goto('http://127.0.0.1:4295/tests/studio-workspace/index.html?scenario=published-ratios')
+ const page=await context.newPage();await page.goto(`${baseURL}/tests/studio-workspace/index.html?scenario=published-ratios`)
  const toggle=page.getByTestId('studio-ratio-toggle');await toggle.scrollIntoViewIfNeeded();await toggle.tap()
  await page.locator('[data-ratio="16:9"]').tap();await expect(toggle).toContainText('16:9')
  expect(await page.evaluate(()=>(window as any).studioFixture.calls.filter((call:any)=>call.method==='POST'&&(call.path.endsWith('/quotes')||call.path.endsWith('/tasks'))))).toEqual([])

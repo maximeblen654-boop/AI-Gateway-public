@@ -80,6 +80,10 @@ jobs:
         working-directory: frontend
         run: pnpm exec playwright test --config playwright.procurement.config.ts
 
+      - name: Isolated video covers and media session recovery
+        working-directory: frontend
+        run: pnpm exec playwright test --config tests/studio-workspace/media-read.config.ts media-read.spec.ts
+
       - name: Upload isolated wizard screenshots and results
         if: always()
         uses: actions/upload-artifact@v4
@@ -88,6 +92,7 @@ jobs:
           path: |
             frontend/test-results/media-workbench/
             frontend/test-results/workbench-procurement/
+            frontend/test-results/media-read/
           retention-days: 14
 
       - name: Synthetic usage display fixture regression
@@ -103,7 +108,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y ffmpeg
           fi
-          node --test studio/bff/video-assets.test.mjs studio/bff/plan-a-isolation.test.mjs studio/bff/asset-intake.test.mjs studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs
+          node --test studio/bff/video-assets.test.mjs studio/bff/plan-a-isolation.test.mjs studio/bff/asset-intake.test.mjs studio/bff/image-binding.test.mjs studio/bff/legacy-runtime.test.mjs studio/api/video-plan.test.mjs studio/bff/video-account.test.mjs studio/bff/video-handler.test.mjs studio/bff/video-result-spec.test.mjs studio/bff/video-cover.test.mjs studio/bff/video-result-store.test.mjs studio/bff/media-retention.test.mjs
 
   plan-b-viewport-evidence:
     if: github.event_name == 'push' && github.ref == 'refs/heads/codex/media-paid-controls'

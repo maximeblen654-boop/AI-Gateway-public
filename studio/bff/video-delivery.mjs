@@ -155,5 +155,20 @@ export function createVideoDelivery({ coordinator, journal, ledger, supplier, re
     }
     return coordinator.inspectTask(ownerId, operationId, index);
   }
-  return Object.freeze({ operation: Object.freeze({ ...coordinator, reconcileChild, inspectTask }), openOriginal });
+  async function openCover(ownerId, operationId, index, { method = 'GET' } = {}) {
+    if (!['GET', 'HEAD'].includes(method)) fail('invalid_original_request');
+    const { child, identity } = context(ownerId, operationId, index);
+    if (child.status !== 'accepted') fail('task_unavailable');
+    // The original-download ledger adapter can poll upstream. Covers require
+    // a dedicated native snapshot read: no supplier, recovery or settlement.
+    if (typeof ledger.getSettlementSnapshot !== 'function' || typeof resultStore.cover !== 'function') fail('video_cover_unavailable');
+    const settled = await ledger.getSettlementSnapshot({ ownerId, childId: child.childId });
+    if (!settled || settled.ownerId !== ownerId || settled.childId !== child.childId || settled.status !== 'captured') fail('download_not_ready');
+    const stored = await resultStore.cover(identity);
+    const headers = { 'Content-Type': 'image/jpeg', 'Content-Length': String(stored.bytes.length),
+      'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+      ...(stored.expiresAt ? { 'X-Studio-Result-Expires-At': stored.expiresAt } : {}) };
+    return { status: 200, response: new Response(method === 'HEAD' ? null : stored.bytes, { headers }) };
+  }
+  return Object.freeze({ operation: Object.freeze({ ...coordinator, reconcileChild, inspectTask }), openOriginal, openCover });
 }

@@ -12,18 +12,107 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
+	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 	"github.com/stretchr/testify/require"
 )
 
-type localReferenceUploader struct{ calls int }
+type localReferenceUploader struct {
+	calls         int
+	expectedModel string
+	assetRefs     []string
+}
 
 func (u *localReferenceUploader) Upload(_ context.Context, account *Account, owner StudioImageOwner, offer mediaworkbench.Offer, input StudioVideoReferenceAsset, bytes []byte) (StudioVideoReferenceReceipt, error) {
 	u.calls++
-	if account == nil || account.ID != 7 || owner.UserID != 1 || offer.SiteModel != "3.0" || len(bytes) != input.Size {
+	model := u.expectedModel
+	if model == "" {
+		model = "3.0"
+	}
+	if account == nil || account.ID != 7 || owner.UserID != 1 || offer.SiteModel != model || len(bytes) != input.Size {
 		return StudioVideoReferenceReceipt{}, ErrStudioVideoInvalidOrder
 	}
+	u.assetRefs = append(u.assetRefs, input.AssetRef)
 	return StudioVideoReferenceReceipt{AssetRef: input.AssetRef, Kind: input.Kind, MimeType: input.MimeType, Size: input.Size,
 		SHA256: input.SHA256, Source: "https://core.example/reference/" + input.AssetRef, UploadID: "upload-" + input.AssetRef}, nil
+}
+
+func TestPrepareReferenceAssetsVideoLimitsBeforeUpload(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		count, min, max, total int
+		invalidOwner           bool
+		invalidLastDigest      bool
+		wantOK                 bool
+	}{
+		{name: "seventeen_ordered", count: 17, max: 30, total: 30, wantOK: true},
+		{name: "thirty_ordered", count: 30, max: 30, total: 30, wantOK: true},
+		{name: "above_video_ceiling", count: 31, max: 30, total: 30},
+		{name: "above_published_kind_max", count: 17, max: 16, total: 30},
+		{name: "above_published_total", count: 17, max: 30, total: 16},
+		{name: "below_published_min", count: 1, min: 2, max: 30, total: 30},
+		{name: "wrong_owner", count: 17, max: 30, total: 30, invalidOwner: true},
+		{name: "invalid_last_asset", count: 30, max: 30, total: 30, invalidLastDigest: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _, q, key, accounts, _ := videoRuntimeFixture(t)
+			m, ok := videoplan.Lookup("3.5")
+			require.True(t, ok)
+			ma := studioCostMediaFixture(t, r.Media)
+			ma.a.Config = nil
+			ma.a.ModelMapping = map[string]string{m.ID: m.Upstream}
+			ma.a.Catalog.Models = []string{m.Upstream}
+			accounts.a.Credentials["model_mapping"] = map[string]any{m.ID: m.Upstream}
+			product := mediaworkbench.Product{ProductID: "video-reference-limit", MediaType: "video", SiteModel: m.ID, UpstreamModel: m.Upstream, Enabled: true,
+				Capabilities: mediaworkbench.Capabilities{Resolutions: []string{m.Resolutions[0]}, AspectRatios: []string{m.Ratios[0]}, DurationsSeconds: []int{m.Durations[0]}, Count: mediaworkbench.Range{Min: 1, Max: 1},
+					References: mediaworkbench.References{Image: mediaworkbench.Range{Min: tc.min, Max: tc.max}, TotalMax: tc.total}},
+				PricingRules: []mediaworkbench.PricingRule{{SalePrice: &mediaworkbench.Price{Amount: "0.80", Currency: "CNY", BillingMode: "per_request"}}}}
+			svc := mediaworkbench.NewService(ma)
+			d, err := svc.SaveDraft(t.Context(), 7, 0, mediaworkbench.DraftInput{Products: []mediaworkbench.Product{product}})
+			require.NoError(t, err)
+			require.True(t, d.Config.Validation.PublishReady, "%+v", d.Config.Validation.Diagnostics)
+			d, err = svc.Publish(t.Context(), 7, d.Config.RecordVersion, d.Config.Draft.Revision)
+			require.NoError(t, err)
+			_, err = svc.SetSales(t.Context(), 7, d.Config.RecordVersion, true)
+			require.NoError(t, err)
+			offerID := ma.a.Config.Published.Offers[0].OfferID
+			spec := mediaworkbench.Spec{Count: 1, Resolution: m.Resolutions[0], AspectRatio: m.Ratios[0], DurationSeconds: m.Durations[0], Images: tc.count}
+			assets := make([]StudioVideoReferenceAsset, tc.count)
+			refs := make([]string, tc.count)
+			for i := range assets {
+				content := []byte(fmt.Sprintf("synthetic-reference-content-%02d", i))
+				refs[i] = fmt.Sprintf("asset-%02d", i)
+				assets[i] = StudioVideoReferenceAsset{AssetRef: refs[i], Kind: "image", MimeType: "image/png", Size: len(content), SHA256: fmt.Sprintf("%x", sha256.Sum256(content)), BytesBase64: base64.StdEncoding.EncodeToString(content)}
+			}
+			owner := q.Binding.Owner
+			if tc.invalidOwner {
+				owner.UserID++
+			}
+			if tc.invalidLastDigest {
+				assets[len(assets)-1].SHA256 = assets[0].SHA256
+			}
+			uploader := &localReferenceUploader{expectedModel: m.ID}
+			r.SetReferenceUploader(uploader)
+			prepared, err := r.PrepareReferenceAssets(t.Context(), owner, key, offerID, spec, assets)
+			if !tc.wantOK {
+				require.Error(t, err)
+				require.Zero(t, uploader.calls, "reject the complete request before uploading any asset")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.count, uploader.calls)
+			require.Equal(t, refs, uploader.assetRefs)
+			require.Len(t, prepared.Receipts, tc.count)
+			stored, err := r.Store.ReferencePreparation(prepared.PreparationID, owner)
+			require.NoError(t, err)
+			require.Len(t, stored.Assets, tc.count)
+			require.Equal(t, prepared.Receipts, stored.Receipts)
+			for i, receipt := range prepared.Receipts {
+				require.Equal(t, refs[i], receipt.AssetRef)
+				require.Equal(t, assets[i].SHA256, receipt.SHA256)
+				require.Equal(t, refs[i], stored.Assets[i].AssetRef)
+			}
+		})
+	}
 }
 
 func TestPrepareReferenceAssetsResolvesPublishedAccountAndRejectsMissingUploader(t *testing.T) {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const client=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}))
 vi.mock('../client',()=>({apiClient:client,buildGatewayUrl:(v:string)=>v}))
-import { ensureStudioSession, studioRequest, studioTaskView, studioResultUrl, studioResultExpired, studioErrorMessage, StudioError } from '../studioMedia'
+import { ensureStudioSession, studioRequest, studioTaskView, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError } from '../studioMedia'
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear()})
 afterEach(()=>vi.unstubAllGlobals())
 it('an authoritative media expiry is not described as a connection or generation failure',()=>{
@@ -116,4 +116,33 @@ it('releases an unread session response when website identity changes after head
  const cancel=vi.fn(),body=new ReadableStream<Uint8Array>({cancel})
  vi.stubGlobal('fetch',vi.fn().mockImplementationOnce(async()=>{localStorage.setItem('auth_token','synthetic-b');return new Response(body,{status:401})}))
  await expect(ensureStudioSession()).rejects.toThrow('studio_session_changed');expect(cancel).toHaveBeenCalledTimes(1);expect(client.post).not.toHaveBeenCalled()
+})
+
+it('uses a private cover endpoint and preserves the original expiry gate',()=>{
+ const task=studioTaskView('video',retentionTask('video'))
+ expect(studioCoverUrl(task)).toBe(studioResultUrl(task).replace('/original','/cover'))
+ expect(()=>studioCoverUrl({...task,resultRetention:{persistedAt:null,expiresAt:null,expired:true,policy:'video_original_48h'}})).toThrow('result_expired')
+})
+it('repairs an expired media session and probes only the original HEAD before playback retries',async()=>{
+ client.get.mockResolvedValue({data:{id:2}});client.post.mockResolvedValue({data:{ticket:'synthetic-ticket'}})
+ const src='/studio-v2/api/video/operations/op_'+'c'.repeat(64)+'/original'
+ const fetch=vi.fn().mockResolvedValueOnce(new Response(null,{status:401})).mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockResolvedValueOnce(new Response(null,{headers:{'content-type':'video/mp4'}}));vi.stubGlobal('fetch',fetch)
+ await recoverStudioMediaRead(src)
+ expect(fetch.mock.calls[2]).toMatchObject([src,{method:'HEAD',credentials:'same-origin',redirect:'error'}])
+ expect(client.post).toHaveBeenCalledTimes(1);expect(client.post).toHaveBeenCalledWith('/auth/studio-media-ticket')
+ expect(fetch.mock.calls.some(c=>String(c[0]).endsWith('/tasks'))).toBe(false)
+})
+it.each([401,403,409,410,503])('keeps media HEAD status %s distinct from a successful retry',async status=>{
+ client.get.mockResolvedValue({data:{id:2}})
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockResolvedValueOnce(new Response(null,{status})))
+ const code=status===410?'result_expired':status===401?'login_required':'result_load_failed'
+ await expect(recoverStudioMediaRead('/studio-v2/api/video/operations/op_'+'d'.repeat(64)+'/cover')).rejects.toThrow(code)
+ expect(client.post).not.toHaveBeenCalled()
+})
+it('rejects external sources before authentication and refuses identity changes during a probe',async()=>{
+ await expect(recoverStudioMediaRead('https://untrusted.invalid/studio-v2/api/video/operations/op_'+'e'.repeat(64)+'/original')).rejects.toThrow('studio_contract')
+ expect(client.get).not.toHaveBeenCalled()
+ localStorage.setItem('auth_token','first');client.get.mockResolvedValue({data:{id:2}})
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockImplementationOnce(async()=>{localStorage.setItem('auth_token','second');return new Response(null,{headers:{'content-type':'video/mp4'}})}))
+ await expect(recoverStudioMediaRead('/studio-v2/api/video/operations/op_'+'e'.repeat(64)+'/original')).rejects.toThrow('studio_session_changed')
 })

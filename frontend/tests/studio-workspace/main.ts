@@ -71,6 +71,7 @@ const persist = () => sessionStorage.setItem(cacheKey, JSON.stringify(db))
 const calls: { method: string; path: string; body?: unknown }[] = []
 Object.assign(window, { studioFixture: { calls, snapshot: () => structuredClone(db) } })
 apiClient.defaults.adapter = async config => {
+  if (scenario === 'media-read' && config.url === '/auth/studio-media-ticket') return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: { ticket: 'synthetic-media-session-ticket' } } }
   if (config.url === '/keys/studio-access') return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: { ready: true } } }
   if (config.url !== '/auth/me') throw new Error(`Unexpected auth request ${config.url}`)
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: { id: 9001 } } }
@@ -85,6 +86,7 @@ window.fetch = async (input, init) => {
   const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
   calls.push({ method, path, body })
   const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
+  if (scenario === 'media-read' && (path.startsWith('/studio-v2/api/session') || /\/video\/operations\/[^/]+\/(original|cover)$/.test(path))) return nativeFetch(input, init)
   if (path.endsWith('/api/session')) return json({ owner_id: 9001 })
   if (path.endsWith('/assets/uploads')) {const headers=new Headers(init?.headers);return json({ asset_ref: `asset_aaaaaaaa-0000-0000-0000-${(++assetSequence).toString().padStart(12,'0')}`, kind: headers.get('X-Studio-Asset-Kind'), mime_type: headers.get('Content-Type'), size: (init?.body as ArrayBuffer).byteLength, duration_seconds: null })}
   const match = /\/api\/(image|video)\/(.*)/.exec(path)

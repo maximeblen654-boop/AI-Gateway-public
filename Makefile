@@ -8,6 +8,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/admin/ops/components/__tests__/OpsDashboardHeader.samples.spec.ts \
 	src/views/admin/ops/components/__tests__/OpsAlertEventsCard.pagination.spec.ts \
 	src/components/video/__tests__/StudioMediaPanel.spec.ts \
+	src/components/video/__tests__/StudioVideoCover.spec.ts \
 	src/components/video/__tests__/studioRatioOptions.spec.ts \
 	src/components/video/__tests__/StudioModelPicker.spec.ts \
 	src/components/admin/media/__tests__/MediaAspectOptions.spec.ts \

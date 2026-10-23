@@ -170,6 +170,28 @@ export function studioResultUrl(task: StudioTask, index = 0, now = Date.now()): 
   if (!['completed','partial'].includes(task.status) || !Number.isInteger(index) || index < 0 || index >= task.resultCount) throw new StudioError('result_unavailable')
   return buildGatewayUrl(`/studio-v2/api/${task.kind}/${task.kind === 'image' ? `tasks/${task.id}/results/${index}` : `operations/${task.id}/original`}`)
 }
+export function studioCoverUrl(task: StudioTask, now = Date.now()): string {
+  if (task.kind !== 'video') throw new StudioError('studio_contract')
+  return studioResultUrl(task, 0, now).replace(/\/original$/, '/cover')
+}
+
+// Native media requests bypass studioRequest. Repair the media session and
+// probe the same private result; never replay a generation request.
+export async function recoverStudioMediaRead(src: string): Promise<void> {
+  const url = new URL(src, window.location.origin), path = url.pathname
+  if (url.search || url.hash || !/^\/studio-v2\/api\/video\/operations\/op_[a-f0-9]{64}\/(?:original|cover)$/.test(path) ||
+      url.href !== new URL(buildGatewayUrl(path), window.location.origin).href) throw new StudioError('studio_contract')
+  const token = localStorage.getItem('auth_token')
+  await ensureStudioSession()
+  sameWebsiteSession(token)
+  const response = await fetch(src, { method: 'HEAD', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000) })
+  sameWebsiteSession(token)
+  if (response.status === 410) throw new StudioError('result_expired', 410)
+  if (response.status === 401) throw new StudioError('login_required', 401)
+  const mime = response.headers.get('content-type')?.split(';')[0]
+  const expected = path.endsWith('/original') ? ['video/mp4', 'video/webm'] : ['image/jpeg']
+  if (!response.ok || !mime || !expected.includes(mime)) throw new StudioError('result_load_failed', response.status)
+}
 export function studioErrorMessage(error: unknown): string {
   if (error instanceof Error && ['invalid_local_asset','file_changed','asset_upload_failed','invalid_asset_receipt'].includes(error.message)) return '素材上传或校验未通过，请检查类型、大小和数量。'
   if (error instanceof Error && error.message === 'login_required') return '登录已失效，请重新登录后查询原任务。'

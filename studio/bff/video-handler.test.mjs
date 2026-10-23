@@ -82,3 +82,27 @@ test('HTTP video history awaits authoritative snapshots and reports asynchronous
  const response=await fetch(url);assert.equal(response.status,200);assert.deepEqual(await response.json(),[{status:'captured'}]);
  fail=true;assert.equal((await fetch(url)).status,409);
 });
+
+test('HTTP cover is authenticated JPEG GET/HEAD with private headers, exact operation path and no paid gate',async t=>{
+ const operationId='op_'+'f'.repeat(64),jpeg=Buffer.from('ffd8ffe000046a66ffd9','hex');
+ const calls=[];let failure;
+ const tasks={cover:async(s,id,options)=>{
+  calls.push({id,options});assert.equal(s.ownerId,7);assert.equal(id,operationId);
+  if(failure)throw Error(failure);
+  return {status:200,response:new Response(options.method==='HEAD'?null:jpeg,{headers:{'Content-Type':'image/jpeg','Content-Length':String(jpeg.length),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}})};
+ },recover:()=>assert.fail('cover cannot recover task'),original:()=>assert.fail('cover cannot download original'),readiness:()=>assert.fail('cover does not consult paid generation gate')};
+ const sessions={authenticate:async req=>req.headers.cookie==='fixture'?{ownerId:7}:null,sameOrigin:()=>true};
+ const server=http.createServer(createVideoHandler({sessions,tasks}));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const url=`http://127.0.0.1:${server.address().port}/studio-v2/api/video/operations/${operationId}/cover`,headers={Cookie:'fixture'};
+ assert.equal((await fetch(url)).status,401);assert.equal(calls.length,0);
+ const get=await fetch(url,{headers});assert.equal(get.status,200);assert.equal(get.headers.get('content-type'),'image/jpeg');
+ assert.equal(get.headers.get('cache-control'),'private, no-store');assert.equal(get.headers.get('x-content-type-options'),'nosniff');assert.deepEqual(Buffer.from(await get.arrayBuffer()),jpeg);
+ const head=await fetch(url,{method:'HEAD',headers});assert.equal(head.status,200);assert.equal(head.headers.get('content-length'),String(jpeg.length));assert.equal((await head.arrayBuffer()).byteLength,0);
+ assert.deepEqual(calls.map(c=>c.options),[{method:'GET'},{method:'HEAD'}]);
+ assert.equal((await fetch(url+'?source=other',{headers})).status,400);
+ assert.equal((await fetch(url.replace('/cover','/children/0/cover'),{headers})).status,404);
+ assert.equal((await fetch(url,{method:'POST',headers:{...headers,'X-Studio-Request':'video-binding-v1'}})).status,404);assert.equal(calls.length,2);
+ failure='video_result_expired';assert.equal((await fetch(url,{headers})).status,410);assert.equal((await fetch(url,{method:'HEAD',headers})).status,410);
+ failure='video_cover_unavailable';assert.equal((await fetch(url,{headers})).status,404);
+});

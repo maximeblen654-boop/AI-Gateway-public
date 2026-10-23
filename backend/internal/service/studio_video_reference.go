@@ -84,7 +84,9 @@ func validateStudioVideoReferenceReceipt(in StudioVideoReferenceAsset, out Studi
 
 func (r *StudioVideoRuntime) PrepareReferenceAssets(ctx context.Context, owner StudioImageOwner, key *APIKey, offerID string, spec mediaworkbench.Spec, assets []StudioVideoReferenceAsset) (StudioVideoReferencePreparationResult, error) {
 	var empty StudioVideoReferencePreparationResult
-	if r == nil || r.Core == nil || r.Media == nil || !videoOwnerKey(owner, key) || len(assets) == 0 || len(assets) > 16 {
+	// Match the video contract ceiling; the published offer and adapter below
+	// still enforce their own per-kind and total limits before any upload.
+	if r == nil || r.Core == nil || r.Media == nil || !videoOwnerKey(owner, key) || len(assets) == 0 || len(assets) > 30 {
 		return empty, ErrStudioVideoInvalidOrder
 	}
 	// Validate the complete ordered input before the first external side effect.
