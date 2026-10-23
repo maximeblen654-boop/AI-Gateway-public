@@ -12,8 +12,8 @@ const offer={offer_id:'offer',model:'synthetic-video',display_name:'合成视频
 let wrapper:ReturnType<typeof mount>
 async function quantityChoices() { if(wrapper.get('[data-testid="studio-count"]').attributes('aria-expanded') !== 'true') await wrapper.get('[data-testid="studio-count"]').trigger('click'); return wrapper.findAll('#studio-count-menu [data-value]') }
 async function chooseQuantity(value: number) { await quantityChoices(); await wrapper.get(`#studio-count-menu [data-value="${value}"]`).trigger('click') }
-beforeEach(()=>{vi.clearAllMocks();sessionStorage.clear();sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video'}));if(typeof URL.createObjectURL!=='function')Object.defineProperty(URL,'createObjectURL',{configurable:true,value:vi.fn(()=>`blob:studio-asset`)});if(typeof URL.revokeObjectURL!=='function')Object.defineProperty(URL,'revokeObjectURL',{configurable:true,value:vi.fn()});api.session.mockResolvedValue({owner_id:1});api.catalog.mockResolvedValue([offer]);api.history.mockResolvedValue([prepared]);api.request.mockResolvedValue({paid_enabled:true});api.task.mockImplementation(async t=>t);api.upload.mockImplementation(async (file:File,kind:string)=>({asset_ref:`asset_${'a'.repeat(8)}-0000-0000-0000-000000000000`,kind,mime_type:file.type,size:file.size,duration_seconds:null}))})
-afterEach(()=>{wrapper?.unmount();document.body.innerHTML='';vi.useRealTimers()})
+beforeEach(()=>{vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockReturnValue({x:200,y:500,width:200,height:40,top:500,bottom:540,left:200,right:400,toJSON:()=>({})});vi.clearAllMocks();sessionStorage.clear();sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video'}));if(typeof URL.createObjectURL!=='function')Object.defineProperty(URL,'createObjectURL',{configurable:true,value:vi.fn(()=>`blob:studio-asset`)});if(typeof URL.revokeObjectURL!=='function')Object.defineProperty(URL,'revokeObjectURL',{configurable:true,value:vi.fn()});api.session.mockResolvedValue({owner_id:1});api.catalog.mockResolvedValue([offer]);api.history.mockResolvedValue([prepared]);api.request.mockResolvedValue({paid_enabled:true});api.task.mockImplementation(async t=>t);api.upload.mockImplementation(async (file:File,kind:string)=>({asset_ref:`asset_${'a'.repeat(8)}-0000-0000-0000-000000000000`,kind,mime_type:file.type,size:file.size,duration_seconds:null}))})
+afterEach(()=>{wrapper?.unmount();document.body.innerHTML='';vi.restoreAllMocks();vi.useRealTimers()})
 
 const imageFile=(name='reference.png')=>new File(['12345678'],name,{type:'image/png'})
 const withImageReferences=(max=3)=>({...offer,spec:{...offer.spec,references:{...offer.spec.references,image:{min:0,max},total_max:max}}})
@@ -584,7 +584,7 @@ describe('One product entry with independent specification Offers',()=>{
   api.catalog.mockResolvedValue(variants);wrapper=mount(StudioMediaPanel);await flushPromises()
   await wrapper.get('[data-testid="studio-model-toggle"]').trigger('click')
   expect(wrapper.findAll('.picker-choice')).toHaveLength(1)
-  expect(wrapper.get('.picker-choice small').text()).toContain('5 / 10 / 15 秒')
+  expect(wrapper.find('.picker-choice small').exists()).toBe(false)
   await wrapper.get('.picker-choice').trigger('click');await wrapper.get('[data-testid="studio-prompt"]').setValue('Synthetic video')
   for(const seconds of [10,15,5]){
    await chooseSpec('studio-duration',String(seconds));api.request.mockClear();api.generate.mockClear()
@@ -648,5 +648,69 @@ describe('Image2Pro provider attachment preparation', () => {
   api.request.mockClear();await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
   expect(api.request.mock.calls.map(call=>call[1])).toEqual(['quotes'])
   expect(api.request.mock.calls[0]![2]).not.toHaveProperty('preparation_id');expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
+describe('Video history covers and leaving the workspace',()=>{
+ it('shows the cat only for terminal video failures and keeps receipt text outside the cover',async()=>{
+  const failed:StudioTask={...prepared,status:'released',billingState:'pending'}
+  api.history.mockResolvedValue([failed]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  const card=wrapper.get(`[data-task-id="${failed.id}"]`)
+  expect(card.find('[data-testid="studio-failed-cover"]').exists()).toBe(true)
+  expect(card.get('.studio-work-preview').text()).toBe('')
+  expect(card.get('.studio-work-state').text()).toBe('生成失败，费用已释放')
+  expect(card.find('[data-testid="studio-history-retention"]').exists()).toBe(false)
+  await card.trigger('click');expect(wrapper.get('[data-testid="studio-task-failure"]').text()).toContain('费用已释放')
+  expect(wrapper.find('[data-testid="studio-result-retention"]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid="studio-results"]').exists()).toBe(false);expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['unknown','processing','billing_pending','recovery_blocked'])('does not mark %s as a failed generation',async status=>{
+  api.history.mockResolvedValue([{...prepared,status}]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  expect(wrapper.find('[data-testid="studio-failed-cover"]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid="studio-task-failure"]').exists()).toBe(false)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['.studio-dashboard','.studio-brand-mark','.studio-header h1 a'])('requires confirmation for the dashboard link %s and cancel preserves the workspace',async selector=>{
+  wrapper=mount(StudioMediaPanel,{attachTo:document.body});await flushPromises()
+  const link=wrapper.get(selector);const click=new MouseEvent('click',{bubbles:true,cancelable:true});link.element.dispatchEvent(click);await flushPromises()
+  expect(click.defaultPrevented).toBe(true)
+  const dialog=document.querySelector('[role="dialog"]')!;expect(dialog.textContent).toContain('确认返回控制台吗？')
+  expect(dialog.querySelector('[data-testid="studio-confirm-dashboard"]')?.getAttribute('href')).toBe('/dashboard')
+  ;(dialog.querySelector('[data-testid="studio-stay"]') as HTMLButtonElement).click();await flushPromises()
+  await vi.waitFor(()=>expect(document.querySelector('[role="dialog"]')).toBeNull());expect(wrapper.get('[data-testid="studio-task-id"]').text()).toContain(prepared.id)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
+
+it('explains that an unconfirmed video quote locks the price without freezing the balance',async()=>{
+ wrapper=mount(StudioMediaPanel);await flushPromises()
+ expect(wrapper.get('[data-testid="studio-status"]').text()).toContain('报价已锁定')
+ expect(wrapper.text()).not.toContain('报价已冻结')
+ expect(api.generate).not.toHaveBeenCalled()
+})
+
+describe('Generation effort cover',()=>{
+ it.each(['image','video'] as const)('shows the approved cover only while %s is processing, and restores the delivered cover',async kind=>{
+  const task:StudioTask={...prepared,kind,id:kind==='image'?'img_'+'8'.repeat(32):'op_'+'8'.repeat(64),status:'processing',spec:{count:1,resolution:kind==='image'?'1K':'720p',aspect_ratio:'16:9'},resultCount:0}
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,id:task.id}));api.history.mockResolvedValue([task]);wrapper=mount(StudioMediaPanel);await flushPromises()
+  const card=wrapper.get('[data-task-id="'+task.id+'"]')
+  expect(card.get('[data-testid="studio-generating-cover"]').attributes('alt')).toBe('在努力啦...')
+  expect(card.get('[data-testid="studio-generating-cover"]').attributes('src')).toContain('studio-generating-effort.png')
+  expect(card.find('[data-testid="studio-failed-cover"]').exists()).toBe(false)
+  api.task.mockResolvedValue({...task,status:'completed',resultCount:1})
+  await wrapper.get('[data-testid="studio-refresh"]').trigger('click');await flushPromises()
+  expect(card.find('[data-testid="studio-generating-cover"]').exists()).toBe(false)
+  expect(wrapper.find(kind==='image'?'[data-testid="studio-result-image"]':'[data-testid="studio-result-video"]').exists()).toBe(true)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['image','video'] as const)('keeps %s unknown, queued, failed, released, and billing states distinct',async kind=>{
+  const states=['prepared','unknown','queued','failed','released','billing_pending','reserve_pending','recovery_blocked']
+  const tasks=states.map((status,i)=>({...prepared,kind,id:(kind==='image'?'img_':'op_')+(i+1).toString(16).padStart(kind==='image'?32:64,'0'),status,resultCount:0}))
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind,view:'compose'}));api.history.mockResolvedValue(tasks);wrapper=mount(StudioMediaPanel);await flushPromises()
+  await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises()
+  expect(wrapper.findAll('[data-task-id]')).toHaveLength(states.length)
+  expect(wrapper.find('[data-testid="studio-generating-cover"]').exists()).toBe(false)
+  expect(api.generate).not.toHaveBeenCalled()
  })
 })

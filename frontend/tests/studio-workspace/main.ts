@@ -91,6 +91,7 @@ window.fetch = async (input, init) => {
   if (!match) return json({ error: 'fixture_unexpected_path' }, 404)
   const [, kind, op] = match as [string, string, string]
   if (scenario === 'history-deadline-real-bff' && kind === 'image' && (op === 'tasks' || op.startsWith('tasks/'))) return nativeFetch(input, init)
+  if (scenario === 'video-history-real-bff' && kind === 'video' && (op === 'operations' || op.startsWith('operations/'))) return nativeFetch(input, init)
   const items = db[kind]!
   if (op === 'catalog') return json({ offers: kind === 'image' ? imageOffers : videoOffers })
   if (op === 'readiness') return json({ paid_enabled: scenario !== 'closed' })

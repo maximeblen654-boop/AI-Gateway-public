@@ -158,6 +158,20 @@ func (h *OpenAIGatewayHandler) StudioVideoReceipt(c *gin.Context) {
 	}
 	c.JSON(200, state)
 }
+func (h *OpenAIGatewayHandler) StudioVideoSnapshot(c *gin.Context) {
+	owner, _, ok := h.videoOwner(c)
+	if !ok {
+		return
+	}
+	state, e := h.studioVideo.Snapshot(c.Request.Context(), owner, c.Param("task_id"))
+	if e != nil && state.TaskID == "" {
+		videoError(c, e)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, state)
+}
+
 func (h *OpenAIGatewayHandler) StudioVideoResult(c *gin.Context) {
 	owner, _, ok := h.videoOwner(c)
 	if !ok {

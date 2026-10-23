@@ -39,6 +39,35 @@ function assertVideoFailureRelease(before, after, order, postsBefore, postsAfter
   assert.equal(postsAfter - postsBefore, 1, 'One original video generation request is required')
 }
 
+function assertVideoHistory(items, expected) {
+  assert(Array.isArray(items), 'Video history must be an array')
+  return expected.map(task => {
+    assert.match(task.operation_id, /^op_[a-f0-9]{64}$/, 'Original video operation identity required')
+    assert.match(task.task_id, /^av_[a-f0-9]{64}$/, 'Original video child identity required')
+    assert(['captured', 'released'].includes(task.status), 'Expected video terminal state required')
+    const matches = items.filter(item => item.operation_id === task.operation_id)
+    assert.equal(matches.length, 1, 'Original video operation must appear exactly once in history')
+    const item = matches[0]
+    assert.equal(item.contract, 'account_video_v1', 'Video history contract changed')
+    assert.equal(item.status, task.status, 'Video history must retain the authoritative terminal state')
+    assert.equal(item.children?.length, 1, 'Original video child must appear exactly once')
+    assert.equal(item.children[0].task_id, task.task_id, 'Video history changed the original child identity')
+    assert.equal(item.children[0].status, task.status, 'Video history child must retain the terminal state')
+    assert.equal(item.offer_id, task.offer_id, 'Video history changed the frozen Offer')
+    assert.equal(item.model, task.model, 'Video history changed the original model')
+    assert.deepEqual(item.spec, task.spec, 'Video history changed the frozen specification')
+    assert.deepEqual(item.sale_price, task.sale_price, 'Video history changed the frozen sale price')
+    return { operation_id: item.operation_id, task_id: item.children[0].task_id, status: item.status, offer_id: item.offer_id }
+  })
+}
+
+function assertHistoryReadOnly(before, after) {
+  assert.deepEqual(after.ledger, before.ledger, 'History changed balance, frozen funds, usage, cost, dedup or Account quota')
+  assert.equal(after.supplier.image_posts, before.supplier.image_posts, 'History generated an image')
+  assert.equal(after.supplier.video_posts, before.supplier.video_posts, 'History generated a video')
+  assert.deepEqual(after.supplier.requests, before.supplier.requests, 'History contacted the supplier, including polling or downloading')
+}
+
 async function setAccountSchedulable(core, token, accountID, schedulable) {
   const path = '/admin/accounts/' + accountID
   await core(token, path + '/schedulable', 'POST', { schedulable })
@@ -119,6 +148,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
   const stats = () => JSON.parse(fs.readFileSync(root + '/evidence/native-supplier-state.json'))
   let admin, account, apiGroup, apiChannel
   const detached = []
+  const videoHistoryExpected = []
   const id = value => { assert(Number.isSafeInteger(value) && value > 0); return value }
   const snapshot = user => JSON.parse(sql(`SELECT json_build_object('balance',balance::text,'frozen',frozen_balance::text,'usage',(SELECT count(*) FROM usage_logs WHERE user_id=${id(user.id)}),'cost',(SELECT COALESCE(sum(actual_cost),0)::text FROM usage_logs WHERE user_id=${id(user.id)}),'dedup',(SELECT count(*) FROM usage_billing_dedup WHERE api_key_id IN (SELECT id FROM api_keys WHERE user_id=${id(user.id)} )),'account_quota',(SELECT COALESCE(extra->>'quota_used','0') FROM accounts WHERE id=${id(account.id)})) FROM users WHERE id=${id(user.id)}`))
   async function raw(token, path, method = 'GET', body) {
@@ -254,6 +284,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.deepEqual(snapshot(user), after, 'Recovery or duplicate click charged again')
     assert.equal(stats()[kind + '_posts'], supplierAfter[kind + '_posts'], 'Recovery replayed generation')
     report.tasks.push({ kind, id: taskID, before, after, expected_sale: expectedSale, expected_account_quota: expectedQuota, original_sha256: createHash('sha256').update(bytes).digest('hex'), supplier_posts: 1, recovery_reposts: 0 })
+    if (kind === 'video') videoHistoryExpected.push({ operation_id: taskID, task_id: prepared.children?.[0]?.task_id, status: 'captured', offer_id: prepared.offer_id, model: prepared.model, spec: structuredClone(prepared.spec), sale_price: structuredClone(prepared.sale_price) })
     saveReport()
     return { taskID, after }
   }
@@ -281,6 +312,7 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     const original = await fetch(base + '/studio-v2/api/video/operations/' + prepared.operation_id + '/original', { headers: { Cookie: user.cookie } })
     assert(original.status >= 400, 'Failed video exposed an original')
     report.video_failure_release = { operation_id: prepared.operation_id, order, balance_and_frozen_unchanged: true, usage_and_dedup_unchanged: true, supplier_posts: 1, recovery_reposts: 0 }
+    videoHistoryExpected.push({ operation_id: prepared.operation_id, task_id: childID, status: 'released', offer_id: prepared.offer_id, model: prepared.model, spec: structuredClone(prepared.spec), sale_price: structuredClone(prepared.sale_price) })
     saveReport()
   }
   try {
@@ -386,6 +418,20 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     }
     report.checks.push('One shared Account routes native API alias and charges API Channel price; Channel cost 99 and Account aliases leave Studio exact model/price unchanged; both media retain SQL NULL procurement and do not infer Account monetary usage; WAN refs0/1 execute, deliver, settle and recover once')
     await failVideo(user, wanOffer)
+    // Use only the list endpoint here. Selecting or recovering an active task
+    // would mask a broken native snapshot route with the old receipt path.
+    assert.equal(videoHistoryExpected.length, 3)
+    assert.equal(videoHistoryExpected.filter(task => task.status === 'captured').length, 2)
+    assert.equal(videoHistoryExpected.filter(task => task.status === 'released').length, 1)
+    const historyBefore = { ledger: snapshot(user), supplier: stats() }, historyReads = []
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await session(user)
+      historyReads.push(assertVideoHistory(ok(await media(user, 'video', 'operations')), videoHistoryExpected))
+      assertHistoryReadOnly(historyBefore, { ledger: snapshot(user), supplier: stats() })
+    }
+    report.video_history = { tasks: historyReads[0], authenticated_sessions: historyReads.length, pure_history: true, ledger_unchanged: true, supplier_requests_added: 0 }
+    report.checks.push('Two completed videos and one released original retain exact operation/child/Offer/spec/price through real BFF/Bridge/Core history in original and fresh sessions; no receipt recovery, supplier request or ledger change')
+    saveReport()
     const prior = structuredClone(report.tasks)
     const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }] }, incomplete])
     await publish(saved, [image.product_id, wan.product_id])
@@ -479,6 +525,8 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
 }
 
 module.exports.assertVideoFailureRelease = assertVideoFailureRelease
+module.exports.assertVideoHistory = assertVideoHistory
+module.exports.assertHistoryReadOnly = assertHistoryReadOnly
 module.exports.assertPublic = assertPublic
 module.exports.assertZeroBalanceRejection = assertZeroBalanceRejection
 module.exports.setAccountSchedulable = setAccountSchedulable

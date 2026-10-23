@@ -1,16 +1,16 @@
 <template>
   <section ref="panelRoot" class="studio-workspace" :class="{ 'is-history': historyMode }" data-testid="studio-media-panel">
     <aside class="studio-rail" aria-label="创作工作台导航">
-      <a href="/dashboard" class="studio-brand-mark" aria-label="AI Gateway，返回控制台"><StudioMark /></a>
+      <a href="/dashboard" @click.prevent="dashboardConfirm = true" class="studio-brand-mark" aria-label="AI Gateway，返回控制台"><StudioMark /></a>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'text' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'text'" :disabled="busy" data-testid="studio-mode-text" @click="changeMode('text')"><Icon name="grid" /><span>文生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'image' && imageMode === 'edit' }" :aria-pressed="!historyMode && kind === 'image' && imageMode === 'edit'" :disabled="busy" data-testid="studio-mode-edit" @click="changeMode('edit')"><Icon name="edit" /><span>图生图</span></button>
       <button :class="{ selected: !historyMode && kind === 'video' }" :aria-pressed="!historyMode && kind === 'video'" :disabled="busy" data-testid="studio-mode-video" @click="changeMode('video')"><Icon name="play" /><span>视频</span></button>
       <button class="studio-history-nav" :class="{ selected: historyMode }" :aria-pressed="historyMode" :disabled="busy" data-testid="studio-mode-history" @click="openHistory"><Icon name="clock" /><span>任务历史</span></button>
-      <a href="/dashboard" class="studio-dashboard"><Icon name="arrowLeft" /><span>控制台</span></a>
+      <a href="/dashboard" @click.prevent="dashboardConfirm = true" class="studio-dashboard"><Icon name="arrowLeft" /><span>控制台</span></a>
     </aside>
     <div class="studio-main">
       <header class="studio-header">
-        <div><h1><a href="/dashboard" aria-label="AI Gateway，返回控制台">AI Gateway</a> <span>{{ historyMode ? '任务历史' : modeLabel }}</span></h1><p class="studio-mobile-tagline">让想法有画面。</p></div>
+        <div><h1><a href="/dashboard" @click.prevent="dashboardConfirm = true" aria-label="AI Gateway，返回控制台">AI Gateway</a> <span>{{ historyMode ? '任务历史' : modeLabel }}</span></h1><p class="studio-mobile-tagline">让想法有画面。</p></div>
         <div v-if="!active && historyMode" class="studio-new-menu-wrap"><button class="studio-button studio-header-new" :disabled="busy" :aria-expanded="createMenuOpen" data-testid="studio-header-new" @click="createMenuOpen = !createMenuOpen"><Icon name="plus" />新建创作</button><div v-if="createMenuOpen" class="studio-new-menu" role="menu"><button role="menuitem" @click="startNew('text')"><Icon name="grid" />文生图</button><button role="menuitem" @click="startNew('edit')"><Icon name="edit" />图生图</button><button role="menuitem" @click="startNew('video')"><Icon name="play" />视频</button></div></div>
         <button v-else-if="canStartNew" class="studio-button studio-header-new" :disabled="busy" @click="newTask"><Icon name="plus" />继续创作</button>
       </header>
@@ -21,14 +21,17 @@
       <p class="studio-retention-note">新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
-          <span class="studio-work-preview">
+          <span class="studio-work-preview" :class="{ 'is-video-failed': task.kind === 'video' && taskFailed(task) }">
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-backdrop" :src="resultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-image" :src="resultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
-            <span v-else class="studio-work-placeholder"><Icon :name="task.kind === 'video' ? 'play' : 'grid'" /><span>{{ resultExpired(task) ? '原片已到期' : hasResults(task) ? '单条视频' : statusText(task.status) }}</span></span>
+            <StudioVideoCover v-else-if="task.kind === 'video' && readableResults(task)" :src="resultUrl(task)" :alt="taskModel(task) + ' 的视频封面'" />
+            <img v-else-if="task.status === 'processing'" class="studio-generating-cover" :src="generatingCover" alt="在努力啦..." loading="lazy" decoding="async" data-testid="studio-generating-cover" />
+            <img v-else-if="task.kind === 'video' && taskFailed(task)" class="studio-video-failed-cover" :src="videoFailureCover" alt="" data-testid="studio-failed-cover" />
+            <span v-else class="studio-work-placeholder"><Icon :name="placeholderIcon(task)" aria-hidden="true" /><span>{{ placeholderText(task) }}</span></span>
           </span>
           <span class="studio-work-title"><strong>{{ taskModel(task) }}</strong><time>{{ taskDate(task) }}</time></span>
           <span class="studio-work-meta">{{ specText(task) }}</span>
-          <span class="studio-work-state">{{ statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></span>
+          <span class="studio-work-state" :class="{ 'is-failed': task.kind === 'video' && taskFailed(task) }">{{ task.kind === 'video' && taskFailed(task) ? failureSummary(task) : statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
         </button>
       </div>
       <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
@@ -40,13 +43,13 @@
         <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</span></div>
         <div class="studio-price-line"><p data-testid="studio-price">冻结报价 <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
         <p v-if="active.status === 'prepared'" class="studio-quote-expiry">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
-        <p v-else class="studio-retention-note" data-testid="studio-result-retention" role="status">{{ retentionText(active) }}<template v-if="resultExpired(active)">任务与结算记录保留。</template></p>
+        <p v-else-if="!taskFailed(active)" class="studio-retention-note" data-testid="studio-result-retention" role="status">{{ retentionText(active) }}<template v-if="resultExpired(active)">任务与结算记录保留。</template></p>
         <p v-if="active.status === 'partial'" class="studio-partial" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
         <div v-if="waiting" class="studio-waiting" data-testid="studio-waiting" :class="{ 'is-uncertain': uncertain && !submitting[active.id] }">
           <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
           <div><strong>{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
         </div>
-        <p v-if="['failed','released'].includes(active.status)" role="alert" class="studio-error">{{ active.billingState === 'not_charged' ? '生成失败，未收费。' : active.status === 'released' ? '本次生成未成功，服务端报告费用已释放。' : '本次生成未成功；费用状态以实际结算回执为准。' }}原任务已保留，不会自动再次生成。</p>
+        <div v-if="taskFailed(active)" role="alert" class="studio-task-failure" data-testid="studio-task-failure"><Icon name="exclamationCircle" aria-hidden="true" /><div><strong>这次没能生成成功</strong><p>{{ failureSummary(active) }}。原任务已保留，不会自动再次生成。</p></div></div>
         <p v-if="active.failureCode === 'upstream_http_502_no_delivery'" class="studio-error" data-testid="studio-http-failure">图片服务返回 HTTP 502，未取得图片的执行单元已终结，不会补扣这些单元的费用。已交付作品仍按实际结算回执计费。</p>
         <p v-if="taskFeedback?.message" role="status" class="studio-query-feedback" data-testid="studio-query-feedback"><time :datetime="new Date(taskFeedback.at).toISOString()">{{ new Date(taskFeedback.at).toLocaleTimeString() }}</time> · {{ taskFeedback.message }}</p>
         <p v-if="taskFeedback?.error" role="alert" class="studio-error" data-testid="studio-query-error">{{ taskFeedback.error }}</p>
@@ -72,8 +75,8 @@
           <fieldset :disabled="!!active">
             <legend class="studio-sr-only">{{ modeLabel }}创作设置</legend>
             <div class="studio-floating-model" :class="{ 'model-open': openControl === 'model' }">
-              <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon name="chevronDown" /></button>
-              <Transition name="studio-pop"><div v-show="openControl === 'model'" class="studio-popover studio-model-menu" id="studio-model-menu"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">收起<Icon name="chevronUp" /></button></div></Transition>
+              <button ref="modelTrigger" class="studio-model-trigger" :disabled="busy" data-testid="studio-model-toggle" :aria-expanded="openControl === 'model'" aria-controls="studio-model-menu" @click="toggleControl('model')"><span class="studio-model-dot"></span><span>{{ offer?.display_name || offer?.upstream_model || '选择模型' }}</span><Icon v-if="openControl === 'model'" :name="modelMenuSide === 'above' ? 'chevronUp' : 'chevronDown'" :data-direction="modelMenuSide" data-testid="studio-model-direction" aria-hidden="true" /><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" data-testid="studio-model-selector-icon"><path d="m8 9 4-4 4 4m-8 6 4 4 4-4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+              <Transition name="studio-pop"><div v-show="openControl === 'model'" ref="modelMenu" class="studio-popover studio-model-menu" id="studio-model-menu" :style="modelMenuStyle"><StudioModelPicker v-if="openControl === 'model'" :offers="visibleOffers" :model-value="offerId" :disabled="busy" @select="offerId = $event; selectOffer(); closeControl()" /><button class="studio-text-button" @click="closeControl">关闭<Icon name="x" /></button></div></Transition>
             </div>
             <div class="studio-writing"><label for="studio-prompt" class="studio-sr-only">提示词</label><textarea :disabled="busy" id="studio-prompt" ref="promptInput" v-model="prompt" :placeholder="imageMode === 'edit' && kind === 'image' ? '想怎样改变这张图？描述你的想法…' : '写下你想看到的画面…'" rows="2" data-testid="studio-prompt" /></div>
             <div v-if="showUploader" class="studio-asset-uploader" data-testid="studio-asset-uploader" @paste.stop="paste">
@@ -97,15 +100,20 @@
       </section>
     </div>
   </section>
+
   <BaseDialog :show="quoteConfirm && active?.status === 'prepared'" title="确认本次生成" width="narrow" @close="quoteConfirm = false">
     <div v-if="active" class="studio-confirm">
       <p>{{ taskModel(active) }}</p><p class="studio-confirm-spec">{{ specText(active) }}</p>
       <p class="studio-confirm-total">{{ active.price.amount }} <span>{{ active.price.currency }}</span></p>
       <p v-if="active.unitPrice && active.quantity">单{{ active.kind === 'image' ? '张' : '条' }} {{ active.unitPrice.amount }} × {{ active.quantity }}</p>
-      <p class="studio-confirm-note">价格由服务端锁定。{{ expired ? '报价已失效，请返回重新获取。' : '确认后开始生成。' }}</p>
+      <p class="studio-confirm-note">价格已锁定，尚未冻结余额。确认后将冻结对应余额。{{ expired ? '报价已失效，请返回重新获取。' : '确认后开始生成。' }}</p>
       <p v-if="!enabled" class="studio-confirm-note">当前生成服务尚未开放。</p>
     </div>
     <template #footer><button class="studio-confirm-back" @click="newTask">返回修改</button><button class="studio-confirm-submit" data-testid="studio-confirm-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认并生成</button></template>
+  </BaseDialog>
+  <BaseDialog :show="dashboardConfirm" title="确认返回控制台吗？" width="narrow" :show-close-button="false" @close="dashboardConfirm = false">
+      <p class="studio-leave-note">已提交的任务仍可在任务历史中查看。</p>
+      <template #footer><button class="studio-confirm-back" data-testid="studio-stay" @click="dashboardConfirm = false">留在工作台</button><a href="/dashboard" class="studio-confirm-submit" data-testid="studio-confirm-dashboard">返回控制台</a></template>
   </BaseDialog>
 </template>
 <script setup lang="ts">
@@ -114,6 +122,9 @@ import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, stud
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
+import StudioVideoCover from './StudioVideoCover.vue'
+import videoFailureCover from '@/assets/studio-video-failed-cat.jpg'
+import generatingCover from '@/assets/studio-generating-effort.png'
 import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
 import { ratioOfferOptions } from './studioRatioOptions'
@@ -138,10 +149,24 @@ const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.valu
 const activeQuoteUnavailable=computed(()=>!!active.value && active.value.status==='prepared' && (invalidatedQuotes.value.has(active.value.id)||unavailableOffers.value.has(`${active.value.kind}:${active.value.offerId}`)))
 const unavailableResults=ref<Record<string,boolean>>({})
 const loadingResults=ref<Record<string,boolean>>({})
+const dashboardConfirm=ref(false)
 const quoteConfirm=ref(false), fileInput=ref<HTMLInputElement|null>(null)
 const taskDetail=ref<HTMLElement|null>(null)
 function revealTask(){void nextTick(()=>taskDetail.value?.scrollIntoView?.({block:'nearest',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}))}
 const composerRoot=ref<HTMLElement|null>(null), promptInput=ref<HTMLTextAreaElement|null>(null), modelTrigger=ref<HTMLButtonElement|null>(null), ratioTrigger=ref<HTMLButtonElement|null>(null)
+const modelMenuSide=ref<'above'|'below'>('below')
+const modelMenu=ref<HTMLElement|null>(null), modelMenuStyle=ref<Record<string,string>>({})
+function positionModelMenu(event?:Event){
+ if(openControl.value!=='model'||!modelMenu.value||!modelTrigger.value)return
+ if(event?.type==='scroll'&&event.target instanceof Node&&modelMenu.value.contains(event.target))return
+ const anchor=modelTrigger.value.getBoundingClientRect(),height=window.innerHeight,width=window.innerWidth,gap=8,margin=12
+ if(anchor.bottom<margin||anchor.top>height-margin){openControl.value=null;return}
+ const above=Math.max(0,anchor.top-gap-margin),below=Math.max(0,height-anchor.bottom-gap-margin)
+ const desired=Math.min(420,modelMenu.value.scrollHeight+2),up=below<desired&&above>below
+ modelMenuSide.value=up?'above':'below'
+ const menuWidth=Math.min(280,width-margin*2)
+ modelMenuStyle.value={position:'fixed',boxSizing:'border-box',width:menuWidth+'px',maxWidth:menuWidth+'px',left:Math.max(margin,Math.min(anchor.right-menuWidth,width-menuWidth-margin))+'px',right:'auto',top:up?'auto':Math.max(margin,anchor.bottom+gap)+'px',bottom:up?Math.max(margin,height-anchor.top+gap)+'px':'auto',maxHeight:Math.min(420,height-margin*2,up?above:below)+'px'}
+}
 const modeLabel=computed(()=>kind.value==='video' ? '视频创作' : imageMode.value==='edit' ? '图生图' : '文生图')
 const visibleOffers=computed(()=>offers.value.filter(o=>kind.value==='video' || (imageMode.value==='edit' ? o.spec.references.image.max>0 && o.spec.references.total_max>0 : o.spec.references.image.min===0)))
 const referenceOffers=computed(()=>kind.value==='image'?offers.value.filter(o=>o.spec.references.image.max>0&&o.spec.references.total_max>0):visibleOffers.value)
@@ -150,6 +175,10 @@ const outputFormatLabels:Record<string,string>={auto:'由模型决定',png:'PNG'
 const outputFormats=computed(()=>kind.value==='image' ? (offer.value?.spec.output_formats||[]).filter(value=>['png','jpeg','webp'].includes(value)) : [])
 watch(outputFormats,formats=>{if(offer.value&&outputFormat.value!=='auto'&&!formats.includes(outputFormat.value)){outputFormat.value='auto';intent=undefined}},{flush:'sync'})
 const showUploader=computed(()=>kind.value==='video' || imageMode.value==='edit' || uploads.value.length>0)
+const taskFailed=(task:StudioTask)=>['failed','released'].includes(task.status)
+const failureSummary=(task:StudioTask)=>task.billingState==='not_charged'?'生成失败，未收费':task.status==='released'?'生成失败，费用已释放':task.billingState==='billed'?'生成失败，费用已结算':'生成失败，费用状态待确认'
+const placeholderIcon=(task:StudioTask)=>taskFailed(task)?'exclamationCircle':resultExpired(task)?'clock':task.kind==='video'?(needsRecovery(task)?'clock':'play'):'grid'
+const placeholderText=(task:StudioTask)=>resultExpired(task)?'原片已到期':taskFailed(task)?'生成失败':task.kind==='video'&&needsRecovery(task)?(['processing','queued'].includes(task.status)?'等待视频生成':'结果待确认'):statusText(task.status)
 const isFailedTask=(task:StudioTask)=>['failed','released'].includes(task.status) && typeof task.billingState === 'string' && ['billed','not_charged'].includes(task.billingState)
 const historyScope=computed(()=>historyMode.value&&historyFilter.value!=='all'?history.value.filter(task=>task.kind===historyFilter.value):history.value)
 const failedHistoryCount=computed(()=>historyScope.value.filter(isFailedTask).length)
@@ -172,7 +201,7 @@ const taskDate=(task:StudioTask)=>Number.isFinite(Date.parse(task.createdAt)) ? 
 const ratioShape=(r:string)=>{const match=/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(r);const n=match ? Number(match[1])/Number(match[2]) : 1;return {width:`${Math.round(17*Math.min(1,Number.isFinite(n)&&n>0?n:1))}px`,height:`${Math.round(17/Math.max(1,Number.isFinite(n)&&n>0?n:1))}px`}}
 function imageUnavailable(event:Event){const image=event.target as HTMLImageElement;image.classList.add('unavailable');image.alt='预览暂不可用，请打开任务查看原片'}
 function hidePreviewBackdrop(event:Event){(event.target as HTMLImageElement).style.display='none'}
-async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus()}
+async function toggleControl(which:'model'|'ratio'){if(busy.value||active.value)return;openControl.value=openControl.value===which?null:which;await nextTick();if(openControl.value==='model')positionModelMenu();if(openControl.value)composerRoot.value?.querySelector<HTMLElement>(which==='model'?'#studio-offer':'#studio-ratio-menu button')?.focus({preventScroll:true})}
 function closeControl(){const previous=openControl.value;openControl.value=null;void nextTick(()=>{(previous==='model'?modelTrigger:previous==='ratio'?ratioTrigger:null)?.value?.focus()})}
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}
 function focusPrompt(){historyMode.value=false;createMenuOpen.value=false;void nextTick(()=>promptInput.value?.focus())}
@@ -237,7 +266,7 @@ const waitingMessage=computed(()=>{
  if(active.value?.status==='billing_pending')return '结果已保存，正在确认原生结算；不会再次生成。'
  return elapsedSeconds.value>=60?'服务端尚未返回最终结果，请稍后查询原任务。':'等待服务端更新任务状态。'
 })
-const statuses:Record<string,string>={prepared:'报价已冻结，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
+const statuses:Record<string,string>={prepared:'报价已锁定，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
 const statusText=(status:string)=>statuses[status]||'结果待确认'
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||(!/^media[-_]/.test(task.model)?task.model:'')||'已保存的创作'
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.kind==='image'&&typeof task.spec.output_format==='string'?outputFormatLabels[task.spec.output_format]||task.spec.output_format:'',task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
@@ -390,7 +419,7 @@ async function generate(){
   feedback.value[task.id]={at:Date.now(),message:'本次提交未取得最终结果。',error:e instanceof StudioError && e.code==='image_binding_unavailable'?'本次请求未取得可确认的结果。请查询原任务；不会重新发送生成请求。':studioErrorMessage(e)}
  }finally{delete submitting.value[task.id]}
 }
-onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();if(!mounted)return;storage=`studio-media-view-${session.owner_id}`;let selected:unknown,restorePending=true;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;restorePending=raw.view!=='compose';if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected,restorePending)}catch(e){if(!mounted)return;error.value=studioErrorMessage(e);busy.value=false}
+onMounted(async()=>{window.addEventListener('resize',positionModelMenu);window.addEventListener('scroll',positionModelMenu,true);window.addEventListener('paste',paste);window.addEventListener('pointerdown',clickOutside);try{const session=await ensureStudioSession();if(!mounted)return;storage=`studio-media-view-${session.owner_id}`;let selected:unknown,restorePending=true;try{const raw=JSON.parse(sessionStorage.getItem(storage)||'{}');if(raw.kind==='image'||raw.kind==='video')kind.value=raw.kind;if(raw.imageMode==='edit')imageMode.value='edit';selected=raw.id;restorePending=raw.view!=='compose';if(Array.isArray(raw.attempted))attempted=new Set(raw.attempted.filter((id:unknown)=>typeof id==='string'))}catch{/* Server history remains authoritative. */}await load(selected,restorePending)}catch(e){if(!mounted)return;error.value=studioErrorMessage(e);busy.value=false}
  if(mounted)timer=setInterval(()=>{
   clock.value=Date.now()
   const task=active.value
@@ -401,5 +430,5 @@ onMounted(async()=>{window.addEventListener('paste',paste);window.addEventListen
   }
  },1000)
 })
-onUnmounted(()=>{mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);window.removeEventListener('pointerdown',clickOutside);uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)})})
+onUnmounted(()=>{window.removeEventListener('resize',positionModelMenu);window.removeEventListener('scroll',positionModelMenu,true);mounted=false;generation++;if(timer)clearInterval(timer);window.removeEventListener('paste',paste);window.removeEventListener('pointerdown',clickOutside);uploads.value.forEach(item=>{item.controller?.abort();revokePreview(item)})})
 </script>

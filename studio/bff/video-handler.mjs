@@ -10,7 +10,7 @@ export function createVideoHandler({sessions,tasks,resolveAssets,paidEnabled=VID
       if(!['GET','HEAD'].includes(req.method)&&(!sessions.sameOrigin(req)||req.headers['x-studio-request']!=='video-binding-v1')){reply(403,{error:'video_csrf'});return;}
       if(req.method==='GET'&&url.pathname==='/studio-v2/api/video/readiness'){reply(200,{contract:VIDEO_CONTRACT,paid_enabled:managedPaid?await effectivePaid(tasks,session,paidEnabled,true):paidEnabled===true&&(await tasks.readiness(session)).paid_enabled===true});return;}
       if(req.method==='GET'&&url.pathname==='/studio-v2/api/video/catalog'){reply(200,await tasks.catalog(session));return;}
-      if(req.method==='GET'&&url.pathname==='/studio-v2/api/video/operations'){reply(200,tasks.history(session));return;}
+      if(req.method==='GET'&&url.pathname==='/studio-v2/api/video/operations'){reply(200,await tasks.history(session));return;}
       if(req.method==='POST'&&url.pathname==='/studio-v2/api/video/prepare'){
         let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>1<<20)throw Error('Request too large');chunks.push(chunk)}
         const input=JSON.parse(Buffer.concat(chunks).toString('utf8'));

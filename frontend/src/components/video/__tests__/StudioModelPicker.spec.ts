@@ -22,7 +22,16 @@ describe('passive model picker',()=>{
  it('does not match same-name offers to one another',()=>{
   const a=offers(observation())[0]!;const b={...a,offer_id:'b',passive_status:undefined}
   const w=mount(Picker,{props:{offers:[a,b],modelValue:'a'}})
-  expect(w.findAll('.picker-status')[1]!.text()).toContain('暂无状态数据');w.unmount()
+  expect(w.findAll('.picker-status')[1]!.text()).toContain('暂无数据');w.unmount()
  })
- for(const rate of [-1,2,NaN])it(`rejects invalid rate ${rate}`,()=>{const s=observation();s.error_rate=rate;const w=mount(Picker,{props:{offers:offers(s),modelValue:'a'}});expect(w.text()).toContain('暂无状态数据');w.unmount()})
+ for(const rate of [-1,2,NaN])it(`rejects invalid rate ${rate}`,()=>{const s=observation();s.error_rate=rate;const w=mount(Picker,{props:{offers:offers(s),modelValue:'a'}});expect(w.text()).toContain('暂无数据');w.unmount()})
+})
+
+it.each(['image','video'])('keeps the %s model menu focused on names and status without repeating specs',async kind=>{
+ const offer=offers()[0]!
+ offer.spec={...offer.spec,resolution:['480p','720p','1080p'],aspect_ratio:['16:9','9:16'],...(kind==='video'?{duration_seconds:[4,5,6,7,8,9,10,11,12,13,14,15]}:{})}
+ const w=mount(Picker,{props:{offers:[offer],modelValue:'a'}})
+ expect(w.get('.picker-choice').text()).toBe('模型 A');expect(w.find('.picker-choice small').exists()).toBe(false)
+ expect(w.text()).not.toContain('480p');expect(w.text()).not.toContain('种比例');expect(w.text()).not.toContain('4 / 5')
+ await w.get('.picker-choice').trigger('click');expect(w.emitted('select')).toEqual([['a']]);w.unmount()
 })

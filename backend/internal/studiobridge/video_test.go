@@ -49,7 +49,9 @@ func TestVideoBridgeOriginalKeyAndPrivateSettlement(t *testing.T) {
 	require.Equal(t, 200, call("GET", "tasks/av_original", "proof", "42").Code)
 	require.Equal(t, 200, call("POST", "tasks/av_original/capture", "proof", "42").Code)
 	require.Contains(t, call("GET", "tasks/av_original/result", "proof", "42").Body.String(), "Zml4dHVyZS1ieXRlcw==")
-	require.Equal(t, 3, keys.receiptCalls)
+	require.Equal(t, 200, call("GET", "tasks/av_original/snapshot", "proof", "42").Code)
+	require.Equal(t, 404, call("POST", "tasks/av_original/snapshot", "proof", "42").Code)
+	require.Equal(t, 4, keys.receiptCalls)
 	before := calls
 	require.Equal(t, 403, call("GET", "tasks/av_original", "proof", "99").Code)
 	require.Equal(t, 401, call("POST", "tasks/av_original/capture", "bad", "42").Code)

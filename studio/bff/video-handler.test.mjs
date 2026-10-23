@@ -72,3 +72,13 @@ test('reference profiles only require preparation for actual reference assets', 
  profile.requiredAnyMedia=['image'];assert.equal((await quote({assets:[]})).status,409);
  assert.equal(quotes,2);assert.equal(uploads,0);
 });
+
+
+test('HTTP video history awaits authoritative snapshots and reports asynchronous failures',async t=>{
+ let fail=false;
+ const server=http.createServer(createVideoHandler({sessions:{authenticate:async()=>({ownerId:1})},tasks:{history:async()=>{await Promise.resolve();if(fail)throw Error('offline');return [{status:'captured'}];}}}));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const url=`http://127.0.0.1:${server.address().port}/studio-v2/api/video/operations`;
+ const response=await fetch(url);assert.equal(response.status,200);assert.deepEqual(await response.json(),[{status:'captured'}]);
+ fail=true;assert.equal((await fetch(url)).status,409);
+});

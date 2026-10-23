@@ -31,7 +31,7 @@ test('ordinary environment restores separate legacy root and original HTTP recei
   const base=`http://127.0.0.1:${server.address().port}`;
   const env={STUDIO_LEGACY_VIDEO_RECOVERY:'true',STUDIO_OPERATION_ROOT:old,STUDIO_VIDEO_BASE_URL:base,STUDIO_VIDEO_API_KEY:'synthetic-only',STUDIO_VIDEO_KEY_SLOT_ID:'old-slot',STUDIO_BRIDGE_URL:base,STUDIO_BRIDGE_SERVICE_TOKEN:'s'.repeat(32)};
   const make=()=>createAccountVideoRuntime({rootDir:path.join(root,'new'),call:()=>assert.fail('Account path must not handle legacy'),legacy:legacyRecoveryFromEnvironment(env)});
-  const runtime=make();assert.equal(runtime.history(session)[0].contract,'legacy_slot');
+  const runtime=make();assert.equal((await runtime.history(session))[0].contract,'legacy_slot');
   assert.equal((await runtime.recover(session,op.operationId)).children[0].status,'accepted');
   await make().recover(session,op.operationId);assert.equal(supplierGets,1);assert.equal(ledgerGets,2);
   await assert.rejects(make().recover({ownerId:2,sessionProof:'other'},op.operationId));assert.equal(ledgerGets,2);

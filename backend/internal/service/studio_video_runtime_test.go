@@ -293,3 +293,38 @@ func TestVideoRuntimeRejectsStoredZeroRetailBeforeSubmit(t *testing.T) {
 	require.Zero(t, orders.reserves)
 	require.Zero(t, orders.captures)
 }
+
+func TestVideoHistorySnapshotUsesLedgerWithoutSupplierOrSettlement(t *testing.T) {
+	for _, terminal := range []string{StudioVideoHeld, StudioVideoCaptured, StudioVideoReleased} {
+		t.Run(terminal, func(t *testing.T) {
+			r, token, q, key, accounts, orders := videoRuntimeFixture(t)
+			posts := 0
+			r.request = func(_ context.Context, _ *Account, method, _ string, _ []byte) ([]byte, string, error) {
+				require.Equal(t, http.MethodPost, method)
+				posts++
+				return []byte(`{"id":"original-history-task"}`), "application/json", nil
+			}
+			_, err := r.Submit(t.Context(), q.Binding.Owner, key, token, "av_history")
+			require.NoError(t, err)
+			order := orders.orders["av_history"]
+			order.State, order.SupplierTaskID = terminal, "original-history-task"
+			accounts.a.Credentials = nil // Reading the native ledger must survive supplier removal.
+			want := map[string]string{StudioVideoHeld: "accepted", StudioVideoCaptured: "captured", StudioVideoReleased: "released"}[terminal]
+			for i := 0; i < 3; i++ {
+				state, err := r.Snapshot(t.Context(), q.Binding.Owner, "av_history")
+				require.NoError(t, err)
+				require.Equal(t, want, state.Status)
+				require.Equal(t, q.BindingHash, state.BindingHash)
+			}
+			require.Equal(t, 1, posts)
+			require.Equal(t, 1, orders.reserves)
+			require.Zero(t, orders.captures)
+			_, err = r.Snapshot(t.Context(), StudioImageOwner{99, 2, 3}, "av_history")
+			require.Error(t, err)
+			order.HoldFingerprint = "corrupt"
+			state, err := r.Snapshot(t.Context(), q.Binding.Owner, "av_history")
+			require.ErrorIs(t, err, ErrStudioVideoConflict)
+			require.Equal(t, "recovery_blocked", state.Status)
+		})
+	}
+}

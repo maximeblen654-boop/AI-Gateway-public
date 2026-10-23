@@ -16,6 +16,9 @@ func TestVideoRecoveryAuthorizationBoundary(t *testing.T) {
 	}{
 		{"GET", "/v1/studio/videos/tasks/av_one", true},
 		{"GET", "/v1/studio/videos/tasks/av_one/result", true},
+		{"GET", "/v1/studio/videos/tasks/av_one/snapshot", true},
+		{"POST", "/v1/studio/videos/tasks/av_one/snapshot", false},
+		{"GET", "/v1/studio/videos/tasks/av_one/snapshot?account=2", false},
 		{"POST", "/v1/studio/videos/tasks/av_one/capture", true},
 		{"POST", "/v1/studio/videos/tasks/av_one/release", true},
 		{"GET", "/v1/studio/videos/tasks/av_one/capture", false},

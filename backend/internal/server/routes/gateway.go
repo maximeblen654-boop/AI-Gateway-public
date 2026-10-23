@@ -701,6 +701,7 @@ func registerStudioVideoRoutes(gateway *gin.RouterGroup, h *handler.OpenAIGatewa
 	gateway.POST("/studio/videos/prepare", allow, h.StudioVideoPrepare)
 	gateway.POST("/studio/videos/tasks", allow, h.StudioVideoSubmit)
 	gateway.GET("/studio/videos/tasks/:task_id", allow, h.StudioVideoReceipt)
+	gateway.GET("/studio/videos/tasks/:task_id/snapshot", allow, h.StudioVideoSnapshot)
 	gateway.GET("/studio/videos/tasks/:task_id/result", allow, h.StudioVideoResult)
 	gateway.POST("/studio/videos/tasks/:task_id/capture", allow, h.StudioVideoCapture)
 	gateway.POST("/studio/videos/tasks/:task_id/release", allow, h.StudioVideoRelease)

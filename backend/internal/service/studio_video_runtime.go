@@ -517,7 +517,9 @@ func videoTaskID(body []byte) string {
 	return id
 }
 
-func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner, id string) (StudioVideoState, error) {
+// Snapshot reads the original task and native ledger only. It never polls the
+// supplier, downloads media, or reserves/finalizes money.
+func (r *StudioVideoRuntime) Snapshot(ctx context.Context, owner StudioImageOwner, id string) (StudioVideoState, error) {
 	t, e := r.Store.Task(id, owner)
 	if e != nil {
 		return StudioVideoState{}, e
@@ -547,6 +549,19 @@ func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner
 	if e != nil {
 		return r.videoState(t, "", "unknown"), e
 	}
+	return r.videoState(t, upstream, "accepted"), nil
+}
+
+func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner, id string) (StudioVideoState, error) {
+	state, e := r.Snapshot(ctx, owner, id)
+	if e != nil || state.Status != "accepted" {
+		return state, e
+	}
+	t, e := r.Store.Task(id, owner)
+	if e != nil {
+		return state, e
+	}
+	upstream := state.UpstreamID
 	a, release, e := r.account(ctx, t.Quote.Binding, false, false)
 	if e != nil {
 		return r.videoState(t, upstream, "recovery_blocked"), e

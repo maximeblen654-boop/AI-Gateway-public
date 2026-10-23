@@ -4,11 +4,10 @@
     <ul class="picker-list">
       <li v-for="group in groups" :key="group.key" :class="{ selected: group.offers.some(item => item.offer_id === modelValue) }">
         <button type="button" class="picker-choice" :data-offer-id="group.selected.offer_id" :aria-pressed="modelValue === group.selected.offer_id" :disabled="disabled" @click="emit('select', group.selected.offer_id)">
-          <span class="picker-name">{{ group.selected.display_name || group.selected.upstream_model }}</span>
-          <small>{{ summary(group.offers) }}</small>
+          <span class="picker-name" :title="group.selected.display_name || group.selected.upstream_model">{{ group.selected.display_name || group.selected.upstream_model }}</span>
         </button>
         <button type="button" class="picker-status" :class="status(group.selected).tone" :aria-label="`${group.selected.display_name || group.selected.upstream_model}：${status(group.selected).label}，查看统计详情`" :aria-expanded="detailId === group.selected.offer_id" aria-controls="studio-model-observation" @mouseenter="detailId = group.selected.offer_id" @focus="detailId = group.selected.offer_id" @click="detailId = group.selected.offer_id">
-          <span class="status-mark" aria-hidden="true">{{ status(group.selected).tone === 'neutral' ? '—' : '·' }}</span>{{ status(group.selected).label }}
+          <span class="status-mark" aria-hidden="true">{{ status(group.selected).tone === 'neutral' ? '—' : '·' }}</span>{{ status(group.selected).label === '暂无状态数据' ? '暂无数据' : status(group.selected).label }}
         </button>
       </li>
     </ul>
@@ -49,12 +48,6 @@ function status(offer: StudioOffer) {
   const percentage = (s.error_rate * 100).toLocaleString('zh-CN', { maximumFractionDigits: 1 })
   return { label: `错误 ${percentage}%`, message: `已记录请求错误率 ${percentage}%。沿用原生监控的错误分类与排除规则；不等同于作品交付失败率。`, tone: s.error_rate > 0 ? 'observed-errors' : 'observed' }
 }
-function summary(offers: StudioOffer[]) {
-  const resolutions = [...new Set(offers.flatMap(offer => offer.spec.resolution || []))]
-  const durations = [...new Set(offers.flatMap(offer => offer.spec.duration_seconds || []))].sort((a,b) => a-b)
-  const ratios = new Set(offers.flatMap(offer => offer.spec.aspect_ratio || []))
-  return [resolutions.join(' / '), durations.length ? `${durations.join(' / ')} 秒` : '', ratios.size ? `${ratios.size} 种比例` : ''].filter(Boolean).join(' · ') || '查看可售规格'
-}
 function navigate(event: KeyboardEvent) {
   if (!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return
   const choices = [...(root.value?.querySelectorAll<HTMLButtonElement>('.picker-choice:not(:disabled)') || [])]
@@ -67,27 +60,26 @@ function navigate(event: KeyboardEvent) {
 </script>
 <style scoped>
 .studio-offer-picker { color:var(--sw-ink); font-size:13px; outline-offset:2px }
-.picker-heading { display:flex; justify-content:space-between; gap:12px; margin:2px 4px 10px; font-weight:650 }
+.picker-heading { display:flex; justify-content:space-between; gap:12px; margin:0 4px 6px; font-weight:600 }
 .picker-heading span { color:var(--sw-muted); font-weight:400 }
-.picker-list { list-style:none; padding:0 4px 0 0; margin:0; max-height:240px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--sw-line) transparent; -webkit-overflow-scrolling:touch }
-.picker-list::-webkit-scrollbar { width:8px }
-.picker-list::-webkit-scrollbar-thumb { background:var(--sw-line); border-radius:999px }
-.picker-list::-webkit-scrollbar-track { background:transparent }
-.picker-list li { display:flex; align-items:center; gap:8px; border:1px solid transparent; border-radius:10px; padding:5px; margin:3px 0 }
+.picker-list { list-style:none; padding:0 4px 0 0; margin:0; max-height:min(200px,32dvh); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--sw-accent) var(--sw-soft); scrollbar-gutter:stable; -webkit-overflow-scrolling:touch }
+.picker-list::-webkit-scrollbar { width:6px }
+.picker-list::-webkit-scrollbar-thumb { background:var(--sw-accent); border:1px solid var(--sw-soft); border-radius:999px }
+.picker-list::-webkit-scrollbar-track { background:var(--sw-soft); border-radius:999px }
+.picker-list li { display:flex; align-items:center; gap:6px; border:1px solid transparent; border-radius:7px; padding:1px 3px; margin:2px 0 }
 .picker-list li.selected { background:var(--sw-soft); border-color:var(--sw-line) }
-.picker-choice { background:transparent; border:0; padding:7px; min-width:0; flex:1; text-align:left; color:inherit; min-height:48px }
-.picker-name { display:block; font-weight:650; overflow-wrap:anywhere; line-height:1.5 }
-.picker-choice small { color:var(--sw-muted); display:block; font-size:12px; margin-top:3px }
-.picker-status { display:flex; align-items:center; gap:5px; flex-shrink:0; border:1px solid var(--sw-line); background:var(--sw-paper); color:var(--sw-muted); border-radius:999px; padding:6px 9px; font-size:12px; min-height:40px; white-space:nowrap }
-.status-mark { font-size:16px; line-height:1; font-weight:700 }
+.picker-choice { background:transparent; border:0; padding:5px; min-width:0; flex:1; text-align:left; color:inherit; min-height:36px }
+.picker-name { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; font-weight:550; font-size:13px; overflow-wrap:anywhere; line-height:1.5 }
+.picker-status { display:flex; align-items:center; gap:5px; flex-shrink:0; border:0; background:transparent; color:var(--sw-muted); border-radius:6px; padding:4px; font-size:12px; min-height:32px; white-space:nowrap }
+.status-mark { font-size:13px; line-height:1; font-weight:500 }
 .observed { color:var(--sw-ink) }.observed-errors { color:#9b4b2f; background:#fff1e8 }
 :global(html.dark .studio-offer-picker .observed-errors) { color:#ffbd9a; background:#3d3029 }
-.picker-detail { background:var(--sw-soft); border-radius:10px; padding:12px; margin-top:10px; line-height:1.6 }
+.picker-detail { background:var(--sw-soft); border-radius:10px; padding:12px; margin-top:10px; line-height:1.6; max-height:160px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--sw-accent) var(--sw-soft) }
 .picker-detail>div { display:flex; justify-content:space-between; align-items:center; gap:10px }
 .picker-detail button { background:none; border:0; color:inherit; font-size:20px; width:30px; height:30px }
 .picker-detail p { margin:5px 0; font-size:12px; overflow-wrap:anywhere }
-.picker-detail small,.picker-footnote,.picker-empty { color:var(--sw-muted); font-size:12px }
-.picker-footnote { margin:10px 4px 4px }
-@media(max-width:700px) { .picker-list { max-height:190px }.picker-list li { gap:2px }.picker-status { padding:6px; font-size:12px }.picker-detail { max-height:180px; overflow-y:auto } }
+.picker-detail small,.picker-footnote,.picker-empty { color:var(--sw-muted); font-size:11px }
+.picker-footnote { margin:7px 4px 0 }
+@media(max-width:700px) { .picker-list { max-height:min(168px,30dvh) }.picker-list li { gap:2px }.picker-status { padding:6px; font-size:12px }.picker-detail { max-height:180px; overflow-y:auto } }
 @media(prefers-reduced-motion:reduce) { button { transition:none!important } }
 </style>

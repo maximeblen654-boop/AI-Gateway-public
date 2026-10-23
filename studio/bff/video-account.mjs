@@ -14,10 +14,10 @@ export function createAccountVideoClient({baseUrl,serviceToken,fetchImpl=fetch})
   const root=new URL(baseUrl);
   if (!['https:','http:'].includes(root.protocol) || root.protocol==='http:'&&!['127.0.0.1','localhost','[::1]'].includes(root.hostname) || root.username || root.password || root.search || root.hash || typeof serviceToken!=='string'||serviceToken.length<32) fail('Invalid video Bridge');
   return async (session,method,operation,payload,keyRef) => {
-    if (!['GET','POST'].includes(method)||! /^(catalog|readiness|quotes|prepare|tasks|tasks\/av_[A-Za-z0-9_-]+(?:\/(result|capture|release))?)$/.test(operation)) fail('Invalid video operation');
+    if (!['GET','POST'].includes(method)||! /^(catalog|readiness|quotes|prepare|tasks|tasks\/av_[A-Za-z0-9_-]+(?:\/(result|capture|release|snapshot))?)$/.test(operation)) fail('Invalid video operation');
     const body=method==='POST'?JSON.stringify({key_ref:keyRef||0,payload}):undefined;
     if(body&&Buffer.byteLength(body)>32*1024*1024)fail('media_request_too_large');
-    const response=await fetchImpl(new URL(`/api/v1/internal/studio/video/${operation}`,root),{method,redirect:'error',signal:AbortSignal.timeout(960000),
+    const response=await fetchImpl(new URL(`/api/v1/internal/studio/video/${operation}`,root),{method,redirect:'error',signal:AbortSignal.timeout(operation.endsWith('/snapshot')?5000:960000),
       headers:{'Content-Type':'application/json','X-Studio-Service-Token':serviceToken,'X-Studio-Session-Proof':session.sessionProof,'X-Studio-Binding-Contract':VIDEO_CONTRACT,...(keyRef?{'X-Studio-Key-Ref':String(keyRef)}:{})},
       body});
     if(!response.ok) {if(response.status===410)throw Object.assign(new Error('video_result_expired'),{code:'video_result_expired'});fail('Video bridge unavailable; recover the original task');}
@@ -96,7 +96,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     ...(b?{status:op.children[0].status,offer_id:b.offer.offer_id,model:b.offer.upstream_model,spec:b.spec,sale_price:b.offer.sale_price,unit_price:b.offer.sale_price,total_price:b.offer.sale_price,quantity:b.spec.count,expires_at:b.expires_at}:{}),
     children:op.children.map(c=>({task_id:c.childId,status:c.status,...(c.account?{sale_price:c.account.binding.offer.sale_price}: {})}))};}
   function child(session,id){const op=get(session,id);if(op.version!==2)fail('Legacy task requires original recovery');return op.children[0];}
-  async function current(session,c){const s=(await call(session,'GET',`tasks/${c.childId}`,undefined,c.account.key_ref)).payload;
+  async function current(session,c,snapshot=false){const s=(await call(session,'GET',`tasks/${c.childId}${snapshot?'/snapshot':''}`,undefined,c.account.key_ref)).payload;
     if(s?.contract!==VIDEO_CONTRACT||s.task_id!==c.childId||s.binding_hash!==c.account.binding_hash||s.request_hash!==c.bodySha256)fail('Recovery identity mismatch');return s;}
   async function dispatch(session,id){
     const c=child(session,id),op=get(session,id);
@@ -152,6 +152,26 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const value=view(get(session,id));return {...value,status:s.status,...(!value.result_retention&&s.result_retention?{result_retention:s.result_retention}:{})};
   }
   async function original(session,id,options){const op=get(session,id);if(op.version===1){if(!legacy)fail('Original slot recovery adapter unavailable');return legacy.original(session,id,options)};if(options?.index)fail('Invalid child index');return delivery(session,id).openOriginal(owner(session),id,0,options);}
-  function history(session){const current=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];if(old.some(op=>current.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');return [...current,...old].map(view);}
+  async function history(session){
+    const operations=journal.listForOwner(owner(session)).items,old=legacy?.history?.(session)||[];
+    if(old.some(op=>operations.some(c=>c.operationId===op.operationId)))fail('Conflicting journal roots');
+    const items=operations.map(view);let next=0;
+    // Read the native ledger without polling suppliers or invoking delivery.
+    // Eight readers keep the existing 50-item page bounded within the browser timeout.
+    await Promise.all(Array.from({length:Math.min(8,operations.length)},async()=>{
+      for(let i=next++;i<operations.length;i=next++){
+        const op=operations[i],c=op.children[0];
+        if(op.version!==2||c.status==='intent')continue;
+        let status='unknown',retention;
+        try{
+          const s=await current(session,c,true);
+          if(!['accepted','captured','released','unknown','reserve_pending','recovery_blocked'].includes(s.status))fail('Invalid history snapshot');
+          status=s.status;retention=s.result_retention;
+        }catch{/* Keep this task visible without claiming it is still generating. */}
+        items[i]={...items[i],status,children:items[i].children.map(child=>({...child,status})),...(retention?{result_retention:retention}:{})};
+      }
+    }));
+    return [...items,...old.map(view)];
+  }
   return {catalog,readiness,prepare,prepareReferences,getPreparation,dispatch,recover,original,history};
 }

@@ -51,7 +51,7 @@ function fixture(t,{bindingVersion=VIDEO_CONTRACT,mutateQuote,lost=false,corrupt
   if(operation==='tasks'){posts++;tasks.set(payload.task_id,{status:taskStatus,upstream_id:'original-upstream'});if(lost)throw Error('lost submit response');return {key_ref:2,payload:{}};}
   const [,id,action]=operation.split('/');const state=tasks.get(id);assert.ok(state);
   if(action==='release'){if(state.status!=='released')releases++;state.status='released';return {key_ref:2,payload:{contract:VIDEO_CONTRACT,task_id:id,status:'released'}};}
-  if(!action){assert.equal(method,'GET');return {key_ref:2,payload:{contract:VIDEO_CONTRACT,task_id:id,...state,binding_hash:q.binding_hash,request_hash:q.binding.request_hash}};}
+  if(!action||action==='snapshot'){assert.equal(method,'GET');return {key_ref:2,payload:{contract:VIDEO_CONTRACT,task_id:id,...state,binding_hash:q.binding_hash,request_hash:q.binding.request_hash}};}
   if(action==='result'){assert.equal(method,'GET');downloads++;if(resultTimeout)throw Error('local result timeout');return {key_ref:2,payload:{mime_type:'video/mp4',bytes_base64:(corrupt?Buffer.from('not a video'):resultBytes||video()).toString('base64')}};}
   if(action==='capture'){
    captureRequests++;
@@ -96,7 +96,7 @@ test('valid different video geometry or duration is delivered unchanged and capt
  assert.deepEqual(f.counts(),{posts:1,captures:1,quoteCalls:1});assert.equal(f.downloads(),1);
  assert.equal(f.captureRequests(),1);
  assert.equal(f.releases(),0);
- assert.equal(restarted.history(session)[0].children[0].status,'accepted');
+ assert.equal((await restarted.history(session))[0].children[0].status,'captured');
  await assert.rejects(restarted.original({ownerId:9},op.operation_id));
  t.diagnostic(JSON.stringify({task:op.children[0].task_id,request:f.request(),actual:{size,seconds},resultHash:hash(tiny),...f.counts(),releaseCalls:f.releases(),resultGets:f.downloads(),status:'captured'}));
  });
@@ -173,7 +173,7 @@ test('new USD quote is rejected before journal or task creation',async t=>{
  const f=fixture(t,{currency:'USD'}),r=f.make();
  await assert.rejects(r.prepare(session,{clientKey:'usd-new',offerId:'offer1',request:request()}),/Quote binding mismatch/);
  assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});
- assert.deepEqual(r.history(session),[]);
+ assert.deepEqual(await r.history(session),[]);
 });
 
 test('lost POST response/restart only recovers original task, never requotes or resubmits',async t=>{
@@ -258,7 +258,7 @@ test('private v2 acceptance preserves transport and identity rejection',async t=
   const f=fixture(t,{bindingVersion:'account_video_v2',mutateQuote});
   await assert.rejects(f.make().prepare(session,{clientKey:name,offerId:'offer1',request:request()}),/Quote binding mismatch/);
   assert.deepEqual(f.counts(),{posts:0,captures:0,quoteCalls:1});
-  assert.deepEqual(f.make().history(session),[]);
+  assert.deepEqual(await f.make().history(session),[]);
  });
 });
 
@@ -271,4 +271,43 @@ test('journal rejects unsupported private binding versions before persisting int
   assert.throws(()=>journal.createIntent({ownerId:1,clientKey:'invalid-version',quoteId:'quote',capabilityRevision:'rev',currency:'CNY',children:[{bodyBytes:body,account:{binding,binding_hash:'a'.repeat(64),quote_token:'b'.repeat(64),key_ref:2}}]}),/invalid_account_binding/);
  }
  assert.deepEqual(fs.readdirSync(root),[]);
+});
+
+
+test('video history reads terminal ledger snapshots after restart without generation, downloads or settlement',async t=>{
+ for(const [taskStatus,expected] of [['captured','captured'],['failed','released'],['processing','processing']])await t.test(taskStatus,async t=>{
+  const f=fixture(t,{taskStatus:taskStatus==='captured'?'captured':taskStatus}),r=f.make();
+  const op=await r.prepare(session,{clientKey:'history-terminal',offerId:'offer1',request:request()});
+  await r.dispatch(session,op.operation_id);
+  const before={...f.counts(),downloads:f.downloads(),releases:f.releases(),captureRequests:f.captureRequests()};
+  const calls=[];
+  const runtime=createAccountVideoRuntime({rootDir:f.root,resultStore:f.store,call:async(s,method,operation,_payload,keyRef)=>{
+   calls.push({method,operation});assert.equal(s.ownerId,1);assert.equal(keyRef,2);assert.equal(method,'GET');assert.match(operation,/\/snapshot$/);
+   const child=createOperationJournal({rootDir:f.root}).getForOwner(1,op.operation_id).children[0];
+   return {payload:{contract:VIDEO_CONTRACT,task_id:child.childId,binding_hash:child.account.binding_hash,request_hash:child.bodySha256,status:expected==='processing'?'accepted':expected}};
+  }});
+  for(let n=0;n<2;n++){
+   const item=(await runtime.history(session))[0];assert.equal(item.status,expected==='processing'?'accepted':expected);assert.equal(item.children[0].status,item.status);
+  }
+  assert.equal(calls.length,2);
+  assert.deepEqual({...f.counts(),downloads:f.downloads(),releases:f.releases(),captureRequests:f.captureRequests()},before);
+  assert.equal(createOperationJournal({rootDir:f.root}).getForOwner(1,op.operation_id).children[0].status,'accepted');
+ });
+});
+
+test('video history keeps unsubmitted quotes local and fails uncertain for an unavailable or mismatched snapshot',async t=>{
+ const f=fixture(t,{taskStatus:'processing'}),r=f.make();
+ const pending=await r.prepare(session,{clientKey:'history-uncertain',offerId:'offer1',request:request()});
+ const noCalls=createAccountVideoRuntime({rootDir:f.root,resultStore:f.store,call:()=>assert.fail('unsubmitted quotes have no Core task')});
+ assert.equal((await noCalls.history(session))[0].status,'intent');
+ await r.dispatch(session,pending.operation_id);
+ for(const mode of ['unavailable','wrong-owner-binding']){
+  const restarted=createAccountVideoRuntime({rootDir:f.root,resultStore:f.store,call:async()=>{
+   if(mode==='unavailable')throw Error('offline');
+   return {payload:{contract:VIDEO_CONTRACT,task_id:'av_other',binding_hash:'f'.repeat(64),request_hash:'f'.repeat(64),status:'captured'}};
+  }});
+  const history=await restarted.history(session);assert.equal(history.length,1);assert.equal(history[0].status,'unknown');
+  assert.deepEqual(await restarted.history({ownerId:999}),[]);
+ }
+ assert.deepEqual(f.counts(),{posts:1,captures:0,quoteCalls:1});assert.equal(f.downloads(),0);
 });

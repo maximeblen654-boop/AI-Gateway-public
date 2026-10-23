@@ -18,7 +18,7 @@ func StudioVideoServiceAuthorized(r *http.Request) bool {
 	return subtle.ConstantTimeCompare(want[:], got[:]) == 1
 }
 
-var videoRecoveryPath = regexp.MustCompile(`^/v1/studio/videos/tasks/av_[A-Za-z0-9_-]{1,120}(?:/(result|capture|release))?$`)
+var videoRecoveryPath = regexp.MustCompile(`^/v1/studio/videos/tasks/av_[A-Za-z0-9_-]{1,120}(?:/(result|capture|release|snapshot))?$`)
 
 func isStudioVideoRecovery(r *http.Request) bool {
 	if !StudioVideoServiceAuthorized(r) || !videoRecoveryPath.MatchString(r.URL.Path) || r.URL.RawQuery != "" {

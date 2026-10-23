@@ -305,7 +305,7 @@ func NewVideo(opts ImageOptions) (*ImageBridge, error) {
 	return b, nil
 }
 
-var videoTaskOperation = regexp.MustCompile(`^tasks/av_[A-Za-z0-9_-]{1,120}(?:/(result|capture|release))?$`)
+var videoTaskOperation = regexp.MustCompile(`^tasks/av_[A-Za-z0-9_-]{1,120}(?:/(result|capture|release|snapshot))?$`)
 
 func videoOperation(method, path string) bool {
 	if method == http.MethodGet {
