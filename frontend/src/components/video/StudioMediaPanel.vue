@@ -21,18 +21,19 @@
       <p class="studio-retention-note">新图片原片保留72小时，新视频原片保留48小时，请及时下载；历史作品以服务端提供的到期时间为准。</p>
       <div v-if="displayHistory.length" class="studio-gallery" data-testid="studio-history">
         <button v-for="task in displayHistory" :key="task.id" class="studio-work" :class="{ 'is-selected': active?.id === task.id }" :disabled="busy" :data-task-id="task.id" @click="selectTask(task)">
-          <span class="studio-work-preview" :class="{ 'is-state-cover': task.status === 'processing' || taskFailed(task) || quotePending(task) }">
+          <span class="studio-work-preview" :class="{ 'is-state-cover': task.status === 'processing' || taskFailed(task) || task.status === 'prepared' }">
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-backdrop" :src="resultUrl(task)" alt="" aria-hidden="true" loading="lazy" @error="hidePreviewBackdrop" />
             <img v-if="task.kind === 'image' && readableResults(task)" class="studio-work-preview-image" :src="resultUrl(task)" :alt="taskModel(task) + ' 的生成结果'" loading="lazy" @error="imageUnavailable" />
             <StudioVideoCover v-else-if="task.kind === 'video' && readableResults(task)" :src="resultUrl(task)" :alt="taskModel(task) + ' 的视频封面'" />
             <img v-else-if="task.status === 'processing'" class="studio-state-cover studio-generating-cover" :src="generatingCover" alt="在努力啦..." loading="lazy" decoding="async" data-testid="studio-generating-cover" />
             <img v-else-if="taskFailed(task)" class="studio-state-cover" :src="failureCover" alt="生成失败" loading="lazy" decoding="async" :data-testid="task.kind === 'image' ? 'studio-image-failed-cover' : 'studio-failed-cover'" />
             <img v-else-if="quotePending(task)" class="studio-state-cover" :src="quoteReadyCover" alt="报价已锁定，等待确认生成" loading="lazy" decoding="async" data-testid="studio-quote-ready-cover" />
+            <img v-else-if="task.status === 'prepared' && quoteExpired(task)" class="studio-state-cover" :src="quoteExpiredCover" alt="报价已失效，请重新报价" loading="lazy" decoding="async" data-testid="studio-quote-expired-cover" />
             <span v-else class="studio-work-placeholder"><Icon :name="placeholderIcon(task)" aria-hidden="true" /><span>{{ placeholderText(task) }}</span></span>
           </span>
           <span class="studio-work-title"><strong>{{ taskModel(task) }}</strong><time>{{ taskDate(task) }}</time></span>
           <span class="studio-work-meta">{{ specText(task) }}</span>
-          <span class="studio-work-state" :class="{ 'is-failed': taskFailed(task) }">{{ taskFailed(task) ? failureSummary(task) : task.status === 'prepared' && quoteExpired(task) ? '报价已失效' : statusText(task.status) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
+          <span class="studio-work-state" :class="{ 'is-failed': taskFailed(task) }">{{ taskFailed(task) ? failureSummary(task) : taskStatusText(task) }}<template v-if="task.status === 'completed' && hasResults(task)"> · 已保存 {{ task.resultCount }} {{ task.kind === 'image' ? '张原图' : '条视频' }}</template><template v-else-if="task.status === 'partial'"> · 已交付 {{ task.deliveredCount ?? task.resultCount }}/{{ task.expectedCount ?? task.quantity }} {{ task.kind === 'image' ? '张' : '条' }}</template><template v-if="hasResults(task)"><br /><span data-testid="studio-history-retention">{{ retentionText(task) }}</span></template></span>
         </button>
       </div>
       <div v-else class="studio-empty" data-testid="studio-empty"><StudioMark /><h2>{{ historyLoading || busy ? '正在读取工作台…' : historyMode && history.length ? '当前没有可显示的任务' : historyMode ? '还没有历史任务' : '让想法有画面。' }}</h2><p>{{ historyMode && history.length ? (failedHistoryCount ? '失败任务已隐藏，点击上方按钮查看。' : '任务仍在生成、恢复或结算中。') : historyMode ? '完成创作后，你可以在这里查看状态和下载作品。' : '写下描述，开始创作。' }}</p></div>
@@ -41,14 +42,14 @@
       <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
       <p v-if="readinessState === 'disabled'" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
       <section v-if="active" ref="taskDetail" class="studio-task-detail" data-testid="studio-task" aria-label="当前任务">
-        <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>已冻结：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</span></div>
-        <div class="studio-price-line"><p data-testid="studio-price">冻结报价 <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
+        <div class="studio-task-heading"><div><h2>{{ taskModel(active) }}</h2><p>{{ active.status === 'prepared' ? '报价规格' : '生成规格' }}：{{ specText(active) }}</p></div><span class="studio-status" :class="`status-${active.status}`" data-testid="studio-status" aria-live="polite">{{ submitting[active.id] ? '提交处理中' : taskStatusText(active) }}</span></div>
+        <div class="studio-price-line"><p data-testid="studio-price">{{ active.status === 'prepared' ? '本次报价' : '冻结报价' }} <strong>{{ active.price.amount }} {{ active.price.currency }}</strong><span v-if="active.unitPrice && active.quantity">（{{ active.unitPrice.amount }} × {{ active.quantity }} {{ active.kind === 'image' ? '张' : '条' }}）</span></p><p v-if="active.kind === 'image'" data-testid="studio-settlement">实际结算：<span v-if="active.status === 'prepared'">尚未生成</span><span v-else-if="active.billingState === 'billed' && active.settledPrice">{{ active.settledPrice.amount }} {{ active.settledPrice.currency }}（服务端原生结算）</span><span v-else-if="active.billingState === 'billed'">已结算，金额待服务端回执</span><span v-else-if="active.billingState === 'not_charged'">未收费</span><span v-else>待结算</span></p></div>
         <p v-if="active.status === 'prepared'" class="studio-quote-expiry">{{ expired ? '报价已失效，请重新获取报价并确认。' : `报价有效至 ${new Date(active.expiresAt).toLocaleString()}` }}</p>
         <p v-else-if="!taskFailed(active)" class="studio-retention-note" data-testid="studio-result-retention" role="status">{{ retentionText(active) }}<template v-if="resultExpired(active)">任务与结算记录保留。</template></p>
         <p v-if="active.status === 'partial'" class="studio-partial" data-testid="studio-partial-counts">部分完成：请求 {{ active.expectedCount ?? active.quantity }} 张，已交付 {{ active.deliveredCount ?? active.resultCount }} 张，未完成 {{ (active.failedCount ?? 0) + (active.pendingCount ?? 0) }} 张。</p>
         <div v-if="waiting" class="studio-waiting" data-testid="studio-waiting" :class="{ 'is-uncertain': uncertain && !submitting[active.id] }">
           <Icon :name="submitting[active.id] || !uncertain ? 'refresh' : 'infoCircle'" :class="{ spinning: submitting[active.id] || !uncertain }" />
-          <div><strong>{{ submitting[active.id] ? '提交处理中' : statusText(active.status) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
+          <div><strong>{{ submitting[active.id] ? '提交处理中' : taskStatusText(active) }}</strong><p>{{ waitingMessage }}</p><small data-testid="studio-elapsed">{{ submitting[active.id] ? '本次提交已等待' : '距任务创建' }} {{ elapsedText }}。可以继续创作，原任务保留在历史记录中。</small></div>
         </div>
         <div v-if="taskFailed(active)" role="alert" class="studio-task-failure" data-testid="studio-task-failure"><Icon name="exclamationCircle" aria-hidden="true" /><div><strong>这次没能生成成功</strong><p>{{ failureSummary(active) }}。原任务已保留，不会自动再次生成。</p></div></div>
         <p v-if="active.failureCode === 'upstream_http_502_no_delivery'" class="studio-error" data-testid="studio-http-failure">图片服务返回 HTTP 502，未取得图片的执行单元已终结，不会补扣这些单元的费用。已交付作品仍按实际结算回执计费。</p>
@@ -67,7 +68,7 @@
             <figcaption><span class="studio-result-label">原始结果 {{ i }}</span><span v-if="resultExpired(active)" role="status" class="studio-result-unavailable">原片已到期</span><span v-else-if="unavailableResults[`${active.id}-${i}`]" role="status" class="studio-result-unavailable">原片暂不可用，可能已过期</span><a v-else class="studio-download" :href="resultUrl(active,i-1)" :download="`${active.id}-${i}`" data-testid="studio-download" @click="guardDownload($event,active)"><Icon name="download" /><span>下载原片</span></a></figcaption><StudioImageExport v-if="active.kind === 'image' && readableResults(active) && !unavailableResults[`${active.id}-${i}`]" :key="`${active.id}-${i}-export`" :url="resultUrl(active,i-1)" :filename="`${active.id}-${i}`" @click.capture="guardDownload($event,active)" />
           </figure>
         </div>
-        <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认报价并生成<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? '调整输入并重新报价' : '继续创作' }}</button></div>
+        <div class="studio-task-actions"><button v-if="active.status === 'prepared'" class="studio-button studio-primary" data-testid="studio-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">{{ expired ? '报价已失效' : '确认报价并生成' }}<Icon name="arrowUp" /></button><button class="studio-button" data-testid="studio-refresh" :disabled="querying || busy || !!submitting[active.id]" :aria-busy="querying" @click="refresh()"><Icon name="refresh" :class="{ spinning: querying }" />{{ querying ? '查询中…' : '查询原任务' }}</button><button v-if="canStartNew" class="studio-button" :class="{ 'studio-primary': active.status === 'prepared' && expired }" data-testid="studio-new" :disabled="busy" @click="newTask">{{ active.status === 'prepared' ? (expired ? '重新报价' : '调整输入并重新报价') : '继续创作' }}</button></div>
         <details class="studio-task-id"><summary>任务详情</summary><p data-testid="studio-task-id">任务：{{ active.id }}</p></details>
       </section>
       <section v-if="!historyMode" v-show="!active" class="studio-composer-wrap" :class="{ 'has-task': !!active }" aria-label="创作输入">
@@ -102,12 +103,12 @@
     </div>
   </section>
 
-  <BaseDialog :show="quoteConfirm && active?.status === 'prepared'" title="确认本次生成" width="narrow" @close="quoteConfirm = false">
+  <BaseDialog :show="quoteConfirm && active?.status === 'prepared'" :title="expired ? '报价已失效' : '确认本次生成'" width="narrow" @close="quoteConfirm = false">
     <div v-if="active" class="studio-confirm">
       <p>{{ taskModel(active) }}</p><p class="studio-confirm-spec">{{ specText(active) }}</p>
       <p class="studio-confirm-total">{{ active.price.amount }} <span>{{ active.price.currency }}</span></p>
       <p v-if="active.unitPrice && active.quantity">单{{ active.kind === 'image' ? '张' : '条' }} {{ active.unitPrice.amount }} × {{ active.quantity }}</p>
-      <p class="studio-confirm-note">价格已锁定，尚未冻结余额。确认后将冻结对应余额。{{ expired ? '报价已失效，请返回重新获取。' : '确认后开始生成。' }}</p>
+      <p class="studio-confirm-note">{{ expired ? '报价已失效，尚未生成。请重新获取报价后确认。' : '价格已锁定，尚未冻结余额。确认后将冻结对应余额并开始生成。' }}</p>
       <p v-if="!enabled" class="studio-confirm-note">当前生成服务尚未开放。</p>
     </div>
     <template #footer><button class="studio-confirm-back" @click="newTask">返回修改</button><button class="studio-confirm-submit" data-testid="studio-confirm-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认并生成</button></template>
@@ -126,6 +127,7 @@ import StudioMark from './StudioMark.vue'
 import StudioVideoCover from './StudioVideoCover.vue'
 import failureCover from '@/assets/studio-image-failed-whale.png'
 import quoteReadyCover from '@/assets/studio-quote-ready-whale.png'
+import quoteExpiredCover from '@/assets/studio-quote-expired-whale.png'
 import generatingCover from '@/assets/studio-generating-effort.png'
 import StudioImageExport from './StudioImageExport.vue'
 import StudioSpecPicker from './StudioSpecPicker.vue'
@@ -272,6 +274,7 @@ const waitingMessage=computed(()=>{
 })
 const statuses:Record<string,string>={prepared:'报价已锁定，等待确认生成',processing:'生成中',queued:'排队中',completed:'生成完成，原始结果已保存',partial:'部分完成',unknown:'结果待确认',billing_pending:'结果已保存，结算待确认',failed:'生成失败',released:'生成失败，费用已释放',reserve_pending:'结果待确认：费用预占处理中，请查询原任务',recovery_blocked:'结果待确认：原任务身份暂不可用，恢复受阻'}
 const statusText=(status:string)=>statuses[status]||'结果待确认'
+const taskStatusText=(task:StudioTask)=>task.status==='prepared' && quoteExpired(task)?'报价已失效':statusText(task.status)
 const taskModel=(task:StudioTask)=>offers.value.find(o=>o.offer_id===task.offerId)?.display_name||(!/^media[-_]/.test(task.model)?task.model:'')||'已保存的创作'
 const specText=(task:StudioTask)=>[task.spec.resolution,task.spec.aspect_ratio,task.kind==='image'&&typeof task.spec.output_format==='string'?outputFormatLabels[task.spec.output_format]||task.spec.output_format:'',task.spec.duration_seconds?`${task.spec.duration_seconds}秒`:'',`${task.spec.count??1}${task.kind==='image'?'张':'条'}`].filter(Boolean).join(' / ')
 function remember(){try{if(storage)sessionStorage.setItem(storage,JSON.stringify({kind:kind.value,imageMode:imageMode.value,id:active.value?.id,view:active.value?'task':'compose',attempted:[...attempted]}))}catch{/* Durable server history remains available when browser storage is unavailable. */}}
@@ -355,7 +358,7 @@ async function refresh(automatic=false){
   if(!mounted)return
   accepted(task,false)
   const unchanged=task.status===original.status && task.resultCount===original.resultCount && task.billingState===original.billingState
-  feedback.value[original.id]={at:Date.now(),message:unchanged?`已查询原任务，暂无新结果。当前状态：${statusText(task.status)}。`:`原任务已更新：${statusText(task.status)}。`}
+  feedback.value[original.id]={at:Date.now(),message:unchanged?`已查询原任务，暂无新结果。当前状态：${taskStatusText(task)}。`:`原任务已更新：${taskStatusText(task)}。`}
  }catch(e){if(mounted)feedback.value[original.id]={at:Date.now(),message:'本次查询未取得最新状态，保留上次记录。',error:`查询未完成：${studioErrorMessage(e)} 原任务未重新提交。`}}
  finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}
 }
@@ -415,8 +418,9 @@ async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable
  if(active.value){quoteConfirm.value=true;revealTask()}
  }catch(e){error.value=studioErrorMessage(e);if(e instanceof StudioError&&e.status===409&&!e.code.includes('paid_gate_off')){intent=undefined;quoteConfirm.value=false;await refreshCatalog()}history.value=await studioHistory(kind.value).catch(()=>history.value)}finally{busy.value=false}}
 async function generate(){
+ clock.value=Date.now()
  if(busy.value||catalogLoading.value||activeQuoteUnavailable.value||!active.value||active.value.status!=='prepared'||!enabled.value||expired.value||attempted.has(active.value.id))return
- const task=active.value;quoteConfirm.value=false;error.value='';attempted.add(task.id);submitting.value[task.id]=Date.now();clock.value=Date.now();accepted({...task,status:'unknown'})
+ const task=active.value;quoteConfirm.value=false;error.value='';attempted.add(task.id);submitting.value[task.id]=clock.value;accepted({...task,status:'unknown'})
  try{accepted(await studioGenerate(task),false)}catch(e){
   if(!mounted)return
   if(e instanceof StudioError&&(e.code.includes('paid_gate_off')||e.code.endsWith('quote_expired'))){attempted.delete(task.id);accepted(task,false)}

@@ -155,7 +155,7 @@ for(const [width,height,theme] of [[1440,900,'light'],[390,844,'light'],[1366,65
  await page.getByTestId('studio-mode-history').click()
  const background='rgb(246, 243, 237)'
  for(const kind of ['image','video']){
-  for(const [n,selector] of [[1,'studio-quote-ready-cover'],[2,'studio-generating-cover'],[3,kind==='image'?'studio-image-failed-cover':'studio-failed-cover']] as const){
+  for(const [n,selector] of [[1,'studio-quote-ready-cover'],[2,'studio-generating-cover'],[3,kind==='image'?'studio-image-failed-cover':'studio-failed-cover'],[6,'studio-quote-expired-cover']] as const){
    const card=page.locator('[data-task-id="'+taskId(kind,n)+'"]'),cover=card.getByTestId(selector)
    await cover.scrollIntoViewIfNeeded();await expect(cover).toBeVisible();await expect(cover).toHaveJSProperty('complete',true)
    expect(await cover.evaluate((e:HTMLImageElement)=>e.naturalWidth)).toBeGreaterThan(1000)
@@ -166,7 +166,7 @@ for(const [width,height,theme] of [[1440,900,'light'],[390,844,'light'],[1366,65
    const alpha=await cover.evaluate((e:HTMLImageElement)=>{const c=document.createElement('canvas');c.width=e.naturalWidth;c.height=e.naturalHeight;const ctx=c.getContext('2d')!;ctx.drawImage(e,0,0);return [[0,0],[c.width-1,0],[0,c.height-1],[c.width-1,c.height-1]].map(([x,y])=>ctx.getImageData(x!,y!,1,1).data[3])})
    expect(alpha[0]).toBe(0);expect(alpha.filter(a=>a===0).length).toBeGreaterThanOrEqual(2)
   }
-  for(const n of [4,5,6])await expect(page.locator('[data-task-id="'+taskId(kind,n)+'"] .studio-state-cover')).toHaveCount(0)
+  for(const n of [4,5])await expect(page.locator('[data-task-id="'+taskId(kind,n)+'"] .studio-state-cover')).toHaveCount(0)
   await expect(page.locator('[data-task-id="'+taskId(kind,6)+'"] .studio-work-state')).toHaveText('报价已失效')
  }
  const failedImage=page.locator('[data-task-id="'+taskId('image',3)+'"]').getByTestId('studio-image-failed-cover')
@@ -179,6 +179,20 @@ for(const [width,height,theme] of [[1440,900,'light'],[390,844,'light'],[1366,65
  if(width>700){
   await gallery.evaluate((e,id)=>{const card=e.querySelector<HTMLElement>('[data-task-id="'+id+'"]')!;e.scrollLeft+=card.getBoundingClientRect().left-e.getBoundingClientRect().left-2},taskId('video',1))
   await page.screenshot({path:info.outputPath('states-video-'+width+'-'+theme+'.png'),fullPage:true})
+ }
+ for(const kind of ['image','video']){
+  await page.getByTestId('studio-mode-history').click()
+  const expired=page.locator('[data-task-id="'+taskId(kind,6)+'"]')
+  await expired.click();await expect(page.getByTestId('studio-status')).toHaveText('报价已失效')
+  await expect(page.getByTestId('studio-generate')).toBeDisabled()
+  await expect(page.getByTestId('studio-generate')).toHaveText('报价已失效')
+  await expect(page.getByTestId('studio-new')).toHaveText('重新报价')
+  await expect(page.locator('.studio-task-heading')).toContainText('报价规格')
+  await expect(page.locator('.studio-task-heading')).not.toContainText('已锁定')
+  await expired.scrollIntoViewIfNeeded()
+  await page.screenshot({path:info.outputPath('expired-'+kind+'-'+width+'-'+theme+'.png'),fullPage:true})
+  await expired.locator('.studio-work-preview').screenshot({path:info.outputPath('expired-cover-'+kind+'-'+width+'-'+theme+'.png')})
+  await page.getByTestId('studio-new').click();await expect(page.getByTestId('studio-prompt')).toBeEditable()
  }
  const quoted=page.locator('[data-task-id="'+taskId('image',1)+'"]')
  await quoted.click();await expect(page.getByTestId('studio-generate')).toBeVisible()
