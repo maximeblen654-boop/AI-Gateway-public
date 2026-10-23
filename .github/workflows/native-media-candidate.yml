@@ -80,12 +80,15 @@ jobs:
           ref: ${{ github.event.inputs.build_source_sha || github.sha }}
           path: .candidate-runtime
           persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.21.0'
       - uses: pnpm/action-setup@v6
         with:
           version: 9.15.9
+      - name: Setup Node.js and restore pnpm store
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - uses: docker/setup-buildx-action@v3
       - name: Checkout the pinned sidecar source for reuse comparison
         if: github.event.inputs.build_acceptance == 'studio-workspace'
@@ -116,11 +119,31 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o "$RUNNER_TEMP/native-candidate-output/media-published-recovery" ./cmd/media-published-recovery
           node -e 'const fs=require("fs"),crypto=require("crypto"),p=process.env.RUNNER_TEMP+"/native-candidate-output/";fs.writeFileSync(p+"maintenance-tool.json",JSON.stringify({source_sha:process.env.NATIVE_CANDIDATE_SOURCE_SHA,file:"media-published-recovery",sha256:crypto.createHash("sha256").update(fs.readFileSync(p+"media-published-recovery")).digest("hex"),platform:"linux/amd64",executed_in_production:false},null,2))'
-      - name: Install browser test dependencies
+      - name: Check missing FFmpeg and Chinese fonts
+        id: system-deps
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-cjk
-          pnpm --dir frontend install --frozen-lockfile
+          missing=()
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            missing+=(ffmpeg)
+          fi
+          if ! dpkg-query -W -f='${Status}' fonts-noto-cjk 2>/dev/null | grep -qx 'install ok installed'; then
+            missing+=(fonts-noto-cjk)
+          fi
+          printf 'packages=%s\n' "${missing[*]}" >> "$GITHUB_OUTPUT"
+      - name: Update apt metadata for missing system dependencies
+        if: steps.system-deps.outputs.packages != ''
+        run: sudo apt-get update
+      - name: Install missing FFmpeg and Chinese fonts
+        if: steps.system-deps.outputs.packages != ''
+        env:
+          MISSING_PACKAGES: ${{ steps.system-deps.outputs.packages }}
+        shell: bash
+        run: |
+          read -r -a packages <<< "$MISSING_PACKAGES"
+          sudo apt-get install -y "${packages[@]}"
+      - name: Install locked frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
       - name: Real candidate startup and non-paid business acceptance
         run: node tools/native-media-e2e/candidate.mjs verify
       - name: Export images and exact identities (manifest records acceptance status)
@@ -162,12 +185,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.21.0'
       - uses: pnpm/action-setup@v6
         with:
           version: 9.15.9
+      - name: Setup Node.js and restore pnpm store
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - uses: docker/setup-buildx-action@v3
       - name: Read the frozen runtime source for acceptance applicability
         if: github.event.inputs.acceptance_scenario == 'paid-controls'
@@ -185,11 +211,31 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --name "${{ github.event.inputs.candidate_artifact_name }}" \
             --dir "$RUNNER_TEMP/native-existing-artifact"
-      - name: Install browser test dependencies
+      - name: Check missing FFmpeg and Chinese fonts
+        id: system-deps
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-cjk
-          pnpm --dir frontend install --frozen-lockfile
+          missing=()
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            missing+=(ffmpeg)
+          fi
+          if ! dpkg-query -W -f='${Status}' fonts-noto-cjk 2>/dev/null | grep -qx 'install ok installed'; then
+            missing+=(fonts-noto-cjk)
+          fi
+          printf 'packages=%s\n' "${missing[*]}" >> "$GITHUB_OUTPUT"
+      - name: Update apt metadata for missing system dependencies
+        if: steps.system-deps.outputs.packages != ''
+        run: sudo apt-get update
+      - name: Install missing FFmpeg and Chinese fonts
+        if: steps.system-deps.outputs.packages != ''
+        env:
+          MISSING_PACKAGES: ${{ steps.system-deps.outputs.packages }}
+        shell: bash
+        run: |
+          read -r -a packages <<< "$MISSING_PACKAGES"
+          sudo apt-get install -y "${packages[@]}"
+      - name: Install locked frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
       - name: Accept the existing candidate without rebuilding
         env:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}
@@ -247,12 +293,15 @@ jobs:
           ref: b2fcdac93afa6ae194ee81801a9b37813f8f39eb
           path: .candidate-reuse-source
           persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.21.0'
       - uses: pnpm/action-setup@v6
         with:
           version: 9.15.9
+      - name: Setup Node.js and restore pnpm store
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - uses: docker/setup-buildx-action@v3
       - name: Reuse existing sidecars in the isolated stack
         env:
@@ -261,11 +310,31 @@ jobs:
       - name: Build the exact Core; preserve existing b2 sidecars
         id: build
         run: node tools/native-media-e2e/candidate.mjs build
-      - name: Prepare existing browser harness
+      - name: Check missing FFmpeg and Chinese fonts
+        id: system-deps
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-cjk
-          pnpm --dir frontend install --frozen-lockfile
+          missing=()
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            missing+=(ffmpeg)
+          fi
+          if ! dpkg-query -W -f='${Status}' fonts-noto-cjk 2>/dev/null | grep -qx 'install ok installed'; then
+            missing+=(fonts-noto-cjk)
+          fi
+          printf 'packages=%s\n' "${missing[*]}" >> "$GITHUB_OUTPUT"
+      - name: Update apt metadata for missing system dependencies
+        if: steps.system-deps.outputs.packages != ''
+        run: sudo apt-get update
+      - name: Install missing FFmpeg and Chinese fonts
+        if: steps.system-deps.outputs.packages != ''
+        env:
+          MISSING_PACKAGES: ${{ steps.system-deps.outputs.packages }}
+        shell: bash
+        run: |
+          read -r -a packages <<< "$MISSING_PACKAGES"
+          sudo apt-get install -y "${packages[@]}"
+      - name: Install locked frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
       - name: Actual Vue and isolated backend integration
         run: node tools/native-media-e2e/candidate.mjs verify
       - name: Export the candidate without rebuilding sidecars
