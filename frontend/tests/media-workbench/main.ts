@@ -23,6 +23,19 @@ const videoPolish = scenario === 'VIDEO_POLISH'
 const mediaTypes = scenario.startsWith('MEDIA_TYPES_')
 const initialDTO = management || videoPolish ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
+if (scenario === 'SALES_CATEGORIES') {
+  initialDTO.host = 'api.image2pro.top'
+  const config = initialDTO.media_workbench_v1!, original = config.draft.products[0]!
+  const names = ['晴空图片', '流光创作', '新建创作商品', '旧款图片商品', '暂停的创作商品', '待核对的上游商品', '已收起的旧商品']
+  const states = ['READY', 'READY', 'NOT_PUBLISHED', 'UNLISTED', 'UNLISTED', 'UPSTREAM_REMOVED', 'ARCHIVED']
+  config.draft.products = names.map((display_name, index) => ({ ...copy(original), product_id: `sales-category-product-${index}`, display_name }))
+  initialDTO.product_states = config.draft.products.map((product, index) => ({
+    product_id: product.product_id, display_name: product.display_name, upstream_model: product.upstream_model, media_type: product.media_type,
+    published: states[index] !== 'NOT_PUBLISHED', published_ready: states[index] === 'READY', state: states[index]!,
+    reason: ({ READY: '此商品的已发布配置及账号销售条件满足。', UNLISTED: '商品已手动下架。', NOT_PUBLISHED: '此商品尚未发布；草稿保存不代表可售。', UPSTREAM_REMOVED: '上次成功目录中未找到此型号。', ARCHIVED: '商品已收起，配置仍然保留。' } as Record<string, string>)[states[index]!]!,
+    action: ({ READY: '实际使用仍需全局开关与客户权限通过。', UNLISTED: '核对商品后，可通过重新上架操作恢复。', NOT_PUBLISHED: '补齐规格和售价，再选择此商品发布。', UPSTREAM_REMOVED: '先同步上游目录，再核对模型是否更名；不会自动删除商品。', ARCHIVED: '需要继续使用时，先恢复显示，再核对重新上架条件。' } as Record<string, string>)[states[index]!]!
+  }))
+}
 const persistent = management || videoPolish || mediaTypes || scenario.startsWith('WIZARD')
 const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
 const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
@@ -173,7 +186,7 @@ if (scenario === 'CURRENT_UPSTREAM_NAMES') {
  dto.model_catalog={source:'upstream',synced_at:'2026-10-21T07:32:00Z',models:['gpt-image-2.0','gpt-image-2.0-原生4K']}
  dto.models=[{model_id:'image-native-1',state:'UPSTREAM_NOT_DISCOVERED'},{model_id:'gpt-image-2.0',state:'PENDING'},{model_id:'gpt-image-2.0-原生4K',state:'PENDING'}]
 }
-if (['CATALOG_CHANGE', 'CATALOG_DELAYED', 'CATALOG_BASELINE'].includes(scenario)) {
+if (['CATALOG_CHANGE', 'CATALOG_DELAYED', 'CATALOG_BASELINE', 'CATALOG_RETIRED', 'CATALOG_INCOMPLETE'].includes(scenario)) {
   const now = new Date()
   const success = new Date(now.getTime() - (scenario === 'CATALOG_DELAYED' ? 11 : 1) * 60_000).toISOString()
   dto.host = 'api.image2pro.top'
@@ -185,6 +198,11 @@ if (['CATALOG_CHANGE', 'CATALOG_DELAYED', 'CATALOG_BASELINE'].includes(scenario)
     { product_id: 'fixture-video', display_name: '隔离视频商品', upstream_model: 'video-old-id', media_type: 'video', published: true, published_ready: false, state: 'UPSTREAM_REMOVED', reason: '本次目录未返回此型号', action: '先核对目录及文档，不猜替代型号' }
   ]
 }
+if (scenario === 'CATALOG_RETIRED') {
+  dto.product_states![0]!.state = 'UNLISTED'
+  dto.product_states![1]!.state = 'ARCHIVED'
+}
+if (scenario === 'CATALOG_INCOMPLETE') delete dto.product_states
 if (scenario === 'CATALOG_BASELINE') delete dto.model_catalog_change
 if (['SELLING', 'PUBLISHED_NOT_READY', 'ACCOUNT_RUNTIME_BLOCKED'].includes(scenario)) { dto.effective_state = scenario; dto.effective_sales = scenario === 'SELLING' }
 if (scenario === 'VALUE_MAPPING') Object.assign(dto.media_workbench_v1!.validation.diagnostics[0]!, {

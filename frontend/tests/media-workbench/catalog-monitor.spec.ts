@@ -12,7 +12,7 @@ for (const width of [1440, 390]) {
     await page.getByTestId('account-search').fill('#77')
     await page.getByTestId('supplier-77').click()
     await expect(page.getByTestId('catalog-change-summary')).toContainText('新增 2 个型号')
-    await expect(page.getByTestId('catalog-affected')).toContainText('2 份已发布商品')
+    await expect(page.getByTestId('catalog-affected')).toContainText('2 份未下架或归档的已发布商品')
     await expect(page.getByTestId('catalog-auto-list')).toContainText('成功同步的新型号会自动进入本账号模型列表')
     await expect(page.getByTestId('catalog-old-model')).toContainText('不代表永久下架')
     await expect(page.getByTestId('model-gpt-image-2.0')).toBeVisible()
@@ -89,3 +89,38 @@ test('first successful baseline still produces a usable report for the local Ski
   expect(report.affected_products).toHaveLength(2)
   await writeFile(info.outputPath('copied-baseline-report.json'), JSON.stringify(report, null, 2), 'utf8')
 })
+
+for (const width of [1440, 390]) for (const scenario of ['CATALOG_RETIRED', 'CATALOG_INCOMPLETE']) {
+  test(`${scenario} keeps historical or unknown impact distinct at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+    await page.route('**/*', route => route.request().url().startsWith('http://127.0.0.1:4190/') && route.request().method() === 'GET' ? route.continue() : route.abort())
+    await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt = value } } }))
+    await page.goto(`/tests/media-workbench/index.html?scenario=${scenario}&theme=blue`)
+    await page.getByTestId('account-search').fill('#77')
+    await page.getByTestId('supplier-77').click()
+    const before = await page.evaluate(() => JSON.stringify((window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot()))
+    await expect(page.getByTestId('catalog-affected')).toHaveCount(0)
+    if (scenario === 'CATALOG_RETIRED') {
+      await expect(page.getByTestId('catalog-historical')).toContainText('2 份已下架或归档的历史快照')
+      await expect(page.getByTestId('catalog-no-affected')).toContainText('未发现仍需处理')
+      await expect(page.getByTestId('catalog-impact-unknown')).toHaveCount(0)
+    } else {
+      await expect(page.getByTestId('catalog-impact-unknown')).toContainText('当前影响尚未确认')
+      await expect(page.getByTestId('catalog-no-affected')).toHaveCount(0)
+    }
+    await page.getByTestId('catalog-copy').click()
+    const prompt = await page.evaluate(() => (window as unknown as { copiedCatalogPrompt: string }).copiedCatalogPrompt)
+    const report = JSON.parse(prompt.split('```json\n\n')[1]!.split('\n\n```')[0]!)
+    expect(report.affected_products).toEqual([])
+    expect(report.product_impact_status).toBe(scenario === 'CATALOG_RETIRED' ? 'CHECKED' : 'UNKNOWN')
+    expect(report.affected_products_truncated).toBe(scenario === 'CATALOG_INCOMPLETE')
+    if (scenario === 'CATALOG_RETIRED') expect(report.historical_missing_products).toHaveLength(2)
+    else expect(prompt).not.toContain('无需要求用户确认或处理商品')
+    const after = await page.evaluate(() => JSON.stringify((window as unknown as { mediaFixture: { snapshot: () => unknown } }).mediaFixture.snapshot()))
+    expect(after).toBe(before)
+    expect(await page.evaluate(() => (window as unknown as { mediaFixture: { calls: { method: string }[] } }).mediaFixture.calls.filter(call => call.method !== 'get'))).toEqual([])
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: info.outputPath(`${scenario}-${width}.png`), fullPage: true })
+    await writeFile(info.outputPath('copied-impact-report.json'), JSON.stringify(report, null, 2), 'utf8')
+  })
+}

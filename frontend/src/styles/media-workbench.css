@@ -240,3 +240,21 @@
 
 .mw-account-actions{display:flex;align-items:flex-end;gap:12px;flex-shrink:0}.mw-account-sales{display:grid;gap:8px;text-align:center;font-size:13px}.mw-account-sales .btn{min-width:8rem;min-height:44px}.mw-step-models .mw-page{scroll-margin-top:5.5rem}
 @media(max-width:767px){.mw-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}.mw-account-actions .btn{width:100%;min-width:0;white-space:normal}.mw-account-publication{gap:12px;margin:12px 0;padding:12px}.mw-publication-description h3{font-size:15px}.mw-publication-description .mw-muted{margin:0}.mw-publication-note{margin-top:6px}.mw-step-models [data-test=selected-account-summary]{display:none}.mw-step-models .mw-account-context{margin-bottom:12px;gap:8px}.mw-step-models .mw-account-context h2{font-size:20px}.mw-step-models .mw-back{margin-bottom:12px}}
+
+.mw-product-management.mw-sales-browser { display: block; }
+.mw-sales-browser > h3 { margin: 0 0 .5rem; }
+.mw-sales-browser > .mw-muted { margin-bottom: 1rem; }
+.mw-sales-categories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.mw-sales-category { display: flex; flex-direction: column; gap: .75rem; min-width: 0; padding: 1.25rem; border: 1px solid var(--mw-border); border-radius: 10px; background: var(--mw-surface); color: var(--mw-text); text-align: left; }
+.mw-sales-category:hover { border-color: var(--mw-accent); background: var(--mw-tint); }
+.mw-sales-category:focus-visible, .mw-sales-list-heading h4:focus-visible { outline: 2px solid var(--mw-accent); outline-offset: 3px; }
+.mw-sales-category-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.mw-sales-count { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mw-sales-category-link { margin-top: auto; color: var(--mw-accent); }
+.mw-sales-list-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1rem 0; }
+.mw-sales-list-heading h4 { margin: 0; scroll-margin-top: 6rem; }
+.mw-sales-product { padding: 1rem 0; border-bottom: 1px solid var(--mw-border); overflow-wrap: anywhere; }
+.mw-sales-product:last-child { border-bottom: 0; }
+.mw-sales-product p { margin: 0 0 .5rem; }
+.mw-sales-product .mw-product-type-actions { margin-bottom: 0; }
+@media (max-width: 767px) { .mw-sales-categories { grid-template-columns: 1fr; gap: .75rem; } .mw-sales-category { padding: 1rem; } }

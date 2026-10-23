@@ -14,6 +14,22 @@ const detail = () => {
   return dto
 }
 const open = (dto = detail()) => { const wrapper = mount(MediaCatalogNotice, { props: { detail: dto } }); wrappers.push(wrapper); return wrapper }
+it.each(['UNLISTED', 'ARCHIVED'])('separates %s history from active product handling', state => {
+  const dto = detail()
+  const product = dto.media_workbench_v1!.published!.products![0]!
+  dto.product_states = [{ product_id: product.product_id, display_name: product.display_name, media_type: product.media_type, upstream_model: product.upstream_model, published: true, published_ready: false, state, reason: '', action: '' }]
+  const wrapper = open(dto)
+  expect(wrapper.get('[data-test="catalog-historical"]').text()).toContain('仅保留观察')
+  expect(wrapper.find('[data-test="catalog-affected"]').exists()).toBe(false)
+  expect(wrapper.get('[data-test="catalog-no-affected"]').text()).toContain('无需确认商品处理')
+})
+it.each(['missing', 'incomplete'])('shows unknown for %s product state evidence', mode => {
+  const dto = detail()
+  if (mode === 'incomplete') dto.product_states = []
+  const wrapper = open(dto)
+  expect(wrapper.get('[data-test="catalog-impact-unknown"]').text()).toContain('当前影响尚未确认')
+  expect(wrapper.find('[data-test="catalog-no-affected"]').exists()).toBe(false)
+})
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); copy.mockReset(); copy.mockResolvedValue(true) })
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers() })
 
@@ -81,6 +97,7 @@ it('explains automatic listing and old-model investigation without adding a conf
 it('does not request product decisions for changed IDs without an affected published product', async () => {
   const dto = detail()
   dto.product_states = [{ product_id: 'unpublished-old', display_name: '保留的草稿', media_type: 'video', upstream_model: 'video-old', published: false, published_ready: false, state: 'UPSTREAM_REMOVED', reason: '', action: '' }]
+  dto.media_workbench_v1!.published!.products = []
   const before = JSON.stringify(dto); const wrapper = open(dto)
   expect(wrapper.get('[data-test="catalog-no-affected"]').text()).toContain('无需确认商品处理')
   expect(wrapper.find('[data-test="catalog-affected"]').exists()).toBe(false)

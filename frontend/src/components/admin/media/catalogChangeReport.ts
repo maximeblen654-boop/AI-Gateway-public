@@ -16,8 +16,15 @@ export function catalogObservation(detail: SupplierDetail, now = Date.now()) {
   const stale = !catalog || catalog.source !== 'upstream' || !catalog.models?.length || elapsed < 0 || elapsed >= STALE_AFTER_MS
   const change = detail.model_catalog_change
   const current = new Set(catalog?.models ?? [])
-  const affected = catalog?.source === 'upstream' && current.size > 0 ? (detail.product_states ?? []).filter(item => item.published && !current.has(item.upstream_model)) : []
-  return { lastSuccessAt: at, stale, change, affected }
+  const states = detail.product_states
+  const published = detail.media_workbench_v1?.published
+  const knownStates = new Set(['ARCHIVED', 'UNLISTED', 'NOT_PUBLISHED', 'ACCOUNT_UNAVAILABLE', 'DEPENDENCIES_CHANGED', 'UPSTREAM_REMOVED', 'PUBLISHED_INVALID', 'ACCOUNT_SALES_OFF', 'READY'])
+  const productEvidenceComplete = Array.isArray(states) && states.every(item => knownStates.has(item.state)) &&
+    (!published || (Array.isArray(published.products) && published.products.every(product => states.some(item => item.product_id === product.product_id && item.published && item.upstream_model === product.upstream_model))))
+  const missing = catalog?.source === 'upstream' && current.size > 0 ? (states ?? []).filter(item => item.published && !current.has(item.upstream_model)) : []
+  const historical = missing.filter(item => item.state === 'UNLISTED' || item.state === 'ARCHIVED')
+  const affected = missing.filter(item => item.state !== 'UNLISTED' && item.state !== 'ARCHIVED')
+  return { lastSuccessAt: at, stale, change, affected, historical, productEvidenceComplete }
 }
 
 function siteOrigin(value: string): string | null {
@@ -34,6 +41,7 @@ export function catalogChangeReport(detail: SupplierDetail, origin: string, now 
   const added = limitedIDs(change?.added_models)
   const missing = limitedIDs(change?.missing_models)
   const affected = observation.affected.filter(item => safeID(item.product_id) && safeID(item.upstream_model)).slice(0, MAX_ITEMS)
+  const historical = observation.historical.filter(item => safeID(item.product_id) && safeID(item.upstream_model)).slice(0, MAX_ITEMS)
   return {
     schema_version: 1,
     report_type: 'ai_gateway_upstream_catalog_change',
@@ -49,8 +57,16 @@ export function catalogChangeReport(detail: SupplierDetail, origin: string, now 
       truncated: change.truncated || added.length < count(change.added_count) || missing.length < count(change.missing_count)
     } : null,
     affected_products: affected.map(item => ({ product_id: item.product_id, media_type: item.media_type === 'video' ? 'video' : 'image', upstream_model: item.upstream_model, state: 'MISSING_FROM_CURRENT_CATALOG' })),
-    affected_products_truncated: affected.length < observation.affected.length,
+    // Schema 1 readers already use this flag to avoid treating an incomplete scope as catalog-only.
+    affected_products_truncated: affected.length < observation.affected.length || !observation.productEvidenceComplete,
+    product_impact_status: observation.stale || !observation.productEvidenceComplete ? 'UNKNOWN' : 'CHECKED',
+    historical_missing_products: historical.map(item => ({ product_id: item.product_id, media_type: item.media_type === 'video' ? 'video' : 'image', upstream_model: item.upstream_model, lifecycle_state: item.state, state: 'MISSING_FROM_CURRENT_CATALOG' })),
+    historical_missing_products_truncated: historical.length < observation.historical.length,
     limitations: [
+      'change 是最近一次相邻成功目录的变化；affected_products 是仍需核对的已发布绑定缺失，两者不必为同一型号。',
+      'historical_missing_products 仅记录已下架或归档的历史快照，不要求替换、重新上架或修改历史记录。',
+      '所有缺失均相对于 last_success_at 的目录；product_impact_status 为 UNKNOWN 时不能断言当前无影响。',
+      'affected_products_truncated 也表示逐商品影响证据不完整，并非断言没有受影响商品。',
       '成功同步的新型号会自动进入本账号模型列表，但不会自动上架、改售价或开启销售。',
       '这是目录观察，不证明新旧型号是同一模型更名，也可能是原商品填写有误。',
       '本次未返回的旧型号需要调查，不代表永久下架；目录同步不会删除草稿、历史任务或账务。',
@@ -69,9 +85,11 @@ export function catalogResponsePrompt(detail: SupplierDetail, origin: string, no
     '请使用本地 ai-gateway-upstream-change-response Skill 处理这份 AI-Gateway 上游目录检查报告。',
     '先查上游 API 文档，核对本账号最近成功目录、精确型号和当前项目材料；目录延迟或读取失败时先重新核实。成功同步的新型号已自动进入本账号列表，不需要逐个确认同步。',
     '旧型号本次未返回只需调查，不代表永久下架。不要把名字相近或一增一减直接当作同一模型更名；也可能是原商品绑定有误。',
-    hasAffectedProducts
+    report.product_impact_status === 'UNKNOWN'
+      ? '当前商品影响尚未确认：目录已过旧或逐商品状态证据不完整。保留截至上次成功目录的观察，先刷新目录与完整商品状态，再判断影响；不能据此声称当前无需处理或已永久下线。已下架、归档的历史快照不要求重新经营。'
+      : hasAffectedProducts
       ? '报告列出了已发布商品受影响，先核对目录及文档，再调查这些商品的处理方案。需要选择替代或下架且本对话尚未明确方案时，先给具体变更预览，再确认该方案；不是每次目录同步都要确认。保留草稿、历史已发布快照、历史任务和账务。'
-      : '报告未显示已发布商品受影响；核对目录及文档后说明结果即可，无需要求用户确认或处理商品。保留草稿和历史记录，不为新增型号制造商品替代。',
+      : '报告未显示仍需处理的已发布商品目录缺失；已下架或归档的历史观察单独保留，核对目录及文档后说明结果即可，无需要求用户确认或处理商品。保留草稿和历史记录，不为新增型号制造商品替代。',
     '确需处理受影响商品时，仅型号 ID 绑定要调整且现有协议与能力可表达，就优先走现有配置草稿→校验→发布，不制造源码提交、CI或部署。只有协议、参数或回包映射确实变化，才最小修代码并完成测试、审查、CI和候选验证。',
     '已有对应本次配置或发布授权就继续，不重复索取；缺少该项授权时，先准备具体变更预览，再一次说明需要决定的内容。如确需代码部署，已有本次部署授权且门禁通过就沿现有受控链完成部署验收；未授权部署时，准备好具体候选后集中确认一次。',
     '已有资料足够就直接推进；确需我补资料时，用大白话说清缺什么、为什么需要、去哪里拿。',

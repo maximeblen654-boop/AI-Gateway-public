@@ -9,6 +9,7 @@ function detail() {
   value.model_catalog = { source: 'upstream', synced_at: '2026-10-21T11:59:00Z', models: ['gpt-image-2.0'] }
   value.model_catalog_change = { schema_version: 1, detected_at: '2026-10-21T11:59:00Z', previous_synced_at: '2026-10-21T11:54:00Z', added_count: 1, missing_count: 1, added_models: ['gpt-image-2.0'], missing_models: ['gpt-image-2'], truncated: false }
   value.product_states = [{ product_id: 'published-1', display_name: '私有商品名不应进入报告', media_type: 'image', upstream_model: 'gpt-image-2', published: true, published_ready: false, state: 'UPSTREAM_REMOVED', reason: 'raw-private-reason', action: 'raw-private-action' }]
+  Object.assign(value.media_workbench_v1!.published!.products![0]!, { product_id: 'published-1', upstream_model: 'gpt-image-2' })
   return value
 }
 
@@ -89,6 +90,7 @@ describe('catalog response product handling boundaries', () => {
     value.model_catalog_change!.missing_models = [oldID]
     value.product_states![0]!.media_type = mediaType
     value.product_states![0]!.upstream_model = oldID
+    value.media_workbench_v1!.published!.products![0]!.upstream_model = oldID
     const before = JSON.stringify(value)
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
@@ -107,6 +109,7 @@ describe('catalog response product handling boundaries', () => {
   })
   it('retains unpublished old products without asking for confirmation or replacement', () => {
     const value = detail(); value.product_states![0]!.published = false
+    value.media_workbench_v1!.published!.products = []
     const before = JSON.stringify(value)
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
@@ -122,5 +125,49 @@ describe('catalog response product handling boundaries', () => {
     expect(report.change).toBeNull()
     expect(report.affected_products).toHaveLength(1)
     expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('报告列出了已发布商品受影响')
+  })
+})
+
+describe('catalog impact evidence and lifecycle', () => {
+  it.each(['UNLISTED', 'ARCHIVED'])('keeps %s missing snapshots as history without requesting product decisions', state => {
+    const value = detail(); value.product_states![0]!.state = state
+    value.model_catalog_change!.missing_models = ['Gemini-3.1-Flash']
+    const before = JSON.stringify(value)
+    const report = catalogChangeReport(value, 'https://laifufu.top', now)
+    expect(report.product_impact_status).toBe('CHECKED')
+    expect(report.affected_products).toEqual([])
+    expect(report.historical_missing_products).toEqual([expect.objectContaining({ upstream_model: 'gpt-image-2', lifecycle_state: state })])
+    expect(report.change!.missing_models).toEqual(['Gemini-3.1-Flash'])
+    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('无需要求用户确认或处理商品')
+    expect(JSON.stringify(value)).toBe(before)
+  })
+  it('keeps unrelated change IDs and active binding risks separate from historical snapshots', () => {
+    const value = detail()
+    value.model_catalog_change!.missing_models = ['Gemini-3.1-Flash']
+    value.product_states!.push({ ...value.product_states![0]!, product_id: 'historical', state: 'ARCHIVED' })
+    const report = catalogChangeReport(value, 'https://laifufu.top', now)
+    expect(report.affected_products.map(p => p.product_id)).toEqual(['published-1'])
+    expect(report.historical_missing_products.map(p => p.product_id)).toEqual(['historical'])
+    expect(report.change!.missing_models).toEqual(['Gemini-3.1-Flash'])
+  })
+  it.each(['absent', 'empty', 'unknown-state', 'wrong-binding'] as const)('does not claim no impact with %s state evidence', mode => {
+    const value = detail()
+    if (mode === 'absent') delete value.product_states
+    if (mode === 'empty') value.product_states = []
+    if (mode === 'unknown-state') value.product_states![0]!.state = 'FUTURE_STATE'
+    if (mode === 'wrong-binding') value.product_states![0]!.upstream_model = 'gpt-image-2.0'
+    const report = catalogChangeReport(value, 'https://laifufu.top', now)
+    expect(report.product_impact_status).toBe('UNKNOWN')
+    expect(report.affected_products_truncated).toBe(true)
+    const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
+    expect(prompt).toContain('当前商品影响尚未确认')
+    expect(prompt).not.toContain('无需要求用户确认或处理商品')
+  })
+  it('keeps stale findings as historical observations with unknown current impact', () => {
+    const value = detail(); value.model_catalog!.synced_at = '2026-10-21T11:00:00Z'
+    const report = catalogChangeReport(value, 'https://laifufu.top', now)
+    expect(report.product_impact_status).toBe('UNKNOWN')
+    expect(report.affected_products).toHaveLength(1)
+    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('截至上次成功目录')
   })
 })

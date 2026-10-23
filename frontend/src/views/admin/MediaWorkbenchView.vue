@@ -91,19 +91,34 @@
             <p class="mw-muted">草稿校验通过只说明保存的草稿通过检查。商品的已发布配置、Account 销售、全局付费开关和客户原生权限仍分别生效；全局开关请返回来源与账号查看。</p>
             <p class="mw-muted" data-test="native-api-boundary">商品保存、发布、上下架与归档只管理 Studio 配置和销售状态，不修改独立 API Key 的原生权限或路由；受保护的图片任务接口仍保留原有访问限制。</p>
           </section>
-          <section class="mw-product-management" aria-label="逐商品销售条件" data-test="product-readiness-list">
+          <section class="mw-product-management mw-sales-browser" aria-label="逐商品销售条件" data-test="product-readiness-list">
             <h3>逐商品销售条件</h3>
             <p class="mw-muted">以下结论来自已保存的服务端状态，按商品分别核对；就绪不代表全局付费开关或每个客户的原生权限已经通过。</p>
             <p v-if="!detail?.product_states?.length" class="mw-muted">后台尚未返回逐商品状态，请重新读取后核对；不能由草稿校验通过推断当前可售。</p>
-            <div v-for="item in detail?.product_states ?? []" :key="item.product_id" :data-test="`readiness-${item.product_id}`">
-              <p><strong>Account #{{ detail?.id }} · {{ availabilityName(item) }}</strong> · {{ availabilityLabel(item) }}</p>
-              <p>{{ item.reason }}</p><p class="mw-muted">{{ item.action }}</p>
-              <div class="mw-product-type-actions">
-                <button v-if="products.some(p => p.product_id === item.product_id)" class="btn btn-secondary" :disabled="busy" @click="navigate(() => editAvailability(item))">编辑此商品</button>
-                <button v-if="item.state === 'UPSTREAM_REMOVED'" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="sync">同步上游目录</button>
-                <router-link v-if="item.state === 'ACCOUNT_UNAVAILABLE' && detail" :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
-              </div>
+            <div v-else-if="!activeReadinessGroup" class="mw-sales-categories" data-test="sales-categories">
+              <button v-for="group in readinessGroups" :key="group.id" type="button" class="mw-sales-category" :data-test="`sales-category-${group.id}`" @click="openReadinessGroup(group.id)">
+                <span class="mw-sales-category-heading"><strong>{{ group.label }}</strong><span class="mw-sales-count">{{ group.items.length }}</span></span>
+                <span class="mw-muted">{{ group.description }}</span>
+                <span class="mw-sales-category-link">查看商品 →</span>
+              </button>
             </div>
+            <template v-else>
+              <div class="mw-sales-list-heading">
+                <button type="button" class="btn btn-secondary" data-test="sales-categories-back" @click="backToReadinessGroups">← 返回分类</button>
+                <h4 ref="readinessHeading" tabindex="-1" data-test="sales-category-heading">{{ activeReadinessGroup.label }} · {{ activeReadinessGroup.items.length }} 个商品</h4>
+              </div>
+              <p v-if="!activeReadinessGroup.items.length" class="mw-muted" data-test="sales-category-empty">此分类暂无商品。</p>
+              <div v-for="item in activeReadinessGroup.items" :key="item.product_id" class="mw-sales-product" :data-test="`readiness-${item.product_id}`">
+                <p><strong>Account #{{ detail?.id }} · {{ availabilityName(item) }}</strong> · {{ availabilityLabel(item) }}</p>
+                <p>{{ item.reason }}</p><p class="mw-muted">{{ item.action }}</p>
+                <div class="mw-product-type-actions">
+                  <button v-if="products.some(p => p.product_id === item.product_id)" class="btn btn-secondary" :disabled="busy" @click="navigate(() => editAvailability(item))">编辑此商品</button>
+                  <button v-if="item.state === 'UPSTREAM_REMOVED'" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="sync">同步上游目录</button>
+                  <button v-if="item.state === 'UPSTREAM_REMOVED' && detail && sourceHost(detail) === 'api.image2pro.top'" type="button" class="btn btn-secondary" data-test="view-catalog-report" @click="showCatalogReport">查看报告与修复提示词</button>
+                  <router-link v-if="item.state === 'ACCOUNT_UNAVAILABLE' && detail" :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
+                </div>
+              </div>
+            </template>
           </section>
           <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ sourceHost(detail) === 'api.image2pro.top' ? '每5分钟自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
           <MediaCatalogNotice v-if="detail && sourceHost(detail) === 'api.image2pro.top'" :detail="detail" />
@@ -443,6 +458,44 @@ watch([showArchived, selectedModel], () => {
   if (!dirty.value && !modelProducts.value.some(p => p.product_id === selectedProduct.value)) selectedProduct.value = modelProducts.value[0]?.product_id ?? ''
 })
 const productStateById = computed(() => new Map((detail.value?.product_states ?? []).map(item => [item.product_id, item])))
+const selectedReadinessGroup = ref('')
+const readinessHeading = ref<HTMLElement>()
+const readinessGroups = computed(() => {
+  const groups = [
+    { id: 'ready', label: '销售条件已就绪', description: '已发布，且账号销售条件已满足。', items: [] as ProductState[] },
+    { id: 'unpublished', label: '尚未发布', description: '继续配置，发布后才对客户生效。', items: [] as ProductState[] },
+    { id: 'unlisted', label: '已下架', description: '保留原配置，暂不接受新的购买。', items: [] as ProductState[] },
+    { id: 'attention', label: '需要处理', description: '查看具体原因，按提示核对模型、账号或配置。', items: [] as ProductState[] },
+    { id: 'archived', label: '已收起', description: '暂不放在日常列表中，原配置和历史记录保留。', items: [] as ProductState[] }
+  ]
+  for (const item of detail.value?.product_states ?? []) {
+    const id = item.state === 'READY' && item.published && item.published_ready ? 'ready'
+      : item.state === 'NOT_PUBLISHED' ? 'unpublished'
+        : item.state === 'UNLISTED' ? 'unlisted'
+          : item.state === 'ARCHIVED' ? 'archived' : 'attention'
+    groups.find(group => group.id === id)!.items.push(item)
+  }
+  return groups.filter(group => ['ready', 'unpublished', 'unlisted'].includes(group.id) || group.items.length || group.id === selectedReadinessGroup.value)
+})
+const activeReadinessGroup = computed(() => readinessGroups.value.find(group => group.id === selectedReadinessGroup.value))
+watch(() => detail.value?.id, () => { selectedReadinessGroup.value = '' })
+async function openReadinessGroup(id: string) {
+  selectedReadinessGroup.value = id
+  await nextTick()
+  readinessHeading.value?.focus({ preventScroll: true })
+  readinessHeading.value?.scrollIntoView?.({ block: 'nearest' })
+}
+async function backToReadinessGroups() {
+  const id = selectedReadinessGroup.value
+  selectedReadinessGroup.value = ''
+  await nextTick()
+  modelPage.value?.querySelector<HTMLButtonElement>(`[data-test="sales-category-${id}"]`)?.focus({ preventScroll: true })
+}
+function showCatalogReport() {
+  const notice = modelPage.value?.querySelector<HTMLElement>('[data-test="catalog-notice"]')
+  notice?.scrollIntoView?.({ block: 'center' })
+  notice?.querySelector<HTMLButtonElement>('[data-test="catalog-copy"]')?.focus({ preventScroll: true })
+}
 const draftValidationLabel = computed(() => !config.value ? '尚未检查' : !validationCurrent.value || validationUnavailable.value ? '结果待确认' : ({ PASS: '通过（仅草稿）', FAIL: '草稿有待修复项，可选择商品单独校验发布', UNKNOWN: '检查暂不可用', PENDING: '检查中', VALIDATING: '检查中', RUNNING: '检查中' } as Record<string, string>)[config.value.validation.status] ?? '结果待确认')
 function availabilityName(item: ProductState) {
   const p = config.value?.published?.products?.find(p => p.product_id === item.product_id) ?? products.value.find(p => p.product_id === item.product_id)

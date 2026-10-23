@@ -622,6 +622,59 @@ it('shows both Draft and Published model identities and blocks ambiguous bulk ac
 
 
 describe('Per-product readiness and explicit publication',()=>{
+ it('groups every saved product state once and opens only the chosen category without business writes', async () => {
+  const dto = supplier(), original = dto.media_workbench_v1!.draft.products[0]!
+  const states = ['READY', 'NOT_PUBLISHED', 'UNLISTED', 'ARCHIVED', 'ACCOUNT_SALES_OFF', 'ACCOUNT_UNAVAILABLE', 'UPSTREAM_REMOVED', 'DEPENDENCIES_CHANGED', 'PUBLISHED_INVALID', 'FUTURE_STATE', 'READY']
+  dto.product_states = states.map((state, index) => ({
+   product_id: `category-product-${index}`, display_name: `分类商品 ${index + 1}`, upstream_model: original.upstream_model, media_type: 'image',
+   published: state !== 'NOT_PUBLISHED', published_ready: state === 'READY' && index === 0, state, reason: `服务器原因 ${index + 1}`, action: `处理方法 ${index + 1}`
+  }))
+  dto.media_workbench_v1!.draft.products = dto.product_states.map(item => ({ ...copy(original), product_id: item.product_id, display_name: item.display_name }))
+  const before = copy(dto)
+  api.detail.mockResolvedValue(dto)
+  await mountWorkbench(); await selectAccount()
+  const panel = wrapper.get('[data-test="product-readiness-list"]')
+  expect(panel.findAll('[data-test^="readiness-"]')).toHaveLength(0)
+  const seen: string[] = []
+  for (const [id, count] of [['ready', 1], ['unpublished', 1], ['unlisted', 1], ['attention', 7], ['archived', 1]] as const) {
+   const card = panel.get(`[data-test="sales-category-${id}"]`)
+   expect(card.get('.mw-sales-count').text()).toBe(String(count))
+   await card.trigger('click'); await flushPromises()
+   const rows = panel.findAll('[data-test^="readiness-"]')
+   expect(rows).toHaveLength(count)
+   expect(document.activeElement).toBe(panel.get('[data-test="sales-category-heading"]').element)
+   for (const row of rows) {
+    seen.push(row.attributes('data-test'))
+    expect(row.text()).toContain('服务器原因')
+    expect(row.text()).toContain('处理方法')
+   }
+   await panel.get('[data-test="sales-categories-back"]').trigger('click'); await flushPromises()
+   expect(document.activeElement).toBe(panel.get(`[data-test="sales-category-${id}"]`).element)
+  }
+  expect(seen.sort()).toEqual(dto.product_states.map(item => `readiness-${item.product_id}`).sort())
+  expect(dto).toEqual(before)
+  expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+  expect(api.sales).not.toHaveBeenCalled(); expect(api.lifecycle).not.toHaveBeenCalled(); expect(api.sync).not.toHaveBeenCalled()
+ })
+ it('shows empty categories explicitly and resets the selected category when the Account changes', async () => {
+  const first = supplier(), second = supplier(44)
+  const state = { product_id: first.media_workbench_v1!.draft.products[0]!.product_id, display_name: '同名商品', upstream_model: 'image-native-1', media_type: 'image', published: true, published_ready: true, state: 'READY', reason: '账号 77 就绪', action: '按需编辑' }
+  first.product_states = [state]
+  second.product_states = [{ ...state, published_ready: false, state: 'UNLISTED', reason: '账号 44 已下架' }]
+  api.detail.mockImplementation(async id => copy(id === 77 ? first : second))
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('[data-test="sales-category-unpublished"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="sales-category-empty"]').text()).toBe('此分类暂无商品。')
+  await wrapper.get('[data-test="model-page"] > .mw-back').trigger('click'); await flushPromises()
+  await selectAccount(44)
+  expect(wrapper.get('[data-test="sales-categories"]').isVisible()).toBe(true)
+  expect(wrapper.get('[data-test="sales-category-ready"] .mw-sales-count').text()).toBe('0')
+  await wrapper.get('[data-test="sales-category-unlisted"]').trigger('click'); await flushPromises()
+  expect(wrapper.get(`[data-test="readiness-${state.product_id}"]`).text()).toContain('Account #44')
+  expect(wrapper.get(`[data-test="readiness-${state.product_id}"]`).text()).toContain('账号 44 已下架')
+  expect(wrapper.get('[data-test="product-readiness-list"]').text()).not.toContain('账号 77 就绪')
+  expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
+ })
  it('associates real reasons with separate product identities on the same model without exposing internal IDs',async()=>{
   const dto=supplier();const first=dto.media_workbench_v1!.draft.products[0]!
   const second=structuredClone(first);second.product_id='private-product-b';second.display_name='Banana 独立商品'
@@ -631,6 +684,7 @@ describe('Per-product readiness and explicit publication',()=>{
    {product_id:second.product_id,display_name:second.display_name,upstream_model:second.upstream_model,media_type:'image',published:true,published_ready:false,state:'PUBLISHED_INVALID',reason:'此商品已发布的价格无效。',action:'修复此商品价格后，明确选择此商品重新发布。'}]
   api.detail.mockResolvedValue(dto)
   await mountWorkbench();await selectAccount()
+  await wrapper.get('[data-test="sales-category-attention"]').trigger('click');await flushPromises()
   expect(wrapper.text()).toContain('已发布配置当前不可售');expect(wrapper.text()).not.toContain('发布未就绪')
   const row=wrapper.get('[data-test="readiness-private-product-b"]')
   expect(row.text()).toContain('Account #77 · Banana 独立商品');expect(row.text()).toContain('已发布的价格无效')
@@ -1252,9 +1306,13 @@ it.each(['UNLISTED','ARCHIVED'])('keeps retired %s IDs out of new candidates eve
 
 it('allows historical inspection but disables creating another product for a removed ID',async()=>{
  const dto=supplier();const product=dto.media_workbench_v1!.draft.products[0]!
+ dto.host='api.image2pro.top'
  dto.model_catalog!.models=['new-model'];dto.models[0]!.state='UPSTREAM_NOT_DISCOVERED'
  dto.product_states=[{product_id:product.product_id,display_name:product.display_name,upstream_model:product.upstream_model,media_type:'image',published:true,published_ready:false,state:'UPSTREAM_REMOVED',reason:'型号已退出上游目录',action:'原配置保留作历史核对'}]
  api.detail.mockResolvedValue(dto);await mountWorkbench();await selectAccount()
+ await wrapper.get('[data-test="sales-category-attention"]').trigger('click');await flushPromises()
+ await wrapper.get('[data-test="view-catalog-report"]').trigger('click');await flushPromises()
+ expect(document.activeElement).toBe(wrapper.get('[data-test="catalog-copy"]').element)
  await wrapper.get(`[data-test="readiness-${product.product_id}"] button`).trigger('click');await flushPromises()
  expect(wrapper.get('[data-test="new-independent-product"]').attributes('disabled')).toBeDefined()
  expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
