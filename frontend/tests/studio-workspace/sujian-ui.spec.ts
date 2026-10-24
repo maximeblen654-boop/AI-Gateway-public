@@ -11,6 +11,10 @@ const calls=(page:Page)=>page.evaluate(()=>(window as any).studioFixture.calls)
 for(const width of [1440,390]){
  test(`multiple images remain in a collapsed quote at ${width}`,async({page},info)=>{
   await page.setViewportSize({width,height:900});await open(page,'reference-offers')
+  if(width===390){
+   const navigation=await Promise.all(['text','edit','video','history'].map(mode=>page.getByTestId('studio-mode-'+mode).boundingBox()))
+   expect(Math.max(...navigation.map(box=>box!.y))-Math.min(...navigation.map(box=>box!.y))).toBeLessThan(2)
+  }
   await expect(page.getByTestId('studio-asset-input')).toHaveCount(0)
   await page.getByTestId('studio-mode-edit').click()
   expect((await page.getByTestId('studio-asset-uploader').boundingBox())!.y).toBeLessThan((await page.getByTestId('studio-prompt').boundingBox())!.y)
@@ -25,7 +29,8 @@ for(const width of [1440,390]){
   expect(prepare.body.asset_refs).toHaveLength(2);expect(new Set(prepare.body.asset_refs).size).toBe(2)
   expect(posted.find((c:any)=>c.path.endsWith('/image/quotes')).body.spec.images).toBe(2)
   expect(posted.filter((c:any)=>c.method==='POST'&&c.path.endsWith('/tasks'))).toHaveLength(0)
-  await page.getByRole('button',{name:'返回修改'}).click();await page.getByTestId('studio-mode-edit').click()
+  await page.getByRole('button',{name:'返回修改'}).click()
+  await expect(page.getByTestId('studio-mode-edit')).toHaveAttribute('aria-pressed','true')
   await expect(page.getByTestId('studio-asset-summary')).toContainText('2');await page.getByTestId('studio-assets-toggle').click()
   await expect(page.getByTestId('studio-asset-success')).toHaveCount(2)
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
@@ -40,8 +45,11 @@ for(const width of [1440,390]){
   await page.screenshot({path:info.outputPath(`video-materials-${width}.png`),fullPage:true})
   await page.getByTestId('studio-assets-toggle').click()
   for(const kind of ['video','audio'])await expect(page.getByTestId('studio-asset-'+kind)).toHaveJSProperty('paused',true)
+  await page.getByTestId('studio-assets-toggle').click()
+  for(const kind of ['video','audio'])await page.getByTestId('studio-asset-'+kind).evaluate(async(e:HTMLMediaElement)=>{e.currentTime=0;await e.play()})
   await page.getByTestId('studio-prompt').fill('根据参考画面、动作和声音创作视频')
   await page.getByTestId('studio-quote').click();await expect(page.getByRole('dialog')).toBeVisible()
+  for(const kind of ['video','audio'])await expect(page.getByTestId('studio-asset-'+kind)).toHaveJSProperty('paused',true)
   const posted=await calls(page),prepare=posted.find((c:any)=>c.path.endsWith('/video/prepare')),quote=posted.find((c:any)=>c.path.endsWith('/video/quotes'))
   expect(prepare.body.assets.map((a:any)=>a.kind)).toEqual(['image','video','audio'])
   expect(quote.body.assets).toEqual(prepare.body.assets);expect(quote.body.preparation_id).toBe('isolated-image2pro-preparation')
@@ -49,6 +57,19 @@ for(const width of [1440,390]){
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
  })
 }
+test('continuing across image and video history reloads the matching catalog',async({page})=>{
+ await open(page,'mixed')
+ for(const kind of ['video','image']){
+  await page.getByTestId('studio-mode-history').click()
+  await page.locator(`[data-task-id^="${kind==='video'?'op_':'img_'}"]`).first().click()
+  await page.getByTestId('studio-new').click()
+  await expect(page.getByTestId('studio-model-toggle')).toContainText(kind==='video'?'映像':'GPT Image 2')
+  if(kind==='video')await expect(page.getByTestId('studio-duration')).toContainText('5 秒')
+  expect((await calls(page)).some((call:any)=>call.path.endsWith(`/${kind}/catalog`))).toBe(true)
+ }
+ expect((await calls(page)).filter((call:any)=>call.method==='POST'&&call.path.endsWith('/tasks'))).toHaveLength(0)
+})
+
 test('collapsed failed upload remains visible and blocks quotation',async({page})=>{
  await open(page);await page.getByTestId('studio-mode-video').click()
  await page.evaluate(()=>{const original=window.fetch;window.fetch=async(input,init)=>String(input).endsWith('/assets/uploads')?new Response(JSON.stringify({error:'synthetic_upload_failure'}),{status:503,headers:{'Content-Type':'application/json'}}):original(input,init)})

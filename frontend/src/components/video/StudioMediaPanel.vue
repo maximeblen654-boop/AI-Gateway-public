@@ -187,14 +187,16 @@ const hasUnreadyAssets=computed(()=>uploads.value.some(item=>item.status!=='succ
 const assetSummary=computed(()=>(['image','video','audio'] as const).map(type=>{const n=uploads.value.filter(item=>item.kind===type).length;return n?`${assetTypeNames[type]} ${n} ${type==='image'?'张':'段'}`:''}).filter(Boolean).join(' · '))
 function toggleAssets(){
  assetsCollapsed.value=!assetsCollapsed.value
- if(assetsCollapsed.value)assetList.value?.querySelectorAll<HTMLMediaElement>('video,audio').forEach(media=>media.pause())
+ if(assetsCollapsed.value)pauseAssetPreviews()
 }
+function pauseAssetPreviews(){assetList.value?.querySelectorAll<HTMLMediaElement>('video,audio').forEach(media=>media.pause())}
 
 const resolution=ref(''), ratio=ref(''), quality=ref(''), outputFormat=ref<StudioOutputFormat|'auto'>('auto'), count=ref(1), duration=ref(5), prompt=ref('')
 const busy=ref(true), querying=ref(false), historyLoading=ref(false), enabled=ref(false), readinessState=ref<'unknown'|'enabled'|'disabled'>('unknown'), error=ref(''), notice=ref(''), history=ref<StudioTask[]>([]), active=ref<StudioTask|null>(null), clock=ref(Date.now())
 type HistoryFilter = 'all'|'image'|'video'
 const historySearch=ref(''), historyStatus=ref<'all'|'completed'|'pending'|'prepared'|'failed'>('all')
 const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilter=ref<HistoryFilter>('all'), createMenuOpen=ref(false), showFailed=ref(false), openControl=ref<'model'|'ratio'|'resolution'|'quality'|'count'|'duration'|'format'|null>(null)
+watch([active,historyMode],([task,inHistory])=>{if(task||inHistory)pauseAssetPreviews()},{flush:'sync'})
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
@@ -384,7 +386,13 @@ function accepted(task:StudioTask,select=true){
  remember()
 }
 function selectOffer(){if(offer.value)unavailableOffers.value.delete(`${kind.value}:${offerId.value}`);const s=offer.value?.spec;resolution.value=s?.resolution?.[0]||'';ratio.value=s?.aspect_ratio?.[0]||'';quality.value=s?.quality?.[0]||'';duration.value=s?.duration_seconds?.[0]||0;count.value=kind.value==='image' ? countOptions.value[0]??1 : 1;intent=undefined}
-function newTask(){if(busy.value || !active.value)return;const nextKind=active.value.kind;kind.value=nextKind;if(nextKind==='image')imageMode.value='text';quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;createMenuOpen.value=false;remember();focusPrompt()}
+async function newTask(){
+ if(busy.value || !active.value)return
+ const nextKind=active.value.kind
+ if(nextKind!==kind.value){await changeMode(nextKind==='video'?'video':uploads.value.length?'edit':'text');return}
+ if(nextKind==='image')imageMode.value=uploads.value.length?'edit':'text'
+ quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;createMenuOpen.value=false;remember();focusPrompt()
+}
 async function loadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation;historyLoading.value=true;try{
  const kinds:StudioKind[]=historyFilter.value==='all'?['image','video']:[historyFilter.value]
  const settled=await Promise.allSettled(kinds.map(value=>studioHistory(value)))

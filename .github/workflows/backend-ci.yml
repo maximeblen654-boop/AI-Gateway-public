@@ -80,9 +80,9 @@ jobs:
         working-directory: frontend
         run: pnpm exec playwright test --config playwright.procurement.config.ts
 
-      - name: Isolated video covers and media session recovery
+        - name: Isolated media recovery and creation workspace
         working-directory: frontend
-        run: pnpm exec playwright test --config tests/studio-workspace/media-read.config.ts media-read.spec.ts
+          run: pnpm exec playwright test --config tests/studio-workspace/media-read.config.ts media-read.spec.ts video-ui.spec.ts sujian-ui.spec.ts
 
       - name: Upload isolated wizard screenshots and results
         if: always()
