@@ -6,6 +6,8 @@ export interface StudioAssetReceipt {
   mime_type: string
   size: number
   duration_seconds: number | null
+  width?: number
+  height?: number
 }
 
 const MAX_ASSET_BYTES = 100_000_000
@@ -32,6 +34,8 @@ export async function uploadStudioAsset(file: File, kind: StudioAssetReceipt['ki
   if (!response.ok) throw new Error('asset_upload_failed')
   const receipt = await response.json() as Partial<StudioAssetReceipt>
   if (!ASSET_REF.test(receipt.asset_ref || '') || receipt.kind !== kind || receipt.mime_type !== file.type || receipt.size !== file.size ||
+      (receipt.width !== undefined && (!Number.isSafeInteger(receipt.width) || receipt.width <= 0)) ||
+      (receipt.height !== undefined && (!Number.isSafeInteger(receipt.height) || receipt.height <= 0)) ||
       (receipt.duration_seconds !== null && (!Number.isFinite(receipt.duration_seconds) || (receipt.duration_seconds || 0) <= 0))) {
     throw new Error('invalid_asset_receipt')
   }

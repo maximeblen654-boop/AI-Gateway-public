@@ -84,12 +84,15 @@ export function createLocalAssetStore({ rootDir, ffprobePath = 'ffprobe' }) {
     fs.mkdirSync(temp, { mode: 0o700 });
     try {
       durableFile(path.join(temp, 'content.bin'), body);
-      const durationSeconds = validateProbe(probeWithFfprobe(path.join(temp, 'content.bin'), ffprobePath), kind);
+      const probe = probeWithFfprobe(path.join(temp, 'content.bin'), ffprobePath);
+      const durationSeconds = validateProbe(probe, kind);
+      const visual = probe.streams.find(stream => stream.codec_type === 'video');
       const meta = { version: 1, id, ownerId, kind, mimeType, size: body.length, sha256,
         durationSeconds, createdAt: new Date().toISOString() };
       durableFile(path.join(temp, 'meta.json'), Buffer.from(JSON.stringify(meta)));
       fs.renameSync(temp, path.join(root, id));
-      return { assetRef: id, kind, mimeType, size: body.length, durationSeconds };
+      return { assetRef: id, kind, mimeType, size: body.length, durationSeconds,
+        ...(kind === 'image' ? { width: visual.width, height: visual.height } : {}) };
     } finally { removeTemp(temp); }
   }
 

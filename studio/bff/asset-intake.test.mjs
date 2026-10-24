@@ -49,6 +49,7 @@ test('asset upload route performs real HTTP intake with session ownership and re
   assert.equal(response.status,201);
   const receipt=await response.json();
   assert.match(receipt.asset_ref,/^asset_[a-f0-9-]{36}$/);
+  assert.equal(receipt.width,1);assert.equal(receipt.height,1);
   const restarted=createAssetIntake({rootDir:root});
   assert.equal(restarted.inlineReceipt(7,receipt.asset_ref).size,png.length);
   const forbidden=await fetch(url,{method:'POST',headers:{...headers,Cookie:'u8'},body:png});

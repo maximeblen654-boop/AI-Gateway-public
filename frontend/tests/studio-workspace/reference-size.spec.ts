@@ -1,0 +1,32 @@
+import { test, expect } from '@playwright/test'
+
+for (const width of [1440, 390]) test(`small reference adapts locally without generating at ${width}`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 900 })
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort())
+  await page.goto('/tests/studio-workspace/index.html?scenario=reference-size')
+  await page.getByTestId('studio-mode-video').click()
+  await page.getByTestId('studio-prompt').fill('本地合成参考图验收，不提交生成')
+  const bytes = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 278; canvas.height = 270
+    const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#e0a969'; ctx.fillRect(0, 0, 278, 270)
+    ctx.fillStyle = '#204957'; ctx.fillRect(50, 50, 100, 100)
+    const blob = await new Promise<Blob>(resolve => canvas.toBlob(b => resolve(b!), 'image/png'))
+    return Array.from(new Uint8Array(await blob.arrayBuffer()))
+  })
+  await page.getByTestId('studio-asset-input').setInputFiles({ name: 'synthetic-278x270.png', mimeType: 'image/png', buffer: Buffer.from(bytes) })
+  await expect(page.getByTestId('studio-asset-size-issue')).toContainText('278 × 270')
+  await expect(page.getByTestId('studio-quote')).toBeDisabled()
+  await page.screenshot({ path: info.outputPath(`reference-size-before-${width}.png`), fullPage: true })
+  await page.getByTestId('studio-asset-adapt').click()
+  await expect(page.getByTestId('studio-asset-success')).toContainText('已等比例适配')
+  await expect(page.getByTestId('studio-asset-success')).toContainText('309 × 300')
+  await expect(page.getByTestId('studio-asset-size-issue')).toHaveCount(0)
+  await expect(page.getByTestId('studio-quote')).toBeEnabled()
+  await page.getByTestId('studio-quote').click()
+  await expect(page.getByRole('dialog', { name: '确认本次生成' })).toBeVisible()
+  const calls = await page.evaluate(() => (window as any).studioFixture.calls)
+  expect(calls.filter((c: any) => c.path.endsWith('/assets/uploads'))).toHaveLength(2)
+  expect(calls.filter((c: any) => c.method === 'POST' && c.path.endsWith('/tasks'))).toEqual([])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
+  await page.screenshot({ path: info.outputPath(`reference-size-ready-${width}.png`), fullPage: true })
+})

@@ -73,7 +73,7 @@ export function createImageHandler({ sessions, tasks, assetIntake, paidEnabled=I
         try {
           const saved=await assetIntake.save({ownerId:session.ownerId,kind,mimeType,sha256,bytes:Buffer.concat(chunks,size)});
           if(!saved || typeof saved.assetRef!=='string' || saved.kind!==kind || saved.mimeType!==mimeType || saved.size!==size) throw new Error('invalid_asset_receipt');
-          reply(201,{asset_ref:saved.assetRef,kind,mime_type:saved.mimeType,size:saved.size,duration_seconds:saved.durationSeconds});
+          reply(201,{asset_ref:saved.assetRef,kind,mime_type:saved.mimeType,size:saved.size,duration_seconds:saved.durationSeconds,...(kind==='image'?{width:saved.width,height:saved.height}:{})});
         } catch(error) {
           const invalid=new Set(['invalid_asset_input','asset_hash_mismatch','asset_type_mismatch','media_probe_failed','invalid_image','invalid_media_type','media_duration_unknown']);
           reply(invalid.has(error?.message)?422:503,{error:invalid.has(error?.message)?'asset_unusable':'asset_store_unavailable',uploaded:false,supplier_request_sent:false});

@@ -1,6 +1,7 @@
 import { CompilePlan, CompilePublishedPlan, Materialize } from '../api/video-request-builder.mjs';
 import { createOperationJournal } from './operation-journal.js';
 import { createVideoDelivery } from './video-delivery.mjs';
+import { withVideoReferenceRules } from './video-reference-rules.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
@@ -46,7 +47,7 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
   const preparationPath=(uid,id)=>path.join(preparationRoot,createHash('sha256').update(`${uid}:${id}`).digest('hex')+'.json');
   const readPreparation=(session,id)=>{const uid=owner(session);if(typeof id!=='string'||!id)return undefined;try{const value=JSON.parse(fs.readFileSync(preparationPath(uid,id),'utf8'));if(value.owner_id!==uid||value.preparation_id!==id)return undefined;return value;}catch{return undefined;}};
   const writePreparation=(uid,value)=>{const file=preparationPath(uid,value.preparation_id),tmp=`${file}.${randomUUID()}.tmp`;const fd=fs.openSync(tmp,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value));fs.fsyncSync(fd)}finally{fs.closeSync(fd)}fs.renameSync(tmp,file);};
-  async function catalog(session){owner(session);return (await call(session,'GET','catalog')).payload;}
+  async function catalog(session){owner(session);return withVideoReferenceRules((await call(session,'GET','catalog')).payload);}
   async function readiness(session){owner(session);return (await call(session,'GET','readiness')).payload;}
   async function prepareReferences(session,payload) {
     const uid=owner(session);

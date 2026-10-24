@@ -36,11 +36,11 @@
               <button type="button" class="studio-upload-trigger" :class="{ 'has-assets': uploads.length }" data-testid="studio-attachment" :disabled="!offer || !accept || busy || !!active" :aria-label="kind === 'image' ? '添加参考图片' : '添加参考素材'" aria-describedby="studio-asset-feedback" @click="fileInput?.click()"><Icon name="plus" /><span>{{ uploads.length ? '继续添加素材' : kind === 'image' ? '添加参考图片' : '添加参考素材' }}</span><small>{{ accept ? '点击选择或拖入文件' : '当前模型不支持参考素材' }}</small></button>
               <input ref="fileInput" type="file" :accept="accept" :disabled="!offer || !accept || busy || !!active" multiple class="studio-sr-only" aria-describedby="studio-asset-feedback" data-testid="studio-asset-input" @change="upload" />
               <p v-if="assetMessage" id="studio-asset-feedback" class="studio-asset-feedback" role="alert" data-testid="studio-asset-feedback">{{ assetMessage }}</p>
-              <p v-if="uploads.length" class="studio-asset-summary" role="status" data-testid="studio-asset-summary">{{ assetSummary }}<span v-if="failedAssets"> · {{ failedAssets }} 项上传失败，请{{ assetsCollapsed ? '展开后' : '' }}移除并重新添加</span><span v-if="pendingAssets"> · {{ pendingAssets }} 项上传中</span></p>
+              <p v-if="uploads.length" class="studio-asset-summary" role="status" data-testid="studio-asset-summary">{{ assetSummary }}<span v-if="failedAssets"> · {{ failedAssets }} 项上传失败，请{{ assetsCollapsed ? '展开后' : '' }}移除并重新添加</span><span v-if="pendingAssets"> · {{ pendingAssets }} 项上传中</span><span v-if="incompatibleImages"> · {{ incompatibleImages }} 张图片需检查尺寸</span></p>
               <div v-if="uploads.length" v-show="!assetsCollapsed" ref="assetList" id="studio-asset-list" class="studio-assets" data-testid="studio-assets">
                 <div v-for="(item,i) in uploads" :key="item.id" class="studio-asset" :class="{ 'is-media': item.kind !== 'image' }" :data-testid="`studio-asset-${item.status}`">
                   <img v-if="item.previewUrl && item.kind === 'image'" :src="item.previewUrl" :alt="item.file.name || `参考图片 ${i+1}`" data-testid="studio-asset-thumbnail" />
-                  <div class="studio-asset-info"><span class="studio-asset-kind">{{ assetTypeNames[item.kind] }}</span><strong>{{ item.file.name || `参考素材 ${i+1}` }}</strong><small v-if="item.status === 'pending'">上传中…</small><small v-else-if="item.status === 'success'">上传成功</small><small v-else>上传失败{{ item.error ? `：${item.error}` : '' }}</small></div>
+                  <div class="studio-asset-info"><span class="studio-asset-kind">{{ assetTypeNames[item.kind] }}</span><strong>{{ item.file.name || `参考素材 ${i+1}` }}</strong><small v-if="item.status === 'pending'">上传中…</small><small v-else-if="item.status === 'success'">{{ item.adapted ? '已等比例适配' : '上传成功' }}<template v-if="item.receipt?.width && item.receipt?.height"> · {{ item.receipt.width }} × {{ item.receipt.height }}</template></small><small v-else>上传失败{{ item.error ? `：${item.error}` : '' }}</small><p v-if="imageIssue(item)" class="studio-asset-issue" role="alert" data-testid="studio-asset-size-issue">{{ imageIssue(item) }}</p><small v-if="imageIssue(item) && !canAdaptImage(item)">请换用更大原图。</small><button v-if="canAdaptImage(item)" type="button" class="studio-asset-adapt" data-testid="studio-asset-adapt" :disabled="busy || !!active" @click="adaptImage(item)">一键适配</button></div>
                   <button type="button" :disabled="!!active" :data-testid="`studio-asset-remove-${item.id}`" :aria-label="`移除素材 ${item.file.name}`" @click="removeAsset(item)"><Icon name="x" /></button>
                   <video v-if="item.previewUrl && item.kind === 'video'" :src="item.previewUrl" controls preload="metadata" :aria-label="`预览 ${item.file.name}`" data-testid="studio-asset-video" />
                   <audio v-if="item.previewUrl && item.kind === 'audio'" :src="item.previewUrl" controls preload="metadata" :aria-label="`试听 ${item.file.name}`" data-testid="studio-asset-audio" />
@@ -177,19 +177,21 @@ import { ratioOfferOptions } from './studioRatioOptions'
 import StudioModelPicker from './StudioModelPicker.vue'
 import { productDimensionValues, productReferenceOffers, resolveProductOffer, supportsProductReferences, type OfferDimension } from './studioProductOffers'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import { adaptStudioImage, studioImageAdaptedSize } from '@/utils/studioImageAdaptation'
 import '@/styles/studio-workspace.css'
 const kind=ref<StudioKind>('image'), offers=ref<StudioOffer[]>([]), offerId=ref('')
 const panelRoot=ref<HTMLElement|null>(null)
 function releaseLeavingPreviews(){panelRoot.value?.querySelectorAll<HTMLImageElement>('.studio-work-preview img').forEach(image=>image.removeAttribute('src'))}
 onBeforeUnmount(releaseLeavingPreviews)
 type UploadState = 'pending' | 'success' | 'failure'
-type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController }
+type StudioAssetUpload = { id:string; file:File; kind:StudioAssetReceipt['kind']; status:UploadState; receipt?:StudioAssetReceipt; error?:string; previewUrl?:string; controller?:AbortController; originalFile?:File; adapted?:boolean }
 const uploads=ref<StudioAssetUpload[]>([])
 const assetsCollapsed=ref(false), assetMessage=ref(''), assetList=ref<HTMLElement|null>(null)
 const assetTypeNames={image:'图片',video:'视频',audio:'音频'}
 const failedAssets=computed(()=>uploads.value.filter(item=>item.status==='failure').length)
 const pendingAssets=computed(()=>uploads.value.filter(item=>item.status==='pending').length)
-const hasUnreadyAssets=computed(()=>uploads.value.some(item=>item.status!=='success'))
+const hasUnreadyAssets=computed(()=>uploads.value.some(item=>item.status!=='success'||!!imageIssue(item)))
+const incompatibleImages=computed(()=>uploads.value.filter(item=>!!imageIssue(item)).length)
 const assetSummary=computed(()=>(['image','video','audio'] as const).map(type=>{const n=uploads.value.filter(item=>item.kind===type).length;return n?`${assetTypeNames[type]} ${n} ${type==='image'?'张':'段'}`:''}).filter(Boolean).join(' · '))
 function toggleAssets(){
  assetsCollapsed.value=!assetsCollapsed.value
@@ -481,6 +483,32 @@ async function refresh(automatic=false){
   feedback.value[original.id]={at:Date.now(),message:unchanged?`已查询原任务，暂无新结果。当前状态：${taskStatusText(task)}。`:`原任务已更新：${taskStatusText(task)}。`}
  }catch(e){if(mounted)feedback.value[original.id]={at:Date.now(),message:'本次查询未取得最新状态，保留上次记录。',error:`查询未完成：${studioErrorMessage(e)} 原任务未重新提交。`}}
  finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}
+}
+function imageMinSide(){const min=offer.value?.reference_image_min_side;return kind.value==='video'&&Number.isSafeInteger(min)&&Number(min)>0&&Number(min)<=4096?Number(min):0}
+function imageIssue(item:StudioAssetUpload){
+ const min=imageMinSide();if(!min||item.kind!=='image'||item.status!=='success')return ''
+ const {width,height}=item.receipt||{}
+ if(!width||!height)return '无法确认图片尺寸，请重新添加图片。'
+ return Math.min(width,height)<min?`图片为 ${width} × ${height} 像素，当前模型要求短边至少 ${min} 像素。放大不会增加原图细节。`:''
+}
+function canAdaptImage(item:StudioAssetUpload){
+ if(!imageIssue(item)||!item.receipt?.width||!item.receipt?.height)return false
+ try{studioImageAdaptedSize({width:item.receipt.width,height:item.receipt.height},imageMinSide());return ['image/png','image/jpeg','image/webp'].includes(item.file.type)&&item.file.size<15_000_000}catch{return false}
+}
+async function adaptImage(item:StudioAssetUpload){
+ if(busy.value||active.value||!canAdaptImage(item))return
+ const current=currentUpload(item);if(!current||!current.receipt?.width||!current.receipt?.height)return
+ const controller=new AbortController();current.controller=controller;busy.value=true;current.status='pending';current.error=undefined;intent=undefined;assetMessage.value='';notice.value='正在适配图片尺寸…'
+ try{
+  const file=await adaptStudioImage(current.file,{width:current.receipt.width,height:current.receipt.height},imageMinSide(),controller.signal)
+  if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return
+  current.originalFile??=current.file;current.file=file;current.receipt=undefined;current.adapted=true;revokePreview(current);current.previewUrl=assetPreview(file)
+  await uploadOne(current)
+ }catch(e){
+  if(!mounted||currentUpload(item)!==current||controller.signal.aborted)return
+  current.status=current.receipt?'success':'failure';current.error=undefined
+  assetMessage.value=e instanceof Error&&e.message==='image_adaptation_unsupported'?'当前浏览器无法适配，请换用更大原图。':'图片适配未完成，请换用更大原图；原素材仍保留。'
+ }finally{if(mounted){busy.value=false;syncSelectedOffer();notice.value=''}}
 }
 function assetKind(file:File):StudioAssetReceipt['kind']|undefined{const value=file.type.split('/')[0];return ['image','video','audio'].includes(value) ? value as StudioAssetReceipt['kind'] : undefined}
 function assetError(error:unknown){

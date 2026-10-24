@@ -10,6 +10,7 @@ export interface StudioPassiveStatus {
   data_through?: string; computed_at?: string; error_rate?: number
 }
 export interface StudioOffer {
+  reference_image_min_side?: number
   product_scope?: string
   excluded?: StudioSpecMatch[]
   passive_status?: StudioPassiveStatus
@@ -163,7 +164,7 @@ async function requestWithSession<T>(token: string | null, kind: StudioKind, ope
 export async function studioCatalog(kind: StudioKind): Promise<StudioOffer[]> {
   const value = await studioRequest<unknown>(kind, 'catalog')
   const offers = Array.isArray(value) ? value : record(value).offers
-  if (!Array.isArray(offers) || offers.some(o => typeof o?.offer_id !== 'string' || typeof o.model !== 'string' || typeof o.upstream_model !== 'string' || !o.spec?.count || !o.spec?.references)) throw new StudioError('studio_contract')
+  if (!Array.isArray(offers) || offers.some(o => typeof o?.offer_id !== 'string' || typeof o.model !== 'string' || typeof o.upstream_model !== 'string' || !o.spec?.count || !o.spec?.references || (o.reference_image_min_side !== undefined && (!Number.isSafeInteger(o.reference_image_min_side) || o.reference_image_min_side < 1 || o.reference_image_min_side > 4096)))) throw new StudioError('studio_contract')
   return offers
 }
 export async function studioHistory(kind: StudioKind): Promise<StudioTask[]> {
@@ -206,6 +207,8 @@ export async function recoverStudioMediaRead(src: string): Promise<void> {
   if (!response.ok || !mime || !expected.includes(mime)) throw new StudioError('result_load_failed', response.status)
 }
 export function studioErrorMessage(error: unknown): string {
+  if (error instanceof StudioError && error.code === 'reference_image_too_small') return '参考图片尺寸不足，请在素材列表中使用“一键适配”或更换图片。'
+  if (error instanceof StudioError && error.code === 'reference_image_dimensions_unavailable') return '无法确认参考图片尺寸，请重新上传图片后再试。'
   if (error instanceof Error && ['invalid_local_asset','file_changed','asset_upload_failed','invalid_asset_receipt'].includes(error.message)) return '素材上传或校验未通过，请检查类型、大小和数量。'
   if (error instanceof Error && error.message === 'login_required') return '登录已失效，请重新登录后查询原任务。'
   if (error instanceof StudioError) {

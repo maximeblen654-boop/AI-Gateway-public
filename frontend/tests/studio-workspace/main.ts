@@ -25,6 +25,7 @@ if (scenario === 'statuses') {
  Object.assign(imageOffers[1]!, {passive_status:{...observation,state:'insufficient'}})
 }
 const videoOffers = [{ offer_id: 'video-standard', model: 'studio-video', display_name: '映像 · 视频', upstream_model: 'configured-video', spec: { resolution: ['720p', '1080p'], aspect_ratio: ['16:9', '9:16'], duration_seconds: [5, 10], count: { min: 1, max: 1 }, references } }]
+if (scenario === 'reference-size') Object.assign(videoOffers[0]!, {reference_image_min_side:300})
 if (scenario === 'image2pro-protocol') {
  Object.assign(videoOffers[0]!,{offer_id:'image2pro-video',model:'image2pro-public-fixture',display_name:'Image2Pro · 合成协议验收',input_mode:'image2pro',product_scope:'isolated-image2pro-product'})
  Object.assign(videoOffers[0]!.spec,{resolution:['720P'],duration_seconds:[5],aspect_ratio:['16:9'],references:{image:{min:0,max:1},audio:{min:0,max:1},video:{min:0,max:1},total_max:3}})
@@ -88,7 +89,7 @@ window.fetch = async (input, init) => {
   const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } })
   if (scenario === 'media-read' && (path.startsWith('/studio-v2/api/session') || /\/video\/operations\/[^/]+\/(original|cover)$/.test(path))) return nativeFetch(input, init)
   if (path.endsWith('/api/session')) return json({ owner_id: 9001 })
-  if (path.endsWith('/assets/uploads')) {const headers=new Headers(init?.headers);return json({ asset_ref: `asset_aaaaaaaa-0000-0000-0000-${(++assetSequence).toString().padStart(12,'0')}`, kind: headers.get('X-Studio-Asset-Kind'), mime_type: headers.get('Content-Type'), size: (init?.body as ArrayBuffer).byteLength, duration_seconds: null })}
+  if (path.endsWith('/assets/uploads')) {const headers=new Headers(init?.headers);let dimensions={};if(scenario==='reference-size'){const bitmap=await createImageBitmap(new Blob([init?.body as ArrayBuffer],{type:headers.get('Content-Type')||'image/png'}));dimensions={width:bitmap.width,height:bitmap.height};bitmap.close()}return json({ ...dimensions, asset_ref: `asset_aaaaaaaa-0000-0000-0000-${(++assetSequence).toString().padStart(12,'0')}`, kind: headers.get('X-Studio-Asset-Kind'), mime_type: headers.get('Content-Type'), size: (init?.body as ArrayBuffer).byteLength, duration_seconds: null })}
   const match = /\/api\/(image|video)\/(.*)/.exec(path)
   if (!match) return json({ error: 'fixture_unexpected_path' }, 404)
   const [, kind, op] = match as [string, string, string]

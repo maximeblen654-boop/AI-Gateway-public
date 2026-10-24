@@ -1,5 +1,6 @@
 import { makeVerifiedAssetReceipt, CompilePlan, CompilePublishedPlan } from '../api/video-request-builder.mjs';
 import contract from '../../backend/internal/videoplan/contract.json' with { type: 'json' };
+import { referenceImageMinSide } from './video-reference-rules.mjs';
 
 // Both fresh and restarted requests use the private store and the same durable
 // preparation shape. The browser never supplies a trusted source or receipt.
@@ -29,6 +30,13 @@ export function createVideoAssetResolver({ intake, tasks }) {
       totalBytes += a.size;
       if (!Number.isSafeInteger(a.size) || a.size < 1 || totalBytes > 18 * 1024 * 1024) throw Error('media_request_too_large');
       if (a.kind !== ref.kind) throw Error('asset_type_mismatch');
+      const minSide = referenceImageMinSide(configured);
+      if (a.kind === 'image' && minSide) {
+        // uploadPayload already probes the stored bytes. Reuse that evidence;
+        // no resize, extra decoder, or supplier request runs on the server.
+        if (!Number.isSafeInteger(a.width) || !Number.isSafeInteger(a.height) || a.width < 1 || a.height < 1) throw Error('reference_image_dimensions_unavailable');
+        if (Math.min(a.width, a.height) < minSide) throw Error('reference_image_too_small');
+      }
       return { asset_ref: ref.asset_ref, kind: a.kind, mime_type: a.mimeType, size: a.size,
         sha256: a.sha256, ...(a.durationSeconds ? { duration_seconds: a.durationSeconds } : {}), bytes_base64: Buffer.from(a.bytes).toString('base64') };
     });

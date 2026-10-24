@@ -1,6 +1,7 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import StudioMediaPanel from '../StudioMediaPanel.vue'
+import * as adaptation from '@/utils/studioImageAdaptation'
 import StudioSpecPicker from '../StudioSpecPicker.vue'
 import { StudioError, type StudioTask } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
@@ -933,5 +934,31 @@ describe('Quote transition progress',()=>{
   expect((wrapper.get('[data-testid="studio-prompt"]').element as HTMLTextAreaElement).value).toBe('Keep this prompt')
   history.resolve([]);await flushPromises()
   expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined();expect(api.generate).not.toHaveBeenCalled()
+ })
+})
+
+
+describe('Reference image size adaptation',()=>{
+ it('blocks a small image, adapts only on demand and uploads a new asset before quoting',async()=>{
+  api.catalog.mockResolvedValue([{...withImageReferences(),reference_image_min_side:300}]);api.history.mockResolvedValue([])
+  api.upload.mockImplementation(async(file:File)=>({...receipt(file),width:file.name.includes('adapted')?309:278,height:file.name.includes('adapted')?300:270}))
+  const adapted=new File(['new-png-bytes'],'adapted.png',{type:'image/png'}),convert=vi.spyOn(adaptation,'adaptStudioImage').mockResolvedValue(adapted)
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('synthetic')
+  const original=imageFile();await pick([original])
+  expect(wrapper.get('[data-testid="studio-asset-size-issue"]').text()).toContain('278 × 270')
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();expect(convert).not.toHaveBeenCalled()
+  await wrapper.get('[data-testid="studio-asset-adapt"]').trigger('click');await flushPromises()
+  expect(convert).toHaveBeenCalledOnce();expect(api.upload).toHaveBeenCalledTimes(2);expect(api.upload.mock.calls[1]![0]).toBe(adapted)
+  expect(wrapper.text()).toContain('已等比例适配');expect(wrapper.text()).toContain('309 × 300');expect(wrapper.find('[data-testid="studio-asset-size-issue"]').exists()).toBe(false)
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined();expect(original.name).toBe('reference.png');expect(api.generate).not.toHaveBeenCalled()
+ })
+ it('retains the original reference when browser adaptation fails and never generates',async()=>{
+  api.catalog.mockResolvedValue([{...withImageReferences(),reference_image_min_side:300}]);api.history.mockResolvedValue([])
+  api.upload.mockImplementation(async(file:File)=>({...receipt(file),width:278,height:270}))
+  vi.spyOn(adaptation,'adaptStudioImage').mockRejectedValue(new Error('image_adaptation_failed'))
+  wrapper=mount(StudioMediaPanel);await flushPromises();const original=imageFile();await pick([original])
+  await wrapper.get('[data-testid="studio-asset-adapt"]').trigger('click');await flushPromises()
+  expect(api.upload).toHaveBeenCalledOnce();expect(wrapper.text()).toContain('原素材仍保留');expect(wrapper.get('[data-testid="studio-asset-adapt"]').exists()).toBe(true)
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeDefined();expect(api.generate).not.toHaveBeenCalled()
  })
 })
