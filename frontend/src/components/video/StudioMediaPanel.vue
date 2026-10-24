@@ -481,7 +481,7 @@ async function refresh(automatic=false){
   accepted(task,false)
   const unchanged=task.status===original.status && task.resultCount===original.resultCount && task.billingState===original.billingState
   feedback.value[original.id]={at:Date.now(),message:unchanged?`已查询原任务，暂无新结果。当前状态：${taskStatusText(task)}。`:`原任务已更新：${taskStatusText(task)}。`}
- }catch(e){if(mounted)feedback.value[original.id]={at:Date.now(),message:'本次查询未取得最新状态，保留上次记录。',error:`查询未完成：${studioErrorMessage(e)} 原任务未重新提交。`}}
+ }catch(e){if(mounted)feedback.value[original.id]={at:Date.now(),message:'本次查询未取得最新状态，保留上次记录。',error:studioErrorMessage(e,'query')}}
  finally{querying.value=false;if(mounted&&active.value&&active.value.id!==original.id)void refresh()}
 }
 function imageMinSide(){const min=offer.value?.reference_image_min_side;return kind.value==='video'&&Number.isSafeInteger(min)&&Number(min)>0&&Number(min)<=4096?Number(min):0}

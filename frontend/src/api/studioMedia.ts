@@ -206,7 +206,7 @@ export async function recoverStudioMediaRead(src: string): Promise<void> {
   const expected = path.endsWith('/original') ? ['video/mp4', 'video/webm'] : ['image/jpeg']
   if (!response.ok || !mime || !expected.includes(mime)) throw new StudioError('result_load_failed', response.status)
 }
-export function studioErrorMessage(error: unknown): string {
+export function studioErrorMessage(error: unknown, context?: 'query'): string {
   if (error instanceof StudioError && error.code === 'reference_image_too_small') return '参考图片尺寸不足，请在素材列表中使用“一键适配”或更换图片。'
   if (error instanceof StudioError && error.code === 'reference_image_dimensions_unavailable') return '无法确认参考图片尺寸，请重新上传图片后再试。'
   if (error instanceof Error && ['invalid_local_asset','file_changed','asset_upload_failed','invalid_asset_receipt'].includes(error.message)) return '素材上传或校验未通过，请检查类型、大小和数量。'
@@ -222,5 +222,7 @@ export function studioErrorMessage(error: unknown): string {
     if (error.code === 'studio_contract') return '工作台响应不完整，已停止操作，请稍后查询。'
     if (error.status === 403 || error.status === 409 || error.status === 422) return '报价、素材、模型状态或访问权限校验未通过；已提交任务不会重新生成。'
   }
-  return '连接暂时不可用。若已点击生成，结果待确认，请查询原任务，勿重复提交。'
+  return context === 'query'
+    ? '查询未完成，请稍后重试或刷新页面。'
+    : '连接暂时不可用。若已点击生成，结果待确认，请查询原任务，勿重复提交。'
 }
