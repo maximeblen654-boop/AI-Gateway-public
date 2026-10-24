@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import StudioMediaPanel from '../StudioMediaPanel.vue'
 
 const api=vi.hoisted(()=>({session:vi.fn(),catalog:vi.fn(),history:vi.fn(),request:vi.fn()}))
-vi.mock('@/api/studioMedia',async original=>({...await original<typeof import('@/api/studioMedia')>(),ensureStudioSession:api.session,studioCatalog:api.catalog,studioHistory:api.history,studioRequest:api.request}))
+vi.mock('@/api/studioMedia',async original=>({...await original<typeof import('@/api/studioMedia')>(),ensureStudioSession:api.session,studioCatalog:api.catalog,studioHistory:api.history,studioRequest:api.request, studioQuoteSequence: (action: (request: import('@/api/studioMedia').StudioQuoteRequest) => Promise<unknown>) => action(api.request)}))
 let wrapper:ReturnType<typeof mount>
 beforeEach(()=>{vi.clearAllMocks();sessionStorage.clear();api.catalog.mockResolvedValue([]);api.history.mockResolvedValue([]);api.request.mockResolvedValue({paid_enabled:false})})
 afterEach(()=>{wrapper?.unmount()})

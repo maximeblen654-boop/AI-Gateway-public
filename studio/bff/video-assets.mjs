@@ -4,9 +4,9 @@ import contract from '../../backend/internal/videoplan/contract.json' with { typ
 // Both fresh and restarted requests use the private store and the same durable
 // preparation shape. The browser never supplies a trusted source or receipt.
 export function createVideoAssetResolver({ intake, tasks }) {
-  return async (session, requested, offerId, modelId, spec, { prepare = false, preparationId } = {}) => {
+  return async (session, requested, offerId, modelId, spec, { prepare = false, preparationId, getCatalog = () => tasks.catalog(session) } = {}) => {
     if (!intake) throw Error('asset_store_unavailable');
-    const payload = await tasks.catalog(session);
+    const payload = await getCatalog();
     const configured = payload?.offers?.find(o => o.offer_id === offerId && o.model === modelId);
     if (!configured) throw Error('unsupported_model');
     const model = configured.video_profile ?? contract.models.find(m => m.apiModelId === modelId);

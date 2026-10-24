@@ -6,7 +6,7 @@ import { StudioError, type StudioTask } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 
 const api = vi.hoisted(() => ({ session:vi.fn(), catalog:vi.fn(), request:vi.fn(), history:vi.fn(), task:vi.fn(), generate:vi.fn(), upload:vi.fn(), recover:vi.fn() }))
-vi.mock('@/api/studioMedia', async original => ({ ...await original<typeof import('@/api/studioMedia')>(), ensureStudioSession:api.session, studioCatalog:api.catalog, studioRequest:api.request, studioHistory:api.history, studioTask:api.task, studioGenerate:api.generate, uploadStudioAsset:api.upload, recoverStudioMediaRead:api.recover }))
+vi.mock('@/api/studioMedia', async original => ({ ...await original<typeof import('@/api/studioMedia')>(), ensureStudioSession:api.session, studioCatalog:api.catalog, studioRequest:api.request, studioQuoteSequence: (action: (request: import('@/api/studioMedia').StudioQuoteRequest) => Promise<unknown>) => action(api.request), studioHistory:api.history, studioTask:api.task, studioGenerate:api.generate, uploadStudioAsset:api.upload, recoverStudioMediaRead:api.recover }))
 const prepared:StudioTask={id:'op_'+'a'.repeat(64),kind:'video',status:'prepared',createdAt:'2026-01-01',expiresAt:'2099-01-01',offerId:'offer',model:'synthetic-video',spec:{resolution:'720p',duration_seconds:5,count:1},price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},resultCount:0}
 const offer={offer_id:'offer',model:'synthetic-video',display_name:'合成视频模型',upstream_model:'synthetic-video',spec:{resolution:['720p'],duration_seconds:[5],aspect_ratio:['16:9'],count:{min:1,max:1},references:{image:{min:0,max:1},video:{min:0,max:0},audio:{min:0,max:0},total_max:1}}}
 let wrapper:ReturnType<typeof mount>
@@ -898,5 +898,40 @@ describe('Integrated reference tray and history UX',()=>{
   const completed={...prepared,id:'op_'+'c'.repeat(64),model:'Completed model',status:'completed',resultCount:1},failed={...prepared,id:'op_'+'d'.repeat(64),model:'Failed model',offerId:'removed-offer',status:'failed',billingState:'not_charged'};api.history.mockResolvedValue([completed,failed]);sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind:'video',view:'compose'}))
   wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-mode-history"]').trigger('click');await flushPromises();await wrapper.get('[data-testid="studio-history-status"]').setValue('failed');await wrapper.get('[data-testid="studio-history-search"]').setValue('Failed');expect(wrapper.findAll('[data-task-id]')).toHaveLength(1)
   await wrapper.get(`[data-task-id="${failed.id}"]`).trigger('click');await wrapper.get('.studio-back').trigger('click');expect(wrapper.find('[data-testid="studio-task"]').exists()).toBe(false);expect((wrapper.get('[data-testid="studio-history-search"]').element as HTMLInputElement).value).toBe('Failed');expect((wrapper.get('[data-testid="studio-history-status"]').element as HTMLSelectElement).value).toBe('failed');expect(wrapper.findAll('[data-task-id]')).toHaveLength(1)
+ })
+})
+
+
+describe('Quote transition progress',()=>{
+ beforeEach(()=>{api.request.mockReset().mockResolvedValue({paid_enabled:true});api.history.mockReset().mockResolvedValue([])})
+ it.each(['image','video'] as const)('opens progress immediately for %s and reveals only the returned price',async kind=>{
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind}));api.history.mockResolvedValue([])
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('Synthetic quotation')
+  const pending=deferred<unknown>();api.request.mockClear()
+  api.request.mockImplementation(async (_kind:string,operation:string)=>operation==='quotes'&&kind==='image'?{quote_token:'synthetic-quote'}:pending.promise)
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises()
+  expect(document.body.querySelector('[data-testid="studio-quote-progress"]')).not.toBeNull()
+  expect(document.body.textContent).toContain('正在获取报价')
+  expect(document.body.querySelector('[data-testid="studio-confirm-generate"]')).toBeNull()
+  expect(document.body.textContent).not.toContain('尚未冻结余额')
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');expect(api.request).toHaveBeenCalledTimes(kind==='image'?2:1)
+  pending.resolve({contract:kind==='image'?'published_image_binding_v1':'account_video_v1',[kind==='image'?'task_id':'operation_id']:(kind==='image'?'img_':'op_')+'c'.repeat(kind==='image'?32:64),status:'prepared',model:'synthetic-video',offer_id:'offer',spec:{count:1},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'},expires_at:'2099-01-01'})
+  await flushPromises()
+  expect(document.body.querySelector('[data-testid="studio-quote-progress"]')).toBeNull()
+  expect(document.body.textContent).toContain('确认本次生成');expect(document.body.textContent).toContain('0.80')
+  expect(document.body.textContent).toContain('尚未冻结余额')
+  expect((document.body.querySelector('[data-testid="studio-confirm-generate"]') as HTMLButtonElement).disabled).toBe(false)
+  expect(api.generate).not.toHaveBeenCalled()
+ })
+ it.each(['image','video'] as const)('closes %s progress on failure and preserves editable input',async kind=>{
+  sessionStorage.setItem('studio-media-view-1',JSON.stringify({kind}));api.history.mockResolvedValue([])
+  wrapper=mount(StudioMediaPanel);await flushPromises();await wrapper.get('[data-testid="studio-prompt"]').setValue('Keep this prompt')
+  const pending=deferred<unknown>(),history=deferred<StudioTask[]>();api.request.mockImplementation(()=>pending.promise);api.history.mockReturnValueOnce(history.promise)
+  await wrapper.get('[data-testid="studio-quote"]').trigger('click');await flushPromises();pending.reject(new Error('quote unavailable'));await flushPromises()
+  await vi.waitFor(()=>expect(wrapper.findAllComponents({name:'BaseDialog'})[0]!.props('show')).toBe(false))
+  expect(wrapper.findAllComponents({name:'BaseDialog'})[0]!.props('title')).not.toBe('正在获取报价')
+  expect((wrapper.get('[data-testid="studio-prompt"]').element as HTMLTextAreaElement).value).toBe('Keep this prompt')
+  history.resolve([]);await flushPromises()
+  expect(wrapper.get('[data-testid="studio-quote"]').attributes('disabled')).toBeUndefined();expect(api.generate).not.toHaveBeenCalled()
  })
 })

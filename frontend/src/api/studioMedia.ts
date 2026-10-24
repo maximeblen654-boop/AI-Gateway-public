@@ -136,6 +136,19 @@ export function ensureStudioSession(): Promise<{ owner_id: number }> {
 export async function studioRequest<T = unknown>(kind: StudioKind, operation: string, body?: unknown): Promise<T> {
   const token = localStorage.getItem('auth_token')
   await ensureStudioSession()
+  return requestWithSession<T>(token, kind, operation, body)
+}
+export type StudioQuoteRequest = <T = unknown>(kind: StudioKind, operation: 'quotes' | 'prepare', body: unknown) => Promise<T>
+// One quote may require two dependent calls. Validate the website/Studio session
+// once for that sequence, while checking identity before and after every call.
+// There is no session cache between quotes; Core still validates each request.
+export async function studioQuoteSequence<T>(action: (request: StudioQuoteRequest) => Promise<T>): Promise<T> {
+  const token = localStorage.getItem('auth_token')
+  await ensureStudioSession()
+  sameWebsiteSession(token)
+  return action(<R = unknown>(kind: StudioKind, operation: 'quotes' | 'prepare', body: unknown) => requestWithSession<R>(token, kind, operation, body))
+}
+async function requestWithSession<T>(token: string | null, kind: StudioKind, operation: string, body?: unknown): Promise<T> {
   sameWebsiteSession(token)
   if (operation === 'catalog' || operation === 'prepare') {
     // Provision only on creation entry, never while reading/recovering old tasks.

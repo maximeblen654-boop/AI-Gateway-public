@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const client=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}))
 vi.mock('../client',()=>({apiClient:client,buildGatewayUrl:(v:string)=>v}))
-import { ensureStudioSession, studioRequest, studioTaskView, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError } from '../studioMedia'
+import { ensureStudioSession, studioRequest, studioQuoteSequence, studioTaskView, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError } from '../studioMedia'
 beforeEach(()=>{vi.clearAllMocks();localStorage.clear()})
 afterEach(()=>vi.unstubAllGlobals())
 it('an authoritative media expiry is not described as a connection or generation failure',()=>{
@@ -145,4 +145,57 @@ it('rejects external sources before authentication and refuses identity changes 
  localStorage.setItem('auth_token','first');client.get.mockResolvedValue({data:{id:2}})
  vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({owner_id:2}))).mockImplementationOnce(async()=>{localStorage.setItem('auth_token','second');return new Response(null,{headers:{'content-type':'video/mp4'}})}))
  await expect(recoverStudioMediaRead('/studio-v2/api/video/operations/op_'+'e'.repeat(64)+'/original')).rejects.toThrow('studio_session_changed')
+})
+
+
+function quoteTransport() {
+ client.get.mockResolvedValue({data:{id:2}})
+ client.post.mockResolvedValue({data:{prepared:true}})
+ const fetch=vi.fn().mockImplementation(async (url:string)=>new Response(JSON.stringify(url.endsWith('/session')?{owner_id:2}:{accepted:true})))
+ vi.stubGlobal('fetch',fetch)
+ return fetch
+}
+it.each(['image','video'] as const)('validates one session for a dependent %s quote sequence',async kind=>{
+ const fetch=quoteTransport()
+ await studioQuoteSequence(async request=>{await request(kind,'quotes',{});await request(kind,'prepare',{})})
+ expect(client.get).toHaveBeenCalledTimes(1)
+ expect(fetch.mock.calls.map(call=>call[0])).toEqual(['/studio-v2/api/session',`/studio-v2/api/${kind}/quotes`,`/studio-v2/api/${kind}/prepare`])
+ expect(client.post).toHaveBeenCalledTimes(1)
+ expect(client.post).toHaveBeenCalledWith('/keys/studio-access',{media:kind})
+ // The same dependent operations through separate requests take seven browser
+ // round trips; this scope takes five. No quotes or preparation were skipped.
+ const scopedTrips=client.get.mock.calls.length+client.post.mock.calls.length+fetch.mock.calls.length
+ expect(scopedTrips).toBe(5)
+ vi.clearAllMocks()
+ await studioRequest(kind,'quotes',{});await studioRequest(kind,'prepare',{})
+ expect(client.get.mock.calls.length+client.post.mock.calls.length+fetch.mock.calls.length).toBe(7)
+})
+it('does not reuse session validation between independent quote sequences',async()=>{
+ const fetch=quoteTransport()
+ for(let i=0;i<2;i++)await studioQuoteSequence(request=>request('video','quotes',{}))
+ expect(client.get).toHaveBeenCalledTimes(2)
+ expect(fetch.mock.calls.filter(call=>call[0]==='/studio-v2/api/session')).toHaveLength(2)
+})
+it('rejects an identity change between dependent quote calls before preparing',async()=>{
+ const fetch=quoteTransport();localStorage.setItem('auth_token','original')
+ await expect(studioQuoteSequence(async request=>{await request('image','quotes',{});localStorage.setItem('auth_token','replacement');await request('image','prepare',{})})).rejects.toThrow('studio_session_changed')
+ expect(fetch.mock.calls.filter(call=>String(call[0]).endsWith('/quotes'))).toHaveLength(1)
+ expect(client.post).not.toHaveBeenCalled()
+ expect(fetch.mock.calls.some(call=>String(call[0]).endsWith('/prepare'))).toBe(false)
+})
+it('rejects identity changes during scoped credential preparation',async()=>{
+ const fetch=quoteTransport();localStorage.setItem('auth_token','original')
+ client.post.mockImplementationOnce(async()=>{localStorage.setItem('auth_token','replacement');return {data:{prepared:true}}})
+ await expect(studioQuoteSequence(request=>request('image','prepare',{}))).rejects.toThrow('studio_session_changed')
+ expect(fetch).toHaveBeenCalledTimes(1)
+})
+it('does not retry a rejected quote or run its dependent preparation',async()=>{
+ const fetch=quoteTransport()
+ fetch.mockImplementation(async (url:string)=>new Response(JSON.stringify(url.endsWith('/session')?{owner_id:2}:{error:'image_quote_expired'}),{status:url.endsWith('/session')?200:409}))
+ await expect(studioQuoteSequence(async request=>{await request('image','quotes',{});await request('image','prepare',{})})).rejects.toThrow('image_quote_expired')
+ expect(fetch).toHaveBeenCalledTimes(2);expect(client.post).not.toHaveBeenCalled()
+})
+it('does not enter a quote sequence when official authentication fails',async()=>{
+ quoteTransport();client.get.mockRejectedValueOnce(new Error('auth unavailable'));const action=vi.fn()
+ await expect(studioQuoteSequence(action)).rejects.toThrow('auth unavailable');expect(action).not.toHaveBeenCalled()
 })

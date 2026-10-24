@@ -2,5 +2,5 @@
 /* Match the production Icon size utilities without loading the application shell. */
 .h-3{height:.75rem}.w-3{width:.75rem}.h-4{height:1rem}.w-4{width:1rem}.h-5{height:1.25rem}.w-5{width:1.25rem}.h-6{height:1.5rem}.w-6{width:1.5rem}.h-8{height:2rem}.w-8{width:2rem}
 .modal-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(20,18,15,.45)}
-.modal-content{width:100%;max-height:90vh;overflow:auto;border-radius:16px;background:#fffdfa;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-content{width:100%;max-height:90vh;overflow:auto;border-radius:16px;background:#fffdfa;box-shadow:0 20px 60px rgba(0,0,0,.2)}.modal-content.max-w-md{max-width:28rem}
 .modal-header,.modal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #ded9ce}.modal-footer{border-top:1px solid #ded9ce;border-bottom:0;justify-content:flex-end}.modal-body{padding:18px 20px}.modal-title{margin:0;font-size:17px}

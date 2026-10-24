@@ -25,10 +25,12 @@ export function createVideoHandler({sessions,tasks,resolveAssets,paidEnabled=VID
         const input=JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if(!input||Object.keys(input).some(k=>!['client_key','offer_id','model','prompt','duration','resolution','ratio','assets','preparation_id'].includes(k))||!Array.isArray(input.assets||[])||(input.assets||[]).some(asset=>!asset||Object.keys(asset).some(k=>!['kind','asset_ref'].includes(k))||!['image','video','audio'].includes(asset.kind)||typeof asset.asset_ref!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(asset.asset_ref)))throw Error('Invalid quote');
         if(!resolveAssets && (input.assets||[]).length)throw Error('asset_store_unavailable');
-        const resolved=resolveAssets?await resolveAssets(session,input.assets||[],input.offer_id,input.model,{resolution:input.resolution,duration_seconds:input.duration,aspect_ratio:input.ratio},{preparationId:input.preparation_id}):[];
+        // Share only this request's trusted catalog read; Core still validates the final quote.
+        let catalogRequest;const getCatalog=()=>catalogRequest??=tasks.catalog(session);
+        const resolved=resolveAssets?await resolveAssets(session,input.assets||[],input.offer_id,input.model,{resolution:input.resolution,duration_seconds:input.duration,aspect_ratio:input.ratio},{preparationId:input.preparation_id,getCatalog}):[];
         const trustedAssets=Array.isArray(resolved)?resolved:resolved.assets;
         const preparationId=Array.isArray(resolved)?undefined:resolved.preparationId;
-        reply(200,await tasks.prepare(session,{clientKey:input.client_key,offerId:input.offer_id,preparationId,request:{model:input.model,prompt:input.prompt,duration:input.duration,resolution:input.resolution,ratio:input.ratio,assets:trustedAssets}}));return;
+        reply(200,await tasks.prepare(session,{clientKey:input.client_key,offerId:input.offer_id,preparationId,request:{model:input.model,prompt:input.prompt,duration:input.duration,resolution:input.resolution,ratio:input.ratio,assets:trustedAssets}},{getCatalog}));return;
       }
       if(req.method==='POST'&&url.pathname==='/studio-v2/api/video/tasks'){if(!await effectivePaid(tasks,session,paidEnabled,managedPaid)){reply(503,{error:'account_video_paid_gate_off'});return;}let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>1024)throw Error('Request too large');chunks.push(chunk);}const input=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!input||Object.keys(input).length!==1||!/^op_[a-f0-9]{64}$/.test(input.operation_id))throw Error('Invalid operation');reply(200,await tasks.dispatch(session,input.operation_id));return;}
       const cover=/^\/studio-v2\/api\/video\/operations\/(op_[a-f0-9]{64})\/cover$/.exec(url.pathname);

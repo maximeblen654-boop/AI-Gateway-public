@@ -57,13 +57,13 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     return reply;
   }
   function getPreparation(session,id){return readPreparation(session,id);}
-  async function prepare(session,{clientKey,offerId,request,preparationId}) {
+  async function prepare(session,{clientKey,offerId,request,preparationId},{getCatalog=()=>catalog(session)}={}) {
     const uid=owner(session);
     const existing=journal.getByClientKey(uid,clientKey);
     if(legacy?.getByClientKey?.(session,clientKey))fail('Original slot task cannot be requoted');
     let profile=existing?.children[0]?.account.builder_profile;
     if (!existing) {
-      const offers=(await catalog(session))?.offers;
+      const offers=(await getCatalog())?.offers;
       const selected=offers?.find(o=>o.offer_id===offerId && o.model===request.model);
       if (!selected) fail('unsupported_model');
       profile=selected.video_profile;

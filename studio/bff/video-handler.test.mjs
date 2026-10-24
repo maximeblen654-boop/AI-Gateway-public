@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {createVideoHandler} from './video-handler.mjs';
 import {createVideoAssetResolver} from './video-assets.mjs';
-import {CompilePublishedPlan,Materialize} from '../api/video-request-builder.mjs';
+import {createAccountVideoRuntime,VIDEO_CONTRACT} from './video-account.mjs';
+import {CompilePublishedPlan,Materialize,makeVerifiedAssetReceipt} from '../api/video-request-builder.mjs';
 
 test('HTTP task dispatch uses authenticated owner, opaque operation and closed default gate',async t=>{
  let calls=0;
@@ -71,6 +76,39 @@ test('reference profiles only require preparation for actual reference assets', 
  const stale=await quote({assets:[],preparation_id:'old-preparation'});assert.equal(stale.status,422);assert.equal((await stale.json()).error,'account_video_preparation_mismatch');
  profile.requiredAnyMedia=['image'];assert.equal((await quote({assets:[]})).status,409);
  assert.equal(quotes,2);assert.equal(uploads,0);
+});
+
+test('HTTP quotes share one trusted catalog within each request and retain final Core quote checks',async t=>{
+ for(const mode of ['text','inline asset','existing preparation','missing profile','missing preparation','wrong owner'])await t.test(mode,async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'video-request-catalog-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const profile={apiModelId:'3.0',upstreamModelId:'synthetic-video',documentedStatus:'enabled',inputMode:mode.includes('preparation')?'references':'images',durationSeconds:[5],resolutions:['720p'],ratios:['16:9'],mediaLimits:{image:9,video:0,audio:0,total:9}};
+  const spec={resolution:'720p',duration_seconds:5,aspect_ratio:'16:9',quality:'',count:1,images:1,videos:0,audio:0};
+  const asset={asset_ref:'asset_one',kind:'image',mime_type:'image/png',size:8,sha256:'a'.repeat(64)};
+  const preparation={owner_id:7,preparation_id:'existing-preparation',offer_id:'offer',model:'3.0',spec,assets:[asset],result:{preparation_id:'existing-preparation',receipts:[{...asset,source:'https://supplier.invalid/reference'}]}};
+  let catalogs=0,quotes=0;
+  const tasks=createAccountVideoRuntime({rootDir:root,resultStore:{},call:async(session,method,operation,payload)=>{
+   assert.equal(session.ownerId,7);
+   if(operation==='catalog'){catalogs++;assert.equal(method,'GET');return {payload:{offers:[{offer_id:'offer',model:'3.0',...(mode==='missing profile'?{}:{video_profile:profile})}]}};}
+   assert.equal(operation,'quotes','only final Core quote may run');assert.equal(method,'POST');quotes++;
+   const binding={version:VIDEO_CONTRACT,quote_id:'quote-original',owner:{user_id:mode==='wrong owner'?99:7,api_key_id:2,group_id:3},published_revision:'pub-original',offer:{offer_id:'offer',account_id:8,site_model:'3.0',adapter:{revision:'laoli_video_json_v136_r1'},sale_price:{amount:'0.80',currency:'CNY',billing_mode:'per_request'}},spec:payload.spec,request_hash:createHash('sha256').update(JSON.stringify(payload.request)).digest('hex'),expires_at:new Date(Date.now()+120000).toISOString()};
+   return {key_ref:2,payload:{contract:VIDEO_CONTRACT,quote_token:'a'.repeat(64),binding_hash:'b'.repeat(64),binding}};
+  }});
+  // Simulate an already persisted preparation, without another upload.
+  tasks.getPreparation=()=>mode==='existing preparation'?preparation:undefined;
+  const intake={uploadPayload:()=>({kind:'image',mimeType:'image/png',size:8,sha256:asset.sha256,bytes:Buffer.alloc(8)}),inlineReceipt:()=>makeVerifiedAssetReceipt({ownerId:'7',type:'image',mimeType:'image/png',size:8,bytes:Buffer.alloc(8)})};
+  const server=http.createServer(createVideoHandler({sessions:{authenticate:async()=>({ownerId:7}),sameOrigin:()=>true},tasks,resolveAssets:createVideoAssetResolver({intake,tasks})}));
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const input={client_key:'quote-client',offer_id:'offer',model:'3.0',prompt:'fixture',duration:5,resolution:'720p',ratio:'16:9',assets:mode.includes('preparation')||mode==='inline asset'?[{kind:'image',asset_ref:asset.asset_ref}]:[],...(mode.includes('preparation')?{preparation_id:preparation.preparation_id}:{})};
+  const post=extra=>fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({...input,...extra})});
+  const failed=mode==='missing preparation'||mode==='wrong owner';
+  const first=await post({});assert.equal(first.status,failed?(mode==='missing preparation'?422:409):200);assert.equal(catalogs,1);assert.equal(quotes,mode==='missing preparation'?0:1);
+  const second=await post({client_key:'another-client'});assert.equal(second.status,first.status);assert.equal(catalogs,2,'another HTTP request must read its own catalog');assert.equal(quotes,mode==='missing preparation'?0:2);
+  if(!failed){
+   const repeated=await post({});assert.equal(repeated.status,200);assert.deepEqual(await repeated.json(),await first.json());assert.equal(catalogs,3);assert.equal(quotes,2,'existing client key must not requote');
+   assert.equal((await post({prompt:'changed'})).status,409);assert.equal(quotes,2,'changed input cannot reuse an existing intent');
+  }
+  const before=catalogs;assert.equal((await post({getCatalog:{offers:[]}})).status,409);assert.equal(catalogs,before,'browser cannot supply catalog context');
+ });
 });
 
 

@@ -140,15 +140,20 @@
     </div>
   </section>
 
-  <BaseDialog :show="quoteConfirm && active?.status === 'prepared'" :title="expired ? '报价已失效' : '确认本次生成'" width="narrow" @close="quoteConfirm = false">
-    <div v-if="active" class="studio-confirm">
+  <BaseDialog :show="quoting || quoteConfirm && active?.status === 'prepared'" :title="quoting ? '正在获取报价' : expired ? '报价已失效' : '确认本次生成'" width="narrow" :show-close-button="!quoting" :close-on-escape="!quoting" :close-on-click-outside="!quoting" @close="quoteConfirm = false">
+    <div v-if="quoting" ref="quoteProgress" tabindex="-1" class="studio-confirm studio-quote-progress" role="status" aria-live="polite" aria-busy="true" data-testid="studio-quote-progress">
+      <p>正在核对本次规格和价格…</p>
+      <div class="studio-quote-progress-track" role="progressbar" aria-label="正在获取报价" aria-valuetext="正在核对本次规格和价格"><span class="studio-quote-progress-bar" aria-hidden="true"></span></div>
+      <p class="studio-confirm-note">请稍候，无需重复点击。报价完成后即可确认生成。</p>
+    </div>
+    <div v-else-if="active" class="studio-confirm">
       <p>{{ taskModel(active) }}</p><p class="studio-confirm-spec">{{ specText(active) }}</p>
       <p class="studio-confirm-total">{{ active.price.amount }} <span>{{ active.price.currency }}</span></p>
       <p v-if="active.unitPrice && active.quantity">单{{ active.kind === 'image' ? '张' : '条' }} {{ active.unitPrice.amount }} × {{ active.quantity }}</p>
       <p class="studio-confirm-note">{{ expired ? '报价已失效，尚未生成。请重新获取报价后确认。' : '价格已锁定，尚未冻结余额。确认后将冻结对应余额并开始生成。' }}</p>
       <p v-if="!enabled" class="studio-confirm-note">当前生成服务尚未开放。</p>
     </div>
-    <template #footer><button class="studio-confirm-back" @click="newTask">返回修改</button><button class="studio-confirm-submit" data-testid="studio-confirm-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认并生成</button></template>
+    <template v-if="!quoting" #footer><button ref="quoteBack" class="studio-confirm-back" @click="newTask">返回修改</button><button class="studio-confirm-submit" data-testid="studio-confirm-generate" :disabled="busy || catalogLoading || !enabled || expired || activeQuoteUnavailable" @click="generate">确认并生成</button></template>
   </BaseDialog>
   <BaseDialog :show="dashboardConfirm" title="确认返回控制台吗？" width="narrow" :show-close-button="false" @close="dashboardConfirm = false">
       <p class="studio-leave-note">已提交的任务仍可在任务历史中查看。</p>
@@ -157,7 +162,7 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ensureStudioSession, studioCatalog, studioRequest, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
+import { ensureStudioSession, studioCatalog, studioRequest, studioQuoteSequence, studioTaskView, studioHistory, studioTask, studioGenerate, studioResultUrl, studioCoverUrl, recoverStudioMediaRead, studioResultExpired, studioErrorMessage, StudioError, uploadStudioAsset, type StudioOffer, type StudioKind, type StudioTask, type StudioOutputFormat } from '@/api/studioMedia'
 import type { StudioAssetReceipt } from '@/api/studioAssets'
 import Icon from '@/components/icons/Icon.vue'
 import StudioMark from './StudioMark.vue'
@@ -208,7 +213,7 @@ const loadingResults=ref<Record<string,boolean>>({})
 const expiredResults=ref<Record<string,boolean>>({}), resultMessages=ref<Record<string,string>>({})
 const retriedResults=new Set<string>(), retryingResults=new Map<string,number>()
 const dashboardConfirm=ref(false)
-const quoteConfirm=ref(false), fileInput=ref<HTMLInputElement|null>(null)
+const quoteConfirm=ref(false), quoting=ref(false), quoteProgress=ref<HTMLElement|null>(null), quoteBack=ref<HTMLButtonElement|null>(null), fileInput=ref<HTMLInputElement|null>(null)
 const taskDetail=ref<HTMLElement|null>(null)
 function revealTask(){void nextTick(()=>taskDetail.value?.scrollIntoView?.({block:'nearest',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}))}
 const composerRoot=ref<HTMLElement|null>(null), promptInput=ref<HTMLTextAreaElement|null>(null), modelTrigger=ref<HTMLButtonElement|null>(null), ratioTrigger=ref<HTMLButtonElement|null>(null)
@@ -521,18 +526,21 @@ async function enqueueFiles(files:File[]){
 function upload(e:Event){const input=e.target as HTMLInputElement;void enqueueFiles(Array.from(input.files||[]));input.value=''}
 function drop(e:DragEvent){void enqueueFiles(Array.from(e.dataTransfer?.files||[]))}
 function paste(event:Event){const e=event as ClipboardEvent;const files=Array.from(e.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter((file):file is File=>!!file);const fallback=files.length?files:Array.from(e.clipboardData?.files||[]).filter(file=>file.type.startsWith('image/'));if(fallback.length)void enqueueFiles(fallback)}
-async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value)return;syncSelectedOffer();if(offer.value.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)||incompatible.value||hasUnreadyAssets.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;openControl.value=null;error.value='';notice.value='';try{
+async function quote(){if(busy.value||catalogLoading.value||selectionUnavailable.value||active.value||!offer.value)return;syncSelectedOffer();if(offer.value.product_scope&&!resolveProductOffer(offer.value,visibleOffers.value,selectedSpec.value)||incompatible.value||hasUnreadyAssets.value||invalidCount.value||!prompt.value.trim())return;busy.value=true;quoting.value=true;openControl.value=null;error.value='';notice.value='';void nextTick(()=>quoteProgress.value?.focus());try{
  const o=offer.value,refs=assets.value.map(a=>({kind:a.kind,asset_ref:a.asset_ref})),spec={...(kind.value==='image'&&outputFormat.value!=='auto'&&outputFormats.value.includes(outputFormat.value)?{output_format:outputFormat.value}:{}),resolution:resolution.value,aspect_ratio:ratio.value,duration_seconds:kind.value==='video'?duration.value:0,quality:kind.value==='image'?quality.value:'',count:kind.value==='image'?count.value:1,images:refs.filter(a=>a.kind==='image').length,videos:refs.filter(a=>a.kind==='video').length,audio:refs.filter(a=>a.kind==='audio').length}
  const fingerprint=JSON.stringify({kind:kind.value,offer:o.offer_id,spec,refs,prompt:prompt.value});if(intent?.fingerprint!==fingerprint)intent={fingerprint,clientKey:crypto.randomUUID()}
+ const quoteIntent=intent
+ await studioQuoteSequence(async request=>{
  if(kind.value==='video'){
-   if((o.input_mode==='references'||o.input_mode==='image2pro')&&assets.value.length&&!intent.preparationId){const p=await studioRequest<{preparation_id:string}>('video','prepare',{offer_id:o.offer_id,model:o.model,spec,assets:refs});if(typeof p.preparation_id!=='string')throw new StudioError('studio_contract');intent.preparationId=p.preparation_id}
-   accepted(studioTaskView('video',await studioRequest('video','quotes',{client_key:intent.clientKey,offer_id:o.offer_id,model:o.model,prompt:prompt.value,duration:spec.duration_seconds,resolution:spec.resolution,ratio:spec.aspect_ratio,assets:refs,...(intent.preparationId?{preparation_id:intent.preparationId}:{})})))
+   if((o.input_mode==='references'||o.input_mode==='image2pro')&&assets.value.length&&!quoteIntent.preparationId){const p=await request<{preparation_id:string}>('video','prepare',{offer_id:o.offer_id,model:o.model,spec,assets:refs});if(typeof p.preparation_id!=='string')throw new StudioError('studio_contract');quoteIntent.preparationId=p.preparation_id}
+   accepted(studioTaskView('video',await request('video','quotes',{client_key:quoteIntent.clientKey,offer_id:o.offer_id,model:o.model,prompt:prompt.value,duration:spec.duration_seconds,resolution:spec.resolution,ratio:spec.aspect_ratio,assets:refs,...(quoteIntent.preparationId?{preparation_id:quoteIntent.preparationId}:{})})))
  }else{
-   if(!intent.quoteToken){const q=await studioRequest<{quote_token:string}>('image','quotes',{offer_id:o.offer_id,spec});if(typeof q.quote_token!=='string')throw new StudioError('studio_contract');intent.quoteToken=q.quote_token}
-   accepted(studioTaskView('image',await studioRequest('image','prepare',{quote_token:intent.quoteToken,client_key:intent.clientKey,prompt:prompt.value,asset_refs:refs.map(a=>a.asset_ref)})))
+   if(!quoteIntent.quoteToken){const q=await request<{quote_token:string}>('image','quotes',{offer_id:o.offer_id,spec});if(typeof q.quote_token!=='string')throw new StudioError('studio_contract');quoteIntent.quoteToken=q.quote_token}
+   accepted(studioTaskView('image',await request('image','prepare',{quote_token:quoteIntent.quoteToken,client_key:quoteIntent.clientKey,prompt:prompt.value,asset_refs:refs.map(a=>a.asset_ref)})))
  }
+ })
  if(active.value){quoteConfirm.value=true;revealTask()}
- }catch(e){error.value=studioErrorMessage(e);if(e instanceof StudioError&&e.status===409&&!e.code.includes('paid_gate_off')){intent=undefined;quoteConfirm.value=false;await refreshCatalog()}history.value=await studioHistory(kind.value).catch(()=>history.value)}finally{busy.value=false}}
+ }catch(e){quoting.value=false;error.value=studioErrorMessage(e);if(e instanceof StudioError&&e.status===409&&!e.code.includes('paid_gate_off')){intent=undefined;quoteConfirm.value=false;await refreshCatalog()}history.value=await studioHistory(kind.value).catch(()=>history.value)}finally{busy.value=false;quoting.value=false;if(quoteConfirm.value)void nextTick(()=>quoteBack.value?.focus())}}
 async function generate(){
  clock.value=Date.now()
  if(busy.value||catalogLoading.value||activeQuoteUnavailable.value||!active.value||active.value.status!=='prepared'||!enabled.value||expired.value||attempted.has(active.value.id))return
