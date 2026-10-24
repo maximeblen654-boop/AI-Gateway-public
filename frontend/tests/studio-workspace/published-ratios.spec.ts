@@ -19,7 +19,7 @@ for(const viewport of [{width:1440,height:900},{width:1366,height:650},{width:39
  await page.screenshot({path:info.outputPath(`published-ratios-${viewport.width}.png`)})
  await page.getByTestId('studio-prompt').fill('Isolated published custom ratio quote')
  await page.getByTestId('studio-quote').click()
- await expect(page.getByRole('dialog')).toBeVisible()
+ await expect(page.getByTestId('studio-confirm-generate')).toBeEnabled()
  const quoted=await page.evaluate(()=>(window as any).studioFixture.calls.find((call:any)=>call.path.endsWith('/image/quotes')))
  expect(quoted.body.offer_id).toBe('ratio-2');expect(quoted.body.spec.aspect_ratio).toBe('7:5')
 })
