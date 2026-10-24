@@ -88,7 +88,7 @@ async function holdNativeAggregator(){
     await expect(page.locator('#studio-model-observation')).toContainText('不代表某个具体渠道')
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'final UI mobile overflow')
     if(width===390){const box=await page.locator('#studio-model-menu').boundingBox();assert(box&&box.y>=100&&box.y+box.height<=900,'model status panel must remain inside mobile viewport below navigation')}
-    const name=`native-model-status-${width}-${theme}.png`;await page.screenshot({path:root+'/evidence/'+name,fullPage:true,animations:'disabled'});report.screenshots.push(name)
+    const name=`native-model-status-${width}-${theme}.png`;await page.screenshot({path:root+'/evidence/'+name,fullPage:false,animations:'disabled'});report.screenshots.push(name)
     await page.keyboard.press('Escape');await expect(page.getByTestId('studio-model-toggle')).toBeFocused()
    }
    report.assets=await assetProof()
