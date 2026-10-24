@@ -16,6 +16,7 @@
       </header>
       <p v-if="selectionUnavailable || activeQuoteUnavailable" role="status" class="studio-notice" data-testid="studio-model-unavailable">此模型暂不可用，请选择其他模型</p>
       <p v-if="notice" role="status" class="studio-notice">{{ notice }}</p>
+      <p v-if="catalogNotice" role="status" class="studio-notice">{{ catalogNotice }}</p>
       <p v-if="error" role="alert" class="studio-error" data-testid="studio-error">{{ error }}</p>
       <p v-if="readinessState === 'disabled'" class="studio-gate" data-testid="studio-gate"><Icon name="infoCircle" />当前生成服务未开放，仍可查看报价和已有结果。</p>
       <p v-if="assetMessage && !showUploader" class="studio-error" role="alert" data-testid="studio-asset-feedback">{{ assetMessage }}</p>
@@ -199,6 +200,7 @@ const imageMode=ref<'text'|'edit'>('text'), historyMode=ref(false), historyFilte
 watch([active,historyMode],([task,inHistory])=>{if(task||inHistory)pauseAssetPreviews()},{flush:'sync'})
 const resultRead=ref(0)
 const catalogLoading=ref(false), unavailableOffers=ref(new Set<string>()), invalidatedQuotes=ref(new Set<string>())
+const catalogNotice=ref('')
 const selectionUnavailable=computed(()=>unavailableOffers.value.has(`${kind.value}:${offerId.value}`))
 const activeQuoteUnavailable=computed(()=>!!active.value && active.value.status==='prepared' && (invalidatedQuotes.value.has(active.value.id)||unavailableOffers.value.has(`${active.value.kind}:${active.value.offerId}`)))
 const unavailableResults=ref<Record<string,boolean>>({})
@@ -272,16 +274,18 @@ function closeControl(){const previous=openControl.value;openControl.value=null;
 function clickOutside(event:PointerEvent){if(openControl.value&&!composerRoot.value?.contains(event.target as Node))openControl.value=null}
 function focusPrompt(){historyMode.value=false;createMenuOpen.value=false;void nextTick(()=>promptInput.value?.focus())}
 function backToList(){if(busy.value)return;active.value=null;quoteConfirm.value=false;resultRead.value++;remember()}
-async function openHistory(){if(busy.value)return;backToList();historyMode.value=true;createMenuOpen.value=false;openControl.value=null;await loadHistory()}
+function cancelHistoryRead(){historyGeneration++;historyLoading.value=false}
+async function openHistory(){if(busy.value)return;backToList();cancelHistoryRead();notice.value='';historyMode.value=true;createMenuOpen.value=false;openControl.value=null;await loadHistory()}
 async function startNew(mode:'text'|'edit'|'video'){createMenuOpen.value=false;await changeMode(mode)}
 async function changeMode(mode:'text'|'edit'|'video'){
  if(busy.value)return
- historyMode.value=false;openControl.value=null
+ cancelHistoryRead()
+ historyMode.value=false;openControl.value=null;quoteConfirm.value=false;active.value=null;intent=undefined;notice.value='';error.value=''
  const nextKind=mode==='video'?'video':'image', sameKind=nextKind===kind.value
- if(sameKind&&active.value)newTask()
  if(mode==='text'&&uploads.value.length){clearAssets();notice.value='已切换为文生图，当前输入不再使用参考素材。'}
  imageMode.value=mode==='edit'?'edit':'text'
- if(!sameKind){releaseLeavingPreviews();quoteConfirm.value=false;active.value=null;intent=undefined;kind.value=nextKind;await load(undefined,false);focusPrompt();return}
+ if(!sameKind){releaseLeavingPreviews();kind.value=nextKind;await load(undefined,false);focusPrompt();return}
+ history.value=history.value.filter(task=>task.kind===nextKind)
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
  remember();focusPrompt()
 }
@@ -329,7 +333,7 @@ const unmatchedSpec=computed(()=>!!offer.value?.product_scope&&!resolveProductOf
 const incompatible=computed(()=>!offer.value || unmatchedSpec.value || kind.value==='image' && (imageMode.value==='edit' ? !assets.value.some(a=>a.kind==='image') : assets.value.length>0) || ['image','video','audio'].some(k=>{const n=assets.value.filter(a=>a.kind===k).length;const r=offer.value!.spec.references[k as StudioAssetReceipt['kind']];return n<r.min || n>r.max}) || assets.value.length>offer.value.spec.references.total_max)
 const expired=computed(()=>!active.value || quoteExpired(active.value))
 let storage='', attempted=new Set<string>(), intent:{fingerprint:string;clientKey:string;preparationId?:string;quoteToken?:string}|undefined
-let generation=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
+let generation=0, historyGeneration=0, timer:ReturnType<typeof setInterval>|undefined, polling=false, mounted=true
 // Only local HTTP submission activity; it never asserts supplier acceptance.
 const submitting=ref<Record<string,number>>({})
 const feedback=ref<Record<string,{at:number;message:string;error?:string}>>({})
@@ -391,28 +395,33 @@ async function newTask(){
  const nextKind=active.value.kind
  if(nextKind!==kind.value){await changeMode(nextKind==='video'?'video':uploads.value.length?'edit':'text');return}
  if(nextKind==='image')imageMode.value=uploads.value.length?'edit':'text'
+ cancelHistoryRead();history.value=history.value.filter(task=>task.kind===nextKind)
  quoteConfirm.value=false;active.value=null;intent=undefined;error.value='';notice.value='';historyMode.value=false;createMenuOpen.value=false;remember();focusPrompt()
 }
-async function loadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation;historyLoading.value=true;try{
+async function loadHistory(){if(busy.value||historyLoading.value)return;const epoch=generation,request=++historyGeneration;historyLoading.value=true;try{
  const kinds:StudioKind[]=historyFilter.value==='all'?['image','video']:[historyFilter.value]
  const settled=await Promise.allSettled(kinds.map(value=>studioHistory(value)))
- if(epoch!==generation)return
+ if(epoch!==generation||request!==historyGeneration||!historyMode.value)return
  const tasks=settled.flatMap(result=>result.status==='fulfilled'?result.value:[])
  if(settled.some(result=>result.status==='rejected')&&tasks.length===0)throw settled.find(result=>result.status==='rejected')?.reason
  const seen=new Set<string>();history.value=tasks.filter(task=>!seen.has(task.id)&&seen.add(task.id)).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))
- }catch(e){error.value=studioErrorMessage(e)}finally{historyLoading.value=false}}
-async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';active.value=null;enabled.value=false;readinessState.value='unknown';offers.value=[];history.value=[];try{
+ }catch(e){if(epoch===generation&&request===historyGeneration)error.value=studioErrorMessage(e)}finally{if(request===historyGeneration)historyLoading.value=false}}
+function setCatalog(catalog:StudioOffer[],mediaKind:StudioKind){
+ offers.value=catalog
+ for(const item of catalog)unavailableOffers.value.delete(`${mediaKind}:${item.offer_id}`)
+}
+async function load(selectedId?:unknown,restorePending=true){const epoch=++generation;busy.value=true;error.value='';catalogNotice.value='';active.value=null;enabled.value=false;readinessState.value='unknown';offers.value=[];history.value=[];try{
  const originalKind=kind.value,catalogRequest=studioCatalog(originalKind)
  // Creation entry provisions the owner's native Key. Read its gate only after
  // that operation settles; history reads remain independent and never provision.
  const readinessRequest=catalogRequest.catch(()=>undefined).then(()=>studioRequest<{paid_enabled:boolean}>(originalKind,'readiness'))
  const [catalog,tasks,readiness]=await Promise.allSettled([catalogRequest,studioHistory(originalKind),readinessRequest]);
  if(epoch!==generation)return;
- if(catalog.status==='fulfilled')offers.value=catalog.value;
+ if(catalog.status==='fulfilled')setCatalog(catalog.value,originalKind);
  if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
  if(tasks.status==='rejected')throw tasks.reason;
  history.value=tasks.value;
- if(catalog.status==='rejected'||readiness.status==='rejected')notice.value='目录或生成服务暂不可用，仍可查询原任务和已保存结果。';
+ if(catalog.status==='rejected'||readiness.status==='rejected')catalogNotice.value='目录或生成服务暂不可用，仍可查询原任务和已保存结果。';
  if(!visibleOffers.value.some(o=>o.offer_id===offerId.value)){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
  const restored=history.value.find(t=>t.id===selectedId)||(restorePending?history.value.find(t=>!['completed','partial','failed','released'].includes(t.status))||(catalog.status==='rejected'?history.value[0]:undefined):undefined);if(restored){
   accepted(restored)
@@ -434,24 +443,26 @@ async function refreshCatalog(){
   if(!mounted||epoch!==generation||originalKind!==kind.value)return
    if(readiness.status==='fulfilled'){enabled.value=readiness.value.paid_enabled===true;readinessState.value=enabled.value?'enabled':'disabled'}
    else {enabled.value=false;readinessState.value='unknown'}
-  if(catalog.status==='rejected'){notice.value='模型目录暂时无法刷新，保留当前输入与已有结果。';return}
+  if(catalog.status==='rejected'){catalogNotice.value='模型目录暂时无法刷新，保留当前输入与已有结果。';return}
+  catalogNotice.value=readiness.status==='fulfilled'?'':'生成服务状态暂时无法确认，仍可查看已有结果。'
   // A closed shared gate may intentionally return an empty catalog. It is not
   // evidence that this particular model was removed; retain the last catalog.
   if(!catalog.value.length&&(readiness.status!=='fulfilled'||!readiness.value.paid_enabled))return
-  offers.value=catalog.value
+  setCatalog(catalog.value,originalKind)
+  if(!offerId.value){offerId.value=visibleOffers.value[0]?.offer_id||'';selectOffer()}
   const available=new Set(catalog.value.map(item=>item.offer_id))
   const selectedMissing=!!offerId.value&&!available.has(offerId.value)
   for(const task of history.value){if(task.kind===originalKind&&task.status==='prepared'&&!attempted.has(task.id)&&!available.has(task.offerId))invalidatedQuotes.value.add(task.id)}
   if(active.value?.kind===originalKind&&active.value.status==='prepared'&&!available.has(active.value.offerId))invalidatedQuotes.value.add(active.value.id)
   if(selectedMissing){unavailableOffers.value.add(`${originalKind}:${offerId.value}`);intent=undefined;quoteConfirm.value=false}
-  if(activeQuoteUnavailable.value){if(active.value){offerId.value=active.value.offerId;unavailableOffers.value.add(`${originalKind}:${active.value.offerId}`)}quoteConfirm.value=false;active.value=null;intent=undefined;remember()}
+  if(activeQuoteUnavailable.value){if(active.value){offerId.value=active.value.offerId;if(!available.has(active.value.offerId))unavailableOffers.value.add(`${originalKind}:${active.value.offerId}`)}quoteConfirm.value=false;active.value=null;intent=undefined;remember()}
  }finally{catalogLoading.value=false}
 }
 async function reloadHistory(){
- if(!historyMode.value){if(busy.value||historyLoading.value)return;const epoch=generation,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&originalKind===kind.value)history.value=tasks}catch(e){if(epoch===generation)error.value=studioErrorMessage(e)}finally{historyLoading.value=false}return}
+ if(!historyMode.value){if(busy.value||historyLoading.value)return;const epoch=generation,request=++historyGeneration,originalKind=kind.value;historyLoading.value=true;try{const tasks=await studioHistory(originalKind);if(epoch===generation&&request===historyGeneration&&originalKind===kind.value&&!historyMode.value)history.value=tasks}catch(e){if(epoch===generation&&request===historyGeneration)error.value=studioErrorMessage(e)}finally{if(request===historyGeneration)historyLoading.value=false}return}
  await loadHistory()
 }
-async function selectTask(task:StudioTask){if(busy.value)return;error.value='';accepted(task);revealTask();if(needsRecovery(task))await refresh()}
+async function selectTask(task:StudioTask){if(busy.value)return;error.value='';notice.value='';accepted(task);revealTask();if(needsRecovery(task))await refresh()}
 async function refresh(automatic=false){
  if(!active.value||querying.value||submitting.value[active.value.id])return
  const original=active.value;querying.value=true

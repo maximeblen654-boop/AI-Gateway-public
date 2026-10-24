@@ -82,7 +82,7 @@ jobs:
 
       - name: Isolated media recovery and creation workspace
         working-directory: frontend
-        run: pnpm exec playwright test --config tests/studio-workspace/media-read.config.ts media-read.spec.ts video-ui.spec.ts sujian-ui.spec.ts
+        run: pnpm exec playwright test --config tests/studio-workspace/media-read.config.ts media-read.spec.ts video-ui.spec.ts sujian-ui.spec.ts navigation-state.spec.ts
 
       - name: Upload isolated wizard screenshots and results
         if: always()

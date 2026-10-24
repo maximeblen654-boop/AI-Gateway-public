@@ -31,8 +31,8 @@ async function imageGallery(){
  api.session.mockResolvedValue({owner_id:7});api.history.mockImplementation(async(kind:string)=>kind==='image'?[{id:'img_'+'1'.repeat(32),kind:'image',status:'completed',createdAt:'2026-10-20',expiresAt:'2099-01-01',offerId:'synthetic-image',model:'Synthetic image',spec:{count:1},price:{amount:'1',currency:'CNY',billing_mode:'per_request'},resultCount:1}]:[])
  wrapper=mount(StudioMediaPanel);await flushPromises();return wrapper.findAll('.studio-work-preview img').map(item=>item.element)
 }
-it('releases both leaving preview readers only within its own panel on a cross-media switch',async()=>{
- const images=await imageGallery();expect(images).toHaveLength(2);images.forEach(image=>expect(image.getAttribute('src')).toContain('/results/0'))
+it('releases leaving preview readers only within its own panel on a cross-media switch',async()=>{
+ const images=await imageGallery();expect(images).toHaveLength(1);images.forEach(image=>expect(image.getAttribute('src')).toContain('/results/0'))
  const otherPanel=document.createElement('div');otherPanel.className='studio-work-preview';const external=document.createElement('img');external.src='/unrelated-preview';otherPanel.append(external);document.body.append(otherPanel)
  try{await wrapper.get('[data-testid="studio-mode-video"]').trigger('click');await flushPromises();images.forEach(image=>expect(image.hasAttribute('src')).toBe(false));expect(external.getAttribute('src')).toBe('/unrelated-preview');expect(api.request.mock.calls.every(call=>call[1]==='readiness')).toBe(true)}finally{otherPanel.remove()}
 })
