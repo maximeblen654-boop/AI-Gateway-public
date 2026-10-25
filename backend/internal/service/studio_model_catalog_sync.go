@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"golang.org/x/sync/singleflight"
 )
@@ -49,7 +48,7 @@ type studioModelCatalogFailure struct {
 	retryAfter time.Time
 }
 
-// StudioModelCatalogSync observes the free Image2Pro model-list endpoint only
+// StudioModelCatalogSync uses the native model-list client
 // for initialized media workbenches or configured Studio products. It never changes metadata,
 // products, Published offers, prices, permissions, or native API model mapping.
 type StudioModelCatalogSync struct {
@@ -223,7 +222,7 @@ func (s *StudioModelCatalogSync) ensureAccount(accountID int64) error {
 	if failure.identity == identity && now.Before(failure.retryAfter) {
 		return ErrStudioModelCatalogUnavailable
 	}
-	if account.GetOpenAIProtocolAPIKey() == "" {
+	if account.GetCredential("api_key") == "" {
 		return ErrStudioModelCatalogUnavailable
 	}
 
@@ -246,7 +245,7 @@ func (s *StudioModelCatalogSync) ensureAccount(accountID int64) error {
 }
 
 func studioModelCatalogSyncEligible(a *Account) bool {
-	if a == nil || a.ID <= 0 || a.ParentAccountID != nil || a.Platform != PlatformOpenAI || a.Type != AccountTypeAPIKey || !imagecontract.IsImage2ProBase(a.GetOpenAIBaseURL()) {
+	if a == nil || a.ID <= 0 || a.ParentAccountID != nil || a.Type != AccountTypeAPIKey {
 		return false
 	}
 	body, err := json.Marshal(a.Extra[mediaworkbench.ExtraKey])

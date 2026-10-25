@@ -10,17 +10,13 @@ import (
 )
 
 // This query returns IDs only. Uninitialized native API Accounts without media
-// products and unreviewed suppliers are never loaded or contacted by the loop.
+// products are not contacted. Supplier domains and protocol requests are handled
+// by the existing native model-list client, not a second allowlist.
 const studioModelCatalogSyncAccountIDsSQL = `
 SELECT id FROM accounts
 WHERE deleted_at IS NULL AND parent_account_id IS NULL
- AND platform = 'openai' AND type = 'apikey'
+ AND type = 'apikey'
  AND length(BTRIM(COALESCE(credentials ->> 'api_key', ''))) > 0
- AND LOWER(BTRIM(credentials ->> 'base_url')) IN (
- 'https://api.image2pro.top', 'https://api.image2pro.top/',
- 'https://api.image2pro.top/v1', 'https://api.image2pro.top/v1/',
- 'https://api.image2pro.top:443', 'https://api.image2pro.top:443/',
- 'https://api.image2pro.top:443/v1', 'https://api.image2pro.top:443/v1/')
  AND (EXISTS (SELECT 1 FROM jsonb_array_elements_text(
  CASE WHEN jsonb_typeof(extra #> '{media_workbench_v1,media_types}') = 'array'
  THEN extra #> '{media_workbench_v1,media_types}' ELSE '[]'::jsonb END) AS configured_media(media_type)

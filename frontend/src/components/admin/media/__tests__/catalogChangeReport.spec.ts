@@ -171,3 +171,11 @@ describe('catalog impact evidence and lifecycle', () => {
     expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('截至上次成功目录')
   })
 })
+
+it('does not label another supplier as Image2Pro', () => {
+ const dto=detail();dto.host='video.laoliimage2.win'
+ const report=catalogChangeReport(dto,'https://laifufu.top',now)
+ expect(report.account_id).toBe(dto.id)
+ expect(report.provider).toBe('Account upstream')
+ expect(report.documentation_url).toBeNull()
+})

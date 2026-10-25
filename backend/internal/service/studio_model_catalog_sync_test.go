@@ -192,10 +192,7 @@ func TestStudioModelCatalogSyncSkipsUnrelatedAccounts(t *testing.T) {
 		name   string
 		change func(*Account)
 	}{
-		{"other supplier", func(a *Account) { a.Credentials["base_url"] = "https://native.example/v1" }},
-		{"HTTP supplier", func(a *Account) { a.Credentials["base_url"] = "http://api.image2pro.top/v1" }},
 		{"OAuth", func(a *Account) { a.Type = AccountTypeOAuth }},
-		{"other platform", func(a *Account) { a.Platform = PlatformAnthropic }},
 		{"native only", func(a *Account) { delete(a.Extra, mediaworkbench.ExtraKey) }},
 		{"no media initialization or products", func(a *Account) { a.Extra[mediaworkbench.ExtraKey] = &mediaworkbench.Config{SchemaVersion: 1} }},
 		{"non-media initialization", func(a *Account) {
@@ -664,5 +661,32 @@ func TestStudioModelCatalogSyncInitializedWorkbenchDiscoversModelsWithoutProduct
 			require.Empty(t, config.Draft.Products)
 			require.Nil(t, config.Published)
 		})
+	}
+}
+
+func TestStudioModelCatalogSyncDoesNotFilterSupplierOrProtocol(t *testing.T) {
+	for _, platform := range []string{PlatformOpenAI, PlatformGemini, PlatformAnthropic, PlatformGrok} {
+		for _, base := range []string{"https://api.image2pro.top/v1", "https://video.laoliimage2.win/v1", "https://new-supplier.example/v1"} {
+			t.Run(platform+base, func(t *testing.T) {
+				a := studioCatalogAccount(44)
+				a.Platform = platform
+				a.Credentials["base_url"] = base
+				s, r := newStudioCatalogSyncTest(t, a)
+				calls := 0
+				s.fetcher = studioCatalogFetchFunc(func(_ context.Context, got *Account) ([]string, error) {
+					calls++
+					require.Equal(t, base, got.GetCredential("base_url"))
+					return []string{"new-model"}, nil
+				})
+				config, err := json.Marshal(a.Extra[mediaworkbench.ExtraKey])
+				require.NoError(t, err)
+				require.NoError(t, s.RunDue(t.Context()))
+				require.Equal(t, 1, calls)
+				require.Equal(t, 1, r.writes)
+				after, err := json.Marshal(a.Extra[mediaworkbench.ExtraKey])
+				require.NoError(t, err)
+				require.Equal(t, config, after)
+			})
+		}
 	}
 }

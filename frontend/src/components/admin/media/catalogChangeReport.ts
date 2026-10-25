@@ -48,8 +48,8 @@ export function catalogChangeReport(detail: SupplierDetail, origin: string, now 
     site_origin: siteOrigin(origin),
     observed_at: new Date(now).toISOString(),
     account_id: detail.id,
-    provider: 'Image2Pro',
-    documentation_url: 'https://image2pro.top/api-docs',
+    provider: detail.host === 'api.image2pro.top' ? 'Image2Pro' : 'Account upstream',
+    documentation_url: detail.host === 'api.image2pro.top' ? 'https://image2pro.top/api-docs' : null,
     catalog: { source: detail.model_catalog?.source === 'upstream' ? 'upstream' : 'unconfirmed', last_success_at: observation.lastSuccessAt, model_count: detail.model_catalog?.models.length ?? 0, stale: observation.stale },
     change: change ? {
       detected_at: timestamp(change.detected_at), previous_synced_at: timestamp(change.previous_synced_at),

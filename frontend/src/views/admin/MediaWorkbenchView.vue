@@ -135,14 +135,14 @@
                 <div class="mw-product-type-actions">
                   <button v-if="products.some(p => p.product_id === item.product_id)" class="btn btn-secondary" :disabled="busy" @click="navigate(() => editAvailability(item))">编辑此商品</button>
                   <button v-if="item.state === 'UPSTREAM_REMOVED'" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="sync">同步上游目录</button>
-                  <button v-if="item.state === 'UPSTREAM_REMOVED' && detail && sourceHost(detail) === 'api.image2pro.top'" type="button" class="btn btn-secondary" data-test="view-catalog-report" @click="showCatalogReport">查看报告与修复提示词</button>
+                  <button v-if="item.state === 'UPSTREAM_REMOVED' && detail && catalogAutoSyncConfigured" type="button" class="btn btn-secondary" data-test="view-catalog-report" @click="showCatalogReport">查看报告与修复提示词</button>
                   <router-link v-if="item.state === 'ACCOUNT_UNAVAILABLE' && detail" :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
                 </div>
               </div>
             </template>
           </section>
-          <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ sourceHost(detail) === 'api.image2pro.top' ? '每5分钟自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
-          <MediaCatalogNotice v-if="detail && sourceHost(detail) === 'api.image2pro.top'" :detail="detail" />
+          <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ catalogAutoSyncConfigured ? '自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
+          <MediaCatalogNotice v-if="detail && catalogAutoSyncConfigured" :detail="detail" />
 
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
@@ -446,6 +446,10 @@ const selectedModelCurrent = computed(() => !!detail.value?.model_catalog?.model
 const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
 const visibleModels = computed(() => detail.value?.models.filter(m => detail.value?.model_catalog?.models.includes(m.model_id) && !['UPSTREAM_NOT_DISCOVERED','UPSTREAM_MISSING','MODEL_SYNC_REQUIRED'].includes(m.state) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id)))) ?? [])
 function hasConfiguredModel(modelId: string) { return products.value.some(p => p.upstream_model === modelId) || !!config.value?.published?.products?.some(p => p.upstream_model === modelId) }
+const catalogAutoSyncConfigured = computed(() => detail.value?.type === 'apikey' && !!config.value && (
+  config.value.media_types.some(type => type === 'image' || type === 'video') ||
+  [...config.value.draft.products, ...(config.value.published?.products ?? [])].some(p => p.media_type === 'image' || p.media_type === 'video')
+))
 const modelScopes = computed(() => [
   { value: 'all', label: '全部模型', count: visibleModels.value.length },
   { value: 'configured', label: '已配置商品', count: visibleModels.value.filter(m => hasConfiguredModel(m.model_id)).length },

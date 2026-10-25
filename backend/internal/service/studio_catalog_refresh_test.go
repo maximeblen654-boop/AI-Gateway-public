@@ -132,5 +132,7 @@ func TestStudioModelCatalogCurrentIsIdentityBoundAndPure(t *testing.T) {
 	a.Credentials["api_key"] = "rotated-synthetic-only"
 	require.False(t, sync.Current(a))
 	a.Credentials["base_url"] = "https://unrelated.example/v1"
-	require.True(t, sync.Current(a), "unrelated API Accounts are outside this observer")
+	require.False(t, sync.Current(a), "a different supplier also requires a fresh identity-bound catalog")
+	delete(a.Extra, mediaworkbench.ExtraKey)
+	require.True(t, sync.Current(a), "native-only Accounts remain outside media observation")
 }

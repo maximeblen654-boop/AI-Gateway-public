@@ -1351,3 +1351,29 @@ it('allows historical inspection but disables creating another product for a rem
  expect(wrapper.get('[data-test="new-independent-product"]').attributes('disabled')).toBeDefined()
  expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
 })
+
+it.each(['video.laoliimage2.win', 'new-supplier.example'])('shows automatic catalog status for %s without supplier gating',async host=>{
+ const dto=supplier();dto.host=host
+ api.detail.mockResolvedValue(dto)
+ await mountWorkbench();await selectAccount()
+ expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('自动同步')
+ expect(wrapper.get('[data-test="catalog-updated"]').text()).not.toContain('手动同步')
+ expect(wrapper.get('[data-test="catalog-notice"]').exists()).toBe(true)
+ expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled();expect(api.sales).not.toHaveBeenCalled()
+})
+
+it('does not promise background API-key catalog sync for an OAuth supplier',async()=>{
+ const dto=supplier();dto.type='oauth'
+ api.detail.mockResolvedValue(dto)
+ await mountWorkbench();await selectAccount()
+ expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('手动同步')
+ expect(wrapper.find('[data-test="catalog-notice"]').exists()).toBe(false)
+})
+
+it('does not promise background sync before a media workbench is initialized',async()=>{
+ const dto=supplier();dto.media_workbench_v1=null
+ api.detail.mockResolvedValue(dto)
+ await mountWorkbench();await selectAccount()
+ expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('手动同步')
+ expect(wrapper.find('[data-test="catalog-notice"]').exists()).toBe(false)
+})
