@@ -73,7 +73,7 @@ func ParseLaoliJSON(body []byte, req *JSONFields) error {
 	for _, name := range []string{"model", "prompt"} {
 		v := root.Get(name)
 		if v.Type != gjson.String || strings.TrimSpace(v.String()) == "" {
-			return fmt.Errorf("Laoli %s is required", name)
+			return fmt.Errorf("laoli %s is required", name)
 		}
 	}
 	req.Model = root.Get("model").String()
@@ -85,7 +85,7 @@ func ParseLaoliJSON(body []byte, req *JSONFields) error {
 		return fmt.Errorf("laoli synchronous execution uses one image per request")
 	}
 	if stream := root.Get("stream"); stream.Exists() && stream.Type != gjson.False {
-		return fmt.Errorf("Laoli does not support streaming")
+		return fmt.Errorf("laoli does not support streaming")
 	}
 	for _, name := range []string{"size", "resolution", "response_format"} {
 		if v := root.Get(name); v.Exists() && (v.Type != gjson.String || strings.TrimSpace(v.String()) == "") {
@@ -96,7 +96,7 @@ func ParseLaoliJSON(body []byte, req *JSONFields) error {
 	req.ExplicitSize = req.Size != ""
 	req.ResponseFormat = root.Get("response_format").String()
 	if req.ResponseFormat != "" && req.ResponseFormat != "url" && req.ResponseFormat != "b64_json" {
-		return fmt.Errorf("Laoli response_format must be url or b64_json")
+		return fmt.Errorf("laoli response_format must be url or b64_json")
 	}
 	for _, name := range []string{"image", "images", "input_image", "reference_image"} {
 		v := root.Get(name)
@@ -107,22 +107,22 @@ func ParseLaoliJSON(body []byte, req *JSONFields) error {
 		if v.IsArray() {
 			values = v.Array()
 			if len(values) == 0 {
-				return fmt.Errorf("Laoli reference array must not be empty")
+				return fmt.Errorf("laoli reference array must not be empty")
 			}
 		}
 		for _, ref := range values {
 			if ref.Type != gjson.String || !validImage2ProReference(ref.String()) {
-				return fmt.Errorf("Laoli references must be HTTPS URLs or image Data URLs")
+				return fmt.Errorf("laoli references must be HTTPS URLs or image Data URLs")
 			}
 			req.InputImageURLs = append(req.InputImageURLs, ref.String())
 		}
 	}
 	if req.IsEdits() && len(req.InputImageURLs) == 0 {
-		return fmt.Errorf("Laoli edits requires a reference image")
+		return fmt.Errorf("laoli edits requires a reference image")
 	}
 	if mask := root.Get("mask"); mask.Exists() {
 		if !req.IsEdits() || mask.Type != gjson.String || !validImage2ProReference(mask.String()) {
-			return fmt.Errorf("Laoli edits mask must be an HTTPS URL or image Data URL")
+			return fmt.Errorf("laoli edits mask must be an HTTPS URL or image Data URL")
 		}
 		req.HasMask, req.MaskImageURL = true, mask.String()
 	}

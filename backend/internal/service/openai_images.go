@@ -638,7 +638,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		}
 		if parsed.publishedImageProtocol == imageplan.LaoliSyncProtocol {
 			if parsed.publishedUpstreamModel == "" || !isStudioNativeExecution(ctx) || !imagecontract.IsLaoliMediaBase(account.GetOpenAIBaseURL()) {
-				return nil, fmt.Errorf("Laoli image plan is not bound to its original supplier")
+				return nil, fmt.Errorf("laoli image plan is not bound to its original supplier")
 			}
 			compile = imageplan.CompileLaoliJSON
 		}

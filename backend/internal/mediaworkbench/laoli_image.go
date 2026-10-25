@@ -78,7 +78,7 @@ func compileLaoliSyncPlan(p Product, spec Spec) (imageplan.Plan, error) {
 		} else {
 			// The supplier documents size/resolution, not image aspect_ratio.
 			// Require a caller-confirmed size mapping instead of guessing pixels.
-			return imageplan.Plan{}, fmt.Errorf("Laoli image aspect ratio requires an explicit size mapping")
+			return imageplan.Plan{}, fmt.Errorf("laoli image aspect ratio requires an explicit size mapping")
 		}
 	}
 	endpoint := imageplan.Generations

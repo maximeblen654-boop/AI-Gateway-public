@@ -40,7 +40,7 @@ func VideoProfileModel(p Product) (videoplan.Model, bool) {
 			profile = "inline_multimedia"
 		}
 	}
-	if (p.AdapterConfig.Version != 1 && !(p.AdapterConfig.Version == 0 && p.AdapterConfig.WireProfile == "")) || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
+	if (p.AdapterConfig.Version != 1 && (p.AdapterConfig.Version != 0 || p.AdapterConfig.WireProfile != "")) || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
 		return videoplan.Model{}, false
 	}
 	if profile == "seedance" && p.Capabilities.References.Video.Max > 0 {
