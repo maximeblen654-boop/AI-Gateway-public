@@ -11,8 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
 	"github.com/Wei-Shaw/sub2api/internal/modelmapping"
+	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
 
 const maxCases = 32768
@@ -168,7 +170,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				add("NEEDS_DEVELOPMENT", "ADAPTER_UNKNOWN", pid, "adapter_bindings", "The Account platform does not own this builder")
 			}
 			if p.MediaType == "image" {
-				configuredProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 1 && (p.AdapterConfig.ModelFamily == "openai_json" || p.AdapterConfig.ModelFamily == "image2pro_json") && p.AdapterConfig.WireProfile == ""
+				configuredProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 1 && (p.AdapterConfig.ModelFamily == "openai_json" || p.AdapterConfig.ModelFamily == "image2pro_json" || p.AdapterConfig.ModelFamily == laoliSyncFamily) && p.AdapterConfig.WireProfile == ""
 				legacyProfile := binding.Kind == "openai_images" && p.AdapterConfig.Version == 0 && p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && imageplan.IsImageModel(p.SiteModel) && imageplan.IsImageModel(p.UpstreamModel)
 				inheritedProfile := p.AdapterConfig.ModelFamily == "" && p.AdapterConfig.WireProfile == "" && nativeAdapterKind(a, "image") == "openai_images"
 				nativeProfile := p.AdapterConfig.Version == 1 && p.AdapterConfig.ModelFamily == nativeAdapterKind(a, "image") && binding.Kind != "openai_images"
@@ -203,10 +205,17 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 		}
 		if p.MediaType == "image" {
 			v.Diagnostics = append(v.Diagnostics, validateImage2ProSyncProduct(a, p)...)
+			v.Diagnostics = append(v.Diagnostics, validateLaoliSyncProduct(a, p)...)
 		}
 		v.Diagnostics = append(v.Diagnostics, validateImage2ProVideoProduct(a, p)...)
 		if known && p.MediaType == "video" {
 			m, ok := VideoProfileModel(p)
+			if p.AdapterConfig.WireProfile == videoplan.LaoliMediaProfile && (!imagecontract.IsLaoliMediaBase(a.BaseURL) || binding.Kind != "laoli_video" || nativeAdapterKind(a, "video") != "laoli_video") {
+				ok = false
+			}
+			if imagecontract.IsLaoliMediaBase(a.BaseURL) && binding.Kind == "laoli_video" && p.AdapterConfig.WireProfile != videoplan.LaoliMediaProfile {
+				ok = false
+			}
 			if !ok || p.AdapterConfig.ModelFamily != "" || p.Capabilities.Count != (Range{Min: 1, Max: 1}) || len(p.Capabilities.Qualities) > 0 || len(p.AdapterConfig.SizeMappings) > 0 {
 				add("NEEDS_DEVELOPMENT", "VIDEO_PROFILE_UNSUPPORTED", pid, "capabilities", "Use a supported explicit video contract, count one, and no image size mappings")
 			} else {

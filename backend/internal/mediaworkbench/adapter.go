@@ -17,30 +17,30 @@ import (
 
 func VideoProfileModel(p Product) (videoplan.Model, bool) {
 	profile := p.AdapterConfig.WireProfile
+	if profile == videoplan.LaoliMediaProfile {
+		if p.AdapterConfig.Version != 1 {
+			return videoplan.Model{}, false
+		}
+		m, ok := videoplan.LaoliMediaModel(p.UpstreamModel, p.Capabilities.AspectRatios)
+		m.ID = p.SiteModel
+		return m, ok
+	}
 	if profile == "image2pro" {
 		return image2ProVideoModel(p)
 	}
-	// An explicit wire profile must not turn a known model's declared product
-	// capabilities into its own authority, bypassing fixed reference/duration limits.
-	if known, ok := videoplan.DocumentedModel(p.SiteModel); ok && known.Upstream == p.UpstreamModel {
-		if known.Status != "enabled" || profile != "" && (p.AdapterConfig.Version != 1 || profile != known.Mode) {
-			return videoplan.Model{}, false
-		}
-		if profile == "" && p.AdapterConfig.Version != 0 {
-			return videoplan.Model{}, false
-		}
-		return known, true
-	}
 	if profile == "" {
-		if p.AdapterConfig.Version != 0 {
+		// Existing generic products may predate explicit profile storage. Their
+		// own frozen capabilities still describe the compatible transport; no
+		// supplier model table or alias is needed to read those products.
+		if p.AdapterConfig.Version != 0 || p.AdapterConfig.ModelFamily != "" || p.MediaType != "video" || len(p.Capabilities.DurationsSeconds) == 0 || len(p.Capabilities.Resolutions) == 0 || len(p.Capabilities.AspectRatios) == 0 || p.Capabilities.Count != (Range{Min: 1, Max: 1}) {
 			return videoplan.Model{}, false
 		}
-		if legacy, ok := videoplan.Lookup(p.SiteModel); ok && legacy.Upstream == p.UpstreamModel {
-			return legacy, true
+		profile = "images"
+		if p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0 {
+			profile = "inline_multimedia"
 		}
-		return videoplan.Model{}, false
 	}
-	if p.AdapterConfig.Version != 1 || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
+	if (p.AdapterConfig.Version != 1 && !(p.AdapterConfig.Version == 0 && p.AdapterConfig.WireProfile == "")) || !videoplan.ValidWireProfile(profile) || (profile == "images" && (p.Capabilities.References.Video.Max > 0 || p.Capabilities.References.Audio.Max > 0)) {
 		return videoplan.Model{}, false
 	}
 	if profile == "seedance" && p.Capabilities.References.Video.Max > 0 {
@@ -268,6 +268,9 @@ func inheritNativeProduct(a *Account, p *Product) {
 	if p.MediaType == "image" && inheritImage2ProSyncProduct(a, p) {
 		return
 	}
+	if p.MediaType == "image" && inheritLaoliSyncProduct(a, p) {
+		return
+	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "grok_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "grok"
 	}
@@ -275,10 +278,9 @@ func inheritNativeProduct(a *Account, p *Product) {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "seedance"
 	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "laoli_video" && p.AdapterConfig.WireProfile == "" {
-		// Keep the immutable legacy catalog contract for existing model IDs.
-		// New discovered IDs use the same compatible transport with a profile
-		// derived from their declared reference domain.
-		if legacy, ok := videoplan.Lookup(p.SiteModel); ok && legacy.Upstream == p.UpstreamModel {
+		// Only exact IDs on the documented supplier origin use this contract.
+		if imagecontract.IsLaoliMediaBase(a.BaseURL) {
+			p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, videoplan.LaoliMediaProfile
 			return
 		}
 		profile := "images"
@@ -440,6 +442,9 @@ func compilePlan(p Product, spec Spec) (imageplan.Plan, error) {
 
 	if p.AdapterConfig.ModelFamily == "image2pro_json" {
 		return compileImage2ProSyncPlan(p, spec)
+	}
+	if p.AdapterConfig.ModelFamily == laoliSyncFamily {
+		return compileLaoliSyncPlan(p, spec)
 	}
 	fields := map[string]any{"model": p.SiteModel, "prompt": "<dry-run-prompt>", "n": spec.Count}
 	if spec.OutputFormat != "" {

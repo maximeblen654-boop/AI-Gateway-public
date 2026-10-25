@@ -13,10 +13,12 @@ import (
 	"strings"
 )
 
+// This existing transport identity is also used by ordinary compatible
+// suppliers and frozen task bytes. It does not install a supplier model table.
 const Revision = "laoli_video_json_v136_r1"
 const GrokRevision = "core_grok_video_r1"
 
-//go:embed contract.json
+//go:embed wire-profiles.json
 var contract []byte
 
 type Model struct {
@@ -44,7 +46,6 @@ type Wire struct {
 
 var registry struct {
 	Revision string          `json:"revision"`
-	Models   []Model         `json:"models"`
 	Profiles map[string]Wire `json:"wireProfiles"`
 }
 
@@ -54,30 +55,11 @@ func init() {
 	}
 }
 
-// DocumentedModel retains paused contracts for capability validation; it does not enable them.
-func DocumentedModel(id string) (Model, bool) {
-	for _, m := range registry.Models {
-		if m.ID == id {
-			return m, true
-		}
-	}
-	return Model{}, false
-}
-
-func Lookup(id string) (Model, bool) {
-	for _, m := range registry.Models {
-		if m.ID == id && m.Status == "enabled" {
-			return m, true
-		}
-	}
-	return Model{}, false
-}
-
 // ValidWireProfile is the adapter-owned allowlist. Model IDs are deliberately
 // absent: administrators may configure discovered models against this fixed
-// protocol vocabulary without changing source or contract.json.
+// protocol vocabulary without changing source or the shared wire profiles.
 func ValidWireProfile(profile string) bool {
-	if profile == "image2pro" {
+	if profile == "image2pro" || profile == LaoliMediaProfile {
 		return true
 	}
 	_, ok := registry.Profiles[profile]
@@ -99,21 +81,14 @@ func digest(b []byte) string { return fmt.Sprintf("%x", sha256.Sum256(b)) }
 
 var ErrPlan = errors.New("unsupported video plan or protocol fields")
 
-// CompilePlan validates the existing builder's output. Wire names and fixed
-// fields come from the same contract.json used by the JS builder, not a copied
-// video field switch. Reference ownership remains the BFF asset boundary.
-func CompilePlan(modelID, upstream string, body []byte) (Plan, error) {
-	var p Plan
-	m, ok := Lookup(modelID)
-	if !ok || m.Upstream != upstream || len(body) > 128*1024*1024 {
-		return p, ErrPlan
-	}
-	return CompilePlanForModel(m, upstream, body)
-}
-
+// CompilePlanForModel requires an explicit resolved product profile. Shared
+// wire vocabulary never supplies a model identity or supplier capabilities.
 func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 	var p Plan
 	if m.Status != "enabled" || m.Upstream != upstream || len(body) > 128*1024*1024 {
+		return p, ErrPlan
+	}
+	if m.Mode == LaoliMediaProfile && (!validLaoliModel(m) || !uniqueLaoliFields(body)) {
 		return p, ErrPlan
 	}
 	if m.Mode == "image2pro" {
@@ -123,6 +98,9 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 		return compileSeedancePlan(m, upstream, body)
 	}
 	w, ok := registry.Profiles[m.Mode]
+	if m.Mode == LaoliMediaProfile {
+		w, ok = laoliWire(), true
+	}
 	if !ok {
 		return p, ErrPlan
 	}
@@ -166,6 +144,9 @@ func CompilePlanForModel(m Model, upstream string, body []byte) (Plan, error) {
 		return p, ErrPlan
 	}
 	p = Plan{Version: "video_wire_plan_v1", AdapterRevision: Revision, ContractRevision: registry.Revision, Method: "POST", Path: "/v1/videos", Body: append([]byte(nil), body...), RequestHash: digest(body)}
+	if m.Mode == LaoliMediaProfile {
+		p.AdapterRevision, p.ContractRevision = LaoliMediaRevision, LaoliMediaContractRevision
+	}
 	if m.Mode == "grok" {
 		p.AdapterRevision, p.Path = GrokRevision, "/v1/videos/generations"
 	}
@@ -224,6 +205,7 @@ func compileSeedancePlan(m Model, upstream string, body []byte) (Plan, error) {
 }
 func (p Plan) Materialize() ([]byte, string, error) {
 	validPath := p.AdapterRevision == Image2ProRevision && p.ContractRevision == Image2ProContractRevision && p.Path == "/v1/videos" || p.AdapterRevision == Revision && p.Path == "/v1/videos" || p.AdapterRevision == GrokRevision && p.Path == "/v1/videos/generations" || p.AdapterRevision == "core_seedance_video_r1" && p.Path == "/v1/contents/generations/tasks"
+	validPath = validPath || p.AdapterRevision == LaoliMediaRevision && p.ContractRevision == LaoliMediaContractRevision && p.Path == "/v1/videos"
 	if p.Version != "video_wire_plan_v1" || !validPath || p.Method != "POST" || !json.Valid(p.Body) || digest(p.Body) != p.RequestHash {
 		return nil, "", ErrPlan
 	}
@@ -231,17 +213,6 @@ func (p Plan) Materialize() ([]byte, string, error) {
 }
 
 // Preview and executable validation consume the same declarative field map.
-func Preview(modelID, upstream, resolution, ratio string, duration int) (Plan, error) {
-	return PreviewWithMedia(modelID, upstream, resolution, ratio, duration, 0, 0, 0)
-}
-func PreviewWithMedia(modelID, upstream, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
-	m, ok := Lookup(modelID)
-	if !ok {
-		return Plan{}, ErrPlan
-	}
-	return PreviewWithModel(m, upstream, resolution, ratio, duration, images, videos, audio)
-}
-
 func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, images, videos, audio int) (Plan, error) {
 	if m.Status != "enabled" || m.Upstream != upstream || !ValidWireProfile(m.Mode) || images < 0 || videos < 0 || audio < 0 || images > m.Limits.Image || videos > m.Limits.Video || audio > m.Limits.Audio || images+videos+audio > m.Limits.Total || images+videos+audio > 30 {
 		return Plan{}, ErrPlan
@@ -267,6 +238,9 @@ func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, ima
 		return CompilePlanForModel(m, upstream, body)
 	}
 	w := registry.Profiles[m.Mode]
+	if m.Mode == LaoliMediaProfile {
+		w = laoliWire()
+	}
 	f := map[string]any{"model": upstream, "prompt": "<dry-run-prompt>", "resolution": resolution, w.Duration: duration, w.Ratio: ratio}
 	for k, v := range w.Fixed {
 		f[k] = v
@@ -286,7 +260,11 @@ func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, ima
 					return Plan{}, ErrPlan
 				}
 				refs, _ := f[name].([]string)
-				f[name] = append(refs, "data:application/octet-stream;base64,AA==")
+				source := "data:application/octet-stream;base64,AA=="
+				if m.Mode == LaoliMediaProfile {
+					source = "https://example.invalid/verified-reference"
+				}
+				f[name] = append(refs, source)
 			}
 		}
 	}
@@ -295,15 +273,6 @@ func PreviewWithModel(m Model, upstream, resolution, ratio string, duration, ima
 		return Plan{}, e
 	}
 	return CompilePlanForModel(m, upstream, body)
-}
-
-func Inspect(modelID string, body []byte) (resolution, ratio string, duration, images, videos, audio int, err error) {
-	m, ok := Lookup(modelID)
-	if !ok {
-		err = ErrPlan
-		return
-	}
-	return InspectForModel(m, body)
 }
 
 func InspectForModel(m Model, body []byte) (resolution, ratio string, duration, images, videos, audio int, err error) {
@@ -343,6 +312,13 @@ func InspectForModel(m Model, body []byte) (resolution, ratio string, duration, 
 		return
 	}
 	w := registry.Profiles[m.Mode]
+	if m.Mode == LaoliMediaProfile {
+		if !validLaoliModel(m) || !uniqueLaoliFields(body) {
+			err = ErrPlan
+			return
+		}
+		w = laoliWire()
+	}
 	var f map[string]json.RawMessage
 	if json.Unmarshal(body, &f) != nil {
 		err = ErrPlan
@@ -357,9 +333,17 @@ func InspectForModel(m Model, body []byte) (resolution, ratio string, duration, 
 		}
 		var values []string
 		if raw, exists := f[name]; exists {
-			if json.Unmarshal(raw, &values) != nil {
+			if json.Unmarshal(raw, &values) != nil || m.Mode == LaoliMediaProfile && bytesEqualNull(raw) {
 				err = ErrPlan
 				return
+			}
+			if m.Mode == LaoliMediaProfile {
+				for _, value := range values {
+					if !validLaoliReference(value, []string{"image", "video", "audio"}[i]) {
+						err = ErrPlan
+						return
+					}
+				}
 			}
 		}
 		switch i {

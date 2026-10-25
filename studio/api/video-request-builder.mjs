@@ -1,4 +1,5 @@
-import catalog from '../../backend/internal/videoplan/contract.json' with { type: 'json' };
+import catalog from '../../backend/internal/videoplan/wire-profiles.json' with { type: 'json' };
+import laoliMedia from '../../backend/internal/videoplan/laoli-20261024.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 
 // Only the BFF's asset lookup may create these receipts, after checking the
@@ -11,10 +12,6 @@ const mimeTypes = {
   video: new Set(['video/mp4', 'video/quicktime', 'video/webm']),
   audio: new Set(['audio/mpeg', 'audio/mp3', 'audio/x-m4a', 'audio/mp4', 'audio/wav', 'audio/x-wav', 'audio/ogg']),
 };
-const candidates = new Map(catalog.models.map(model => [model.apiModelId, model]));
-if (candidates.size !== catalog.models.length || catalog.revision !== 'laoli-video-api-v1.36-2026-10-02') {
-  throw new Error('Video contract catalog mismatch');
-}
 
 function fail(reason) { throw new TypeError(reason); }
 function keysOnly(value, allowed, label) {
@@ -68,7 +65,6 @@ function assertAssets(assets, ownerId, model) {
   if (model.requiredAnyMedia.length && !model.requiredAnyMedia.some(type => counts[type] > 0)) {
     fail('Required image or video missing');
   }
-  if (model.apiModelId.startsWith('happyhorse-') && counts.image === 0) fail('Happyhorse requires image');
   return counts;
 }
 
@@ -103,45 +99,24 @@ function inlineMedia(assets, mode) {
   return groups;
 }
 
-function referenceMedia(assets, model) {
-  let officialAudioDuration = 0;
-  let minimaxImageBytes = 0;
-  const references = assets.map(asset => {
+function referenceMedia(assets) {
+  return assets.map(asset => {
     const payload = receiptPayloads.get(asset);
     if (!payload.source) fail('Reference model requires verified HTTPS source');
-    if (model.apiModelId === 'minimax-h3-1080p' && asset.type === 'image') {
-      if (asset.size > 5 * 1024 * 1024) fail('MiniMax image exceeds 5 MiB');
-      minimaxImageBytes += asset.size;
-      if (minimaxImageBytes > 20 * 1024 * 1024) fail('MiniMax images exceed 20 MiB');
-    }
-    if (model.apiModelId === 'sd-2.5-native-seconds' && asset.size > 25_000_000) {
-      fail('Reference asset exceeds 25 MB');
-    }
-    const reference = { type: asset.type, source: httpsSource(payload.source) };
-    if (asset.type !== 'image' && (model.apiModelId.startsWith('sd-official-') ||
-        model.apiModelId === 'sd-2.5-native-seconds')) {
-      if (asset.durationSeconds === undefined) fail('Media duration receipt required');
-      if (model.apiModelId.startsWith('sd-official-')) {
-        if (asset.durationSeconds > (asset.type === 'audio' ? 30 : 30.2)) fail('Reference media too long');
-        if (asset.type === 'audio') officialAudioDuration += asset.durationSeconds;
-      }
-      reference.duration_seconds = asset.durationSeconds;
-    }
-    return reference;
+    return { type: asset.type, source: httpsSource(payload.source) };
   });
-  if (officialAudioDuration > 30.2) fail('Official audio total duration exceeded');
-  return references;
 }
 
-/** Pure v1.36 POST /v1/videos JSON byte constructor. No network, key, quote or ledger access. */
-export function CompilePlan(input) {
-  return compile(input, undefined);
+/** A display model name never grants a supplier contract. */
+export function CompilePlan(input, profile) {
+  if (!profile) fail('Published video profile required');
+  return CompilePublishedPlan(input, profile);
 }
 
 // Only BFF callers use an authenticated Core catalog profile. The browser route
 // cannot supply this argument; Core independently resolves and checks the offer.
 export function CompilePublishedPlan(input, profile) {
-  if (!profile || profile.apiModelId !== input.model || (profile.inputMode !== 'image2pro' && !catalog.wireProfiles[profile.inputMode])) fail('Invalid Published profile');
+  if (!profile || profile.apiModelId !== input.model || (profile.inputMode !== 'image2pro' && profile.inputMode !== laoliMedia.inputMode && !catalog.wireProfiles[profile.inputMode])) fail('Invalid Published profile');
   const limits = profile.mediaLimits;
   const model = {...profile, requiredAnyMedia: profile.requiredAnyMedia || [],
     mediaLimits: {image:limits.Image ?? limits.image, video:limits.Video ?? limits.video, audio:limits.Audio ?? limits.audio, total:limits.Total ?? limits.total}};
@@ -152,7 +127,7 @@ function compile(input, modelOverride) {
   keysOnly(input, allowedInputKeys, 'video request');
   const { ownerId, model: modelId, prompt, duration, resolution, ratio, assets } = input;
   if (typeof ownerId !== 'string' || !ownerId) fail('Owner ID required');
-  const model = modelOverride ?? candidates.get(modelId);
+  const model = modelOverride;
   if (!model || model.documentedStatus !== 'enabled') fail('Unsupported or paused model');
   if (typeof prompt !== 'string' || prompt.length < 1 ||
       [...prompt].length > (model.promptMaxLength || 6000)) fail('Invalid prompt');
@@ -162,6 +137,7 @@ function compile(input, modelOverride) {
   }
   const counts = assertAssets(assets, ownerId, model);
   assertPromptReferences(prompt, counts);
+  if (model.inputMode === laoliMedia.inputMode) return compileLaoliMedia(input, model);
   if (model.inputMode === 'image2pro') return compileImage2Pro(input, model);
   if (model.inputMode === 'seedance') {
     const content = [{ type: 'text', text: prompt }];
@@ -189,7 +165,7 @@ function compile(input, modelOverride) {
     if (groups.video.length) body[wire.video] = groups.video;
     if (groups.audio.length) body[wire.audio] = groups.audio;
   } else if (assets.length) {
-    body[wire.references] = referenceMedia(assets, model);
+    body[wire.references] = referenceMedia(assets);
   }
   const bytes = Buffer.from(JSON.stringify(body), 'utf8');
   if (bytes.byteLength > 128 * 1024 * 1024) fail('Video JSON exceeds 128 MiB');
@@ -201,6 +177,35 @@ function compile(input, modelOverride) {
   const snapshot = JSON.parse(JSON.stringify(plan));
   snapshot.planHash = planHash(snapshot);
   return snapshot;
+}
+
+// The internal frozen JSON retains verified bytes. Core converts only this
+// revision to documented multipart file fields; no supplier upload API or JSON
+// data-URI support is assumed. HTTPS receipts remain ordinary field values.
+function compileLaoliMedia(input, model) {
+  const known = laoliMedia.models.find(m => m.upstreamModelId === model.upstreamModelId);
+  if (!known || !Array.isArray(model.ratios) || !model.ratios.length ||
+      model.ratios.some(r => typeof r !== 'string' || !/^[1-9][0-9]{0,3}:[1-9][0-9]{0,3}$/.test(r) || known.ratios.length && !known.ratios.includes(r)) ||
+      !Array.isArray(model.durationSeconds) || !model.durationSeconds.length || model.durationSeconds.some(v => !known.durationSeconds.includes(v)) ||
+      !Array.isArray(model.resolutions) || !model.resolutions.length || model.resolutions.some(v => !known.resolutions.includes(v)) ||
+      Object.keys(known.mediaLimits).some(k => !Number.isSafeInteger(model.mediaLimits[k]) || model.mediaLimits[k] < 0 || model.mediaLimits[k] > known.mediaLimits[k])) {
+    fail('Unconfirmed Laoli video capabilities');
+  }
+  const groups = {image:[],video:[],audio:[]};
+  for (const asset of input.assets) {
+    const payload = receiptPayloads.get(asset);
+    if (payload.bytes) groups[asset.type].push(`data:${asset.mimeType};base64,${Buffer.from(payload.bytes).toString('base64')}`);
+    else if (payload.source) groups[asset.type].push(httpsSource(payload.source));
+    else fail('Laoli media requires verified bytes or HTTPS source');
+  }
+  const fields = {model:model.upstreamModelId,prompt:input.prompt,seconds:input.duration,resolution:input.resolution,aspect_ratio:input.ratio};
+  for (const [kind,name] of [['image','reference_images'],['video','reference_videos'],['audio','reference_audios']]) {
+    if (groups[kind].length) fields[name] = groups[kind];
+  }
+  if (Buffer.byteLength(JSON.stringify(fields),'utf8') > 128*1024*1024) fail('Video JSON exceeds 128 MiB');
+  const plan = {version:'video_json_plan_v1',adapterRevision:laoliMedia.adapterRevision,method:'POST',path:'/v1/videos',
+    encoding:'application/json',contractRevision:laoliMedia.revision,fields};
+  const snapshot = JSON.parse(JSON.stringify(plan)); snapshot.planHash = planHash(snapshot); return snapshot;
 }
 
 // This provider's published REST contract is independent of Laoli wire fields.
@@ -264,6 +269,7 @@ function planHash(plan) {
 export function Materialize(plan) {
   if (!plan || plan.version !== 'video_json_plan_v1' ||
       !((plan.adapterRevision === 'laoli_video_json_v136_r1' && plan.path === '/v1/videos') ||
+      (plan.adapterRevision === laoliMedia.adapterRevision && plan.contractRevision === laoliMedia.revision && plan.path === '/v1/videos') ||
       (plan.adapterRevision === 'core_grok_video_r1' && plan.path === '/v1/videos/generations') ||
       (plan.adapterRevision === 'core_image2pro_video_r1' && plan.path === '/v1/videos') ||
       (plan.adapterRevision === 'core_seedance_video_r1' && plan.path === '/v1/contents/generations/tasks')) ||
@@ -278,6 +284,6 @@ export function Materialize(plan) {
 }
 
 // Legacy callers retain the same validation and bytes; one shared field builder.
-export function buildVideoRequestBytes(input) {
-  return Materialize(CompilePlan(input)).bytes;
+export function buildVideoRequestBytes(input, profile) {
+  return Materialize(CompilePlan(input, profile)).bytes;
 }

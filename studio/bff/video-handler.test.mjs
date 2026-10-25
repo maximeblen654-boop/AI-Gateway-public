@@ -100,9 +100,12 @@ test('HTTP quotes share one trusted catalog within each request and retain final
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
   const input={client_key:'quote-client',offer_id:'offer',model:'3.0',prompt:'fixture',duration:5,resolution:'720p',ratio:'16:9',assets:mode.includes('preparation')||mode==='inline asset'?[{kind:'image',asset_ref:asset.asset_ref}]:[],...(mode.includes('preparation')?{preparation_id:preparation.preparation_id}:{})};
   const post=extra=>fetch(`http://127.0.0.1:${server.address().port}/studio-v2/api/video/quotes`,{method:'POST',headers:{'X-Studio-Request':'video-binding-v1','Content-Type':'application/json'},body:JSON.stringify({...input,...extra})});
-  const failed=mode==='missing preparation'||mode==='wrong owner';
-  const first=await post({});assert.equal(first.status,failed?(mode==='missing preparation'?422:409):200);assert.equal(catalogs,1);assert.equal(quotes,mode==='missing preparation'?0:1);
-  const second=await post({client_key:'another-client'});assert.equal(second.status,first.status);assert.equal(catalogs,2,'another HTTP request must read its own catalog');assert.equal(quotes,mode==='missing preparation'?0:2);
+  const missingContract=mode==='missing profile',blockedBeforeQuote=mode==='missing preparation'||missingContract;
+  const failed=blockedBeforeQuote||mode==='wrong owner';
+  const first=await post({});assert.equal(first.status,failed?(blockedBeforeQuote?422:409):200);assert.equal(catalogs,1);assert.equal(quotes,blockedBeforeQuote?0:1);
+  if(missingContract)assert.equal((await first.clone().json()).error,'unsupported_model','an omitted resolved profile cannot revive the removed static model fallback');
+  const second=await post({client_key:'another-client'});assert.equal(second.status,first.status);assert.equal(catalogs,2,'another HTTP request must read its own catalog');assert.equal(quotes,blockedBeforeQuote?0:2);
+  if(missingContract)assert.deepEqual(await tasks.history({ownerId:7}),[],'missing profile cannot persist an intent');
   if(!failed){
    const repeated=await post({});assert.equal(repeated.status,200);assert.deepEqual(await repeated.json(),await first.json());assert.equal(catalogs,3);assert.equal(quotes,2,'existing client key must not requote');
    assert.equal((await post({prompt:'changed'})).status,409);assert.equal(quotes,2,'changed input cannot reuse an existing intent');

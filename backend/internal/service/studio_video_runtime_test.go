@@ -78,8 +78,9 @@ func videoRuntimeFixture(t *testing.T) (*StudioVideoRuntime, string, StudioVideo
 	delete(accounts.a.Extra, "quota_limit")
 	delete(accounts.a.Extra, "quota_daily_limit")
 	delete(accounts.a.Extra, "quota_weekly_limit")
-	model, ok := videoplan.Lookup("3.0")
-	require.True(t, ok)
+	model := videoplan.Model{ID: "3.0", Upstream: "generic-video-upstream", Status: "enabled", Mode: "images", Durations: []int{5}, Resolutions: []string{"720p"}, Ratios: []string{"16:9"}}
+	model.Limits.Image = 1
+	model.Limits.Total = 1
 	accounts.a.Credentials["model_mapping"] = map[string]any{"3.0": model.Upstream}
 	ma := &studioMediaFixture{a: mediaworkbench.Account{ID: 7, Platform: "openai", Type: "apikey", Status: "active", Schedulable: true, RuntimeReady: true, BaseURL: accounts.a.GetOpenAIBaseURL(), ModelMapping: map[string]string{"3.0": model.Upstream}, Catalog: &mediaworkbench.Catalog{Models: []string{model.Upstream}, SyncedAt: "fixture"}}}
 	svc := mediaworkbench.NewService(ma)
@@ -103,7 +104,7 @@ func videoRuntimeFixture(t *testing.T) (*StudioVideoRuntime, string, StudioVideo
 	r := NewStudioVideoRuntime(image.Core, ma, orders)
 	r.Store = &StudioVideoStore{Root: t.TempDir()}
 	r.enabled = true
-	plan, e := videoplan.Preview("3.0", model.Upstream, "720p", "16:9", 5)
+	plan, e := videoplan.PreviewWithModel(model, model.Upstream, "720p", "16:9", 5, 0, 0, 0)
 	require.NoError(t, e)
 	token, q, e := r.Issue(ctx, StudioImageOwner{1, 2, 3}, key, ma.a.Config.Published.Offers[0].OfferID, mediaworkbench.Spec{Count: 1, DurationSeconds: 5, Resolution: "720p", AspectRatio: "16:9"}, plan.Body)
 	require.NoError(t, e)

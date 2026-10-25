@@ -93,10 +93,10 @@ func TestConfiguredProfileSafety(t *testing.T) {
 	if _, ok := VideoProfileModel(p); ok {
 		t.Fatal("arbitrary wire")
 	}
-	p.SiteModel = "3.0-native"
+	p.SiteModel = "unconfigured-video"
 	p.AdapterConfig = ImageConfig{}
 	if _, ok := VideoProfileModel(p); ok {
-		t.Fatal("paused automatically opened")
+		t.Fatal("missing frozen video capabilities automatically opened")
 	}
 }
 

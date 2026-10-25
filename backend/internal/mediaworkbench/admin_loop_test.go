@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-const representativeUpstreamModel = "特价2.0-需要过人脸技术-可参考过人脸素材库"
+const representativeUpstreamModel = "generic-video-upstream"
 
 func representativeVideoProduct(salePrice *Price) Product {
 	return Product{CostRules: []CostRule{{Cost: &Price{Amount: "0.35", Currency: "CNY", BillingMode: "per_request"}, Source: "manual"}},
 		ProductID: "video-3-0", MediaType: "video", SiteModel: "3.0", DisplayName: "本站产品别名",
-		UpstreamModel: representativeUpstreamModel, Enabled: true,
+		UpstreamModel: representativeUpstreamModel, Enabled: true, AdapterConfig: ImageConfig{Version: 1, WireProfile: "images"},
 		Capabilities: Capabilities{Resolutions: []string{"720p"}, AspectRatios: []string{"16:9"}, DurationsSeconds: []int{5}, Count: Range{Min: 1, Max: 1}, References: References{Image: Range{0, 0}, Video: Range{0, 0}, Audio: Range{0, 0}, TotalMax: 0}},
 		PricingRules: []PricingRule{{Match: Match{Resolution: []string{"720p"}, DurationSeconds: []int{5}, AspectRatio: []string{"16:9"}, Count: &Range{Min: 1, Max: 1}}, SalePrice: salePrice}},
 	}
@@ -58,7 +58,7 @@ func TestAdminVideoSaveValidateReadbackPublishLoop(t *testing.T) {
 		t.Fatalf("repeated publish must use CAS: %v", err)
 	}
 
-	// Missing price and an unsupported combination are explicit UI-fixable gates.
+	// Missing price and a price/specification mismatch are explicit UI-fixable gates.
 	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{representativeVideoProduct(nil)}})
 	if err != nil || d.Config.Validation.Status != "FAIL" || !hasCode(d.Config.Validation, "MISSING_PRICE", "UI_FIXABLE") {
 		t.Fatalf("missing price gate: %v %+v", err, d.Config.Validation)
@@ -66,7 +66,7 @@ func TestAdminVideoSaveValidateReadbackPublishLoop(t *testing.T) {
 	bad := representativeVideoProduct(&Price{Amount: "2.50", Currency: "CNY", BillingMode: "per_request"})
 	bad.Capabilities.Resolutions = []string{"1080p"}
 	d, err = s.SaveDraft(ctx, 7, d.Config.RecordVersion, DraftInput{Products: []Product{bad}})
-	if err != nil || d.Config.Validation.Status != "FAIL" || !hasCode(d.Config.Validation, "VIDEO_RESOLUTION_UNSUPPORTED", "UI_FIXABLE") {
+	if err != nil || d.Config.Validation.Status != "FAIL" || !hasCode(d.Config.Validation, "INVALID_PRICE_MATCH", "UI_FIXABLE") {
 		t.Fatalf("unsupported spec gate: %v %+v", err, d.Config.Validation)
 	}
 	if _, err = s.Publish(ctx, 7, d.Config.RecordVersion, d.Config.Draft.Revision); !errors.Is(err, ErrValidation) {

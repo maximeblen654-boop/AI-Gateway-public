@@ -12,14 +12,14 @@ func TestThirtyReferencesRemainModelBounded(t *testing.T) {
 		service, r := validatorFixture(t)
 		d, _ := Descriptor("laoli_video")
 		r.a.Config.AdapterBindings["video"] = AdapterBinding{d.Kind, d.Revision, d.Auth, d.TaskFlow}
-		m, _ := videoplan.Lookup("3.5")
+		m := genericReferenceVideoModel()
 		r.a.Catalog.Models = append(r.a.Catalog.Models, m.Upstream)
 		r.a.ModelMapping = map[string]string{m.ID: m.Upstream}
 		p := validProduct()
 		p.MediaType = "video"
 		p.SiteModel = m.ID
 		p.UpstreamModel = m.Upstream
-		p.AdapterConfig = ImageConfig{}
+		p.AdapterConfig = ImageConfig{Version: 1, WireProfile: m.Mode}
 		p.Capabilities = Capabilities{Resolutions: []string{m.Resolutions[0]}, AspectRatios: []string{m.Ratios[0]}, DurationsSeconds: []int{m.Durations[0]}, Count: Range{1, 1}, References: References{Image: Range{0, n}, TotalMax: n}}
 		p.PricingRules = []PricingRule{{SalePrice: &Price{Amount: "0.1", Currency: "CNY", BillingMode: "per_request"}}}
 		v, _ := Validate(&r.a, Draft{Revision: "refs", Products: []Product{p}}, time.Now())
@@ -80,27 +80,23 @@ func TestReferencesIndependentTotalAndBudget(t *testing.T) {
 	}
 }
 
-func TestExplicitProfileCannotWidenKnownContract(t *testing.T) {
-	m, _ := videoplan.Lookup("3.0")
-	p := Product{MediaType: "video", SiteModel: m.ID, UpstreamModel: m.Upstream, AdapterConfig: ImageConfig{Version: 1, WireProfile: m.Mode}, Capabilities: Capabilities{DurationsSeconds: []int{4}, References: References{Image: Range{0, 30}, TotalMax: 30}}}
+func TestExplicitLaoliProfileCannotWidenKnownContract(t *testing.T) {
+	m, _ := videoplan.LaoliMediaModel("3.0", nil)
+	p := Product{MediaType: "video", SiteModel: m.ID, UpstreamModel: m.Upstream, AdapterConfig: ImageConfig{Version: 1, WireProfile: videoplan.LaoliMediaProfile}, Capabilities: Capabilities{DurationsSeconds: []int{4}, References: References{Image: Range{0, 30}, TotalMax: 30}}}
 	resolved, ok := VideoProfileModel(p)
 	if !ok || resolved.Limits.Image != 9 {
-		t.Fatal("known contract widened")
+		t.Fatal("documented contract widened")
 	}
 	if _, err := videoplan.PreviewWithModel(resolved, m.Upstream, m.Resolutions[0], m.Ratios[0], 4, 30, 0, 0); err == nil {
 		t.Fatal("invalid configured duration/reference accepted")
 	}
-	p.AdapterConfig.WireProfile = "inline_multimedia"
-	if _, ok = VideoProfileModel(p); ok {
-		t.Fatal("changed protocol accepted")
-	}
-	paused, _ := videoplan.DocumentedModel("sd-native-full-2.5")
-	p.SiteModel = paused.ID
-	p.UpstreamModel = paused.Upstream
-	p.AdapterConfig.WireProfile = paused.Mode
-	if _, ok = VideoProfileModel(p); ok {
-		t.Fatal("paused model enabled by explicit profile")
-	}
+}
+
+func genericReferenceVideoModel() videoplan.Model {
+	m := videoplan.Model{ID: "reference-video", Upstream: "reference-upstream", Status: "enabled", Mode: "images", Durations: []int{5}, Resolutions: []string{"720p"}, Ratios: []string{"16:9"}}
+	m.Limits.Image = 30
+	m.Limits.Total = 30
+	return m
 }
 
 func TestUnsupportedReferenceKindsStayClosed(t *testing.T) {

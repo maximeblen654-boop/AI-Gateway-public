@@ -12,6 +12,9 @@ func MeteredAccountTestsDisabled(account *Account) bool {
 	if account == nil || account.Type != AccountTypeAPIKey {
 		return false
 	}
+	if imagecontract.IsLaoliMediaBase(account.GetOpenAIBaseURL()) {
+		return true
+	}
 	u, err := url.Parse(account.GetOpenAIBaseURL())
 	return err == nil && strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), "api.image2pro.top")
 }

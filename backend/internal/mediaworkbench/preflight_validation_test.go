@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 )
 
 func memoAccountSnapshot(t *testing.T, a *Account) *Account {
@@ -224,10 +222,11 @@ func memoVideoSnapshot(t *testing.T) *Account {
 	r.a.BaseURL = "https://supplier.example/v1"
 	r.a.ModelMapping = map[string]string{"3.0": representativeUpstreamModel}
 	r.a.Catalog.Models = []string{representativeUpstreamModel}
-	m, ok := videoplan.Lookup("3.0")
-	if !ok {
-		t.Fatal("representative video contract missing")
-	}
+	m := genericReferenceVideoModel()
+	// Keep the generic fixture larger than the 64 preview cap, while the
+	// resolver's independent image-limit rejection remains exactly ten > nine.
+	m.Durations = []int{5, 6, 7, 8, 9, 10, 11}
+	m.Limits.Image, m.Limits.Total = 9, 9
 	p := representativeVideoProduct(&Price{Amount: "2.50", Currency: "CNY", BillingMode: "per_request"})
 	p.Capabilities.Resolutions = slices.Clone(m.Resolutions)
 	p.Capabilities.AspectRatios = slices.Clone(m.Ratios)

@@ -1,0 +1,41 @@
+{
+  "revision": "media-video-wire-profiles-r1",
+  "wireProfiles": {
+    "seedance": {
+      "duration": "duration",
+      "aspectRatio": "aspect_ratio",
+      "references": "content",
+      "fixed": {}
+    },
+    "grok": {
+      "duration": "duration",
+      "aspectRatio": "aspect_ratio",
+      "image": "images",
+      "fixed": {}
+    },
+    "images": {
+      "duration": "duration",
+      "aspectRatio": "ratio",
+      "image": "images",
+      "video": "video_b64s",
+      "audio": "audio_b64s",
+      "fixed": {
+        "face_direct": false
+      }
+    },
+    "inline_multimedia": {
+      "duration": "duration",
+      "aspectRatio": "ratio",
+      "image": "images",
+      "video": "video_b64s",
+      "audio": "audio_b64s",
+      "fixed": {}
+    },
+    "references": {
+      "duration": "seconds",
+      "aspectRatio": "aspect_ratio",
+      "references": "references",
+      "fixed": {}
+    }
+  }
+}

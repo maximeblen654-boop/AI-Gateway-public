@@ -1,5 +1,4 @@
 import { makeVerifiedAssetReceipt, CompilePlan, CompilePublishedPlan } from '../api/video-request-builder.mjs';
-import contract from '../../backend/internal/videoplan/contract.json' with { type: 'json' };
 import { referenceImageMinSide } from './video-reference-rules.mjs';
 
 // Both fresh and restarted requests use the private store and the same durable
@@ -10,7 +9,7 @@ export function createVideoAssetResolver({ intake, tasks }) {
     const payload = await getCatalog();
     const configured = payload?.offers?.find(o => o.offer_id === offerId && o.model === modelId);
     if (!configured) throw Error('unsupported_model');
-    const model = configured.video_profile ?? contract.models.find(m => m.apiModelId === modelId);
+    const model = configured.video_profile;
     if (!model || model.documentedStatus !== 'enabled') throw Error('unsupported_model');
     const declaredLimits = model.mediaLimits;
     const limits = { image: declaredLimits?.image ?? declaredLimits?.Image,

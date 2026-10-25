@@ -76,7 +76,7 @@ func (h *OpenAIGatewayHandler) StudioVideoQuote(c *gin.Context) {
 		return
 	}
 	// Internal Bridge/BFF response. Browser serializers expose only price/token/spec.
-	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "quote_token": token, "binding": q.Binding, "binding_hash": q.BindingHash})
+	c.JSON(200, gin.H{"contract": service.StudioVideoBindingVersion, "quote_token": token, "binding": q.Binding, "binding_hash": q.BindingHash, "plan_adapter_revision": q.Plan.AdapterRevision})
 }
 
 func (h *OpenAIGatewayHandler) StudioVideoPrepare(c *gin.Context) {

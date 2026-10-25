@@ -231,7 +231,7 @@ func CompilePublishedImagePlanForCount(r ResolvedImageOffer, prompt string, refe
 	fields := dry.Fields
 	fields["prompt"] = prompt
 	if len(references) > 0 {
-		if dry.Protocol == imageplan.Image2ProSyncProtocol {
+		if dry.Protocol == imageplan.Image2ProSyncProtocol || dry.Protocol == imageplan.LaoliSyncProtocol {
 			fields["images"] = append([]string(nil), references...)
 		} else {
 			images := make([]map[string]string, len(references))
@@ -250,6 +250,9 @@ func CompilePublishedImagePlanForCount(r ResolvedImageOffer, prompt string, refe
 	}
 	if dry.Protocol == imageplan.Image2ProSyncProtocol {
 		return imageplan.CompileImage2ProJSON(body, r.Offer.UpstreamModel, dry.Path)
+	}
+	if dry.Protocol == imageplan.LaoliSyncProtocol {
+		return imageplan.CompileLaoliJSON(body, r.Offer.UpstreamModel, dry.Path)
 	}
 	return imageplan.CompileJSON(body, r.Offer.UpstreamModel, dry.Path)
 }

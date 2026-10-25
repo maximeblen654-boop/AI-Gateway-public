@@ -82,7 +82,12 @@ export function createAccountVideoRuntime({rootDir,call,resultStore,legacy,now=D
     const quotePayload={offer_id:offerId,spec,request:JSON.parse(wire.bytes.toString('utf8')),...(preparationId?{preparation_id:preparationId}:{})};
     const reply=await call(session,'POST','quotes',quotePayload);
     const q=reply.payload,b=q?.binding;
-    if(q?.contract!==VIDEO_CONTRACT||!digest(q.quote_token)||!digest(q.binding_hash)||![VIDEO_CONTRACT,'account_video_v2'].includes(b?.version)||b.owner.user_id!==uid||b.owner.api_key_id!==reply.key_ref||b.offer.offer_id!==offerId||b.offer.site_model!==request.model||b.request_hash!==wire.requestHash||b.offer.adapter.revision!==wire.adapterRevision||b.offer.sale_price.currency!=='CNY'||Date.parse(b.expires_at)<=now())fail('Quote binding mismatch');
+    // Offer adapter identity and the compiled frozen plan revision are distinct.
+    // Older Core responses may omit this field for existing generic providers;
+    // the new Laoli contract requires the explicit plan revision from Core.
+    const quotedPlanRevision=q?.plan_adapter_revision??b?.offer?.adapter?.revision;
+    const missingLaoliPlanRevision=wire.adapterRevision==='laoli_video_openai_20261024_r1'&&q?.plan_adapter_revision!==wire.adapterRevision;
+    if(q?.contract!==VIDEO_CONTRACT||!digest(q.quote_token)||!digest(q.binding_hash)||![VIDEO_CONTRACT,'account_video_v2'].includes(b?.version)||b.owner.user_id!==uid||b.owner.api_key_id!==reply.key_ref||b.offer.offer_id!==offerId||b.offer.site_model!==request.model||b.request_hash!==wire.requestHash||quotedPlanRevision!==wire.adapterRevision||missingLaoliPlanRevision||b.offer.sale_price.currency!=='CNY'||Date.parse(b.expires_at)<=now())fail('Quote binding mismatch');
     const op=journal.createIntent({ownerId:uid,clientKey,quoteId:b.quote_id,capabilityRevision:b.offer.adapter.revision,currency:b.offer.sale_price.currency,
       children:[{bodyBytes:wire.bytes,account:{...q,key_ref:reply.key_ref,plan,...(profile?{builder_profile:profile}:{}),...(preparationId?{preparation_id:preparationId}:{})}}]});
     return view(op);

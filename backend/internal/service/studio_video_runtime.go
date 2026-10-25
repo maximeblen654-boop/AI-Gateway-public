@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
 	"github.com/Wei-Shaw/sub2api/internal/videoplan"
 	"github.com/shopspring/decimal"
@@ -75,17 +77,13 @@ func (r *StudioVideoRuntime) Catalog(ctx context.Context, owner StudioImageOwner
 			}
 			if key.Group.ModelAllowlist.Allows(o.SiteModel) {
 				mode := o.ResolvedConfig.WireProfile
-				if mode == "" {
-					if model, ok := videoplan.Lookup(o.SiteModel); ok {
-						mode = model.Mode
-					}
-				}
 				entry := StudioImageCatalogOffer{ProductScope: studioVideoProductScope(o, rows[i].Config.Published.Revision), statusPlatform: studioPassivePlatform(a, key), InputMode: mode, DisplayName: o.UpstreamModel, UpstreamModel: o.UpstreamModel, OfferID: o.OfferID, ProductID: o.ProductID, Model: o.SiteModel, Revision: rows[i].Config.Published.Revision, Spec: o.SpecMatch, Excluded: o.Excluded, Price: o.SalePrice}
 
 				for _, product := range rows[i].Config.Published.Products {
-					if product.ProductID == o.ProductID && product.AdapterConfig.Version == 1 {
+					if product.ProductID == o.ProductID {
 						if profile, ok := mediaworkbench.VideoProfileModel(product); ok {
 							entry.VideoProfile = &profile
+							entry.InputMode = profile.Mode
 						}
 					}
 				}
@@ -487,6 +485,7 @@ func (r *StudioVideoRuntime) Submit(ctx context.Context, owner StudioImageOwner,
 	}
 	dispatchCtx := context.WithValue(ctx, videoIdempotencyContextKey{}, id)
 	dispatchCtx = context.WithValue(dispatchCtx, videoAdapterContextKey{}, q.Binding.Offer.Adapter.Kind)
+	dispatchCtx = context.WithValue(dispatchCtx, videoPlanRevisionContextKey{}, q.Plan.AdapterRevision)
 	data, _, e := r.request(dispatchCtx, a, http.MethodPost, strings.TrimPrefix(q.Plan.Path, "/v1"), body)
 	if e != nil {
 		if b.Offer.Adapter.Kind == "image2pro_video" {
@@ -554,6 +553,9 @@ func (r *StudioVideoRuntime) Snapshot(ctx context.Context, owner StudioImageOwne
 
 func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner, id string) (StudioVideoState, error) {
 	state, e := r.Snapshot(ctx, owner, id)
+	if e == nil && state.Status == "unknown" {
+		return r.recoverLaoliSubmission(ctx, owner, id, state)
+	}
 	if e != nil || state.Status != "accepted" {
 		return state, e
 	}
@@ -578,6 +580,9 @@ func (r *StudioVideoRuntime) Recover(ctx context.Context, owner StudioImageOwner
 	status := gjson.GetBytes(body, "status").String()
 	if status == "" {
 		status = gjson.GetBytes(body, "data.status").String()
+	}
+	if status == "in_progress" && imagecontract.IsLaoliMediaBase(t.Quote.Binding.BaseURL) {
+		status = "processing"
 	}
 	if status != "completed" && status != "failed" && status != "queued" && status != "processing" {
 		status = "unknown"
@@ -668,6 +673,7 @@ func (r *StudioVideoRuntime) Capture(ctx context.Context, owner StudioImageOwner
 
 type videoIdempotencyContextKey struct{}
 type videoAdapterContextKey struct{}
+type videoPlanRevisionContextKey struct{}
 type seedanceRawStatusContextKey struct{}
 
 func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {
@@ -684,18 +690,29 @@ func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method
 	if !strings.HasSuffix(root, "/v1") {
 		root += "/v1"
 	}
+	contentType := "application/json"
+	if revision, _ := ctx.Value(videoPlanRevisionContextKey{}).(string); revision == videoplan.LaoliMediaRevision && method == http.MethodPost {
+		if !imagecontract.IsLaoliMediaBase(a.GetOpenAIBaseURL()) || path != "/videos" {
+			return nil, "", ErrStudioVideoConflict
+		}
+		var err error
+		body, contentType, err = laoliVideoMultipart(body)
+		if err != nil {
+			return nil, "", err
+		}
+	}
 	req, e := http.NewRequestWithContext(WithHTTPUpstreamRedirectsDisabled(ctx), method, root+path, bytes.NewReader(body))
 	if e != nil {
 		return nil, "", e
 	}
 	req.GetBody = nil
-	if id, ok := ctx.Value(videoIdempotencyContextKey{}).(string); ok && method == http.MethodPost {
+	if id, ok := ctx.Value(videoIdempotencyContextKey{}).(string); ok && (method == http.MethodPost || method == http.MethodGet && path == "/video-submissions/current" && imagecontract.IsLaoliMediaBase(a.GetOpenAIBaseURL())) {
 		req.Header.Set("Idempotency-Key", id)
 	}
 	req.Header.Set("Authorization", "Bearer "+a.GetOpenAIProtocolAPIKey())
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 	}
 	proxy := ""
 	if a.Proxy != nil {
@@ -713,14 +730,26 @@ func (r *StudioVideoRuntime) requestHTTP(ctx context.Context, a *Account, method
 	if strings.HasSuffix(path, "/content") {
 		limit = 100_000_000
 	}
-	if strings.HasSuffix(path, "/content") && (resp.StatusCode != 200 || resp.Header.Get("X-Video-Quality") != "original" || (resp.Header.Get("Content-Type") != "video/mp4" && resp.Header.Get("Content-Type") != "video/webm") || resp.Header.Get("Content-Range") != "") {
+	mediaType := resp.Header.Get("Content-Type")
+	if strings.HasSuffix(path, "/content") {
+		if imagecontract.IsLaoliMediaBase(a.GetOpenAIBaseURL()) {
+			var err error
+			mediaType, _, err = mime.ParseMediaType(mediaType)
+			if err != nil {
+				return nil, "", ErrStudioVideoUnknown
+			}
+		} else if resp.Header.Get("X-Video-Quality") != "original" {
+			return nil, "", ErrStudioVideoUnknown
+		}
+	}
+	if strings.HasSuffix(path, "/content") && (resp.StatusCode != 200 || (mediaType != "video/mp4" && mediaType != "video/webm") || resp.Header.Get("Content-Range") != "") {
 		return nil, "", ErrStudioVideoUnknown
 	}
 	data, e := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if e != nil || int64(len(data)) > limit {
 		return nil, "", ErrStudioVideoUnknown
 	}
-	return data, resp.Header.Get("Content-Type"), nil
+	return data, mediaType, nil
 }
 
 func (r *StudioVideoRuntime) requestSeedance(ctx context.Context, a *Account, method, path string, body []byte) ([]byte, string, error) {

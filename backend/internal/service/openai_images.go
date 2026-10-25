@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/imagecontract"
 	"github.com/Wei-Shaw/sub2api/internal/imageplan"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
@@ -223,7 +224,7 @@ func (s *OpenAIGatewayService) ParsePublishedImagePlan(plan imageplan.Plan) (*Op
 		(plan.Path != imageplan.Generations && plan.Path != imageplan.Edits) {
 		return nil, fmt.Errorf("invalid compiled image plan")
 	}
-	if plan.Protocol != "" && plan.Protocol != imageplan.Image2ProSyncProtocol {
+	if plan.Protocol != "" && plan.Protocol != imageplan.Image2ProSyncProtocol && plan.Protocol != imageplan.LaoliSyncProtocol {
 		return nil, fmt.Errorf("unsupported compiled image protocol")
 	}
 	parsed, err := parseOpenAIImagesRequestWithProtocol(plan.Path, plan.Encoding, plan.MaterializeJSON(), plan.Protocol)
@@ -282,7 +283,11 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 	fields := imageplan.JSONFields{Endpoint: req.Endpoint, N: req.N,
 		Image2ProReferences:    req.publishedImageProtocol == imageplan.Image2ProSyncProtocol,
 		LegacyStringReferences: IsDurableImageModel(gjson.GetBytes(body, "model").String()) || isImage2ProModel(gjson.GetBytes(body, "model").String())}
-	if err := imageplan.ParseJSON(body, &fields); err != nil {
+	parse := imageplan.ParseJSON
+	if req.publishedImageProtocol == imageplan.LaoliSyncProtocol {
+		parse = imageplan.ParseLaoliJSON
+	}
+	if err := parse(body, &fields); err != nil {
 		return err
 	}
 	req.Model = fields.Model
@@ -630,6 +635,12 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		compile := imageplan.CompileJSON
 		if parsed.publishedImageProtocol == imageplan.Image2ProSyncProtocol && parsed.publishedUpstreamModel != "" && isStudioNativeExecution(ctx) {
 			compile = imageplan.CompileImage2ProJSON
+		}
+		if parsed.publishedImageProtocol == imageplan.LaoliSyncProtocol {
+			if parsed.publishedUpstreamModel == "" || !isStudioNativeExecution(ctx) || !imagecontract.IsLaoliMediaBase(account.GetOpenAIBaseURL()) {
+				return nil, fmt.Errorf("Laoli image plan is not bound to its original supplier")
+			}
+			compile = imageplan.CompileLaoliJSON
 		}
 		plan, compileErr := compile(body, upstreamModel, parsed.Endpoint)
 		if compileErr != nil {

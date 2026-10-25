@@ -149,7 +149,9 @@ func TestStudioVideoPreflightReusesQuoteWithoutSubmissionOrToken(t *testing.T) {
 	for _, refs := range []int{0, 1} {
 		spec := q.Binding.Spec
 		spec.Images = refs
-		plan, e := videoplan.PreviewWithMedia("3.0", q.Binding.Offer.UpstreamModel, spec.Resolution, spec.AspectRatio, spec.DurationSeconds, refs, 0, 0)
+		model := videoplan.Model{ID: "generic-video", Upstream: q.Binding.Offer.UpstreamModel, Status: "enabled", Mode: "images", Resolutions: []string{spec.Resolution}, Ratios: []string{spec.AspectRatio}, Durations: []int{spec.DurationSeconds}}
+		model.Limits.Image, model.Limits.Total = 1, 1
+		plan, e := videoplan.PreviewWithModel(model, model.Upstream, spec.Resolution, spec.AspectRatio, spec.DurationSeconds, refs, 0, 0)
 		if e != nil {
 			t.Fatal(e)
 		}

@@ -55,8 +55,7 @@ func TestPrepareReferenceAssetsVideoLimitsBeforeUpload(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, _, q, key, accounts, _ := videoRuntimeFixture(t)
-			m, ok := videoplan.Lookup("3.5")
-			require.True(t, ok)
+			m := videoplan.Model{ID: "generic-reference-video", Upstream: "generic-reference-upstream", Status: "enabled", Mode: "images", Resolutions: []string{"720p"}, Ratios: []string{"16:9"}, Durations: []int{30}}
 			ma := studioCostMediaFixture(t, r.Media)
 			ma.a.Config = nil
 			ma.a.ModelMapping = map[string]string{m.ID: m.Upstream}

@@ -223,6 +223,9 @@ func (r *StudioImageRuntime) Dispatch(ctx context.Context, c *gin.Context, q Stu
 	if q.Binding.Offer.ResolvedConfig.Version == 1 && q.Binding.Offer.ResolvedConfig.ModelFamily == "image2pro_json" {
 		protocol = imageplan.Image2ProSyncProtocol
 	}
+	if q.Binding.Offer.ResolvedConfig.Version == 1 && q.Binding.Offer.ResolvedConfig.ModelFamily == "laoli_json" {
+		protocol = imageplan.LaoliSyncProtocol
+	}
 	// Only the protocol bound by the verified quote may select the dedicated
 	// compiler. Current validation rejects old Image2Pro profiles before sending.
 	ctx = context.WithValue(ctx, studioImageProtocolContextKey{}, protocol)
@@ -429,6 +432,12 @@ func (r *StudioImageRuntime) dispatchHTTP(ctx context.Context, outer *gin.Contex
 	if ctx.Value(studioImageProtocolContextKey{}) == imageplan.Image2ProSyncProtocol &&
 		a != nil && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey && imagecontract.IsImage2ProBase(a.GetOpenAIBaseURL()) {
 		compile = imageplan.CompileImage2ProJSON
+	}
+	if ctx.Value(studioImageProtocolContextKey{}) == imageplan.LaoliSyncProtocol {
+		if a == nil || a.Platform != PlatformOpenAI || a.Type != AccountTypeAPIKey || !imagecontract.IsLaoliMediaBase(a.GetOpenAIBaseURL()) {
+			return nil, "", ErrStudioImageConflict
+		}
+		compile = imageplan.CompileLaoliJSON
 	}
 	plan, err := compile(body, gjson.GetBytes(body, "model").String(), endpoint)
 	if err != nil {
