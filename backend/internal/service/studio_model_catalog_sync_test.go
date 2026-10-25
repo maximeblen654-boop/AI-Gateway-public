@@ -690,3 +690,35 @@ func TestStudioModelCatalogSyncDoesNotFilterSupplierOrProtocol(t *testing.T) {
 		}
 	}
 }
+
+func TestStudioCatalogIdentityIgnoresNativeAliasesOnly(t *testing.T) {
+	a := studioCatalogAccount(44)
+	original, err := studioModelCatalogAccountIdentity(a)
+	require.NoError(t, err)
+	a.Credentials["model_mapping"] = map[string]any{"customer": "different-native-api-model"}
+	mapped, err := studioModelCatalogAccountIdentity(a)
+	require.NoError(t, err)
+	require.Equal(t, original, mapped)
+	s, _ := newStudioCatalogSyncTest(t, a)
+	setStudioCatalogSnapshot(t, s, a, s.now())
+	a.Credentials["model_mapping"] = map[string]any{"another": "another-native-api-model"}
+	require.True(t, s.Current(a), "native API aliases cannot revoke Studio catalog freshness")
+	for _, field := range []string{"api_key", "base_url", "other_transport_option"} {
+		previous, exists := a.Credentials[field]
+		a.Credentials[field] = "changed-" + field
+		changed, e := studioModelCatalogAccountIdentity(a)
+		require.NoError(t, e)
+		require.NotEqual(t, original, changed)
+		require.False(t, s.Current(a), "transport/credential changes must still invalidate freshness")
+		if exists {
+			a.Credentials[field] = previous
+		} else {
+			delete(a.Credentials, field)
+		}
+	}
+	proxy := int64(99)
+	a.ProxyID = &proxy
+	changed, err := studioModelCatalogAccountIdentity(a)
+	require.NoError(t, err)
+	require.NotEqual(t, original, changed)
+}

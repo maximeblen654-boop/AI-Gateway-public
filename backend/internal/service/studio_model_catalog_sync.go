@@ -289,13 +289,21 @@ func studioModelCatalogSyncEligible(a *Account) bool {
 }
 
 func studioModelCatalogAccountIdentity(a *Account) (string, error) {
+	// Native API aliases do not change the upstream model-list request or the
+	// exact model IDs frozen in Studio products. Keep transport/auth fields bound.
+	credentials := make(map[string]any, len(a.Credentials))
+	for key, value := range a.Credentials {
+		if key != "model_mapping" {
+			credentials[key] = value
+		}
+	}
 	body, err := json.Marshal(struct {
 		ID          int64
 		Platform    string
 		Type        string
 		Credentials map[string]any
 		ProxyID     *int64
-	}{a.ID, a.Platform, a.Type, a.Credentials, a.ProxyID})
+	}{a.ID, a.Platform, a.Type, credentials, a.ProxyID})
 	if err != nil {
 		return "", err
 	}
