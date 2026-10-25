@@ -70,6 +70,21 @@ it('keeps a live autosave buffer quiet while making the same copy a recovery cho
   expect(api.saveDraft).not.toHaveBeenCalled()
 })
 
+it('keeps normalized live video price buffers quiet without hiding changed input', async () => {
+  const dto = supplier(); dto.media_workbench_v1!.draft.products[0]!.media_type = 'video'
+  api.detail.mockResolvedValue(dto)
+  await start(); vi.useFakeTimers()
+  state.selectModel('image-native-1'); state.selectedProduct.value = state.products.value[0]!.product_id
+  const pending = { resolution: '1K', group: { aspect_ratio: ['1:1'] }, duration: 5, amount: '12.', source_price: null, domain: 'confirmed-spec-domain' }
+  state.updateVideoSaleInputs([pending]); await flushPromises()
+  expect(state.recovery.value?.video_sale_inputs).toHaveLength(1)
+  expect(JSON.stringify(state.recovery.value!.video_sale_inputs)).not.toBe(JSON.stringify(state.videoSaleInputs.value))
+  expect(state.recoveryIsCurrentBuffer.value).toBe(true)
+  state.recovery.value!.video_sale_inputs![0]!.amount = 'different-local-input'
+  expect(state.recoveryIsCurrentBuffer.value).toBe(false)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+})
+
 it('does not hide the live buffer when offline or when the save fails', async () => {
   await start(); vi.useFakeTimers()
   state.selectModel('image-native-1'); state.selectedProduct.value = state.products.value[0]!.product_id

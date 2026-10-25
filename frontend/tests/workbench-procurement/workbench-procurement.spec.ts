@@ -29,6 +29,10 @@ async function editor(page: Page, model = 'image-native-1') {
   await page.getByTestId('wizard-step-4').click()
   await expect(page.getByTestId('pricing-editor')).toBeVisible()
 }
+async function openSalesManagement(page: Page) {
+  const management = page.locator('details.mw-management-menu')
+  if (await management.getAttribute('open') === null) await management.locator('summary').click()
+}
 async function save(page: Page) {
   await page.getByTestId('wizard-step-5').click()
   // Leaving an input/step flushes the autosave queue. Do not add a second
@@ -46,10 +50,12 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     await page.setViewportSize(viewport)
     await open(page, 'complete', mode)
     await expect(page.locator('aside.sidebar')).toHaveCount(1)
+    await openSalesManagement(page)
     await page.screenshot({ path: info.outputPath('account-operations.png'), animations: 'disabled' })
     await info.attach('account-operation-bounds', { body: JSON.stringify(await page.evaluate(() => ({ scrollY, sales: document.querySelector('[data-test=sales]')?.getBoundingClientRect().toJSON(), publication: document.querySelector('[data-test=account-publication]')?.getBoundingClientRect().toJSON(), context: document.querySelector('.mw-account-context')?.getBoundingClientRect().toJSON() }))), contentType: 'application/json' })
     await expect(page.getByTestId('sales')).toBeInViewport()
     await expect(page.getByTestId('publish')).toBeInViewport()
+    await page.getByTestId('model-scope-all').click()
     expect(await page.locator('.mw-model-row').count()).toBeGreaterThan(30)
     await editor(page)
     const panel = page.getByTestId('editor-page')
@@ -62,6 +68,8 @@ for (const viewport of widths) for (const mode of ['light', 'dark']) {
     await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'))})
     await page.getByTestId('price-0').fill('0.123456')
     await expect(page.getByTestId('price-1')).toHaveValue('0.90')
+    await expect(page.getByTestId('autosave-status')).not.toContainText('已确认保存')
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('ai-gateway:media-draft:v1:')).map(key => JSON.parse(localStorage.getItem(key)!)).find(copy => copy.product.product_id === 'procurement-image')?.product.pricing_rules[0]?.sale_price?.amount)).toBe('0.123456')
     expect(await writes(page)).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
     if (viewport.width < 1024) {
@@ -199,6 +207,7 @@ test('definite input rejection retains the draft for correction and an explicit 
 test('sales failure leaves confirmation open; server-confirmed retry changes only Account sales', async ({ page }) => {
   await open(page)
   const before = (await snapshot(page)).media_workbench_v1!
+  await openSalesManagement(page)
   await page.getByTestId('sales').click()
   const dialog = page.getByRole('dialog').filter({ has: page.getByTestId('confirm-sales') })
   await expect(dialog).toContainText('Account #44')
@@ -224,7 +233,10 @@ for (const operation of ['sales', 'publish'] as const) for (const mode of ['time
     if (operation === 'publish') {
       await page.getByTestId('publish').click()
       await page.getByTestId('publish-product-procurement-image').check()
-    } else await page.getByTestId('sales').click()
+    } else {
+      await openSalesManagement(page)
+      await page.getByTestId('sales').click()
+    }
     await page.getByTestId(`confirm-${operation}`).click()
     const dialog = page.getByRole('dialog').filter({ has: page.getByTestId(`confirm-${operation}`) })
     if (mode === 'timeout-committed') {

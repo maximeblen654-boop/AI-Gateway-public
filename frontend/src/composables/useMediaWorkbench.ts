@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
-import { draftFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
+import { draftFingerprint, videoSaleInputsFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
 import type { VideoSaleInput } from '@/components/admin/media/videoSaleGroups'
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -81,7 +81,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     return !!owned && selectedRecoveryKey.value === owned.key && current.copy_id === owned.value.copy_id &&
       productRecoveries.value.length === 1 && productRecoveries.value[0]?.raw === owned.raw &&
       draftFingerprint([current.product]) === draftFingerprint([editing]) &&
-      JSON.stringify(current.video_sale_inputs ?? []) === JSON.stringify(videoSaleInputs.value)
+      videoSaleInputsFingerprint(current.video_sale_inputs ?? []) === videoSaleInputsFingerprint(videoSaleInputs.value)
   })
   const unsubmittedRecoveries = computed(() => recoveryEntries.value.filter(entry => !entry.value.removed_product && entry.value.identity.upstream_model === selectedModel.value &&
     !products.value.some(p => p.product_id === entry.value.product.product_id) && (entry.value.new_product === true ||

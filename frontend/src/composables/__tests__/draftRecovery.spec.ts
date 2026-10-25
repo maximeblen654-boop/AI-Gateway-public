@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { copy, imageProduct, supplier } from '@/components/admin/media/__tests__/fixtures'
-import { draftFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryKey, recoveryCopyKey, listDraftRecoveries, readDraftRecovery, encodeDraftRecovery, recoveryDifferences, type DraftRecovery } from '../draftRecovery'
+import { draftFingerprint, videoSaleInputsFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryKey, recoveryCopyKey, listDraftRecoveries, readDraftRecovery, encodeDraftRecovery, recoveryDifferences, type DraftRecovery } from '../draftRecovery'
 
 const identity = { admin_id: 1, account_id: 77, product_id: imageProduct.product_id, site_model: imageProduct.site_model, upstream_model: imageProduct.upstream_model }
 const fixture = (): DraftRecovery => ({ version: 1, identity, base_record_version: 3, base_draft_revision: 'mwd_a', updated_at: 1, copy_id: '99999999-9999-4999-8999-999999999999', product: copy(imageProduct) })
 
 describe('bounded product recovery and save comparison', () => {
+  it('matches live video inputs to recovered key order while retaining amount, source, domain and row order', () => {
+    const value = fixture(); value.product.media_type = 'video'
+    value.video_sale_inputs = [{ resolution: '720p', group: { aspect_ratio: ['16:9'] }, duration: 5, amount: '12.', source_price: null, domain: 'confirmed-spec-domain' }]
+    const recovered = readDraftRecovery(encodeDraftRecovery(value), identity)!.video_sale_inputs!
+    expect(JSON.stringify(value.video_sale_inputs)).not.toBe(JSON.stringify(recovered))
+    expect(videoSaleInputsFingerprint(value.video_sale_inputs)).toBe(videoSaleInputsFingerprint(recovered))
+    for (const patch of [{ amount: '12.5' }, { domain: 'different-domain' }, { source_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } }]) {
+      expect(videoSaleInputsFingerprint([{ ...recovered[0]!, ...patch }])).not.toBe(videoSaleInputsFingerprint(recovered))
+    }
+    const rows = [recovered[0]!, { ...recovered[0]!, duration: 10 }]
+    expect(videoSaleInputsFingerprint(rows)).not.toBe(videoSaleInputsFingerprint([...rows].reverse()))
+  })
   it('round-trips unfinished video price text with its exact source and strips undocumented buffer fields', () => {
     const value = fixture(); value.product.media_type = 'video'
     value.video_sale_inputs = [{ resolution: '720p', group: { aspect_ratio: ['16:9'] }, duration: 5, amount: '12.', source_price: null, domain: JSON.stringify(value.product.capabilities) }]

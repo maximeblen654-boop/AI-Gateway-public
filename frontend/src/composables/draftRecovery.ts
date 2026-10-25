@@ -118,6 +118,10 @@ function canonical(value: unknown): unknown {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]))
   return value
 }
+/** Compare the same bounded payload that recovery encoding retains, independent of key insertion order. */
+export function videoSaleInputsFingerprint(inputs: VideoSaleInput[]): string {
+  return JSON.stringify(canonical(inputPayload(inputs)))
+}
 /** Compare current editable retail fields and Go's documented empty-list omission.
  * Retired procurement metadata is not editable; prices and identity stay exact. */
 export function draftFingerprint(products: Product[]): string {
