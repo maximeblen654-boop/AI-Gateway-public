@@ -18,7 +18,7 @@ const laoliSyncMaxBodyBytes = 24 << 20 // Local bounded request limit, not a sup
 func CompileLaoliJSON(body []byte, upstream, endpoint string) (Plan, error) {
 	p := Plan{Protocol: LaoliSyncProtocol, Method: "POST", Path: endpoint, Encoding: "application/json", Omitted: []string{}, AssetSlots: []AssetSlot{}}
 	if !imagecontract.IsLaoliSyncImageModel(upstream) {
-		return p, fmt.Errorf("Laoli synchronous model/count contract is not confirmed")
+		return p, fmt.Errorf("laoli synchronous model/count contract is not confirmed")
 	}
 	forwarded, err := RewriteJSON(body, upstream)
 	if err != nil {
@@ -78,11 +78,11 @@ func ParseLaoliJSON(body []byte, req *JSONFields) error {
 	}
 	req.Model = root.Get("model").String()
 	if !imagecontract.IsLaoliSyncImageModel(req.Model) {
-		return fmt.Errorf("Laoli synchronous model/count contract is not confirmed")
+		return fmt.Errorf("laoli synchronous model/count contract is not confirmed")
 	}
 	req.ExplicitModel, req.Prompt, req.N = true, strings.TrimSpace(root.Get("prompt").String()), 1
 	if n := root.Get("n"); n.Exists() && (n.Type != gjson.Number || n.Raw != "1") {
-		return fmt.Errorf("Laoli synchronous execution uses one image per request")
+		return fmt.Errorf("laoli synchronous execution uses one image per request")
 	}
 	if stream := root.Get("stream"); stream.Exists() && stream.Type != gjson.False {
 		return fmt.Errorf("Laoli does not support streaming")
