@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.revision=$SOURCE_REVISION
 RUN apk add --no-cache ffmpeg=8.0.1-r1 ca-certificates
 WORKDIR /app
 COPY --chown=node:node studio/ ./studio/
-COPY --chown=node:node backend/internal/videoplan/contract.json ./backend/internal/videoplan/contract.json
+COPY --chown=node:node backend/internal/videoplan/wire-profiles.json backend/internal/videoplan/laoli-20261024.json ./backend/internal/videoplan/
 COPY --chown=node:node deploy/studio/check-runtime.mjs deploy/studio/entrypoint.sh ./deploy/studio/
 USER 1000:1000
 ENV NODE_ENV=production STUDIO_IMAGE_BFF_PORT=4173
