@@ -1,9 +1,7 @@
 <template>
   <section class="mw-video-sales" data-test="video-sale-editor">
-    <div class="mw-pricing-dimensions" role="group" aria-label="售价分辨率">
-      <template v-if="resolutionPricing">
+    <div v-if="resolutionPricing" class="mw-pricing-dimensions" role="group" aria-label="售价分辨率">
         <button v-for="resolution in product.capabilities.resolutions" :key="resolution" type="button" class="btn" :class="selectedResolution === resolution ? 'btn-primary' : 'btn-secondary'" :aria-pressed="selectedResolution === resolution" :data-test="`sale-resolution-${resolution}`" @click="selectResolution(resolution)">{{ resolution }} <small>{{ progress.get(resolution) }}</small></button>
-      </template>
     </div>
     <p v-if="!resolutionPricing" class="mw-muted" data-test="shared-video-resolution">所有分辨率共用同一售价。</p>
     <div class="mw-video-price-actions" data-test="video-sale-tools">

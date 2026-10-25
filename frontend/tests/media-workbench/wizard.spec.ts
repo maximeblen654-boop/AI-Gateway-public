@@ -215,7 +215,11 @@ test('reference pending autosave blocks leaving until its exact receipt is confi
   await expect(page.getByTestId('autosave-status')).toContainText('保存中，后续输入继续保留')
   await expect(page.getByRole('button', { name: '← 返回模型列表', exact: true }).first()).toBeDisabled()
   await expect(page.getByTestId('editor-page')).toBeVisible()
-  await expect(page.getByTestId('draft-recovery')).toBeVisible()
+  await expect(page.getByTestId('draft-recovery')).toHaveCount(0)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('ai-gateway:media-draft:')).some(key => {
+    const copy = JSON.parse(localStorage.getItem(key)!)
+    return typeof copy.pending_submission?.submission_id === 'string'
+  }))).toBe(true)
   expect(await snapshot(page)).toEqual(initial)
   await capture(page, info, 'reference-pending-leave-protection')
   await releaseDraft(page)

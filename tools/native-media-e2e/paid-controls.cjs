@@ -76,6 +76,7 @@ const p='/admin/media-workbench/paid-controls/'
    await api(accountPath+'/publish','POST',{expected_record_version:config.record_version,expected_draft_revision:config.draft.revision})
    detail=await api(accountPath);assert.deepEqual(detail.media_workbench_v1.published.products[0].capabilities,product.capabilities)
    await page.goto(base+'/admin/media')
+   await page.locator('[data-test="paid-toggle"]').click()
    const card=page.locator('[data-test="paid-image"]')
    report.scale={specs:1870,client_timeout_ms:30000,budget_ms:15000,runs:[]}
    // Actual Vue/Axios clicks against final Core, no Vite or browser API mock.
@@ -152,6 +153,7 @@ const p='/admin/media-workbench/paid-controls/'
    assert.equal((await change('image',true,{fingerprint:'stale'})).status,409)
    assert.equal((await current('image')).effective_enabled,false)
    await page.goto(base+'/admin/media')
+   await page.locator('[data-test="paid-toggle"]').click()
    const imageCard=page.locator('[data-test="paid-image"]')
    await imageCard.getByRole('button',{name:'开启前检查',exact:true}).click();await expect(imageCard).toContainText('检查通过')
    await imageCard.getByRole('button',{name:'开启图片',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible()

@@ -30,6 +30,8 @@ async function openMediaType(page: Page) {
   await expect(mediaType(page)).toBeVisible()
 }
 async function openIndependentProduct(page: Page) {
+  const management = page.getByTestId('product-management')
+  if (await management.getAttribute('open') === null) await management.locator(':scope > summary').click()
   const options = page.getByTestId('product-options')
   if (await options.getAttribute('open') === null) await options.locator('summary').click()
   await page.getByTestId('new-independent-product').click()

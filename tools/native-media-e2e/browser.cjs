@@ -160,6 +160,7 @@ const report = { cases: [], http: [] }
       assertNoMappings(report.first_save_request_products)
       const first = structuredClone(report.product)
       // Configure the second independent product through the same UI.
+      await w('product-management').locator(':scope > summary').click()
       await w('product-options').locator('summary').click()
       await w('new-independent-product').click()
       await w('confirm-add-product').click()
@@ -252,6 +253,7 @@ const report = { cases: [], http: [] }
     await w('publish').click()
     for (const checkbox of await w("publish-products").locator("input[type=checkbox]").all()) await checkbox.check()
     await w('confirm-publish').click()
+    await page.locator('.mw-management-menu > summary').click()
     await expect(w('sales')).toBeEnabled()
     if ((await w('sales').innerText()).includes('开启')) { await w('sales').click(); await w('confirm-sales').click() }
     await expect(w('sales')).toContainText('暂停')

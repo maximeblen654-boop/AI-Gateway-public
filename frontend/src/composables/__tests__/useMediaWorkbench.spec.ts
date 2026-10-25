@@ -28,6 +28,61 @@ async function start(adminId: () => number | undefined = () => 1) {
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); vi.spyOn(console, 'warn').mockImplementation(() => undefined); api.detail.mockResolvedValue(supplier()); api.suppliers.mockResolvedValue([supplier(), supplier(44)]) })
 afterEach(() => { wrapper?.unmount(); vi.useRealTimers(); vi.restoreAllMocks() })
 
+it('pauses both automatic save paths while keeping explicit save available for leaving', async () => {
+  await start(); vi.useFakeTimers(); mockSave(saved())
+  state.products.value[0]!.display_name = '等待离开决定'
+  state.autoSavePaused.value = true
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(await state.flushAutoSave()).toBe(false)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  expect(await state.saveDraft()).toBe(true)
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+})
+
+it('restarts the autosave debounce when a leave decision is cancelled', async () => {
+  await start(); vi.useFakeTimers(); mockSave(saved())
+  state.autoSavePaused.value = true
+  state.products.value[0]!.display_name = '取消离开后继续编辑'
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  state.autoSavePaused.value = false
+  await vi.advanceTimersByTimeAsync(1499)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1); await flushPromises()
+  expect(api.saveDraft).toHaveBeenCalledTimes(1)
+})
+
+it('keeps a live autosave buffer quiet while making the same copy a recovery choice after refresh', async () => {
+  await start(); vi.useFakeTimers()
+  state.selectModel('image-native-1'); state.selectedProduct.value = state.products.value[0]!.product_id
+  state.products.value[0]!.display_name = '当前页面正在编辑'
+  await flushPromises()
+  expect(state.recovery.value).not.toBeNull()
+  expect(state.recoveryIsCurrentBuffer.value).toBe(true)
+  expect(Object.keys(localStorage).filter(key => key.startsWith('ai-gateway:media-draft:'))).toHaveLength(1)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  wrapper.unmount(); await start()
+  state.selectModel('image-native-1'); state.selectedProduct.value = state.products.value[0]!.product_id
+  await flushPromises()
+  expect(state.recovery.value?.product.display_name).toBe('当前页面正在编辑')
+  expect(state.recoveryIsCurrentBuffer.value).toBe(false)
+  expect(state.products.value[0]!.display_name).toBe('画布图片')
+  expect(api.saveDraft).not.toHaveBeenCalled()
+})
+
+it('does not hide the live buffer when offline or when the save fails', async () => {
+  await start(); vi.useFakeTimers()
+  state.selectModel('image-native-1'); state.selectedProduct.value = state.products.value[0]!.product_id
+  state.products.value[0]!.display_name = '必须保留的本地输入'
+  await flushPromises()
+  expect(state.recoveryIsCurrentBuffer.value).toBe(true)
+  state.online.value = false
+  expect(state.recoveryIsCurrentBuffer.value).toBe(false)
+  state.online.value = true; state.saveState.value = 'failed'
+  expect(state.recoveryIsCurrentBuffer.value).toBe(false)
+  expect(state.recovery.value?.product.display_name).toBe('必须保留的本地输入')
+})
+
 it('confirms the new video receipt after legacy procurement fields are removed, retaining sale values', async () => {
   const source = supplier(); const video = source.media_workbench_v1!.draft.products[0]!
   video.media_type = 'video'; video.cost_rules = [{ match: {}, cost: { amount: '1.2', currency: 'CNY', billing_mode: 'per_request' } }]

@@ -1,18 +1,30 @@
 <template>
   <section class="mw-paid-panel mw-panel" aria-label="客户付费生成开关">
-    <header><div><h2>客户生成服务</h2><p class="mw-muted">商品发布、Account 销售和全局付费提交分别管理。开启前检查不生成作品、不扣费。全局开关开放不代表每个商品或每个客户均可生成。</p></div><button class="btn btn-secondary" :disabled="busy" @click="refresh()">刷新状态</button></header>
-    <p class="mw-muted">本开关只控制 Studio 付费提交，不修改独立 API Key 的原生权限、路由或受保护图片任务接口的访问限制。</p>
+    <header>
+      <h2>客户生成服务</h2>
+      <div class="mw-paid-actions">
+        <button type="button" class="btn btn-secondary" :disabled="busy" @click="refresh()">刷新状态</button>
+        <button type="button" class="btn btn-secondary mw-paid-toggle" data-test="paid-toggle" :aria-expanded="controlsExpanded" aria-controls="mw-paid-info mw-paid-image-details mw-paid-video-details" @click="controlsExpanded = !controlsExpanded">{{ controlsExpanded ? '收起服务控制' : '服务控制' }}</button>
+      </div>
+    </header>
+    <div id="mw-paid-info" v-show="controlsExpanded" class="mw-paid-details">
+      <p class="mw-muted">商品发布、Account 销售和全局付费提交分别管理。开启前检查不生成作品、不扣费。全局开关开放不代表每个商品或每个客户均可生成。</p>
+      <p class="mw-muted">本开关只控制 Studio 付费提交，不修改独立 API Key 的原生权限、路由或受保护图片任务接口的访问限制。</p>
+    </div>
     <p v-if="error" role="alert" class="mw-paid-error">{{ error }}</p>
-    <div class="mw-paid-grid">
+    <div class="mw-paid-grid mw-paid-summary">
       <article v-for="kind in kinds" :key="kind" :data-test="`paid-${kind}`" :data-phase="phase(kind)" :aria-busy="pending === `check-${kind}` || pending === `apply-${kind}`">
         <h3>{{ label(kind) }}付费生成</h3>
-        <p class="mw-paid-state" :class="{ 'is-open': knownState(kind) && states[kind]?.effective_enabled }">{{ knownState(kind) ? (states[kind]?.effective_enabled ? '实际已开放' : '实际未开放') : '状态未确认' }}</p>
+        <p class="mw-paid-state" :class="{ 'is-open': knownState(kind) && states[kind]?.effective_enabled }" aria-live="polite">{{ knownState(kind) ? (states[kind]?.effective_enabled ? '实际已开放' : '实际未开放') : '状态未确认' }}</p>
         <p class="mw-muted">{{ !knownState(kind) ? '请求状态未确认' : states[kind]?.requested_enabled ? '已请求开启' : '未请求开启' }} · {{ reason(states[kind]?.reason) }}</p>
-        <p v-if="kind === 'image'" class="mw-muted">文生图与图生图共用此开关，视频独立控制。</p>
-        <div class="mw-paid-actions">
-          <button class="btn btn-secondary" :disabled="busy || suppliersLoading || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
-          <button class="btn btn-primary" :disabled="busy || !canEnable(kind)" @click="confirmKind = kind">开启{{ label(kind) }}</button>
-          <button class="btn btn-secondary" :disabled="busy || !knownState(kind) || !states[kind]?.requested_enabled" @click="apply(kind, false)">关闭提交</button>
+        <p v-if="unconfirmedApply[kind]" class="mw-paid-error" role="status">本次操作结果尚未确认，请核对实际状态后重新检查。</p>
+        <div :id="`mw-paid-${kind}-details`" v-show="controlsExpanded" class="mw-paid-details" role="group" :aria-label="`${label(kind)}服务控制`">
+          <p v-if="kind === 'image'" class="mw-muted">文生图与图生图共用此开关，视频独立控制。</p>
+          <div class="mw-paid-actions">
+            <button type="button" class="btn btn-secondary" :disabled="busy || suppliersLoading || states[kind]?.mode !== 'managed-v1'" @click="check(kind)">{{ pending === `check-${kind}` ? '正在检查…' : '开启前检查' }}</button>
+            <button type="button" class="btn btn-primary" :disabled="busy || !canEnable(kind)" @click="confirmKind = kind">开启{{ label(kind) }}</button>
+            <button type="button" class="btn btn-secondary" :disabled="busy || !knownState(kind) || !states[kind]?.requested_enabled" @click="apply(kind, false)">关闭提交</button>
+          </div>
         </div>
         <p v-if="suppliersLoading" class="mw-muted" role="status">供应商列表仍在读取，请等待完成后执行开启前检查。</p>
         <p v-if="pending === `check-${kind}`" class="mw-muted" role="status">正在执行完整检查，本次最多等待 {{ PAID_CHECK_TIMEOUT_MS / 1000 }} 秒；检查不会开启提交。超时后需要重新检查，不能从状态页恢复未返回的报告。</p>
@@ -45,6 +57,7 @@ const busy = computed(() => pending.value !== '')
 const error = ref('')
 const unconfirmedApply = ref<Partial<Record<PaidMedia, boolean>>>({})
 const confirmKind = ref<PaidMedia | null>(null)
+const controlsExpanded = ref(false)
 const label = (kind: PaidMedia) => kind === 'image' ? '图片' : '视频'
 function phase(kind: PaidMedia) {
   if (pending.value === `check-${kind}`) return 'checking'
@@ -201,11 +214,12 @@ function confirmOpen() { const kind = confirmKind.value; confirmKind.value = nul
 onMounted(() => refresh())
 </script>
 <style scoped>
-.mw-paid-panel { margin: 0 0 24px; padding: 24px; }
-.mw-paid-panel > header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; }
+.mw-paid-panel { margin: 0 0 8px; padding: 12px 16px; }
+.mw-paid-panel > header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+.mw-paid-panel > header .mw-paid-actions { margin: 0; }
 .mw-paid-panel h2,.mw-paid-panel h3 { font-weight:650; margin-bottom:8px; }
-.mw-paid-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
-.mw-paid-grid article { border:1px solid var(--mw-border, #d8dee7); border-radius:12px; padding:20px; min-width:0; }
+.mw-paid-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 24px; }
+.mw-paid-grid article { padding:8px 0; min-width:0; }
 .mw-paid-state { font-size:18px; font-weight:600; margin:12px 0 6px; }
 .mw-paid-state.is-open { color:#15803d; }
 .mw-paid-actions { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }

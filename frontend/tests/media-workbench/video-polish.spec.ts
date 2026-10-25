@@ -88,6 +88,7 @@ for (const outcome of ['business-failure', 'post-error', 'status-error']) {
   test(`paid check ${outcome}: report and transport failures stay distinct, no enable`, async ({ page }, info) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`/tests/media-workbench/index.html?paidCheck=${outcome}`)
+    await page.getByTestId('paid-toggle').click()
     const panel = page.getByTestId('paid-video')
     await panel.getByRole('button', { name: '开启前检查' }).click()
     await expect(panel.getByRole('button', { name: '开启视频', exact: true })).toBeDisabled()

@@ -40,6 +40,7 @@ async function selectAccount(id = 77) {
   await expandSource(id === 77 ? 'images.example.invalid' : 'video.example.invalid')
   await wrapper.get(`[data-test="supplier-${id}"]`).trigger('click')
   await flushPromises()
+  if (wrapper.find('[data-test="model-scope-all"]').exists()) await wrapper.get('[data-test="model-scope-all"]').trigger('click')
 }
 async function openEditor(id = 77, model = 'image-native-1') {
   await mountWorkbench(); await selectAccount(id)
@@ -56,6 +57,38 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 })
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
+
+it('opens customer pricing directly and keeps account filters when returning', async () => {
+  await mountWorkbench()
+  await wrapper.get('[data-test="account-search"]').setValue('#77')
+  await wrapper.get('[data-test="supplier-77"]').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="model-search"]').setValue('image-native')
+  await wrapper.get('[data-test="edit-price-image-native-1"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="wizard-page-4"]').isVisible()).toBe(true)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+  expect((wrapper.get('[data-test="model-search"]').element as HTMLInputElement).value).toBe('image-native')
+  await wrapper.get('.mw-back').trigger('click'); await flushPromises()
+  expect((wrapper.get('[data-test="account-search"]').element as HTMLInputElement).value).toBe('#77')
+})
+
+it('prioritizes configured products and keeps the full directory one explicit choice away', async () => {
+  await mountWorkbench(); await expandSource('images.example.invalid')
+  await wrapper.get('[data-test="supplier-77"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="model-scope-configured"]').attributes('aria-pressed')).toBe('true')
+  expect(wrapper.find('[data-test="model-new-model"]').exists()).toBe(false)
+  await wrapper.get('[data-test="model-scope-pending"]').trigger('click')
+  expect(wrapper.find('[data-test="model-new-model"]').exists()).toBe(true)
+  expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+})
+
+it('uses distinct account filter labels without conflating legacy states', async () => {
+  await mountWorkbench()
+  const options = wrapper.get('[data-test="account-filter"]').findAll('option')
+  expect(new Set(options.map(option => option.text())).size).toBe(options.length)
+  expect(options.find(option => option.attributes('value') === 'NOT_INITIALIZED')?.text()).toBe('尚未配置媒体商品')
+})
 
 it('opens a missing customer sale price at step four and focuses that exact field', async () => {
   const dto = supplier(77, 'FAIL')
@@ -665,7 +698,7 @@ describe('Per-product readiness and explicit publication',()=>{
   await mountWorkbench(); await selectAccount()
   await wrapper.get('[data-test="sales-category-unpublished"]').trigger('click'); await flushPromises()
   expect(wrapper.get('[data-test="sales-category-empty"]').text()).toBe('此分类暂无商品。')
-  await wrapper.get('[data-test="model-page"] > .mw-back').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="model-page"] .mw-back').trigger('click'); await flushPromises()
   await selectAccount(44)
   expect(wrapper.get('[data-test="sales-categories"]').isVisible()).toBe(true)
   expect(wrapper.get('[data-test="sales-category-ready"] .mw-sales-count').text()).toBe('0')
@@ -692,7 +725,8 @@ describe('Per-product readiness and explicit publication',()=>{
   expect(wrapper.get('[data-test="publication-layers"]').text()).toContain('通过（仅草稿）')
   expect(wrapper.get('[data-test="publication-layers"]').text()).toContain('全局付费开关和客户原生权限仍分别生效')
   await row.get('button').trigger('click');await flushPromises()
-  expect(wrapper.get('[data-test="selected-product-readiness"]').text()).toContain('Banana 独立商品')
+  expect(wrapper.get('[data-test="selected-model-summary"]').text()).toContain('Banana 独立商品')
+  expect(wrapper.get('[data-test="selected-product-readiness"]').attributes('data-product-id')).toBe('private-product-b')
   expect(wrapper.get('[data-test="selected-product-readiness"]').text()).toContain('价格无效')
   expect(api.publish).not.toHaveBeenCalled();expect(api.sync).not.toHaveBeenCalled()
  })

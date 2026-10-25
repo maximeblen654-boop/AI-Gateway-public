@@ -11,6 +11,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const selectedModel = ref('')
   const selectedProduct = ref('')
   const pending = ref('')
+  const autoSavePaused = ref(false)
   const loading = ref(false)
   const loadingAccountId = ref<number | null>(null)
   const message = ref('')
@@ -69,6 +70,19 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   })
 
   const productRecoveries = computed(() => recoveryEntries.value.filter(entry => entry.value.product.product_id === selectedProduct.value))
+  // A buffer written by this live editor is normal autosave progress. It still
+  // persists exactly as before; only foreign, failed or divergent copies need
+  // the recovery decision UI. Never infer ownership from editor_id alone.
+  const recoveryIsCurrentBuffer = computed(() => {
+    const current = recovery.value, editing = product.value
+    if (!current || !editing || !online.value || conflict.value || recoveryConflict.value || recoveryWarning.value ||
+        !['unsaved', 'saving', 'saved'].includes(saveState.value)) return false
+    const owned = ownedRecoveries.get(editing.product_id)
+    return !!owned && selectedRecoveryKey.value === owned.key && current.copy_id === owned.value.copy_id &&
+      productRecoveries.value.length === 1 && productRecoveries.value[0]?.raw === owned.raw &&
+      draftFingerprint([current.product]) === draftFingerprint([editing]) &&
+      JSON.stringify(current.video_sale_inputs ?? []) === JSON.stringify(videoSaleInputs.value)
+  })
   const unsubmittedRecoveries = computed(() => recoveryEntries.value.filter(entry => !entry.value.removed_product && entry.value.identity.upstream_model === selectedModel.value &&
     !products.value.some(p => p.product_id === entry.value.product.product_id) && (entry.value.new_product === true ||
       entry.value.base_record_version === (config.value?.record_version ?? 0) && entry.value.base_draft_revision === (config.value?.draft.revision ?? '') &&
@@ -210,17 +224,20 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   }
   function scheduleSave() {
     clearTimeout(autoSaveTimer)
-    if (applying || hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return
+    if (autoSavePaused.value || applying || hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return
     autoSaveTimer = setTimeout(() => { void flushAutoSave() }, 1500)
   }
   async function flushAutoSave() {
     clearTimeout(autoSaveTimer)
-    if (hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return false
+    if (autoSavePaused.value || hasPendingVideoSales.value || !dirty.value || !online.value || conflict.value || deleted.value || saveState.value === 'unconfirmed') return false
     // A step/blur event is not an explicit retry of an unchanged rejected input.
     if (rejectedInput === draftFingerprint(products.value)) return false
     if (pending.value || loading.value) { queuedSave = true; return false }
     return saveDraft()
   }
+  // Leave confirmation owns this pause. Explicit saveDraft remains available
+  // for "save and leave"; cancelling starts a fresh debounce for current input.
+  watch(autoSavePaused, paused => { if (paused) clearTimeout(autoSaveTimer); else scheduleSave() }, { flush: 'sync' })
   watch(products, () => {
     if (applying) return
     if (saveState.value !== 'unconfirmed' && !conflict.value && pending.value !== 'save') saveState.value = 'unsaved'
@@ -815,9 +832,9 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     clearTimeout(autoSaveTimer); apply(detail.value, true); saveState.value = conflict.value ? 'conflict' : config.value?.draft.revision ? 'saved' : 'unsaved'; saveFeedback.value = ''
   }
   onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
-  return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, loadingAccountId, message,
+  return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
     errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
-    recovery, recoveryWarning, recoveryConflict, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
+    recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
     videoSaleInputs, updateVideoSaleInputs,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
     loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }

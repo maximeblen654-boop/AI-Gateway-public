@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { copy, imageProduct } from '@/components/admin/media/__tests__/fixtures'
-import { mediaDiagnosticGuidance, mediaPublicationLabel } from '../mediaAdminPresentation'
+import { mediaDiagnosticGuidance, mediaPublicationLabel, mediaProductPublicationLabel } from '../mediaAdminPresentation'
 import type { Diagnostic } from '@/api/admin/mediaWorkbench'
 
 describe('administrator readable media feedback', () => {
+  it('keeps the current product status independent of other unpublished products and unsaved input', () => {
+    const current = copy(imageProduct), published = copy(current)
+    const other = copy(current); other.product_id = 'other'; other.pricing_rules[0]!.sale_price!.amount = '9'
+    expect(mediaPublicationLabel([current, other], [published])).toContain('仍有配置待发布')
+    expect(mediaProductPublicationLabel(current, current, published)).toBe('当前商品与已发布配置一致')
+    expect(mediaProductPublicationLabel(current, current, undefined)).toBe('当前商品尚未发布')
+    const changed = copy(current); changed.pricing_rules[0]!.sale_price!.amount = '8'
+    expect(mediaProductPublicationLabel(changed, current, published)).toContain('未保存修改')
+    expect(mediaProductPublicationLabel(changed, changed, published)).toContain('草稿有待发布修改')
+    const rebound = copy(current); rebound.upstream_model = 'another-model'
+    expect(mediaProductPublicationLabel(rebound, rebound, published)).toContain('待发布修改')
+  })
   it('shows an actionable explanation without protocol labels or raw failure codes', () => {
     const diagnostic: Diagnostic = { class: 'UI_FIXABLE', severity: 'error', code: 'IMAGE2PRO_VIDEO_METADATA_REQUIRED', scope: 'sample', path: 'adapter_config.image2pro', message: 'opaque_protocol_xyz_v123', action: 'call internal code path' }
     const guidance = mediaDiagnosticGuidance(diagnostic)

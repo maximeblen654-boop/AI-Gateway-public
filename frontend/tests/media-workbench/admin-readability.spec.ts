@@ -12,6 +12,8 @@ for (const width of [1440, 390]) test(`plain-language connection and publication
   await expect(page.getByTestId('published-time')).toContainText('2026-10-20 09:08')
   await expect(page.getByTestId('publication-status')).toContainText('待发布')
   await page.getByTestId('model-image-native-1').click()
+  const saveDetails = page.locator('.mw-save-details')
+  if (await saveDetails.getAttribute('open') === null) await saveDetails.locator('summary').first().click()
   await expect(page.getByTestId('published-time')).toContainText('保存草稿不等于发布')
   await expect(page.locator('.mw-diagnostic')).toContainText('刷新模型列表')
   await expect(page.locator('.mw-diagnostic')).not.toContainText('IMAGE2PRO')

@@ -1,12 +1,101 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import MediaPaidControls from '../MediaPaidControls.vue'
 import { supplier } from './fixtures'
 const api = vi.hoisted(() => ({ status: vi.fn(), check: vi.fn(), apply: vi.fn() }))
 vi.mock('@/api/admin/mediaPaid', async importOriginal => ({ ...await importOriginal<typeof import('@/api/admin/mediaPaid')>(), mediaPaidAPI: api }))
 const state = (media: string, effective = false) => ({ media, mode: 'managed-v1', requested_enabled: effective, effective_enabled: effective, reason: effective ? 'open' : 'closed', revision: 'r1' })
-const create = (suppliers: ReturnType<typeof supplier>[] = []) => mount(MediaPaidControls, { props: { suppliers }, global: { stubs: { ConfirmDialog: { props: ['show'], template: '<div v-if="show"><button data-test="confirm" @click="$emit(\'confirm\')">confirm</button></div>' } } } })
+const unmountFixtures: (() => void)[] = []
+const create = (suppliers: ReturnType<typeof supplier>[] = [], showControls = true) => {
+ // jsdom only invalidates its computed-style cache for connected nodes after v-show changes.
+ const wrapper = mount(MediaPaidControls, { attachTo: document.body, props: { suppliers }, global: { stubs: { ConfirmDialog: { props: ['show'], template: '<div v-if="show"><button data-test="confirm" @click="$emit(\'confirm\')">confirm</button></div>' } } } })
+ unmountFixtures.push(() => wrapper.unmount())
+ if (showControls) void wrapper.get('[data-test="paid-toggle"]').trigger('click')
+ return wrapper
+}
 beforeEach(() => { vi.resetAllMocks(); api.status.mockImplementation(async kind => state(kind)); api.check.mockResolvedValue({ pass: true, fingerprint: 'abc', checks: [] }) })
+afterEach(() => { unmountFixtures.splice(0).forEach(unmount => unmount()) })
+it('starts with actual image and video summaries and accessible service controls without extra API requests', async () => {
+ api.status.mockImplementation(async kind => state(kind, kind === 'image'))
+ const w = create([], false); await flushPromises()
+ const toggle = w.get('[data-test="paid-toggle"]')
+ expect(w.get('.mw-paid-summary').isVisible()).toBe(true)
+ expect(w.get('[data-test="paid-image"]').text()).toContain('实际已开放')
+ expect(w.get('[data-test="paid-video"]').text()).toContain('实际未开放')
+ expect(toggle.text()).toBe('服务控制')
+ expect(toggle.attributes('type')).toBe('button')
+ expect(toggle.attributes('aria-expanded')).toBe('false')
+ const controlledIds = toggle.attributes('aria-controls')!.split(' ')
+ expect(controlledIds).toHaveLength(3)
+ controlledIds.forEach(id => expect(w.get(`#${id}`).isVisible(), id).toBe(false))
+ await toggle.trigger('click')
+ expect(toggle.attributes('aria-expanded')).toBe('true')
+ controlledIds.forEach(id => expect(w.get(`#${id}`).isVisible(), id).toBe(true))
+ expect(api.status).toHaveBeenCalledTimes(2)
+ expect(api.check).not.toHaveBeenCalled()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('keeps unknown and failed status reads explicit while service controls are collapsed', async () => {
+ api.status.mockImplementation(async kind => {
+  if (kind === 'image') throw { status: 503, message: 'DBerror SECRET' }
+  return { ...state(kind), reason: 'future_state' }
+ })
+ const w = create([], false); await flushPromises()
+ const summary = w.get('.mw-paid-summary')
+ expect(w.get('[data-test="paid-toggle"]').attributes('aria-expanded')).toBe('false')
+ expect(w.get('[data-test="paid-image"] .mw-paid-state').text()).toBe('状态未确认')
+ expect(w.get('[data-test="paid-video"] .mw-paid-state').text()).toBe('状态未确认')
+ expect(summary.text()).not.toMatch(/实际已开放|实际未开放/)
+ expect(w.get('[role="alert"]').isVisible()).toBe(true)
+ expect(w.get('[role="alert"]').text()).toContain('图片状态读取失败（GET）')
+ expect(w.text()).not.toMatch(/DBerror|SECRET/)
+ expect(api.check).not.toHaveBeenCalled()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('keeps in-flight progress and the completed report visible across collapse without discarding its authorization', async () => {
+ let finish!: (value: unknown) => void
+ api.check.mockReturnValue(new Promise(resolve => { finish = resolve }))
+ const w = create([], false); await flushPromises()
+ const toggle = w.get('[data-test="paid-toggle"]')
+ await toggle.trigger('click')
+ const video = w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click')
+ await toggle.trigger('click')
+ expect(toggle.attributes('aria-expanded')).toBe('false')
+ expect(video.get('[role="status"]').isVisible()).toBe(true)
+ expect(video.get('[role="status"]').text()).toContain('最多等待 120 秒')
+ finish({ pass: true, fingerprint: 'kept-across-collapse', checks: [{ code: 'native_quote', pass: true }] }); await flushPromises()
+ const report = video.get('.mw-paid-checks')
+ expect(report.isVisible()).toBe(true)
+ expect(report.attributes('aria-live')).toBe('polite')
+ expect(report.text()).toContain('检查通过，开启时服务端将再次核对')
+ expect(report.text()).toContain('原生非付费报价')
+ expect(video.get('.mw-paid-details').isVisible()).toBe(false)
+ expect(video.findAll('button')[1].attributes('disabled')).toBeUndefined()
+ await toggle.trigger('click'); await toggle.trigger('click')
+ expect(video.get('.mw-paid-checks').element).toBe(report.element)
+ expect(api.check).toHaveBeenCalledTimes(1)
+ expect(api.status).toHaveBeenCalledTimes(3)
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
+it('keeps failed preflight details visible after service controls collapse', async () => {
+ api.check.mockResolvedValue({ pass: false, fingerprint: 'failed', checks: [{ code: 'published_offer', pass: false }] })
+ const w = create(); await flushPromises()
+ const video = w.get('[data-test="paid-video"]')
+ await video.findAll('button')[0].trigger('click'); await flushPromises()
+ await w.get('[data-test="paid-toggle"]').trigger('click')
+ expect(video.get('.mw-paid-details').isVisible()).toBe(false)
+ expect(video.get('.mw-paid-checks').isVisible()).toBe(true)
+ expect(video.get('details').attributes('open')).toBeDefined()
+ expect(video.text()).toContain('检查未通过')
+ expect(video.text()).toContain('没有可用的已发布商品')
+ expect(video.findAll('button')[1].attributes('disabled')).toBeDefined()
+ expect(api.apply).not.toHaveBeenCalled()
+})
+
 it('keeps separate state and requires preflight plus explicit confirmation', async () => {
  const w=create();await flushPromises()
  const image=w.find('[data-test="paid-image"]');const enable=image.findAll('button')[1]

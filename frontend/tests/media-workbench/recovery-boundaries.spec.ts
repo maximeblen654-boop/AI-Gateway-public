@@ -68,6 +68,7 @@ for (const width of [1440, 390]) {
   test(`paid preflight ${width}: waits for loaded suppliers, then preserves stable passing report`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
     await page.goto('/tests/media-workbench/index.html?holdSuppliers=1&holdPaidCheck=1')
+    await page.getByTestId('paid-toggle').click()
     const panel = page.getByTestId('paid-video')
     await expect(panel).toContainText('供应商列表仍在读取')
     await expect(panel.getByRole('button', { name: '开启前检查', exact: true })).toBeDisabled()

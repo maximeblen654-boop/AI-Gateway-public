@@ -10,6 +10,8 @@ async function editor(page: Page, kind: string) {
   await page.getByTestId(`model-${kind === 'IMAGE' ? 'gpt-image-2' : 'video-model'}`).click()
 }
 async function options(page: Page) {
+  const management = page.getByTestId('product-management')
+  if (await management.getAttribute('open') === null) await management.locator(':scope > summary').click()
   const panel = page.getByTestId('product-options')
   if (!await panel.getAttribute('open').then(value => value !== null)) await panel.locator('summary').click()
 }
@@ -21,9 +23,9 @@ for (const kind of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
     await editor(page, kind)
     const before = await snapshot(page)
     await expect(page.getByTestId('product-select').locator('option')).toHaveCount(7)
+    await options(page)
     await expect(page.getByTestId('product-enabled')).toBeVisible()
     await expect(page.getByRole('button', { name: /添加.*产品/ })).toHaveCount(0)
-    await options(page)
     await expect(page.getByTestId('remove-blank-product')).toHaveCount(0)
     await expect(page.getByTestId('removal-protection')).toContainText('已发布')
     await page.screenshot({ path: info.outputPath('configured-product.png'), fullPage: true })

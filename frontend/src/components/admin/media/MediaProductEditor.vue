@@ -144,7 +144,7 @@ async function goToStep(step: number) {
   wizardStep.value = step
   await nextTick()
   stepHeading.value?.focus({ preventScroll: true })
-  wizardElement.value?.scrollIntoView?.({ block: 'start' })
+  wizardElement.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
 }
 function showField(path: string, code?: string) {
   // Model identity is displayed outside the specification wizard.
@@ -160,7 +160,7 @@ async function commitPending(): Promise<boolean> {
   if (videoSaleEditor.value && !await videoSaleEditor.value.commitPending()) return false
   return await referenceEditor.value?.commitPending() ?? true
 }
-defineExpose({ showField, invalidateSaleUndo, commitPending })
+defineExpose({ showField, invalidateSaleUndo, commitPending, goToStep })
 const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
 const adapterStatus = computed(() => {
   if (adapterDiagnostics.value.length) return { title: '连接配置需要处理', description: '后台检查发现以下问题。请按提示处理后重新保存并检查；目前不能据此开启销售。' }

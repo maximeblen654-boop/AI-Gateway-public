@@ -2,6 +2,16 @@ import type { Diagnostic, Product } from '@/api/admin/mediaWorkbench'
 import { draftFingerprint } from '@/composables/draftRecovery'
 
 /** Display only: never substitutes for server validation, CAS or publishing. */
+export function mediaProductMatches(product: Product, previous: Product | undefined): boolean {
+  return !!previous && draftFingerprint([product]) === draftFingerprint([previous])
+}
+
+export function mediaProductPublicationLabel(product: Product, saved: Product | undefined, published: Product | undefined): string {
+  if (!mediaProductMatches(product, saved)) return '当前商品有未保存修改，尚未发布'
+  if (!published) return '当前商品尚未发布'
+  return mediaProductMatches(product, published) ? '当前商品与已发布配置一致' : '当前商品草稿有待发布修改'
+}
+
 export function mediaDiagnosticGuidance(diagnostic: Diagnostic): { message: string; action: string } {
   const known: Record<string, [string, string]> = {
     MODEL_NOT_DISCOVERED: ['最近成功获取的上游模型列表中，没有这个商品绑定的型号。', '请返回模型列表核对当前可用型号，再按实际型号配置商品。'],

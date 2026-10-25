@@ -7,10 +7,10 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.goto(`/tests/media-workbench/index.html?scenario=PUBLICATION_LONG_LIST&theme=blue&mode=${mode}`)
     await page.getByTestId('account-search').fill('#77')
     await page.getByTestId('supplier-77').click()
+    await page.getByTestId('model-scope-all').click()
     const publication = page.getByTestId('account-publication')
     await expect(page.locator('.mw-model-row')).toHaveCount(33)
-    await expect(publication).toContainText('后台仅校验并发布勾选项')
-    await expect(publication).toContainText('发布配置不会自动开启销售')
+    await expect(publication).toContainText('发布与销售分别管理')
     await expect(page.getByTestId('publish')).toBeInViewport()
     const card = (await publication.boundingBox())!
     const list = (await page.locator('.mw-model-list').boundingBox())!
@@ -20,8 +20,10 @@ for (const width of [1440, 390]) for (const mode of ['light', 'dark']) {
     await page.getByTestId('publish').click()
     const dialog = page.getByRole('dialog', { name: '发布选中的商品？' })
     await expect(dialog).toContainText('Account #77')
+    await expect(dialog).toContainText('发布配置不会自动开启销售')
     await expect(page.getByTestId('confirm-publish')).toBeDisabled()
     await page.getByTestId('publish-product-canvas-1').check()
+    await expect(page.getByTestId('publish-scope')).toContainText('仅发布本次勾选的 1 份商品，后台只校验这些商品')
     await expect(page.getByTestId('confirm-publish')).toBeEnabled()
     await expect(page.getByTestId('confirm-publish')).toBeVisible()
     await page.keyboard.press('Escape')

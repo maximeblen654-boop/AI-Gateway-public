@@ -4,12 +4,14 @@
       <header class="mw-heading">
         <div>
           <h1>媒体工作台</h1>
-          <p v-if="step !== 'editor'" class="mw-muted">选择现有账号，为模型配置可售规格和价格。</p>
+          <p v-if="step === 'suppliers'" class="mw-muted">管理图片与视频商品的规格、售价和发布状态。</p>
         </div>
         <nav class="mw-steps" aria-label="工作台导航">
-          <span :class="{ 'mw-step-current': step === 'suppliers' }">来源与账号</span>
-          <span :class="{ 'mw-step-current': step === 'models' }">选择模型</span>
-          <span :class="{ 'mw-step-current': step === 'editor' }">配置商品</span>
+          <button type="button" data-media-navigation :aria-current="step === 'suppliers' ? 'page' : undefined" :disabled="busy || step === 'suppliers'" @click="navigate(returnToSuppliers)">来源与账号</button>
+          <span aria-hidden="true">›</span>
+          <button type="button" data-media-navigation :aria-current="step === 'models' ? 'page' : undefined" :disabled="busy || !detail || step === 'models'" @click="navigate(backToModels)">选择模型</button>
+          <span aria-hidden="true">›</span>
+          <span :aria-current="step === 'editor' ? 'page' : undefined">配置商品</span>
         </nav>
       </header>
 
@@ -17,7 +19,7 @@
       <div v-if="step === 'suppliers'" class="mw-statistics">
         <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
         <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
-        <div><span>待配置模型</span><strong>{{ suppliers.reduce((n, s) => n + s.pending_count, 0) }}</strong></div>
+        <div><span>目录待配置</span><strong>{{ suppliers.reduce((n, s) => n + s.pending_count, 0) }}</strong></div>
         <div><span>已发布模型</span><strong>{{ publishedCount }}</strong></div>
       </div>
 
@@ -34,7 +36,7 @@
       <main class="mw-flow">
         <section v-if="step === 'suppliers'" class="mw-page mw-panel" aria-label="来源与账号导航" data-test="account-page">
           <div class="mw-page-heading">
-            <div><p class="mw-eyebrow">选择 Account</p><h2>先选择来源与 Account</h2><p class="mw-muted">来源域名默认折叠。搜索支持数字 Account ID、名称、域名和平台。</p></div>
+            <div><h2>来源与账号</h2></div>
             <span class="mw-badge">{{ visibleAccountCount }} / {{ suppliers.length }} 个账号</span>
           </div>
           <div class="mw-toolbar">
@@ -61,36 +63,55 @@
         </section>
 
         <section v-else-if="step === 'models'" ref="modelPage" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
-          <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(() => { step = 'suppliers' })">← 返回来源与账号</button>
           <div v-if="detail" class="mw-page-heading mw-account-context">
-            <div><p class="mw-eyebrow">模型管理 · Account #{{ detail.id }}</p><h2>{{ detail.name }}</h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }}</p><p class="mw-muted">媒体类型：{{ mediaTypeLabel }}</p><p class="mw-muted">{{ effectiveLabel(detail.effective_state) }}</p></div>
-            <div class="mw-selection-feedback" data-test="selected-account-summary"><strong>已选择账号</strong><span>#{{ detail.id }} · {{ detail.name }}</span></div>
+            <div data-test="selected-account-summary"><h2>{{ detail.name }} <span class="mw-context-id">#{{ detail.id }}</span></h2><p class="mw-muted mw-account-host">{{ sourceHost(detail) || '未识别来源' }} · {{ detail.platform || '未知平台' }} · {{ mediaTypeLabel }}</p></div>
+            <span class="mw-badge">{{ effectiveLabel(detail.effective_state) }}</span>
+            <button type="button" data-media-navigation class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(returnToSuppliers)">← 返回来源与账号</button>
           </div>
           <section class="mw-account-publication" aria-label="Account 发布与销售操作" data-test="account-publication">
             <div class="mw-publication-description">
-              <h3>Account #{{ detail?.id }} · 工作台操作</h3>
-              <p class="mw-muted">发布仅影响勾选商品；销售开关影响此 Account 的全部已发布工作台商品。</p>
-              <p class="mw-publication-note">发布配置不会自动开启销售</p>
-              <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
-              <p class="mw-muted" data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}</p>
+              <p data-test="publication-status">{{ publicationLabel }}</p>
+              <p class="mw-muted">Account 销售：{{ salesLabel }} · 发布与销售分别管理</p>
+              <p class="mw-muted mw-publication-times"><span data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</span> · <span data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}</span></p>
+              <p class="mw-muted" data-test="global-paid-status">图片提交：{{ paidStatusLabel('image') }} · 视频提交：{{ paidStatusLabel('video') }}</p>
             </div>
             <div class="mw-account-actions">
               <button type="button" class="btn btn-primary mw-publish-action" data-test="publish" :disabled="!canPublish" @click="openPublish">{{ pending === 'publish' ? '发布中…' : '发布配置' }}</button>
-              <div class="mw-account-sales" data-test="sales-state"><strong>{{ salesLabel }}</strong><button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="managementDisabled || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button><span v-else class="mw-badge">首次保存后可开启</span></div>
+              <details class="mw-management-menu"><summary>账号销售管理</summary><div class="mw-account-sales" data-test="sales-state"><strong>{{ salesLabel }}</strong><button v-if="config" class="btn" :class="config.sales.enabled ? 'mw-danger' : 'btn-secondary'" data-test="sales" :disabled="managementDisabled || (!config.sales.enabled && !canResume)" @click="salesDialog = true">{{ config.sales.enabled ? '暂停销售' : '开启销售' }}</button><span v-else class="mw-badge">首次保存后可开启</span></div></details>
             </div>
           </section>
           <p v-if="config && !config.sales.enabled && !canResume" class="mw-muted">{{ resumeReason }}</p>
           <p v-if="salesFeedback" class="mw-banner" role="status" data-test="account-sales-feedback">{{ salesFeedback }}</p>
           <p v-if="publicationFeedback" class="mw-banner" role="status" data-test="publication-feedback">{{ publicationFeedback }}</p>
-          <section class="mw-product-management" aria-label="配置与销售状态" data-test="publication-layers">
-            <strong>分别核对配置与销售状态</strong>
+
+
+
+
+          <div class="mw-model-filters"><label class="mw-field">搜索模型<input v-model="search" class="input" placeholder="模型名称或精确 ID" type="search" data-test="model-search" /></label>
+          <label class="mw-field">模型状态<select v-model="filter" class="input" data-test="model-filter"><option value="">全部状态</option><option v-for="state in modelStates" :key="state" :value="state">{{ modelLabel(state) }}</option></select></label></div>
+          <div class="mw-model-scopes" role="group" aria-label="模型配置范围"><button v-for="scope in modelScopes" :key="scope.value" type="button" :aria-pressed="modelScope === scope.value" :data-test="`model-scope-${scope.value}`" @click="modelScope = scope.value">{{ scope.label }} · {{ scope.count }}</button></div>
+          <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-models" /><span>显示已归档模型</span></label>
+          <p v-if="!filteredModels.length" class="mw-muted">当前范围没有匹配模型。可切换“全部模型”、清除筛选，或同步上游目录。</p>
+          <p v-if="modelScope === 'pending'" class="mw-muted">这些是上游目录中的未配置型号，是否支持媒体生成仍需按实际能力核对。</p>
+          <div class="mw-model-list">
+            <article v-for="row in filteredModels" :key="row.model_id" class="mw-model-card"><button class="mw-model-row" :class="{ 'mw-selected': selectedModel === row.model_id }" :aria-pressed="selectedModel === row.model_id" :disabled="busy" :data-test="`model-${row.model_id}`" @click="navigate(() => openEditor(row.model_id))">
+              <span class="mw-model-row-main"><strong>{{ row.model_id }}</strong><span class="mw-badge" :data-state="row.state">● {{ modelLabel(row.state) }}</span></span>
+              <span v-if="rowProduct(row.model_id)">{{ productDisplayTitle(rowProduct(row.model_id)!) }} · {{ rowProduct(row.model_id)?.media_type === 'video' ? '视频' : '图片' }}</span>
+              <small v-if="rowProduct(row.model_id)">{{ (rowProduct(row.model_id)?.capabilities.resolutions ?? []).join(' / ') }} · {{ priceLabel(rowProduct(row.model_id)) }}</small>
+              <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
+            </button><button v-if="rowProduct(row.model_id)" type="button" class="mw-link mw-price-shortcut" :disabled="busy" :data-test="`edit-price-${row.model_id}`" :aria-label="`编辑 ${productDisplayTitle(rowProduct(row.model_id)!)} 的售价`" @click="navigate(() => openEditor(row.model_id, true))">编辑售价 →</button></article>
+          </div>
+          <details class="mw-product-management mw-status-details" aria-label="配置与销售状态" data-test="publication-layers">
+            <summary>配置与销售状态 · {{ saveStateLabel }}</summary>
             <p>草稿：{{ config ? saveStateLabel : '尚未建立' }} · 草稿校验：{{ draftValidationLabel }}</p>
-            <p data-test="publication-status">发布状态：{{ publicationLabel }} · Account 销售：{{ config?.sales.enabled ? '已开启' : '已关闭' }}</p>
-            <p data-test="global-paid-status">图片生成服务：{{ paidStatusLabel('image') }} · 视频生成服务：{{ paidStatusLabel('video') }}</p>
             <p v-if="config?.sales.enabled && paidStates.video?.mode === 'managed-v1' && !paidStates.video.effective_enabled" class="mw-muted" data-test="video-service-closed">销售已开启，但视频生成服务尚未开放。</p>
-            <p class="mw-muted">草稿校验通过只说明保存的草稿通过检查。商品的已发布配置、Account 销售、全局付费开关和客户原生权限仍分别生效；全局开关请返回来源与账号查看。</p>
+            <p class="mw-muted">草稿校验、商品发布、Account 销售、全局付费开关和客户原生权限仍分别生效。全局开关可在来源与账号页管理。</p>
             <p class="mw-muted" data-test="native-api-boundary">商品保存、发布、上下架与归档只管理 Studio 配置和销售状态，不修改独立 API Key 的原生权限或路由；受保护的图片任务接口仍保留原有访问限制。</p>
-          </section>
+          </details>
+          <div v-if="detail" class="mw-model-toolbar">
+            <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
+            <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
+          </div>
           <section class="mw-product-management mw-sales-browser" aria-label="逐商品销售条件" data-test="product-readiness-list">
             <h3>逐商品销售条件</h3>
             <p class="mw-muted">以下结论来自已保存的服务端状态，按商品分别核对；就绪不代表全局付费开关或每个客户的原生权限已经通过。</p>
@@ -122,50 +143,17 @@
           </section>
           <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ sourceHost(detail) === 'api.image2pro.top' ? '每5分钟自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
           <MediaCatalogNotice v-if="detail && sourceHost(detail) === 'api.image2pro.top'" :detail="detail" />
-          <div v-if="detail" class="mw-model-toolbar">
-            <button class="btn btn-secondary" data-test="sync" :disabled="busy || deleted || conflict" @click="sync">{{ pending === 'sync' ? '同步中…' : '同步模型目录' }}</button>
-            <router-link :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
-          </div>
-          <div class="mw-model-filters"><label class="mw-field">搜索模型<input v-model="search" class="input" placeholder="模型名称或精确 ID" type="search" data-test="model-search" /></label>
-          <label class="mw-field">模型状态<select v-model="filter" class="input" data-test="model-filter"><option value="">全部状态</option><option v-for="state in modelStates" :key="state" :value="state">{{ modelLabel(state) }}</option></select></label></div>
-          <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-models" /><span>显示已归档模型</span></label>
-          <p v-if="!filteredModels.length" class="mw-muted">没有匹配模型。可同步上游模型目录。</p>
-          <div class="mw-model-list">
-            <button v-for="row in filteredModels" :key="row.model_id" class="mw-model-row" :class="{ 'mw-selected': selectedModel === row.model_id }" :aria-pressed="selectedModel === row.model_id" :disabled="busy" :data-test="`model-${row.model_id}`" @click="navigate(() => openEditor(row.model_id))">
-              <span class="mw-model-row-main"><strong>{{ row.model_id }}</strong><span class="mw-badge" :data-state="row.state">● {{ modelLabel(row.state) }}</span></span>
-              <span v-if="rowProduct(row.model_id)">{{ productDisplayTitle(rowProduct(row.model_id)!) }} · {{ rowProduct(row.model_id)?.media_type === 'video' ? '视频' : '图片' }}</span>
-              <small v-if="rowProduct(row.model_id)">{{ (rowProduct(row.model_id)?.capabilities.resolutions ?? []).join(' / ') }} · {{ priceLabel(rowProduct(row.model_id)) }}</small>
-              <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
-            </button>
-          </div>
-
 
             <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
 
         <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page" @focusout="flushOnFocusOut" @click.capture="flushStep">
-          <button type="button" class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
           <div v-if="detail" class="mw-page-heading mw-account-context mw-product-context">
-            <div><p class="mw-eyebrow">配置商品 · {{ product?.media_type === 'video' ? '视频' : '图片' }}</p><h2>{{ product?.display_name || selectedModel || '选择商品类型' }}</h2><p class="mw-muted">Account #{{ detail.id }} · {{ detail.name }}</p></div>
-            <div class="mw-selection-feedback" data-test="selected-model-summary" data-field="upstream_model" tabindex="-1" role="group" aria-label="当前上游模型"><strong>当前上游模型</strong><span data-test="upstream-model-name">{{ selectedModel }}</span></div>
+            <div data-test="selected-model-summary" data-field="upstream_model" tabindex="-1" role="group" aria-label="当前上游模型"><h2>{{ product?.display_name || selectedModel || '选择商品类型' }}</h2><p class="mw-muted">Account #{{ detail.id }} · {{ detail.name }}<span v-if="product?.display_name !== selectedModel"> · 上游模型：<span data-test="upstream-model-name">{{ selectedModel }}</span></span><span v-else class="sr-only" data-test="upstream-model-name">{{ selectedModel }}</span></p></div>
+            <button type="button" data-media-navigation class="mw-back btn btn-secondary" :disabled="busy" @click="navigate(backToModels)">← 返回模型列表</button>
           </div>
           <template v-if="detail && selectedModel">
-            <section class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
-              <div class="mw-section-heading"><strong>模型管理</strong><span class="mw-badge">{{ modelLabel(selectedRow?.state ?? '') }}</span></div>
-              <p class="mw-muted">模型操作覆盖 {{ selectedModel }} 下的全部 {{ lifecycleModelProducts.length }} 份商品（包含已归档商品）。</p>
-              <div class="mw-product-type-actions">
-                <template v-if="lifecycleModelProducts.length">
-                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'active')" class="btn btn-secondary" data-test="model-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { model_id: selectedModel })">下架模型全部商品</button>
-                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'unlisted')" class="btn btn-secondary" data-test="model-relist" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { model_id: selectedModel })">重新上架模型商品</button>
-                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) !== 'archived')" class="btn btn-secondary" data-test="model-archive" :disabled="lifecycleDisabled || modelArchiveBlocked" @click="requestLifecycle('archive', { model_id: selectedModel })">归档模型全部商品</button>
-                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'archived')" class="btn btn-secondary" data-test="model-restore" :disabled="lifecycleDisabled" @click="requestLifecycle('restore', { model_id: selectedModel })">恢复模型已归档商品</button>
-                </template>
-                <button v-else class="btn btn-secondary" data-test="model-hide-restore" :disabled="lifecycleDisabled" @click="requestLifecycle(isModelHidden ? 'restore' : 'hide', { model_id: selectedModel })">{{ isModelHidden ? '恢复显示模型' : '隐藏未配置模型' }}</button>
-              </div>
-              <p v-if="modelArchiveBlocked" class="mw-muted">已发布商品需先下架，再归档。</p>
-              <p v-if="dirty" class="mw-muted" data-test="lifecycle-dirty">请先保存或放弃未保存修改，再管理上下架与归档。</p>
-              <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-products" :disabled="busy || dirty" /><span>显示已归档商品</span></label>
-            </section>
+
             <p v-if="selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING'" class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
             <section v-if="unsubmittedRecoveries.length" class="mw-banner" data-test="unsubmitted-recoveries" aria-label="尚未提交的新商品恢复副本">
               <h3>发现尚未提交服务器的新商品</h3>
@@ -189,16 +177,63 @@
                 </div>
               </div>
             </section>
-            <section v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
-              <div class="mw-section-heading"><strong>正在编辑的商品</strong><span class="mw-badge" data-test="product-status">{{ lifecycleLabel(product) }} · {{ product.enabled ? '草稿：已启用' : '草稿：已停用' }}</span></div>
-              <div v-if="productStateById.get(product.product_id)" data-test="selected-product-readiness">
-                <p><strong>Account #{{ detail.id }} · {{ availabilityName(productStateById.get(product.product_id)!) }}</strong> · {{ availabilityLabel(productStateById.get(product.product_id)!) }}</p>
-                <p>{{ productStateById.get(product.product_id)?.reason }}</p><p class="mw-muted">{{ productStateById.get(product.product_id)?.action }}</p>
-                <p class="mw-muted">这是已保存的商品状态；当前草稿编辑不会自动发布。全局付费开关与客户原生权限独立核验。</p>
+
+            <section v-if="removedProducts.length" class="mw-removal-notice" aria-label="待保存的草稿移除" data-test="pending-removals">
+              <strong>待移除 {{ removedProducts.length }} 份空白草稿，保存后生效</strong>
+              <ul><li v-for="removed in removedProducts" :key="removed.product_id"><span>{{ productDisplayTitle(removed) }} · {{ removed.media_type === 'video' ? '视频' : '图片' }}</span><button type="button" class="btn btn-secondary" :disabled="managementDisabled" :data-test="`undo-removal-${removed.product_id}`" @click="undoProductRemoval(removed.product_id)">撤销移除</button></li></ul>
+              <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
+              <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveEditorDraft">保存草稿与移除操作</button>
+            </section>
+            <section v-if="product || recovery" aria-live="polite" class="mw-save-draft" data-test="autosave-status">
+              <p>{{ recovery && !recoveryIsCurrentBuffer && !dirty && saveState === 'saved' ? '服务器草稿已确认；仍有本地内容待处理' : saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
+              <p data-test="selected-product-publication">{{ currentProductPublicationLabel }}</p>
+              <p v-if="otherPendingProducts" class="mw-muted" data-test="other-pending-products">账号另有 {{ otherPendingProducts }} 份商品草稿待发布</p>
+              <details class="mw-save-details" :open="!!recovery && !recoveryIsCurrentBuffer || !!recoveryWarning || ['failed', 'unconfirmed', 'conflict'].includes(saveState)"><summary>保存详情与恢复</summary>
+              <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
+              <p class="mw-muted" data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}。保存草稿不等于发布。</p>
+              <p data-test="publication-status">账号：{{ publicationLabel }}</p>
+              <p v-if="recoveryWarning" role="alert" class="mw-field-error" data-test="recovery-warning">{{ recoveryWarning }}</p>
+              <div v-if="recovery && !recoveryIsCurrentBuffer" class="mw-banner" data-test="draft-recovery">
+                <label v-if="productRecoveries.length > 1">此商品有 {{ productRecoveries.length }} 份独立恢复副本<select class="input" data-test="recovery-copy-select" :value="selectedRecoveryKey" :disabled="busy" @change="chooseProductRecovery(($event.target as HTMLSelectElement).value)"><option v-for="entry in productRecoveries" :key="entry.key" :value="entry.key">{{ new Date(entry.value.updated_at).toLocaleString() }} · {{ entry.value.product.display_name }} · 页面 {{ entry.value.editor_id?.slice(-8) || '旧副本' }}</option></select></label>
+                <strong>发现尚未与服务器完全一致的本地修改</strong>
+                <p>这份本地恢复副本暂时保留，以免修改丢失。{{ recoveryConflict ? '服务器内容已发生变化，需要核对差异。' : recovery.pending_submission ? '上一次保存结果仍待核对，确认前不会自动重发。' : recoveryDiff.length ? '本地修改尚未同步。' : '内容目前一致，但尚无足够的保存确认，请核对后处理。' }}</p>
+                <p class="mw-muted">恢复只影响草稿；未应用的售价输入仍需确认，不会正式发布。</p>
+                <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看哪些内容不同（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.label }}</strong><p style="overflow-wrap:anywhere;max-width:100%">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere;max-width:100%">服务器：{{ diff.server }}</p></li></ul></details>
+                <label v-if="recoveryConflict"><input v-model="acceptRecoveryConflict" type="checkbox" data-test="confirm-recovery-conflict" />我已核对差异，恢复本地此商品并以服务器最新版本为基准</label>
+                <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreWithUndoProtection()">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
+                <button type="button" class="btn btn-secondary" data-test="discard-recovery" :disabled="busy" @click="discardRecoveryDialog = true">丢弃恢复副本</button>
+              </div>
+              <button type="button" class="btn btn-secondary" data-test="check-server" :disabled="busy" @click="checkServer">核对服务器状态</button>
+              <button v-if="canRetryUnconfirmedSave" type="button" class="btn btn-secondary" data-test="retry-unconfirmed-save" @click="retryUnconfirmedSave">重新核对并保存当前草稿</button>
+              <button type="button" class="btn btn-secondary" data-test="editor-discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
+              </details>
+            </section>
+            <div v-if="product" class="mw-current-product">
+              <div v-if="productStateById.get(product.product_id)" data-test="selected-product-readiness" :data-product-id="product.product_id">
+                <strong>{{ availabilityLabel(productStateById.get(product.product_id)!) }}</strong>
+                <details><summary>查看销售条件</summary><p>{{ productStateById.get(product.product_id)?.reason }}</p><p class="mw-muted">{{ productStateById.get(product.product_id)?.action }}</p>
+                <p class="mw-muted">这是已保存的商品状态；当前草稿编辑不会自动发布。全局付费开关与客户原生权限独立核验。</p></details>
               </div>
               <label v-if="modelProducts.length > 1" class="mw-field">切换商品（此模型共 {{ modelProducts.length }} 份）<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label>
-              <p v-else class="mw-muted">{{ productDisplayTitle(product) }} · {{ product.media_type === 'video' ? '视频' : '图片' }}</p>
               <p v-if="modelProducts.length > 1" class="mw-product-description mw-muted" data-test="selected-product-description">当前：{{ productOptionLabel(product, modelProducts.indexOf(product)) }}</p>
+            </div>
+            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+              <template #review>
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+              </template>
+              <template #save>
+                <div class="mw-save-draft">
+                  <p class="mw-muted">停止输入约 1.5 秒后自动保存本 Account 草稿（共 {{ products.length }} 个商品）。本地恢复副本即时更新；服务器确认对应版本后才显示已确认保存。不会发布、启售或发起生成。</p>
+                  <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
+                  <button class="btn btn-primary" data-test="save" :disabled="managementDisabled || !products.length" @click="saveEditorDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
+                  <button v-if="!dirty && config" type="button" data-media-navigation class="btn btn-secondary mw-return-models" data-test="return-models" @click="navigate(backToModels)">← 返回模型列表</button>
+                  <p v-if="saveFeedback || saveState === 'saved'" class="mw-banner" role="status" data-test="save-feedback">{{ saveFeedback || '草稿已确认保存' }}</p>
+                  <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果待核对，后续编辑仍保留本地副本；核对确认前暂停自动写入。</p>
+                </div>
+              </template>
+            </MediaProductEditor>
+            <details v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
+              <summary data-test="product-status">当前商品管理 · {{ lifecycleLabel(product) }} · {{ product.enabled ? '草稿已启用' : '草稿已停用' }}</summary>
               <div class="mw-product-type-actions" data-test="product-lifecycle">
                 <button v-if="lifecycleState(product) === 'active'" class="btn btn-secondary" data-test="product-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { product_id: product.product_id })">下架此商品</button>
                 <button v-if="lifecycleState(product) === 'unlisted'" class="btn btn-secondary" data-test="product-relist" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { product_id: product.product_id })">重新上架此商品</button>
@@ -214,48 +249,23 @@
                 <div class="mw-product-type-actions"><button type="button" class="btn btn-secondary" data-test="new-independent-product" :disabled="managementDisabled || !selectedModelCurrent" @click="newProductType = product.media_type">另建独立销售商品</button><button v-if="!addedProductIds.includes(product.product_id) && !removalReason(product)" type="button" class="btn mw-danger" data-test="remove-blank-product" :disabled="managementDisabled" @click="removeProductId = product.product_id">移除空白草稿</button></div>
                 <p v-if="!addedProductIds.includes(product.product_id) && removalReason(product)" class="mw-muted" data-test="removal-protection">{{ removalReason(product) }}</p>
               </details>
-            </section>
-            <section v-if="removedProducts.length" class="mw-removal-notice" aria-label="待保存的草稿移除" data-test="pending-removals">
-              <strong>待移除 {{ removedProducts.length }} 份空白草稿，保存后生效</strong>
-              <ul><li v-for="removed in removedProducts" :key="removed.product_id"><span>{{ productDisplayTitle(removed) }} · {{ removed.media_type === 'video' ? '视频' : '图片' }}</span><button type="button" class="btn btn-secondary" :disabled="managementDisabled" :data-test="`undo-removal-${removed.product_id}`" @click="undoProductRemoval(removed.product_id)">撤销移除</button></li></ul>
-              <p class="mw-muted">保留原草稿副本；已发布配置、历史任务、原片和结算不变。本次其他未保存修改也会一起保存。</p>
-              <button type="button" class="btn btn-primary" data-test="save-removals" :disabled="managementDisabled" @click="saveEditorDraft">保存草稿与移除操作</button>
-            </section>
-            <section v-if="product || recovery" aria-live="polite" class="mw-save-draft" data-test="autosave-status">
-              <p>{{ recovery && !dirty && saveState === 'saved' ? '服务器草稿已确认；仍有本地内容待处理' : saveStateLabel }}<span v-if="!online"> · 当前离线，联网后核对版本再同步</span></p>
-              <p class="mw-muted" data-test="draft-save-time">草稿最近保存：{{ draftLastSavedLabel }}</p>
-              <p class="mw-muted" data-test="published-time">本账号最近发布：{{ lastPublishedLabel }}。保存草稿不等于发布。</p>
-              <p data-test="publication-status">{{ publicationLabel }}</p>
-              <p v-if="recoveryWarning" role="alert" class="mw-field-error" data-test="recovery-warning">{{ recoveryWarning }}</p>
-              <div v-if="recovery" class="mw-banner" data-test="draft-recovery">
-                <label v-if="productRecoveries.length > 1">此商品有 {{ productRecoveries.length }} 份独立恢复副本<select class="input" data-test="recovery-copy-select" :value="selectedRecoveryKey" :disabled="busy" @change="chooseProductRecovery(($event.target as HTMLSelectElement).value)"><option v-for="entry in productRecoveries" :key="entry.key" :value="entry.key">{{ new Date(entry.value.updated_at).toLocaleString() }} · {{ entry.value.product.display_name }} · 页面 {{ entry.value.editor_id?.slice(-8) || '旧副本' }}</option></select></label>
-                <strong>发现尚未与服务器完全一致的本地修改</strong>
-                <p>这份本地恢复副本暂时保留，以免修改丢失。{{ recoveryConflict ? '服务器内容已发生变化，需要核对差异。' : recovery.pending_submission ? '上一次保存结果仍待核对，确认前不会自动重发。' : recoveryDiff.length ? '本地修改尚未同步。' : '内容目前一致，但尚无足够的保存确认，请核对后处理。' }}</p>
-                <p class="mw-muted">恢复只影响草稿；未应用的售价输入仍需确认，不会正式发布。</p>
-                <details v-if="recoveryDiff.length" data-test="recovery-differences"><summary>查看哪些内容不同（{{ recoveryDiff.length }}）</summary><ul><li v-for="diff in recoveryDiff" :key="diff.field"><strong>{{ diff.label }}</strong><p style="overflow-wrap:anywhere;max-width:100%">本地：{{ diff.local }}</p><p style="overflow-wrap:anywhere;max-width:100%">服务器：{{ diff.server }}</p></li></ul></details>
-                <label v-if="recoveryConflict"><input v-model="acceptRecoveryConflict" type="checkbox" data-test="confirm-recovery-conflict" />我已核对差异，恢复本地此商品并以服务器最新版本为基准</label>
-                <button type="button" class="btn btn-secondary" data-test="restore-recovery" :disabled="busy || recoveryConflict && !acceptRecoveryConflict" @click="restoreWithUndoProtection()">{{ recovery?.removed_product ? '恢复待移除操作' : '恢复本地内容' }}</button>
-                <button type="button" class="btn btn-secondary" data-test="discard-recovery" :disabled="busy" @click="discardRecoveryDialog = true">丢弃恢复副本</button>
+            </details>
+            <details class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
+              <summary>模型管理 · {{ selectedModel }} · {{ lifecycleModelProducts.length }} 份商品</summary>
+              <p class="mw-muted">模型操作覆盖 {{ selectedModel }} 下的全部 {{ lifecycleModelProducts.length }} 份商品（包含已归档商品）。</p>
+              <div class="mw-product-type-actions">
+                <template v-if="lifecycleModelProducts.length">
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'active')" class="btn btn-secondary" data-test="model-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { model_id: selectedModel })">下架模型全部商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'unlisted')" class="btn btn-secondary" data-test="model-relist" :disabled="lifecycleDisabled" @click="requestLifecycle('relist', { model_id: selectedModel })">重新上架模型商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) !== 'archived')" class="btn btn-secondary" data-test="model-archive" :disabled="lifecycleDisabled || modelArchiveBlocked" @click="requestLifecycle('archive', { model_id: selectedModel })">归档模型全部商品</button>
+                  <button v-if="lifecycleModelProducts.some(p => lifecycleState(p) === 'archived')" class="btn btn-secondary" data-test="model-restore" :disabled="lifecycleDisabled" @click="requestLifecycle('restore', { model_id: selectedModel })">恢复模型已归档商品</button>
+                </template>
+                <button v-else class="btn btn-secondary" data-test="model-hide-restore" :disabled="lifecycleDisabled" @click="requestLifecycle(isModelHidden ? 'restore' : 'hide', { model_id: selectedModel })">{{ isModelHidden ? '恢复显示模型' : '隐藏未配置模型' }}</button>
               </div>
-              <button type="button" class="btn btn-secondary" data-test="check-server" :disabled="busy" @click="checkServer">核对服务器状态</button>
-              <button v-if="canRetryUnconfirmedSave" type="button" class="btn btn-secondary" data-test="retry-unconfirmed-save" @click="retryUnconfirmedSave">重新核对并保存当前草稿</button>
-              <button type="button" class="btn btn-secondary" data-test="editor-discard-reload" :disabled="busy" @click="reloadDialog = true">放弃修改并重新加载</button>
-            </section>
-            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
-              <template #review>
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
-              </template>
-              <template #save>
-                <div class="mw-save-draft">
-                  <p class="mw-muted">停止输入约 1.5 秒后自动保存本 Account 草稿（共 {{ products.length }} 个商品）。本地恢复副本即时更新；服务器确认对应版本后才显示已确认保存。不会发布、启售或发起生成。</p>
-                  <p v-if="dirty" data-test="unsaved" class="mw-muted">有未保存修改</p>
-                  <button class="btn btn-primary" data-test="save" :disabled="managementDisabled || !products.length" @click="saveEditorDraft">{{ pending === 'save' ? '保存中…' : '保存草稿' }}</button>
-                  <button v-if="!dirty && config" type="button" class="btn btn-secondary mw-return-models" data-test="return-models" @click="navigate(backToModels)">← 返回模型列表</button>
-                  <p v-if="saveFeedback || saveState === 'saved'" class="mw-banner" role="status" data-test="save-feedback">{{ saveFeedback || '草稿已确认保存' }}</p>
-                  <p v-if="saveState === 'unconfirmed'" role="status" class="mw-field-error">保存结果待核对，后续编辑仍保留本地副本；核对确认前暂停自动写入。</p>
-                </div>
-              </template>
-            </MediaProductEditor>
+              <p v-if="modelArchiveBlocked" class="mw-muted">已发布商品需先下架，再归档。</p>
+              <p v-if="dirty" class="mw-muted" data-test="lifecycle-dirty">请先保存或放弃未保存修改，再管理上下架与归档。</p>
+              <label class="mw-product-toggle"><input v-model="showArchived" type="checkbox" data-test="show-archived-products" :disabled="busy || dirty" /><span>显示已归档商品</span></label>
+            </details>
 
 
           </template>
@@ -340,21 +350,26 @@ import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
 import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
 import { formatDateTimeLocalInput } from '@/utils/format'
-import { mediaPublicationLabel } from '@/utils/mediaAdminPresentation'
+import { mediaPublicationLabel, mediaProductPublicationLabel, mediaProductMatches } from '@/utils/mediaAdminPresentation'
 import '@/styles/media-workbench.css'
 
 const paidStates = ref<Partial<Record<PaidMedia, PaidState>>>({})
-const paidStatusLabel = (kind: PaidMedia) => paidStates.value[kind]?.mode === 'managed-v1' ? paidStates.value[kind]?.effective_enabled ? '已开放' : '尚未开放' : '状态未确认'
+const paidStatusLabel = (kind: PaidMedia) => {
+  const state = paidStates.value[kind]
+  const knownReasons = ['runtime_restarted', 'deployment_mode', 'closed', 'open', 'dependencies_changed', 'dependencies_unavailable', 'apply_failed', 'no_approved_offer', 'revision_changed']
+  if (state?.mode !== 'managed-v1' || !knownReasons.includes(state.reason)) return '状态未确认'
+  return state.effective_enabled ? '已开放' : '尚未开放'
+}
 async function readPaidStatus() {
   const results = await Promise.allSettled((['image', 'video'] as const).map(kind => mediaPaidAPI.status(kind)))
   for (const [index, result] of results.entries()) { const kind = index === 0 ? 'image' : 'video'; if (result.status === 'fulfilled') paidStates.value[kind] = result.value; else delete paidStates.value[kind] }
 }
 const auth = useAuthStore()
 const workbench = useMediaWorkbench(() => auth.user?.id)
-const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, loading, loadingAccountId, message,
+const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
   diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval, videoSaleInputs, updateVideoSaleInputs,
-  recovery, recoveryWarning, recoveryConflict, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
+  recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
 // Saved types describe earlier Studio products; native adapters also expose
 // the Account's currently supported configuration paths. Selection is explicit,
@@ -364,6 +379,7 @@ const availableMediaTypes = computed(() => ['image', 'video'].filter(type =>
 const step = ref('suppliers')
 const search = ref('')
 const filter = ref('')
+const modelScope = ref('all')
 const showArchived = ref(false)
 const lifecycleRequest = ref<{ action: LifecycleAction; target: LifecycleTarget } | null>(null)
 const editorElement = ref<HTMLElement>()
@@ -371,6 +387,7 @@ const modelPage = ref<HTMLElement>()
 const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
 const modelsScrollPosition = ref({ top: 0, left: 0 })
+const suppliersScrollPosition = ref({ top: 0, left: 0 })
 const publishDialog = ref(false)
 const publishProductIds = ref<string[]>([])
 const salesDialog = ref(false)
@@ -389,6 +406,11 @@ const lastPublishedLabel = computed(() => {
   return Number.isFinite(publishedAt) && publishedAt > 0 ? formatDateTimeLocalInput(publishedAt / 1000).replace('T', ' ') : '已有发布配置，发布时间未记录'
 })
 const publicationLabel = computed(() => dirty.value ? '有未保存修改，当前输入尚未发布' : saveState.value !== 'saved' && config.value ? '当前保存结果尚未确认，不能据此判断已发布' : mediaPublicationLabel(config.value?.draft.products ?? [], config.value?.published?.products))
+const currentProductPublicationLabel = computed(() => {
+  if (!product.value || !config.value) return '当前商品发布状态尚未确认'
+  return mediaProductPublicationLabel(product.value, config.value.draft.products.find(p => p.product_id === product.value?.product_id), config.value.published?.products?.find(p => p.product_id === product.value?.product_id))
+})
+const otherPendingProducts = computed(() => config.value?.draft.products.filter(p => p.product_id !== selectedProduct.value && !mediaProductMatches(p, config.value?.published?.products?.find(item => item.product_id === p.product_id))).length ?? 0)
 const newProductType = ref('')
 const removeProductId = ref('')
 const removalTarget = computed(() => products.value.find(p => p.product_id === removeProductId.value))
@@ -404,9 +426,9 @@ const publishedCount = computed(() => suppliers.value.reduce((n, s) => n + s.mod
 const accountStates: Record<string, string> = {
   SELLING: '媒体销售中', SALES_PAUSED: '媒体销售已暂停', PUBLISHED_NOT_READY: '已发布配置当前不可售',
   NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）',
-  NOT_INITIALIZED: '未开启销售', ACCOUNT_INACTIVE: '账户已停用', ACCOUNT_UNSCHEDULABLE: '不可调度',
-  ACCOUNT_RUNTIME_BLOCKED: '运行受限', UNSUPPORTED_ACCOUNT_TYPE: '类型不支持', ACTIVE: '媒体销售中',
-  SALES_ENABLED: '媒体销售中', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入'
+  NOT_INITIALIZED: '尚未配置媒体商品', ACCOUNT_INACTIVE: '账户已停用', ACCOUNT_UNSCHEDULABLE: '不可调度',
+  ACCOUNT_RUNTIME_BLOCKED: '运行受限', UNSUPPORTED_ACCOUNT_TYPE: '类型不支持', ACTIVE: '运行正常（旧状态）',
+  SALES_ENABLED: '已开启销售（旧状态）', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入'
 }
 const sourceGroups = computed(() => {
   const groups = new Map<string, SupplierDetail[]>()
@@ -422,7 +444,15 @@ const catalogUpdatedAt = computed(() => {
 })
 const selectedModelCurrent = computed(() => !!detail.value?.model_catalog?.models.includes(selectedModel.value))
 const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
-const filteredModels = computed(() => detail.value?.models.filter(m => detail.value?.model_catalog?.models.includes(m.model_id) && !['UPSTREAM_NOT_DISCOVERED','UPSTREAM_MISSING','MODEL_SYNC_REQUIRED'].includes(m.state) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id))) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.toLowerCase())) ?? [])
+const visibleModels = computed(() => detail.value?.models.filter(m => detail.value?.model_catalog?.models.includes(m.model_id) && !['UPSTREAM_NOT_DISCOVERED','UPSTREAM_MISSING','MODEL_SYNC_REQUIRED'].includes(m.state) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id)))) ?? [])
+function hasConfiguredModel(modelId: string) { return products.value.some(p => p.upstream_model === modelId) || !!config.value?.published?.products?.some(p => p.upstream_model === modelId) }
+const modelScopes = computed(() => [
+  { value: 'all', label: '全部模型', count: visibleModels.value.length },
+  { value: 'configured', label: '已配置商品', count: visibleModels.value.filter(m => hasConfiguredModel(m.model_id)).length },
+  { value: 'pending', label: '目录待配置', count: visibleModels.value.filter(m => !hasConfiguredModel(m.model_id)).length }
+])
+const filteredModels = computed(() => visibleModels.value.filter(m => (modelScope.value === 'all' || hasConfiguredModel(m.model_id) === (modelScope.value === 'configured')) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.trim().toLowerCase())).sort((a, b) => Number(hasConfiguredModel(b.model_id)) - Number(hasConfiguredModel(a.model_id))))
+watch(showArchived, value => { if (value) modelScope.value = 'all' })
 const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value && (showArchived.value || lifecycleState(p) !== 'archived')))
 const lifecycleProducts = computed(() => {
@@ -629,7 +659,11 @@ function commitBeforeProductSwitch(action: () => void) {
 }
 async function saveEditorDraft() { return await commitEditor() ? saveDraft() : false }
 async function flushOnFocusOut(event: FocusEvent) {
-  if ((!event.relatedTarget || !editorElement.value?.contains(event.relatedTarget as Node)) && await commitEditor()) await flushAutoSave()
+  if (autoSavePaused.value || nextNavigation.value || event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-media-navigation], [data-app-navigation-toggle]')) return
+  const link = event.relatedTarget instanceof Element ? event.relatedTarget.closest('a[href]') : null
+  // A site navigation must reach the route guard before blur can force a save.
+  if (link instanceof HTMLAnchorElement && link.origin === window.location.origin && !link.hasAttribute('download') && (!link.target || link.target === '_self')) return
+  if ((!event.relatedTarget || !editorElement.value?.contains(event.relatedTarget as Node)) && await commitEditor() && !autoSavePaused.value) await flushAutoSave()
 }
 async function flushStep(event: MouseEvent) {
   const button = (event.target as HTMLElement).closest('button')
@@ -637,17 +671,35 @@ async function flushStep(event: MouseEvent) {
 }
 function navigate(action: () => void | Promise<void>) {
   if (busy.value) return
-  const proceed = () => { if (dirty.value) nextNavigation.value = action; else void action() }
+  const proceed = () => { if (dirty.value) requestNavigation(action); else void action() }
   if (videoSaleInputs.value.length) void commitEditor().then(committed => { if (committed) proceed() })
   else proceed()
 }
-async function openSupplier(id: number) { const selected = await selectSupplier(id); if (selected && !loading.value && detail.value?.id === id) { step.value = 'models'; void readPaidStatus(); await nextTick(); modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }) } }
-async function openEditor(modelId: string) {
+function requestNavigation(action: () => void | Promise<void>) {
+  autoSavePaused.value = true
+  nextNavigation.value = action
+}
+async function openSupplier(id: number) {
+  suppliersScrollPosition.value = { top: window.scrollY, left: window.scrollX }
+  const previousId = detail.value?.id
+  const selected = await selectSupplier(id)
+  if (selected && !loading.value && detail.value?.id === id) {
+    if (previousId !== id) {
+      search.value = ''; filter.value = ''
+      modelScope.value = visibleModels.value.some(m => hasConfiguredModel(m.model_id)) ? 'configured' : 'pending'
+    }
+    step.value = 'models'; void readPaidStatus()
+    await nextTick()
+    modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+  }
+}
+async function openEditor(modelId: string, pricing = false) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
   modelsScrollPosition.value = { top: window.scrollY, left: window.scrollX }
   selectModel(modelId); selectedProduct.value = modelProducts.value[0]?.product_id ?? ''; step.value = 'editor'
   await nextTick()
   editorElement.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
+  if (pricing) await productEditor.value?.goToStep(4)
 }
 async function backToModels() {
   step.value = 'models'
@@ -697,7 +749,7 @@ async function reload() {
   void readPaidStatus()
   step.value = previousStep === 'editor' && !selectedModel.value ? 'models' : previousStep
 }
-async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers() }
+async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers(); await nextTick(); window.scrollTo({ ...suppliersScrollPosition.value, behavior: 'instant' }) }
 async function locate(diagnostic: Diagnostic) {
   const { path, scope } = diagnostic
   const productIndex = /products(?:\[|\.)(\d+)/.exec(path)?.[1]
@@ -738,9 +790,9 @@ watch(sourceGroups, groups => {
   collapsedSources.value = next
   knownSourceHosts.value = new Set(groups.map(group => group.host))
 })
-onBeforeRouteLeave(async () => { if (busy.value) { message.value = '操作正在进行，请等待完成后离开。'; return false } if (!await commitEditor()) return false; if (!dirty.value) return true; return new Promise<boolean>(resolve => { nextNavigation.value = () => resolve(true); routeResolve = resolve }) })
+onBeforeRouteLeave(async () => { if (busy.value) { message.value = '操作正在进行，请等待完成后离开。'; return false } if (!await commitEditor()) return false; if (!dirty.value) return true; return new Promise<boolean>(resolve => { routeResolve = resolve; requestNavigation(() => resolve(true)) }) })
 let routeResolve: ((value: boolean) => void) | undefined
-watch(nextNavigation, value => { if (!value && routeResolve) { routeResolve(false); routeResolve = undefined } })
+watch(nextNavigation, value => { if (!value) { autoSavePaused.value = false; if (routeResolve) { routeResolve(false); routeResolve = undefined } } }, { flush: 'sync' })
 onMounted(() => { void loadSuppliers(); window.addEventListener('beforeunload', beforeUnload) })
 onBeforeUnmount(() => { routeResolve?.(false); window.removeEventListener('beforeunload', beforeUnload) })
 </script>

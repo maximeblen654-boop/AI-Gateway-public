@@ -111,6 +111,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   page.on('request',recordWrites)
   // Exercise the actual admin confirmation in the final embedded frontend.
   await page.goto(base+'/admin/media');await page.locator('[data-test="account-search"]').fill(String(id));await page.locator(`[data-test="supplier-${id}"]`).click();await page.locator('[data-test="model-gpt-image-2"]').click()
+  await page.locator('[data-test="product-management"] > summary').click()
   await expect(page.locator('[data-test="product-archive"]')).toBeDisabled()
   await page.locator('[data-test="product-unlist"]').click()
   await expect(page.locator('dialog[open]')).toContainText('Synthetic lifecycle target')
@@ -285,6 +286,7 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   assert.equal(savedSelection.draft.products.length,3);assert.equal(savedSelection.validation.publish_ready,false,'unfinished product must prevent whole-Draft publication')
   const selectionPosts=stats().image_posts,selectionOwner=snapshot(owner.id)
   await page.goto(base+'/admin/media');await page.locator('[data-test="account-search"]').fill(String(id));await page.locator(`[data-test="supplier-${id}"]`).click()
+  await page.locator('[data-test="model-scope-all"]').click()
   await expect(page.locator('.mw-model-list .mw-model-row')).toHaveCount(53)
   await shot(page,'native-model-lifecycle-53-model-catalog.png')
   await page.locator('[data-test="model-gpt-image-2"]').click()

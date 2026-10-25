@@ -11,6 +11,7 @@ for (const width of [1440, 390]) {
     await page.goto('/tests/media-workbench/index.html?scenario=CATALOG_CHANGE&theme=blue')
     await page.getByTestId('account-search').fill('#77')
     await page.getByTestId('supplier-77').click()
+    await page.getByTestId('model-scope-all').click()
     await expect(page.getByTestId('catalog-change-summary')).toContainText('新增 2 个型号')
     await expect(page.getByTestId('catalog-affected')).toContainText('2 份未下架或归档的已发布商品')
     await expect(page.getByTestId('catalog-auto-list')).toContainText('成功同步的新型号会自动进入本账号模型列表')

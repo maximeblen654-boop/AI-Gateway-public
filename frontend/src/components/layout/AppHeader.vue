@@ -4,6 +4,7 @@
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex shrink-0 items-center gap-2 sm:gap-4">
         <button
+          data-app-navigation-toggle
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
           :aria-label="t('common.toggleMenu')"
