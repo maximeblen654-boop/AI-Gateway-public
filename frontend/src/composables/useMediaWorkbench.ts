@@ -20,6 +20,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const publishValidation = ref<Validation | null>(null)
   const bindingValidationProducts = ref<Product[]>([])
   const bindingValidationModel = ref('')
+  const bindingValidationOriginalModel = ref('')
   const deleted = ref(false)
   const conflict = ref(false)
   const validationUnavailable = ref(false)
@@ -62,7 +63,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const validationCurrent = computed(() => !!config.value && config.value.validation.draft_revision === config.value.draft.revision)
   const canPublish = computed(() => !pending.value && !loading.value && !dirty.value && !deleted.value && !conflict.value && saveState.value !== 'unconfirmed' &&
     !!config.value && Number.isInteger(config.value.record_version) && config.value.record_version >= 0 && !!config.value.draft.revision && !!config.value.draft.products.length)
-  const diagnostics = computed(() => errorDiagnostics.value.length ? errorDiagnostics.value : validationCurrent.value ? config.value?.validation.diagnostics ?? [] : [])
+  const diagnostics = computed(() => errorDiagnostics.value.length ? errorDiagnostics.value : validationCurrent.value ? detail.value?.current_technical_diagnostics?.diagnostics ?? config.value?.validation.diagnostics ?? [] : [])
   const recoveryConflict = computed(() => !!recovery.value && (unresolvedProductConflicts.value.includes(recovery.value.product.product_id) || recovery.value.base_record_version !== (serverSnapshot.value ?? detail.value)?.media_workbench_v1?.record_version || recovery.value.base_draft_revision !== ((serverSnapshot.value ?? detail.value)?.media_workbench_v1?.draft.revision ?? '')))
   const recoveryDiff = computed(() => {
     if (!recovery.value) return []
@@ -268,7 +269,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     }
     if (replaceDraft) discoverRecovery()
   }
-  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null; bindingValidationProducts.value = []; bindingValidationModel.value = '' }
+  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null; bindingValidationProducts.value = []; bindingValidationModel.value = ''; bindingValidationOriginalModel.value = '' }
   function requiresPublishedRecovery(error: unknown) {
     const e = error as { status?: number; reason?: string }
     return e.status === 409 && e.reason === 'MEDIA_PUBLISHED_RECOVERY_REQUIRED'
@@ -828,6 +829,8 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
         publishValidation.value = receipt.publish_validation ?? null
         bindingValidationProducts.value = receipt.binding_validation_products ?? []
         bindingValidationModel.value = input.new_model_id ?? input.old_model_id
+        bindingValidationOriginalModel.value = input.old_model_id
+        if (publishValidation.value?.diagnostics.length) message.value = '已选新型号，换绑尚未生效。原绑定和配置保持不变，请查看下方具体原因。'
       }
       if (![401, 403, 404, 409, 410, 422].includes(errorStatus.value)) { saveState.value = 'unconfirmed'; validationUnavailable.value = true }
       return false
@@ -859,7 +862,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   }
   onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
-    errorStatus, diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    errorStatus, diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, bindingValidationOriginalModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
     videoSaleInputs, updateVideoSaleInputs,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,

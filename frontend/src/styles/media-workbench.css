@@ -331,3 +331,9 @@ details.mw-product-management[open] > :not(summary) { margin-top: .75rem; }
   .mw-paid-panel > header { flex-wrap: wrap; }
   .mw-paid-panel .mw-paid-summary { grid-template-columns: 1fr; }
 }
+
+.mw-current-problems { scroll-margin-top: 5.5rem; margin-block: .75rem; }
+
+@media (max-width: 720px) {
+  .mw-current-problems { padding-inline-end: 1.5rem; }
+}

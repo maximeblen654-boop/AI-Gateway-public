@@ -1,4 +1,4 @@
-import type { AdapterConfig, Diagnostic, Match, Product, Validation } from '@/api/admin/mediaWorkbench'
+import type { AdapterConfig, Diagnostic, Match, Product, Validation, NativeAdapter, CurrentTechnicalDiagnostics } from '@/api/admin/mediaWorkbench'
 import { mediaDiagnosticGuidance, mediaDiagnosticIsAccount, mediaDiagnosticProductId, mediaDiagnosticsForModel, mediaVisibleDiagnostics, type MediaDiagnosticProductLabel } from './mediaAdminPresentation'
 
 const UNKNOWN = 'UNKNOWN'
@@ -32,7 +32,12 @@ function diagnosticDetails(diagnostic: Diagnostic) {
 
 export interface MediaModelDiagnosticInput {
   accountId?: number
+  accountHost?: string
+  nativeAdapters?: Partial<Record<'image' | 'video', Pick<NativeAdapter, 'kind' | 'revision'>>>
+  originalModelId?: string
   modelId: string
+  productId?: string
+  technicalCheck?: Pick<CurrentTechnicalDiagnostics, 'checked_at' | 'source' | 'target_product_ids'>
   requestedModelId?: string
   draftRevision?: string
   validation?: Validation
@@ -43,22 +48,36 @@ export interface MediaModelDiagnosticInput {
   preview?: boolean
 }
 
-/** Explicit fields only: prices, credentials, Account data and customer data never enter the copy. */
+/** Explicit host/adapter identifiers only; prices, credentials and customer data never enter the copy. */
 export function mediaModelDiagnosticReport(input: MediaModelDiagnosticInput) {
   const products = input.productDetails ?? []
-  const diagnostics = mediaVisibleDiagnostics(mediaDiagnosticsForModel(input.diagnostics, input.modelId, products), products).filter(diagnostic => diagnostic.class === 'NEEDS_DEVELOPMENT')
+  const diagnostics = mediaVisibleDiagnostics(mediaDiagnosticsForModel(input.diagnostics, input.modelId, products, input.productId), products).filter(diagnostic => diagnostic.class === 'NEEDS_DEVELOPMENT')
   const productIds = [...new Set(diagnostics.filter(diagnostic => !mediaDiagnosticIsAccount(diagnostic)).map(diagnostic => mediaDiagnosticProductId(diagnostic, products)).filter((value): value is string => !!value))]
+  const checkedModels = [...new Set(products.filter(product => productIds.includes(product.product_id)).map(product => product.upstream_model).filter(Boolean))]
+  const modelId = input.modelId || (checkedModels.length === 1 ? checkedModels[0] : input.requestedModelId) || UNKNOWN
+  const upstreamHost = input.accountHost && input.accountHost.length <= 253 && /^[a-z0-9.:-]+$/i.test(input.accountHost) ? input.accountHost : UNKNOWN
+  const nativeAdapters = Object.fromEntries((['image', 'video'] as const).flatMap(type => {
+    const native = input.nativeAdapters?.[type]
+    return native ? [[type, { kind: native.kind, revision: native.revision }]] : []
+  }))
   return {
+    title: `${input.preview ? '商品换绑检查未通过' : '商品模型技术诊断'} · Account #${input.accountId ?? UNKNOWN} · ${modelId}`,
+    problem_summary: [...new Set(diagnostics.map(diagnostic => mediaDiagnosticGuidance(diagnostic).message))],
+    operation_state: input.preview ? '这是未保存的更换绑定候选，不能视为换绑成功；原绑定保持不变。' : '这是当前范围的技术诊断说明，不执行保存、商品发布或启售。',
     source: '媒体工作台 → 商品模型配置 → 需要技术适配 → 复制给 Codex',
     purpose: '核查当前商品配置是否需要新增技术支持，或修复误报及配置联动问题',
     intent_question: '你是希望新增支持这项能力，还是不需要这项能力，只想恢复正常使用？',
     handling_note: '先确认上述意图；已明确选择时沿用选择。诊断不证明上游支持或不支持，也不代表允许修改经营配置、付费生成或部署。',
+    report_scope: input.preview ? '仅包含本次选择的换绑商品，不是整个账号的错误汇总。' : input.productId ? '仅包含当前选中的商品，不是整个账号的错误汇总。' : '仅包含当前型号或页面列出的技术诊断，不是整个账号所有检查结果。',
+    ...(input.technicalCheck ? { technical_check: { checked_at: input.technicalCheck.checked_at, source: input.technicalCheck.source, target_product_ids: [...input.technicalCheck.target_product_ids].filter(id => productIds.includes(id)) } } : {}),
     account_id: input.accountId ?? UNKNOWN,
+    account_context: { upstream_host: upstreamHost, native_adapters: nativeAdapters },
     configuration_state: input.preview ? '尚未保存的更换绑定候选' : '商品草稿配置',
     ...(input.requestedModelId ? { requested_model_id: input.requestedModelId } : {}),
-    model_id: input.modelId || UNKNOWN,
+    ...(input.preview ? { original_model_id: input.originalModelId || UNKNOWN, configuration_note: '以下为服务端本次实际检查的候选配置，可能取自原发布版本；不代表当前草稿已保存或换绑成功。' } : {}),
+    model_id: modelId,
     draft_revision: input.draftRevision || (input.current ? input.validation?.draft_revision : undefined) || UNKNOWN,
-    validation: { draft_revision: input.validation?.draft_revision || UNKNOWN, checked_at: input.validation?.checked_at || UNKNOWN, current: input.current, status: input.validation?.status || UNKNOWN },
+    validation: { draft_revision: input.validation?.draft_revision || UNKNOWN, checked_at: input.validation?.checked_at || UNKNOWN, current: input.current, applies_to: input.preview ? '本次候选配置，尚未保存' : '商品草稿配置', status: input.validation?.status || UNKNOWN },
     products: productIds.map(productId => {
       const product = products.find(item => item.product_id === productId)
       const capabilities = product?.capabilities

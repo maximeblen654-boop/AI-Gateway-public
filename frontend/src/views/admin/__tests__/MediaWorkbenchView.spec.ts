@@ -99,7 +99,10 @@ it('keeps a rejected binding preview separate from the saved draft and shows its
   await openEditor(77, 'new-model')
   await wrapper.get('[data-test="binding-new"]').setValue('other-model')
   await wrapper.get('[data-test="binding-confirm"]').trigger('click'); await flushPromises()
-  expect(wrapper.get('[data-test="model-binding"]').text()).toContain('型号暂不兼容')
+  expect(wrapper.get('[data-test="model-binding"]').text()).toContain('换绑尚未生效')
+  expect(wrapper.get('[data-test="model-binding"]').get('h3').text()).toContain('新型号需要技术适配')
+  expect(wrapper.get('[data-test="binding-diagnostic-context"]').text()).toContain('image-native-1')
+  expect(wrapper.get('[data-test="binding-diagnostic-context"]').text()).toContain('other-model')
   expect(wrapper.text()).toContain('本站尚不支持这个型号的调用方式')
   expect(wrapper.text()).toContain('本次更换尚未保存')
   expect(wrapper.text()).not.toContain('整份草稿检查结果不属于当前版本')
@@ -1447,4 +1450,39 @@ it('does not promise background sync before a media workbench is initialized',as
  await mountWorkbench();await selectAccount()
  expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('手动同步')
  expect(wrapper.find('[data-test="catalog-notice"]').exists()).toBe(false)
+})
+
+
+it('shows current read-only technical diagnostics without resaving an old failed validation', async () => {
+  const dto = supplier()
+  const p = dto.media_workbench_v1!.draft.products[0]!
+  dto.media_workbench_v1!.validation.status = 'FAIL'
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'VIDEO_PROFILE_UNSUPPORTED', scope: p.product_id, path: 'adapter_config.wire_profile', message: '历史错误旧协议尚未接通', action: '旧操作' }]
+  dto.current_technical_diagnostics = { checked_at: '2026-10-26T10:00:00Z', source: 'current_local_video_technical_check', target_product_ids: [p.product_id], diagnostics: [{ class: 'UI_FIXABLE', severity: 'error', code: 'VIDEO_LEGACY_PROFILE_UPGRADE_REQUIRED', scope: p.product_id, path: 'adapter_config.wire_profile', message: '旧视频连接配置可由系统自动更新', action: '直接保存草稿即可更新' }] }
+  const original = JSON.stringify(dto.media_workbench_v1)
+  api.detail.mockResolvedValue(copy(dto)); api.suppliers.mockResolvedValue([copy(dto)])
+  await openEditor()
+  expect(wrapper.get('[data-test="current-technical-check"]').text()).toContain('尚未因此保存或发布')
+  expect(wrapper.text()).toContain('旧视频连接配置可由系统自动更新')
+  expect(wrapper.text()).not.toContain('历史错误旧协议尚未接通')
+  expect(wrapper.find('[data-test="copy-codex"]').exists()).toBe(false)
+  expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled(); expect(api.modelBinding).not.toHaveBeenCalled()
+  expect(JSON.stringify(dto.media_workbench_v1)).toBe(original)
+})
+
+
+it('offers issue access beside the model and places explanation before the editing wizard', async () => {
+  const dto = supplier(77, 'FAIL')
+  const p = dto.media_workbench_v1!.draft.products[0]!
+  dto.models[0]!.state = 'NEEDS_DEVELOPMENT'
+  dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'REAL_UNSUPPORTED', scope: p.product_id, path: 'adapter_config', message: '需要核查这项能力', action: '复制说明' }]
+  api.detail.mockResolvedValue(copy(dto)); api.suppliers.mockResolvedValue([copy(dto)])
+  await mountWorkbench(); await selectAccount()
+  await wrapper.get('[data-test="model-issues-image-native-1"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="product-problems"]').exists()).toBe(true)
+  const problem = wrapper.get('[data-test="product-problems"]').element
+  const wizard = wrapper.get('[data-test="wizard-step-1"]').element
+  expect(problem.compareDocumentPosition(wizard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(wrapper.get('[data-test="copy-codex"]').text()).toContain('当前商品')
+  expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
 })

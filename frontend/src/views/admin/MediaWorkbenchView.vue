@@ -99,7 +99,7 @@
               <span v-if="rowProduct(row.model_id)">{{ productDisplayTitle(rowProduct(row.model_id)!) }} · {{ rowProduct(row.model_id)?.media_type === 'video' ? '视频' : '图片' }}</span>
               <small v-if="rowProduct(row.model_id)">{{ (rowProduct(row.model_id)?.capabilities.resolutions ?? []).join(' / ') }} · {{ priceLabel(rowProduct(row.model_id)) }}</small>
               <span class="mw-model-action">{{ rowProduct(row.model_id) ? '编辑配置 →' : '配置 →' }}</span>
-            </button><button v-if="rowProduct(row.model_id)" type="button" class="mw-link mw-price-shortcut" :disabled="busy" :data-test="`edit-price-${row.model_id}`" :aria-label="`编辑 ${productDisplayTitle(rowProduct(row.model_id)!)} 的售价`" @click="navigate(() => openEditor(row.model_id, true))">编辑售价 →</button></article>
+            </button><button v-if="['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'UNKNOWN', 'UPSTREAM_NOT_DISCOVERED', 'UPSTREAM_MISSING', 'MODEL_SYNC_REQUIRED'].includes(row.state)" type="button" class="mw-link mw-price-shortcut" :disabled="busy" :data-test="`model-issues-${row.model_id}`" :aria-label="`查看 ${row.model_id} 的问题`" @click="navigate(() => openEditor(row.model_id))">查看问题 →</button><button v-if="rowProduct(row.model_id)" type="button" class="mw-link mw-price-shortcut" :disabled="busy" :data-test="`edit-price-${row.model_id}`" :aria-label="`编辑 ${productDisplayTitle(rowProduct(row.model_id)!)} 的售价`" @click="navigate(() => openEditor(row.model_id, true))">编辑售价 →</button></article>
           </div>
           <details class="mw-product-management mw-status-details" aria-label="配置与销售状态" data-test="publication-layers">
             <summary>配置与销售状态 · {{ saveStateLabel }}</summary>
@@ -144,7 +144,7 @@
           <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ catalogAutoSyncConfigured ? '自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
           <MediaCatalogNotice v-if="detail && catalogAutoSyncConfigured" :detail="detail" @configure="openBindingProduct" />
 
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+            <MediaValidationPanel v-if="config" :validation="config.validation" :technical-check="!dirty ? detail?.current_technical_diagnostics : undefined" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :account-host="detail?.host" :native-adapters="detail?.native_adapters" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
 
         <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page" @focusout="flushOnFocusOut" @click.capture="flushStep">
@@ -154,8 +154,15 @@
           </div>
           <template v-if="detail && selectedModel">
 
-            <MediaModelBinding v-if="bindingRequired" :groups="missingModelGroups" :available="detail.model_catalog?.models ?? []" :added-models="detail.model_catalog_change?.added_models ?? []" :initial-model="bindingOldModel" :initial-product="selectedProduct" :disabled="lifecycleDisabled" :message="message" @submit="confirmModelBinding" />
-            <MediaValidationPanel v-if="bindingRequired && publishValidation" preview :validation="publishValidation" :current="false" :unavailable="false" :save-state="saveState" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="bindingValidationProducts" :draft-revision="config?.draft.revision" :account-id="detail.id" model-id="" :requested-model-id="bindingValidationModel" @locate="locate" @message="message = $event" />
+            <section v-if="config && !bindingRequired && (hasModelDiagnostics || validationUnavailable || !validationCurrent)" ref="currentProblems" class="mw-current-problems" data-test="product-problems" aria-label="当前型号问题" tabindex="-1">
+            <MediaValidationPanel v-if="config" :validation="config.validation" :product-id="selectedProduct" :technical-check="!dirty ? detail?.current_technical_diagnostics : undefined" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :account-host="detail?.host" :native-adapters="detail?.native_adapters" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+              <button v-if="detail?.current_technical_diagnostics?.target_product_ids.includes(selectedProduct)" type="button" class="btn btn-secondary" data-test="refresh-technical-config" :disabled="managementDisabled || dirty" @click="saveEditorDraft">保存并更新旧连接配置</button>
+            </section>
+            <section v-if="bindingRequired && publishValidation" ref="currentProblems" class="mw-current-problems" data-test="binding-problems" aria-label="新型号检查结果" tabindex="-1">
+            <MediaValidationPanel v-if="bindingRequired && publishValidation" preview :validation="publishValidation" :current="false" :unavailable="false" :save-state="saveState" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="bindingValidationProducts" :draft-revision="config?.draft.revision" :account-id="detail.id" :account-host="detail.host" :native-adapters="detail.native_adapters" model-id="" :requested-model-id="bindingValidationModel" :original-model-id="bindingValidationOriginalModel" @locate="locate" @message="message = $event" />
+            </section>
+            <MediaModelBinding :failure-state="bindingValidationModel && publishValidation ? publishValidation.diagnostics.some(d => d.class === 'NEEDS_DEVELOPMENT') ? 'NEEDS_DEVELOPMENT' : 'CHECK_FAILED' : undefined" v-if="bindingRequired" :groups="missingModelGroups" :available="detail.model_catalog?.models ?? []" :added-models="detail.model_catalog_change?.added_models ?? []" :initial-model="bindingOldModel" :initial-product="selectedProduct" :disabled="lifecycleDisabled" :message="message" @submit="confirmModelBinding" />
+
             <section v-if="unsubmittedRecoveries.length" class="mw-banner" data-test="unsubmitted-recoveries" aria-label="尚未提交的新商品恢复副本">
               <h3>发现尚未提交服务器的新商品</h3>
               <p>以下商品仅有浏览器恢复副本。查看后可明确恢复原商品身份、规格和价格；不会自动发布。</p>
@@ -219,9 +226,7 @@
               <p v-if="modelProducts.length > 1" class="mw-product-description mw-muted" data-test="selected-product-description">当前：{{ productOptionLabel(product, modelProducts.indexOf(product)) }}</p>
             </div>
             <MediaProductEditor v-if="product && !bindingRequired" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
-              <template #review>
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
-              </template>
+
               <template #save>
                 <div class="mw-save-draft">
                   <p class="mw-muted">停止输入约 1.5 秒后自动保存本 Account 草稿（共 {{ products.length }} 个商品）。本地恢复副本即时更新；服务器确认对应版本后才显示已确认保存。不会发布、启售或发起生成。</p>
@@ -311,7 +316,7 @@
       <div class="mw-dialog-list" data-test="publish-products"><label v-for="p in config?.draft.products ?? []" :key="p.product_id" class="mw-product-toggle"><input v-model="publishProductIds" type="checkbox" :value="p.product_id" :data-test="`publish-product-${p.product_id}`" :disabled="busy" /><span>{{ productDisplayTitle(p) }} · {{ p.upstream_model }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</span></label></div>
       <p>发布配置不会自动开启销售或全局付费开关，已有订单不会改变，也不会发送真实生成请求。独立 API Key 的原生权限和路由保持原状。</p>
       <p v-if="message" role="alert">{{ message }}</p>
-      <section v-if="publishValidation" data-test="publish-validation"><h3>本次选中商品的发布检查</h3><MediaValidationPanel :validation="publishValidation" :current="true" :unavailable="false" save-state="" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" model-id="" @locate="publishDialog = false; locate($event)" @message="message = $event" /></section>
+      <section v-if="publishValidation" data-test="publish-validation"><h3>本次选中商品的发布检查</h3><MediaValidationPanel :validation="publishValidation" :current="true" :unavailable="false" save-state="" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :account-host="detail?.host" :native-adapters="detail?.native_adapters" model-id="" @locate="publishDialog = false; locate($event)" @message="message = $event" /></section>
       <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish || !publishProductIds.length" @click="confirmPublish">确认发布选中商品</button></template>
     </MediaDialog>
     <MediaDialog :show="salesDialog" :title="config?.sales.enabled ? '暂停媒体销售？' : '开启媒体销售？'" :busy="pending === 'sales'" @close="salesDialog = false">
@@ -352,7 +357,7 @@ import MediaModelBinding from '@/components/admin/media/MediaModelBinding.vue'
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
 import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget, ModelBindingInput } from '@/api/admin/mediaWorkbench'
 import { formatDateTimeLocalInput } from '@/utils/format'
-import { mediaPublicationLabel, mediaProductPublicationLabel, mediaProductMatches } from '@/utils/mediaAdminPresentation'
+import { mediaPublicationLabel, mediaProductPublicationLabel, mediaProductMatches, mediaDiagnosticsForModel } from '@/utils/mediaAdminPresentation'
 import '@/styles/media-workbench.css'
 
 const paidStates = ref<Partial<Record<PaidMedia, PaidState>>>({})
@@ -369,7 +374,7 @@ async function readPaidStatus() {
 const auth = useAuthStore()
 const workbench = useMediaWorkbench(() => auth.user?.id)
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
-  diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+  diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, bindingValidationOriginalModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval, videoSaleInputs, updateVideoSaleInputs,
   recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
   loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, modelBinding, sync, discard } = workbench
@@ -385,6 +390,8 @@ const modelScope = ref('all')
 const showArchived = ref(false)
 const lifecycleRequest = ref<{ action: LifecycleAction; target: LifecycleTarget } | null>(null)
 const editorElement = ref<HTMLElement>()
+const currentProblems = ref<HTMLElement>()
+const hasModelDiagnostics = computed(() => mediaDiagnosticsForModel(diagnostics.value, selectedModel.value, products.value).length > 0)
 const modelPage = ref<HTMLElement>()
 const productEditor = ref<InstanceType<typeof MediaProductEditor>>()
 const sourceListRef = ref<HTMLElement>()
@@ -495,6 +502,7 @@ async function openBindingProduct(productId: string) {
 }
 async function confirmModelBinding(input: ModelBindingInput) {
   if (await modelBinding(input)) { if (input.action === 'delete') { step.value = 'models'; await loadSuppliers() } await readPaidStatus() }
+  else { await nextTick(); currentProblems.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' }); currentProblems.value?.focus?.({ preventScroll: true }) }
 }
 const lifecycleModelProducts = computed(() => lifecycleProducts.value.filter(p => p.upstream_model === selectedModel.value))
 const publishedOnlyProducts = computed(() => lifecycleModelProducts.value.filter(p => !products.value.some(draft => draft.product_id === p.product_id) && (showArchived.value || lifecycleState(p) !== 'archived')))

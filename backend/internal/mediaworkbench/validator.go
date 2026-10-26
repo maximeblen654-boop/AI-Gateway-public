@@ -49,6 +49,9 @@ func diagnostic(class, code, scope, path, message string) Diagnostic {
 	if class == "UI_FIXABLE" && (code == "IMAGE_EXECUTION_CAPABILITY_INVALID" || code == "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID") {
 		action = "请在指示的执行字段中修正单请求产出上限，然后重新保存草稿"
 	}
+	if code == "VIDEO_LEGACY_PROFILE_UPGRADE_REQUIRED" {
+		action = "直接保存草稿即可自动更新旧协议；如正在更换缺失型号，请明确选择新型号并提交换绑。"
+	}
 	if class == "UNKNOWN" {
 		action = "本地依赖恢复后重新校验。"
 	}
@@ -390,6 +393,13 @@ func validateVideoProduct(a *Account, p Product, binding AdapterBinding, image2P
 		out = append(out, diagnostic(class, code, p.ProductID, path, message))
 	}
 	c, config := p.Capabilities, p.AdapterConfig
+	if canUpgradeLegacyLaoliVideoProfile(a, p, binding) {
+		add("UI_FIXABLE", "VIDEO_LEGACY_PROFILE_UPGRADE_REQUIRED", "adapter_config.wire_profile", "当前商品保留了旧视频协议；保存草稿或明确更换绑定时会自动更新为本站已安装的新协议，商品规格和售价不会自动改动。")
+		// Validate editable fields against the installed contract on a local
+		// copy. The diagnostic prevents offers; reads never migrate snapshots.
+		config.WireProfile = videoplan.LaoliMediaProfile
+		p.AdapterConfig = config
+	}
 	if len(c.DurationsSeconds) == 0 {
 		add("UI_FIXABLE", "VIDEO_DURATION_REQUIRED", "capabilities.durations_seconds", "请至少填写一个视频时长，再重新保存并校验。")
 	}

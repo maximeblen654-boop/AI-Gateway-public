@@ -15,10 +15,14 @@ export function mediaDiagnosticIsAccount(diagnostic: Diagnostic): boolean {
   return diagnostic.scope === 'account' || !diagnostic.scope && /^(?:account(?:\.|$)|model_catalog(?:\.|$)|schema_version$|validation(?:\.|$)|products$)/.test(diagnostic.path)
 }
 
-export function mediaDiagnosticsForModel(diagnostics: Diagnostic[], modelId: string, products: Product[] = []): Diagnostic[] {
-  if (!modelId) return diagnostics
+export function mediaDiagnosticsForModel(diagnostics: Diagnostic[], modelId: string, products: Product[] = [], productId?: string): Diagnostic[] {
+  if (!modelId && !productId) return diagnostics
   const selected = new Set(products.filter(product => product.upstream_model === modelId).map(product => product.product_id))
-  return diagnostics.filter(diagnostic => mediaDiagnosticIsAccount(diagnostic) || selected.has(mediaDiagnosticProductId(diagnostic, products) ?? ''))
+  return diagnostics.filter(diagnostic => {
+    if (mediaDiagnosticIsAccount(diagnostic)) return true
+    const id = mediaDiagnosticProductId(diagnostic, products) ?? ''
+    return (!modelId || selected.has(id)) && (!productId || id === productId)
+  })
 }
 
 /** A missing model is the actionable cause; derivative adapter errors are premature. */
@@ -57,6 +61,7 @@ export function mediaDiagnosticGuidance(diagnostic: Diagnostic): { message: stri
     AUTH_FLOW_UNSUPPORTED: ['本站媒体调用尚未接通这个 Account 使用的认证方式。', technicalReview],
     TASK_FLOW_UNSUPPORTED: ['本站尚未接通这个同步或异步任务的处理流程。', technicalReview],
     BUILDER_REFACTOR_REQUIRED: ['这个媒体流程还没有接入本站统一的请求处理程序。', technicalReview],
+    VIDEO_LEGACY_PROFILE_UPGRADE_REQUIRED: ['商品还保留旧的视频连接配置，本站已经支持当前接口。', '保存商品草稿或明确更换型号后，系统会自动更新连接配置；不需要新增技术适配。'],
     VIDEO_PROFILE_UNSUPPORTED: ['本站还没有提供这项视频协议、精确型号或配置版本对应的执行方式。', technicalReview],
     IMAGE_PROVIDER_ASYNC_UNAVAILABLE: ['本站还没有接通这项供应商原生异步批量出图流程。', technicalReview],
     VALUE_HARDCODED: ['商品内部技术配置与当前 Account 的媒体接口不一致。', '请技术维护者核对当前账号、型号和原有技术配置；需要新的调用方式时再确认技术适配。'],

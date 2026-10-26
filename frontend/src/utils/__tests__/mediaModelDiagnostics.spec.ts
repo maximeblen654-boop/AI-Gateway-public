@@ -58,3 +58,41 @@ describe('model-bound diagnostic reports', () => {
     expect(mediaModelDiagnosticText({ modelId: '', current: false, diagnostics: [] })).toContain('UNKNOWN')
   })
 })
+
+
+describe('failed rebinding report context', () => {
+  it('identifies the actual candidate, original binding and native adapter without unrelated data', () => {
+    const [candidate, other] = products() as [Product, Product]
+    candidate.upstream_model = 'checked-model'
+    const report = mediaModelDiagnosticReport({ accountId: 44, accountHost: 'video.laoliimage2.win', nativeAdapters: { video: { kind: 'laoli_video', revision: 'installed-r1' } }, modelId: '', requestedModelId: 'requested-model', originalModelId: 'old-model', current: false, preview: true, diagnostics: [issue(candidate.product_id)], productDetails: [candidate, other] })
+    expect(report.model_id).toBe('checked-model')
+    expect(report.title).toContain('Account #44 · checked-model')
+    expect(report.operation_state).toContain('不能视为换绑成功')
+    expect(report.problem_summary).toEqual(['尚未接通这项功能'])
+    expect(report.original_model_id).toBe('old-model')
+    expect(report.requested_model_id).toBe('requested-model')
+    expect(report.account_context).toEqual({ upstream_host: 'video.laoliimage2.win', native_adapters: { video: { kind: 'laoli_video', revision: 'installed-r1' } } })
+    expect(report.report_scope).toContain('不是整个账号')
+    expect(report.configuration_note).toContain('原发布')
+    expect(report.validation.applies_to).toContain('本次候选')
+    expect(report.products).toHaveLength(1)
+    expect(JSON.stringify(report)).not.toContain(other.upstream_model)
+  })
+
+  it('uses a known requested ID when candidate data is unavailable and excludes credential-shaped host input', () => {
+    const report = mediaModelDiagnosticReport({ modelId: '', requestedModelId: 'new-model', accountHost: 'user:password@host.invalid/path', current: false, preview: true, diagnostics: [] })
+    expect(report.model_id).toBe('new-model')
+    expect(report.account_context.upstream_host).toBe('UNKNOWN')
+    expect(JSON.stringify(report)).not.toContain('password')
+  })
+})
+
+
+it('copies only the selected product when two products share the same upstream model', () => {
+  const [first, other] = products() as [Product, Product]
+  other.upstream_model = first.upstream_model
+  const report = mediaModelDiagnosticReport({ modelId: first.upstream_model, productId: first.product_id, current: true, diagnostics: [issue(first.product_id, 'OWN'), issue(other.product_id, 'SIBLING')], productDetails: [first, other] })
+  expect(report.products.map(product => product.product_id)).toEqual([first.product_id])
+  expect(JSON.stringify(report)).not.toMatch(/SIBLING|video-other/)
+  expect(report.report_scope).toContain('当前选中的商品')
+})

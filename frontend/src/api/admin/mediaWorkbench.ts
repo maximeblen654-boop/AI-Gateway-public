@@ -67,7 +67,9 @@ export interface CatalogChange {
   added_count: number; missing_count: number
   added_models: string[]; missing_models: string[]; truncated: boolean
 }
+export interface CurrentTechnicalDiagnostics { checked_at: string; source: string; diagnostics: Diagnostic[]; target_product_ids: string[] }
 export interface SupplierDetail {
+  current_technical_diagnostics?: CurrentTechnicalDiagnostics
   binding_validation_products?: Product[]
   model_catalog_change?: CatalogChange
   publish_validation?: Validation

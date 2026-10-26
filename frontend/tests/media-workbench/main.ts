@@ -22,7 +22,7 @@ const management = scenario.startsWith('DRAFT_MANAGEMENT')
 const videoPolish = scenario === 'VIDEO_POLISH'
 const mediaTypes = scenario.startsWith('MEDIA_TYPES_')
 const initialDTO = management || videoPolish ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
-if (scenario === 'MODEL_BINDING') {
+if (scenario.startsWith('MODEL_BINDING')) {
   const c = initialDTO.media_workbench_v1!, current = c.draft.products[0]!
   current.upstream_model = 'new-model'
   current.pricing_rules[0]!.sale_price!.amount = '9.00'
@@ -93,6 +93,13 @@ if (scenario === 'ADMIN_READABLE') {
   dto.media_workbench_v1!.published!.revision = 'mwp_private_opaque_long_revision'
   dto.media_workbench_v1!.draft.products[0]!.display_name = '新供应商图片（隔离配置）'
   dto.media_workbench_v1!.validation.diagnostics = [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'IMAGE2PRO_VIDEO_METADATA_REQUIRED', scope: 'canvas-1', path: 'adapter_config.image2pro', message: 'opaque_wire_profile_very_long_revision', action: 'internal_action_only' }]
+}
+
+if (scenario === 'MODEL_ISSUES_TOP') {
+  const product = dto.media_workbench_v1!.draft.products[0]!
+  product.media_type = 'video'
+  dto.models[0]!.state = 'NEEDS_DEVELOPMENT'
+  dto.media_workbench_v1!.validation = { ...dto.media_workbench_v1!.validation, status: 'FAIL', publish_ready: false, diagnostics: [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'FIXTURE_REAL_CAPABILITY_UNSUPPORTED', scope: product.product_id, path: 'adapter_config.wire_profile', message: '当前商品的视频能力需要技术适配', action: '复制当前商品说明核查' }] }
 }
 
 if (scenario.startsWith('MODEL_DIAGNOSTIC_')) {
@@ -265,7 +272,15 @@ apiClient.defaults.adapter = async config => {
     if (url.endsWith('/model-binding')) {
       // Canned browser response only; real atomic writes are tested in Go.
       const input = JSON.parse(config.data) as { action: string; new_model_id?: string }
-      if (scenario !== 'MODEL_BINDING' || input.action !== 'rebind' || input.new_model_id !== 'new-model') throw new Error('Unexpected browser binding fixture request')
+      if (!scenario.startsWith('MODEL_BINDING') || input.action !== 'rebind' || input.new_model_id !== 'new-model') throw new Error('Unexpected browser binding fixture request')
+      if (scenario === 'MODEL_BINDING_REJECT') {
+        const receipt = copy(account)
+        const candidate = copy(account.media_workbench_v1!.published!.products![0]!)
+        candidate.upstream_model = 'new-model'; candidate.media_type = 'video'
+        receipt.binding_validation_products = [candidate]
+        receipt.publish_validation = { draft_revision: account.media_workbench_v1!.draft.revision, checked_at: '2026-10-26T09:52:44Z', status: 'FAIL', publish_ready: false, diagnostics: [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'FIXTURE_REAL_CAPABILITY_UNSUPPORTED', scope: candidate.product_id, path: 'adapter_config.wire_profile', message: '新型号所需的视频能力尚未接入', action: '复制当前商品技术说明核查' }] }
+        throw { isAxiosError: true, config, response: { status: 422, data: { code: 'MODEL_BINDING_VALIDATION_FAILED', message: 'Model binding validation failed; no changes were saved', data: receipt } } }
+      }
       account.media_workbench_v1!.record_version++
       account.media_workbench_v1!.published!.products![0]!.upstream_model = 'new-model'
       data = copy(account)

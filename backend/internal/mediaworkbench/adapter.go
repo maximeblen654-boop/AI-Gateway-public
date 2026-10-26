@@ -261,6 +261,20 @@ func adapterOwnsPlatform(kind, platform string) bool {
 	return false
 }
 
+// Legacy Laoli profiles can acquire the installed contract only during an
+// explicit save or rebind. Keep the supplier, exact model, version and resolved
+// native binding checks shared with the read-only upgrade diagnostic.
+func canUpgradeLegacyLaoliVideoProfile(a *Account, p Product, binding AdapterBinding) bool {
+	if p.MediaType != "video" || p.AdapterConfig.Version != 1 ||
+		(p.AdapterConfig.WireProfile != "images" && p.AdapterConfig.WireProfile != "inline_multimedia") ||
+		!imagecontract.IsLaoliMediaBase(a.BaseURL) || nativeAdapterKind(a, "video") != "laoli_video" ||
+		!videoplan.IsLaoliMediaModel(p.UpstreamModel) || a.Catalog == nil || !slices.Contains(a.Catalog.Models, p.UpstreamModel) {
+		return false
+	}
+	d, _ := Descriptor("laoli_video")
+	return binding == (AdapterBinding{Kind: d.Kind, Revision: d.Revision, Auth: d.Auth, TaskFlow: d.TaskFlow})
+}
+
 // Only explicit draft saves acquire defaults. Published products and historical
 // quotes retain their original configuration and hashes.
 func inheritNativeProduct(a *Account, p *Product) {
@@ -286,6 +300,10 @@ func inheritNativeProduct(a *Account, p *Product) {
 	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "seedance_video" && p.AdapterConfig.WireProfile == "" {
 		p.AdapterConfig.Version, p.AdapterConfig.WireProfile = 1, "seedance"
+	}
+	if a.Config != nil && canUpgradeLegacyLaoliVideoProfile(a, *p, bindingsFor(a, a.Config.MediaTypes)["video"]) {
+		p.AdapterConfig.WireProfile = videoplan.LaoliMediaProfile
+		return
 	}
 	if p.MediaType == "video" && nativeAdapterKind(a, "video") == "laoli_video" && p.AdapterConfig.WireProfile == "" {
 		// Only exact IDs on the documented supplier origin use this contract.

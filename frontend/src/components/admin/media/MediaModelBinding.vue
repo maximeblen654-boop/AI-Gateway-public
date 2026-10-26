@@ -1,7 +1,8 @@
 <template>
   <section class="mw-banner mw-model-binding" aria-label="处理原型号不可用" data-test="model-binding">
-    <h3>原型号不可用，请更换绑定</h3>
+    <h3>{{ failureState === 'NEEDS_DEVELOPMENT' ? '新型号需要技术适配，换绑尚未生效' : failureState === 'CHECK_FAILED' ? '新型号检查未通过，换绑尚未生效' : '原型号不可用，请更换绑定' }}</h3>
     <p>原型号已不在最近成功同步的目录中。先处理型号绑定，已有规格和售价会保留。</p>
+    <p data-test="binding-check-order">确认时会单独检查新型号是否兼容；检查未通过，会在下方说明原因，不会保存更换。</p>
     <label class="mw-field">原型号（必选）
       <select v-model="oldModel" class="input" data-test="binding-old" :disabled="disabled">
         <option value="" disabled>请选择原型号</option>
@@ -28,7 +29,7 @@
 import { computed, ref, watch } from 'vue'
 import type { ModelBindingInput } from '@/api/admin/mediaWorkbench'
 export interface MissingModelGroup { model_id: string; products: { id: string; label: string; current_model?: string }[] }
-const props = defineProps<{ groups: MissingModelGroup[]; available: string[]; addedModels: string[]; initialModel: string; initialProduct?: string; disabled: boolean; message?: string }>()
+const props = defineProps<{ groups: MissingModelGroup[]; available: string[]; addedModels: string[]; initialModel: string; initialProduct?: string; disabled: boolean; message?: string; failureState?: 'NEEDS_DEVELOPMENT' | 'CHECK_FAILED' }>()
 const emit = defineEmits<{ submit: [input: ModelBindingInput] }>()
 const oldModel = ref('')
 const replacement = ref('')

@@ -1,8 +1,10 @@
 <template>
   <section class="mw-validation" :data-status="state" aria-live="polite">
     <h3>{{ label }}</h3>
-    <p v-if="preview">本次更换尚未保存。以下检查针对拟使用的新型号配置，当前商品绑定保持原状。</p>
+    <p v-if="preview">本次更换尚未保存，原绑定和已有配置保持不变。</p>
+    <p v-if="preview" data-test="binding-diagnostic-context">原型号：{{ originalModelId || '未知' }}；拟用新型号：{{ requestedModelId || '未知' }}。以下为本次返回的 {{ productDetails?.length ?? 0 }} 件候选商品检查结果，不是全账号错误汇总。</p>
     <p v-else-if="saveState === 'saved'">草稿已保存，但尚未因此发布。客户当前使用的配置和历史订单保持不变。</p>
+    <p v-if="technicalCheck && (!productId || technicalCheck.target_product_ids.includes(productId))" data-test="current-technical-check">连接配置已按当前安装的接口重新检查；尚未因此保存或发布。下方显示本次技术检查原因。</p>
     <p v-if="state === 'PASS'">后台检查通过；未发送真实生成请求。</p>
     <p v-else-if="state === 'UNKNOWN'">整份草稿检查暂不可用。已确认保存后，可明确选择商品，在发布时单独检查。</p>
     <p v-else-if="state === 'STALE'">整份草稿检查结果不属于当前版本。先保存未保存修改，再明确选择商品进行发布检查。</p>
@@ -21,7 +23,8 @@
       </li>
     </ul>
     <details v-if="visibleDiagnostics.length" data-test="diagnostic-technical-details"><summary>技术详情（供维护者排查）</summary><pre>{{ JSON.stringify(visibleDiagnostics.map(({ code, path, message, action }) => ({ code, path, message, action })), null, 2) }}</pre></details>
-    <button v-if="development.length" type="button" class="btn btn-secondary" data-test="copy-codex" @click="copy">复制给 Codex</button>
+    <button v-if="development.length" type="button" class="btn btn-secondary" data-test="copy-codex" @click="copy">{{ productId ? '复制当前商品给 Codex' : '复制给 Codex' }}</button>
+    <p v-if="copyFeedback" role="status" class="mw-muted" data-test="copy-feedback">{{ copyFeedback }}</p>
     <label v-if="manualCopy" data-test="diagnostic-manual-copy">请选中下方诊断文本，复制给 Codex：<textarea readonly rows="10" :value="copyText" aria-label="商品模型配置诊断" @focus="($event.target as HTMLTextAreaElement).select()" /></label>
     <details v-if="!modelId && validation?.previews"><summary>请求编译示例（最多 64 条）</summary><p class="mw-muted">这是有界抽样，不是完整可售规格。选择范围和价格覆盖以商品规格、组合限制及服务端发布结果为准。</p><pre>{{ JSON.stringify(validation.previews, null, 2) }}</pre></details>
   </section>
@@ -30,24 +33,26 @@
 import { computed, ref, watch } from 'vue'
 import { mediaDiagnosticGuidance, mediaDiagnosticIsAccount, mediaDiagnosticProductId, mediaDiagnosticsForModel, mediaVisibleDiagnostics, type MediaDiagnosticProductLabel } from '@/utils/mediaAdminPresentation'
 import { mediaModelDiagnosticText } from '@/utils/mediaModelDiagnostics'
-import type { Diagnostic, Match, Product, Validation } from '@/api/admin/mediaWorkbench'
-const props = defineProps<{ validation?: Validation; current: boolean; unavailable: boolean; saveState: string; diagnostics: Diagnostic[]; accountId?: number; modelId: string; requestedModelId?: string; draftRevision?: string; products?: MediaDiagnosticProductLabel[]; productDetails?: Product[]; preview?: boolean }>()
+import type { Diagnostic, Match, Product, Validation, NativeAdapter, CurrentTechnicalDiagnostics } from '@/api/admin/mediaWorkbench'
+const props = defineProps<{ validation?: Validation; current: boolean; unavailable: boolean; saveState: string; diagnostics: Diagnostic[]; accountId?: number; accountHost?: string; nativeAdapters?: Partial<Record<'image' | 'video', Pick<NativeAdapter, 'kind' | 'revision'>>>; originalModelId?: string; modelId: string; productId?: string; technicalCheck?: Pick<CurrentTechnicalDiagnostics, 'checked_at' | 'source' | 'target_product_ids'>; requestedModelId?: string; draftRevision?: string; products?: MediaDiagnosticProductLabel[]; productDetails?: Product[]; preview?: boolean }>()
 const emit = defineEmits<{ locate: [diagnostic: Diagnostic]; message: [value: string] }>()
 const state = computed(() => props.preview ? props.validation?.status ?? 'UNKNOWN' : props.saveState === 'saving' ? 'SAVING' : props.saveState === 'unconfirmed' ? 'UNCONFIRMED' : props.saveState === 'conflict' ? 'CONFLICT' : props.saveState === 'failed' ? 'SAVE_FAILED' : props.unavailable ? 'UNKNOWN' : !props.current ? 'STALE' : props.validation?.status ?? 'UNKNOWN')
-const label = computed(() => ({ SAVING: '保存中', UNCONFIRMED: '保存结果待核对', CONFLICT: '服务器版本冲突', SAVE_FAILED: '保存失败', PENDING: '草稿已确认保存，检查中', VALIDATING: '草稿已确认保存，检查中', RUNNING: '草稿已确认保存，检查中', PASS: '检查通过', FAIL: props.modelId && !visibleDiagnostics.value.length ? '整份草稿检查未通过' : '检查失败，请处理以下事项', UNKNOWN: '检查暂不可用', STALE: '检查结果待更新' } as Record<string, string>)[state.value] ?? `后台状态：${state.value}`)
+const label = computed(() => ({ SAVING: '保存中', UNCONFIRMED: '保存结果待核对', CONFLICT: '服务器版本冲突', SAVE_FAILED: '保存失败', PENDING: '草稿已确认保存，检查中', VALIDATING: '草稿已确认保存，检查中', RUNNING: '草稿已确认保存，检查中', PASS: '检查通过', FAIL: props.preview && development.value.length ? '新型号需要技术适配，换绑尚未生效' : props.modelId && !visibleDiagnostics.value.length ? '整份草稿检查未通过' : '检查失败，请处理以下事项', UNKNOWN: '检查暂不可用', STALE: '检查结果待更新' } as Record<string, string>)[state.value] ?? `后台状态：${state.value}`)
 const visibleDiagnostics = computed(() => mediaVisibleDiagnostics(mediaDiagnosticsForModel(props.diagnostics, props.modelId, props.productDetails), props.productDetails))
-const development = computed(() => visibleDiagnostics.value.filter(d => d.class === 'NEEDS_DEVELOPMENT'))
+const development = computed(() => mediaDiagnosticsForModel(visibleDiagnostics.value, props.modelId, props.productDetails, props.productId).filter(d => d.class === 'NEEDS_DEVELOPMENT'))
 const copyText = computed(() => mediaModelDiagnosticText(props))
 const manualCopy = ref(false)
-watch(copyText, () => { manualCopy.value = false })
+const copyFeedback = ref('')
+watch(copyText, () => { manualCopy.value = false; copyFeedback.value = '' })
 function productLabel(diagnostic: Diagnostic) {
   const id = mediaDiagnosticProductId(diagnostic, props.productDetails)
-  const product = props.products?.find(item => item.product_id === id)
+  const product = props.preview ? undefined : props.products?.find(item => item.product_id === id)
   const detail = props.productDetails?.find(item => item.product_id === id)
   return product || detail ? `所属商品：${product?.label || detail?.display_name || '名称未知'}` : mediaDiagnosticIsAccount(diagnostic) ? `Account #${props.accountId ?? '未知'} · 账号级检查` : '所属商品暂不可定位，请重新读取草稿核对'
 }
 function fieldLabel(path: string) {
   if (path === 'upstream_model' || path.endsWith('.upstream_model')) return '模型选择 · 当前上游模型'
+  if (path.includes('wire_profile')) return '视频连接配置 · 系统技术检查'
   if (path.includes('edit_execution')) return '参考图编辑 · 单请求能力'
   if (path.includes('execution')) return '文生图 · 单请求能力'
   if (path.includes('cost_rules') || path.includes('cost_coverage')) return '历史成本信息 · 技术核对'
@@ -72,11 +77,11 @@ async function copy() {
     await navigator.clipboard.writeText(content)
     if (content !== copyText.value) return
     manualCopy.value = false
-    emit('message', '商品配置诊断已复制；请先说明是新增能力，还是恢复正常使用。')
+    copyFeedback.value = '说明已复制，可粘贴给 Codex；复制不会更改商品配置。'
   } catch {
     if (content !== copyText.value) return
     manualCopy.value = true
-    emit('message', '剪贴板暂不可用，可在下方手动复制完整诊断。')
+    copyFeedback.value = '剪贴板暂不可用，请在下方手动复制完整说明。'
   }
 }
 </script>

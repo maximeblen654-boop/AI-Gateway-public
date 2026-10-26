@@ -53,3 +53,23 @@ describe('current model diagnostic panel', () => {
     wrapper.unmount()
   })
 })
+
+
+it('explains the selected new model failure and copies the actual candidate with original binding context', async () => {
+  const candidate = copy(imageProduct)
+  candidate.upstream_model = 'checked-model'; candidate.display_name = '原发布商品'
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  vi.stubGlobal('navigator', { clipboard: { writeText } })
+  const wrapper = mount(MediaValidationPanel, { props: { preview: true, current: false, unavailable: false, saveState: 'saved', validation: { draft_revision: 'r1', checked_at: '2026-10-26T09:52:44Z', status: 'FAIL', publish_ready: false, diagnostics: [] }, accountId: 44, accountHost: 'video.laoliimage2.win', nativeAdapters: { video: { kind: 'laoli_video', revision: 'r1' } }, modelId: '', originalModelId: 'old-model', requestedModelId: 'requested-model', productDetails: [candidate], products: [{ product_id: candidate.product_id, label: '草稿里的另一显示名' }], diagnostics: [issue(candidate.product_id, 'REAL_UNSUPPORTED')] } })
+  expect(wrapper.get('h3').text()).toContain('新型号需要技术适配，换绑尚未生效')
+  expect(wrapper.get('[data-test="binding-diagnostic-context"]').text()).toContain('old-model')
+  expect(wrapper.get('[data-test="binding-diagnostic-context"]').text()).toContain('requested-model')
+  expect(wrapper.get('[data-test="binding-diagnostic-context"]').text()).toContain('不是全账号错误汇总')
+  expect(wrapper.get('[data-test="diagnostic-product"]').text()).toContain('原发布商品')
+  await wrapper.get('[data-test="copy-codex"]').trigger('click'); await flushPromises()
+  const report = JSON.parse(writeText.mock.calls[0]![0])
+  expect(report).toMatchObject({ model_id: 'checked-model', original_model_id: 'old-model', requested_model_id: 'requested-model' })
+  expect(wrapper.get('[data-test="copy-feedback"]').text()).toContain('说明已复制')
+  expect(wrapper.emitted('message')).toBeUndefined()
+  wrapper.unmount()
+})

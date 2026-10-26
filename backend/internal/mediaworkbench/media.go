@@ -259,9 +259,10 @@ type ModelState struct {
 	State   string `json:"state"`
 }
 type Detail struct {
-	BindingValidationProducts []Product      `json:"binding_validation_products,omitempty"`
-	ProductStates             []ProductState `json:"product_states"`
-	PublishValidation         *Validation    `json:"publish_validation,omitempty"`
+	CurrentTechnicalDiagnostics *TechnicalDiagnostics `json:"current_technical_diagnostics,omitempty"`
+	BindingValidationProducts   []Product             `json:"binding_validation_products,omitempty"`
+	ProductStates               []ProductState        `json:"product_states"`
+	PublishValidation           *Validation           `json:"publish_validation,omitempty"`
 	*Account
 	NativeAdapters map[string]AdapterDescriptor `json:"native_adapters"`
 	ProductRemoval map[string]DraftRemoval      `json:"product_removal"`
@@ -328,6 +329,7 @@ func describe(a *Account) *Detail {
 func describeContext(ctx context.Context, a *Account) *Detail {
 	ready := publishedSnapshotValidator(ctx, a)
 	d := &Detail{Account: a, Models: []ModelState{}, EffectiveState: "NOT_INITIALIZED"}
+	d.CurrentTechnicalDiagnostics = currentTechnicalDiagnostics(a, time.Now().UTC())
 	d.ProductStates = describeProductsContext(ctx, a, ready)
 	d.ProductRemoval = draftRemovalOptions(a.Config)
 	d.NativeAdapters = map[string]AdapterDescriptor{}
@@ -353,7 +355,9 @@ func describeContext(ctx context.Context, a *Account) *Detail {
 			if p.UpstreamModel == "" {
 				continue
 			}
-			if discovered[p.UpstreamModel] {
+			if a.Catalog == nil || a.Catalog.SyncedAt == "" {
+				states[p.UpstreamModel] = "MODEL_SYNC_REQUIRED"
+			} else if discovered[p.UpstreamModel] {
 				states[p.UpstreamModel] = "DRAFT"
 			} else if a.Catalog != nil {
 				states[p.UpstreamModel] = "UPSTREAM_NOT_DISCOVERED"
@@ -375,27 +379,46 @@ func describeContext(ctx context.Context, a *Account) *Detail {
 				d.EffectiveState = "SELLING"
 			}
 		}
+		diagnostics := c.Validation.Diagnostics
+		projectionModels := map[string]bool{}
+		if d.CurrentTechnicalDiagnostics != nil {
+			diagnostics = d.CurrentTechnicalDiagnostics.Diagnostics
+			for _, p := range c.Draft.Products {
+				if slices.Contains(d.CurrentTechnicalDiagnostics.TargetProductIDs, p.ProductID) {
+					projectionModels[p.UpstreamModel] = true
+				}
+			}
+		}
+		modelClasses := map[string]string{}
 		for _, p := range c.Draft.Products {
 			if states[p.UpstreamModel] != "DRAFT" {
 				continue
 			}
-			for _, diagnostic := range c.Validation.Diagnostics {
-				if diagnostic.Scope == p.ProductID {
+			for _, diagnostic := range diagnostics {
+				if diagnostic.Scope != p.ProductID {
+					continue
+				}
+				if !projectionModels[p.UpstreamModel] {
 					states[p.UpstreamModel] = diagnostic.Class
 					break
 				}
+				if diagnosticClassPriority(diagnostic.Class) > diagnosticClassPriority(modelClasses[p.UpstreamModel]) {
+					modelClasses[p.UpstreamModel] = diagnostic.Class
+				}
 			}
+		}
+		for model, class := range modelClasses {
+			states[model] = class
 		}
 		if c.Published != nil {
 			for _, p := range c.Published.Products {
 				if !p.Enabled {
 					continue
 				}
-				if !discovered[p.UpstreamModel] {
+				if a.Catalog == nil || a.Catalog.SyncedAt == "" {
+					states[p.UpstreamModel] = "MODEL_SYNC_REQUIRED"
+				} else if !discovered[p.UpstreamModel] {
 					states[p.UpstreamModel] = "UPSTREAM_NOT_DISCOVERED"
-					if a.Catalog == nil {
-						states[p.UpstreamModel] = "MODEL_SYNC_REQUIRED"
-					}
 				} else if states[p.UpstreamModel] == "PENDING" || (states[p.UpstreamModel] == "DRAFT" && draftProductMatchesPublished(c.Draft, p)) {
 					states[p.UpstreamModel] = "PUBLISHED"
 				}
