@@ -105,6 +105,8 @@ jobs:
           gh run download 38443205417 --repo "$GITHUB_REPOSITORY" \
             --name native-media-candidate-b2fcdac93afa6ae194ee81801a9b37813f8f39eb \
             --dir "$NATIVE_REUSE_ARTIFACT_DIR"
+      - name: Catalog snapshot fixture regression
+        run: node --test tools/native-media-e2e/catalog-fixture.test.cjs
       - name: Build only this commit, using existing component recipes
         id: build
         run: node tools/native-media-e2e/candidate.mjs build
@@ -236,6 +238,8 @@ jobs:
           sudo apt-get install -y "${packages[@]}"
       - name: Install locked frontend dependencies
         run: pnpm --dir frontend install --frozen-lockfile
+      - name: Catalog snapshot fixture regression
+        run: node --test tools/native-media-e2e/catalog-fixture.test.cjs
       - name: Accept the existing candidate without rebuilding
         env:
           NATIVE_CANDIDATE_SOURCE_SHA: ${{ github.event.inputs.candidate_source_sha }}

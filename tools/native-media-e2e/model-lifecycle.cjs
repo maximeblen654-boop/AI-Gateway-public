@@ -1,6 +1,7 @@
 // Incremental acceptance against final Core/Bridge/BFF and isolated PostgreSQL.
 // Only the existing local supplier is simulated. No browser routes are mocked.
 const fs=require('node:fs'),assert=require('node:assert/strict')
+const {createCatalogFixture}=require('./catalog-fixture.cjs')
 const {createHash,randomUUID}=require('node:crypto')
 const {expect}=require('../../frontend/node_modules/@playwright/test')
 module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,base,accountPath,stats})=>{
@@ -18,11 +19,11 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
  const report={production:false,api_mocking:false,supplier:'local simulator only',source_sha:process.env.NATIVE_CANDIDATE_SOURCE_SHA,checks:[],screenshots:[],actions:[]}
  const save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2))
  const query=q=>dc('exec','-T','postgres','psql','-X','-U','native','-d','sub2api','-At','-v','ON_ERROR_STOP=1','-c',q).toString().trim()
- const sqlJSON=v=>"'"+JSON.stringify(v).replace(/'/g,"''")+"'::jsonb"
  const id=fixture.accounts.openai,gid=fixture.groups.openai
  assert(Number.isSafeInteger(id)&&Number.isSafeInteger(gid))
- const nativeCatalog=JSON.parse(query(`SELECT extra->'upstream_model_catalog_snapshot' FROM accounts WHERE id=${id} AND name LIKE 'Synthetic %'`))
- const setCatalog=value=>assert(query(`UPDATE accounts SET extra=jsonb_set(extra,'{upstream_model_catalog_snapshot}',${sqlJSON(value)}) WHERE id=${id} AND name LIKE 'Synthetic %' RETURNING id`).split(/\r?\n/).includes(String(id)))
+ const catalogFixture=createCatalogFixture({query,accountId:id})
+ const {setCatalog}=catalogFixture
+ let nativeCatalog
  const ok=r=>{assert.equal(r.status,200,JSON.stringify(r));return r.body}
  const config=async(path=accountPath)=>(await api(path)).media_workbench_v1
  const saveDraft=async(path,products)=>{const c=await config(path);return (await api(path+'/draft','PUT',{expected_record_version:c?.record_version||0,draft:{products}})).media_workbench_v1}
@@ -52,6 +53,11 @@ module.exports=async({root,fixture,dc,api,raw,current,check,change,media,page,ba
   // Native API admission uses its own explicit model mapping. This synthetic
   // fixture does not borrow Studio's Published-model context or task headers.
   await api('/admin/accounts/'+id,'PUT',{credentials:{...source.credentials,base_url:'https://localhost:19090',model_mapping:{...source.credentials.model_mapping,'gpt-image-1':'gpt-image-1'}},upstream_billing_probe_enabled:false})
+  // The URL change invalidates the earlier provider identity. Capture the
+  // normal sync result now; every later isolated injection keeps it fresh.
+  nativeCatalog=await catalogFixture.captureAfterSync(()=>api('/admin/accounts/'+id+'/models/sync-upstream','POST',{}))
+  assert(nativeCatalog.models.includes('gpt-image-2')&&nativeCatalog.models.includes('gpt-image-1'))
+  report.catalog_fixture_baseline=structuredClone(nativeCatalog);save()
   const original=await config(),products=structuredClone(original.draft.products)
   assert.equal(products.length,2);assert(products.every(p=>p.media_type==='image'))
   const [a,b]=products
