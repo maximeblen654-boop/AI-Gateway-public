@@ -320,6 +320,102 @@ func (s *StudioPaidControl) Apply(ctx context.Context, m string, actor int64, en
 	}
 	return out, &report, nil
 }
+
+const StudioPaidRenewExistingMode = "renew-existing"
+
+// ApplyWithMode keeps ordinary Apply unchanged; renewal can only rebind an
+// already approved exact scope to this Core runtime after a restart.
+func (s *StudioPaidControl) ApplyWithMode(ctx context.Context, m string, actor int64, enable bool, revision, fingerprint, mode string) (PaidState, *PaidReport, error) {
+	if mode == "" {
+		return s.Apply(ctx, m, actor, enable, revision, fingerprint)
+	}
+	if mode != StudioPaidRenewExistingMode || !enable {
+		return PaidState{Media: m, Reason: "invalid_renewal_mode"}, nil, ErrPaidControl
+	}
+	return s.renewExisting(ctx, m, actor, revision, fingerprint)
+}
+
+func (s *StudioPaidControl) renewExisting(ctx context.Context, m string, actor int64, revision, fingerprint string) (PaidState, *PaidReport, error) {
+	if s == nil || !s.Managed || !validPaidMedia(m) || actor <= 0 || s.Settings == nil || s.Check == nil || s.Snapshot == nil {
+		return PaidState{Media: m, Reason: "deployment_mode"}, nil, ErrPaidControl
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	deny := func(reason string, report *PaidReport) (PaidState, *PaidReport, error) {
+		return PaidState{Media: m, Reason: reason}, report, ErrPaidControl
+	}
+	raw, err := s.Settings.GetValue(ctx, paidSetting(m))
+	var current paidRecord
+	var fields map[string]json.RawMessage
+	if err != nil || json.Unmarshal([]byte(raw), &current) != nil || json.Unmarshal([]byte(raw), &fields) != nil || fields == nil {
+		s.failed.Store(m, true)
+		return deny("state_unavailable", nil)
+	}
+	if current.Revision == "" || current.Revision != revision {
+		return deny("revision_changed", nil)
+	}
+	approved := paidDependencies{Shared: current.SharedFingerprint, Offers: map[string]string{}}
+	for id, identity := range current.Grants {
+		approved.Offers[id] = identity
+	}
+	if current.Actor != actor || !current.Enabled || current.Fingerprint == "" || fingerprint != current.Fingerprint || !paidDependenciesContain(approved, approved) || studioHash(approved) != current.Fingerprint {
+		return deny("renewal_scope_changed", nil)
+	}
+	s.once.Do(func() { s.epoch, _ = studioRandom() })
+	blocked, _ := s.failed.Load(m)
+	if blocked == true || s.epoch == "" || current.Epoch == "" || current.Epoch == s.epoch {
+		return deny("renewal_requires_runtime_restart", nil)
+	}
+	// The old epoch already keeps admission closed. Latch any failed renewal
+	// closed too; never clear the stored scope as ordinary Apply does.
+	s.failed.Store(m, true)
+	if ctx.Err() != nil {
+		return deny("renewal_cancelled", nil)
+	}
+	report := s.Preflight(ctx, m, current.Actor)
+	if ctx.Err() != nil || !report.Pass || report.Media != m || report.Fingerprint != studioHash(report.dependencies) || !paidDependenciesContain(report.dependencies, approved) {
+		return deny("renewal_scope_changed", &report)
+	}
+	latest, err := s.Snapshot(ctx, m, current.Actor)
+	if ctx.Err() != nil || err != nil || !paidDependenciesContain(latest, approved) {
+		return deny("renewal_dependencies_changed", &report)
+	}
+	// Same single-Core mutex/revision ownership as Apply. This re-read also
+	// rejects an out-of-band disable/scope edit during the full validation.
+	unchanged, err := s.Settings.GetValue(ctx, paidSetting(m))
+	if err != nil || unchanged != raw || ctx.Err() != nil {
+		return deny("revision_changed", &report)
+	}
+	nextRevision, err := studioRandom()
+	if err != nil {
+		return deny("apply_failed", &report)
+	}
+	fields["revision"], _ = json.Marshal(nextRevision)
+	fields["epoch"], _ = json.Marshal(s.epoch)
+	next, err := json.Marshal(fields)
+	if err != nil || s.Settings.Set(ctx, paidSetting(m), string(next)) != nil {
+		return deny("apply_failed", &report)
+	}
+	stored, err := s.Settings.GetValue(ctx, paidSetting(m))
+	if err != nil || stored != string(next) || ctx.Err() != nil {
+		return deny("renewal_dependencies_changed", &report)
+	}
+	s.failed.Store(m, false)
+	out := s.Status(ctx, m)
+	// Status admits any surviving approved offer. Renewal must finish with
+	// an observation containing every old grant, including after that read.
+	latest, snapshotErr := s.Snapshot(ctx, m, current.Actor)
+	if snapshotErr != nil || ctx.Err() != nil || !paidDependenciesContain(latest, approved) {
+		s.failed.Store(m, true)
+		return deny("renewal_dependencies_changed", &report)
+	}
+	if !out.Effective || out.Revision != nextRevision || out.Fingerprint != current.Fingerprint || out.Actor != current.Actor || !out.Requested {
+		s.failed.Store(m, true)
+		return out, &report, ErrPaidControl
+	}
+	return out, &report, nil
+}
+
 func StudioManagedPaidMode() bool {
 	return os.Getenv("STUDIO_PAID_CONTROL_MODE") == StudioPaidControlVersion
 }
