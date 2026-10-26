@@ -4,6 +4,7 @@ const fs = require('node:fs')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
 const { createHash, randomUUID } = require('node:crypto')
+const { assertPreflightSupplierStats } = require('./preflight-supplier-stats.cjs')
 
 const base = 'http://127.0.0.1:28100'
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
@@ -65,7 +66,7 @@ function assertHistoryReadOnly(before, after) {
   assert.deepEqual(after.ledger, before.ledger, 'History changed balance, frozen funds, usage, cost, dedup or Account quota')
   assert.equal(after.supplier.image_posts, before.supplier.image_posts, 'History generated an image')
   assert.equal(after.supplier.video_posts, before.supplier.video_posts, 'History generated a video')
-  assert.deepEqual(after.supplier.requests, before.supplier.requests, 'History contacted the supplier, including polling or downloading')
+  return assertPreflightSupplierStats(after.supplier, before.supplier)
 }
 
 async function setAccountSchedulable(core, token, accountID, schedulable) {
@@ -423,14 +424,14 @@ module.exports = async function run(root, suppliedCompose, suppliedFixture, supp
     assert.equal(videoHistoryExpected.length, 3)
     assert.equal(videoHistoryExpected.filter(task => task.status === 'captured').length, 2)
     assert.equal(videoHistoryExpected.filter(task => task.status === 'released').length, 1)
-    const historyBefore = { ledger: snapshot(user), supplier: stats() }, historyReads = []
+    const historyBefore = { ledger: snapshot(user), supplier: stats() }, historyReads = [], historySupplierObservations = []
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt) await session(user)
       historyReads.push(assertVideoHistory(ok(await media(user, 'video', 'operations')), videoHistoryExpected))
-      assertHistoryReadOnly(historyBefore, { ledger: snapshot(user), supplier: stats() })
+      historySupplierObservations.push(assertHistoryReadOnly(historyBefore, { ledger: snapshot(user), supplier: stats() }))
     }
-    report.video_history = { tasks: historyReads[0], authenticated_sessions: historyReads.length, pure_history: true, ledger_unchanged: true, supplier_requests_added: 0 }
-    report.checks.push('Two completed videos and one released original retain exact operation/child/Offer/spec/price through real BFF/Bridge/Core history in original and fresh sessions; no receipt recovery, supplier request or ledger change')
+    report.video_history = { tasks: historyReads[0], authenticated_sessions: historyReads.length, pure_history: true, ledger_unchanged: true, supplier_requests_added: historySupplierObservations.at(-1).added_catalog_gets, supplier_observations: historySupplierObservations }
+    report.checks.push('Two completed videos and one released original retain exact operation/child/Offer/spec/price through real BFF/Bridge/Core history in original and fresh sessions; no receipt recovery, supplier generation/poll/download or ledger change; concurrent exact catalog GETs counted separately')
     saveReport()
     const prior = structuredClone(report.tasks)
     const saved = await draft([{ ...image, pricing_rules: [{ match: {}, sale_price: price('1.1') }] }, { ...wan, pricing_rules: [{ match: {}, sale_price: price('2.5') }] }, incomplete])

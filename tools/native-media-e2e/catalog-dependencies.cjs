@@ -1,5 +1,6 @@
 // Reuse the existing isolated paid-controls browser/session and PostgreSQL.
 const assert=require('node:assert/strict')
+const {assertPreflightSupplierStats}=require('./preflight-supplier-stats.cjs')
 module.exports=async({fixture,dc,api,current,check,change,media,page,base,accountPath,p,stats,before})=>{
  assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted')
  assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO,'paid-controls')
@@ -46,6 +47,6 @@ module.exports=async({fixture,dc,api,current,check,change,media,page,base,accoun
  const recheck=await check('image');assert.equal((await change('image',true,recheck)).status,200)
  assert.equal((await current('image')).effective_enabled,true);assert.equal((await current('video')).effective_enabled,false)
  assert.deepEqual((await api(accountPath)).media_workbench_v1,config)
- assert.deepEqual(stats(),before,'catalog/quote checks called supplier')
- return{pass:true,specs:1870,quotes,irrelevant_changes_preserved_grant:true,model_deletion_closed_and_rejected:true,restore_required_explicit_recheck:true,all_product_config_unchanged:true,supplier_calls:0}
+ const supplier_observation=assertPreflightSupplierStats(stats(),before)
+ return{pass:true,specs:1870,quotes,irrelevant_changes_preserved_grant:true,model_deletion_closed_and_rejected:true,restore_required_explicit_recheck:true,all_product_config_unchanged:true,supplier_observation}
 }

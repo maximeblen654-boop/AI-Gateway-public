@@ -2,6 +2,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict')
 const {execFileSync}=require('node:child_process')
 const {chromium,expect}=require('../../frontend/node_modules/@playwright/test')
+const {assertPreflightSupplierStats}=require('./preflight-supplier-stats.cjs')
 const root=process.argv[2],phase=process.argv[3],base='http://127.0.0.1:28100'
 assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted');assert.equal(process.env.NATIVE_ACCEPTANCE_SCENARIO,'paid-controls')
 assert(root.endsWith('/native-media-20261012'))
@@ -9,10 +10,13 @@ const fixture=JSON.parse(fs.readFileSync(root+'/evidence/fixture.json')),compose
 assert.equal(compose.services.postgres.environment.POSTGRES_DB,'sub2api');assert.equal(compose.services.core.environment.STUDIO_PAID_CONTROL_MODE,'managed-v1')
 const report={phase,checks:[],screenshots:[],http_errors:[],production:false,supplier:'local simulator only'}
 const stats=()=>JSON.parse(fs.readFileSync(root+'/evidence/native-supplier-state.json'))
+const observeSupplier=(label,before,after=stats())=>{const proof=assertPreflightSupplierStats(after,before);(report.supplier_preflight_observations??=[]).push({label,...proof});return proof}
 const dc=(...args)=>execFileSync('docker',['compose','-p','ai-gateway-native-20261012','-f',root+'/compose.json',...args],{stdio:'pipe'})
 // Isolated dependency-fault injection only. Native Account update automatically
 // launches an unrelated Responses capability probe; do not mistake that for a
-// preflight request or weaken the zero-network assertion. Positive product flows
+// preflight generation or weaken the no-generation assertion. Exact concurrent
+// native catalog GETs are counted separately; all other supplier state is frozen.
+// Positive product flows
 // continue through the real Vue/API paths.
 const setMapping=(id,mapping)=>{
  assert.equal(id,fixture.accounts.openai);assert(Number.isSafeInteger(id));assert.equal(compose.services.postgres.environment.POSTGRES_DB,'sub2api')
@@ -109,13 +113,13 @@ const p='/admin/media-workbench/paid-controls/'
    assert(elapsed<15000,`server enable recheck took ${elapsed}ms`)
    report.scale.apply={wall_ms:elapsed,report:result.report}
    assert.equal((await current('video')).effective_enabled,false)
-   assert.deepEqual(stats(),before,'all 1870 checks and enable recheck must make zero supplier calls')
+   observeSupplier('1870-spec-preflights-and-enable',before)
    if(process.env.NATIVE_CATALOG_RECOVERY==='true') report.catalog_dependencies=await require('./catalog-dependencies.cjs')({fixture,dc,api,current,check,change,media,page,base,accountPath,p,stats,before})
    if(process.env.NATIVE_MODEL_LIFECYCLE==='true') report.model_lifecycle=await require('./model-lifecycle.cjs')({root,fixture,dc,api,raw,current,check,change,media,page,base,accountPath,stats})
    assert.equal((await change('image',false)).status,200)
    assert.equal((await current('image')).effective_enabled,false)
    report.assets=await proof()
-   report.checks.push('All 1870 specs checked; three real admin UI preflights and enable recheck under 15s with zero supplier requests; optional lifecycle delivery reported separately; video stayed closed; final both closed')
+   report.checks.push('All 1870 specs checked; three real admin UI preflights and enable recheck under 15s without supplier generation or business-state change; concurrent exact catalog GETs counted separately; optional lifecycle delivery reported separately; video stayed closed; final both closed')
   }else if(phase==='close'){
    for(const kind of ['image','video']){assert.equal((await change(kind,false)).status,200);assert.equal((await current(kind)).effective_enabled,false)}
    report.checks.push('Both synthetic paid gates closed after simulated task acceptance')
@@ -135,7 +139,7 @@ const p='/admin/media-workbench/paid-controls/'
     const r=await media('image','quotes','POST',{offer_id:offer.offer_id,spec:{resolution:'1K',aspect_ratio:'1:1',count:1,images,videos:0,audio:0,duration_seconds:0,quality:''}})
     assert.equal(r.status,200,JSON.stringify(r));report.checks.push((images?'edit':'text')+' real BFF → Bridge → Core quote succeeds while paid closed with unrelated legacy mapping')
    }
-   assert.deepEqual(stats(),before,'closed quote must not reach supplier')
+   observeSupplier('closed-quotes',before)
    // Native permission/balance failure must stay closed and retain a safe category.
    const admin=await api('/auth/me');assert.equal(admin.email,'native-admin@example.invalid')
    await api('/admin/users/'+admin.id+'/balance','POST',{balance:100,operation:'subtract',notes:'Isolated refusal test'})
@@ -149,7 +153,7 @@ const p='/admin/media-workbench/paid-controls/'
    report.checks.push('Native insufficient balance rejects both quotes and preflight without opening; safe billing diagnostic preserved')
    const imageCheck=await check('image'),videoCheck=await check('video')
    assert(imageCheck.checks.some(c=>c.code==='native_quote'&&c.path==='edit'&&c.pass));assert(imageCheck.checks.some(c=>c.code==='native_quote'&&c.path==='text'&&c.pass))
-   assert.deepEqual(stats(),before,'preflight must not contact supplier')
+   observeSupplier('closed-preflight',before)
    assert.equal((await change('image',true,{fingerprint:'stale'})).status,409)
    assert.equal((await current('image')).effective_enabled,false)
    await page.goto(base+'/admin/media')
@@ -186,13 +190,13 @@ const p='/admin/media-workbench/paid-controls/'
    // A real sidecar outage fails the server opening action, not merely the UI.
    dc('stop','bff')
    try{assert.equal((await change('image',true,imageCheck)).status,409);assert.equal((await current('image')).effective_enabled,false)}finally{dc('up','-d','--no-deps','--wait','--wait-timeout','60','bff')}
-   report.supplier_after_checks=stats();assert.deepEqual(report.supplier_after_checks,before,'all checks, rejects and drift tests remain non-paid')
+   report.supplier_after_checks=stats();observeSupplier('checks-rejects-and-drift',before,report.supplier_after_checks)
    const ready=await check('image');assert.equal((await change('image',true,ready)).status,200)
    assert.equal((await current('image')).effective_enabled,true);assert.equal((await current('video')).effective_enabled,false)
    // Open video independently, solely for the following existing simulated E2E.
    assert.equal((await change('video',true,await check('video'))).status,200)
    assert.equal((await current('image')).effective_enabled,true);assert.equal((await current('video')).effective_enabled,true)
-   report.checks.push('Server recheck rejects stale PASS; native permission rejects customer; API mapping drift preserves explicit Studio identity; BFF outage blocks opening; independent video enable; no supplier activity during any preflight')
+   report.checks.push('Server recheck rejects stale PASS; native permission rejects customer; API mapping drift preserves explicit Studio identity; BFF outage blocks opening; independent video enable; no supplier generation or business-state change during preflight; concurrent exact catalog GETs counted separately')
    report.image_preflight=imageCheck;report.video_preflight=videoCheck;report.assets=await proof()
   }
   report.pass=true

@@ -1,6 +1,18 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { assertVideoFailureRelease, assertPublic, assertZeroBalanceRejection, setAccountSchedulable, setAccountQuota, clearAccountQuota, setKeyStatus, disableFixtureSales } = require('./workbench-procurement.cjs')
+const { assertVideoFailureRelease, assertPublic, assertZeroBalanceRejection, assertHistoryReadOnly, setAccountSchedulable, setAccountQuota, clearAccountQuota, setKeyStatus, disableFixtureSales } = require('./workbench-procurement.cjs')
+
+test('history records concurrent exact catalog GETs while preserving full supplier state and ledger', () => {
+  const before = { ledger: { balance: '10', usage: 1 }, supplier: { image_posts: 127, video_posts: 3, tasks: { done: { state: 'complete' } }, requests: [] } }
+  const after = structuredClone(before)
+  after.supplier.requests.push({ auth: 'bearer', body: {}, method: 'GET', path: '/v1/models' })
+  const proof = assertHistoryReadOnly(before, after)
+  assert.equal(proof.added_catalog_gets, 1); assert.match(proof.added_requests_sha256, /^[a-f0-9]{64}$/)
+  for (const change of [value => { value.ledger.usage++ }, value => { value.supplier.image_posts++ }, value => { value.supplier.tasks.done.state = 'changed' }, value => { value.supplier.requests[0].path = '/v1/tasks/one' }, value => { value.supplier.requests[0].method = 'POST' }]) {
+    const changed = structuredClone(after); change(changed)
+    assert.throws(() => assertHistoryReadOnly(before, changed))
+  }
+})
 
 test('customer privacy audit permits sale price, model, offer and task identity', () => {
   assert.doesNotThrow(() => assertPublic({ offers: [{ offer_id: 'offer-1', product_id: 'product-1', model: 'public-model', sale_price: { amount: '2', currency: 'CNY', billing_mode: 'per_request' } }], task_id: 'task-1' }))
