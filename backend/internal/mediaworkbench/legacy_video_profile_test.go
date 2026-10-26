@@ -60,7 +60,7 @@ func TestLaoliLegacyVideoProfileRebindPreservesPublishedAndDivergentDraft(t *tes
 				p.SiteModel = "customer-video-alias"
 				saved, err := s.SaveDraft(t.Context(), 7, a.Config.RecordVersion, DraftInput{Products: []Product{p}})
 				require.NoError(t, err)
-				saved, err = s.Publish(t.Context(), 7, saved.Config.RecordVersion, saved.Config.Draft.Revision)
+				_, err = s.Publish(t.Context(), 7, saved.Config.RecordVersion, saved.Config.Draft.Revision)
 				require.NoError(t, err)
 				// Represent the persisted legacy snapshots before the explicit repair.
 				oldID := "removed-" + model
