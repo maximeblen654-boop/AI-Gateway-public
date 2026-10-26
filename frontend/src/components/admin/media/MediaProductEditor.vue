@@ -118,7 +118,7 @@ function toggleOutputFormat(format: string) {
     next.capabilities.output_formats = formats.includes(format) ? formats.filter(value => value !== format) : [...formats, format]
   })
 }
-const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['720p', '1080p', '4K'] : ['1K', '2K', '4K'])
+const resolutionPresets = computed(() => props.product.media_type === 'video' ? ['480p', '720p', '1080p', '2K', '4K'] : ['1K', '2K', '4K'])
 const pricingDimensionDefinitions: { key: PricingDimension; label: string }[] = [
   { key: 'resolution', label: '分辨率' },
   { key: 'aspect_ratio', label: '比例' },

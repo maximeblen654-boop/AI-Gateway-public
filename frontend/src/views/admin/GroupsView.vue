@@ -1,5 +1,6 @@
 <template>
-  <AppLayout>
+  <component :is="embedded ? 'div' : AppLayout">
+    <p v-if="initialActionError" class="text-red-600" role="alert">{{ initialActionError }} <button type="button" class="btn btn-secondary" @click="openInitialAction">重试读取分组</button></p>
     <TablePageLayout>
       <template #filters>
         <div
@@ -3767,12 +3768,16 @@
       :show="showDeleteDialog"
       :title="t('admin.groups.deleteGroup')"
       :message="deleteConfirmMessage"
+      :busy="deleteSubmitting"
       :confirm-text="t('common.delete')"
       :cancel-text="t('common.cancel')"
       :danger="true"
       @confirm="confirmDelete"
       @cancel="showDeleteDialog = false"
-    />
+    >
+      <p v-if="deleteSubmitting" role="status">正在删除分组，请稍候…</p>
+      <p v-if="deleteError" class="text-red-600" role="alert">{{ deleteError }}</p>
+    </ConfirmDialog>
 
     <ConfirmDialog
       :show="showUnsupportedLiveConfirm"
@@ -4261,7 +4266,7 @@
       @close="showRPMOverridesModal = false"
       @success="loadGroups"
     />
-  </AppLayout>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -4451,6 +4456,15 @@ const groupPricingToAPI = (
       time_pricing: null,
     }));
 
+const props = withDefaults(defineProps<{
+  embedded?: boolean;
+  initialAction?: 'list' | 'create' | 'edit' | 'delete';
+  initialGroupId?: number;
+  initialGroupName?: string;
+}>(), { embedded: false, initialAction: 'list' });
+const initialActionError = ref('');
+const deleteSubmitting = ref(false);
+const deleteError = ref('');
 const { t } = useI18n();
 const appStore = useAppStore();
 const authStore = useAuthStore();
@@ -4490,7 +4504,7 @@ const allColumns = computed<Column[]>(() => {
 });
 
 const toggleableColumns = computed(() =>
-  allColumns.value.filter((col) => !ALWAYS_VISIBLE_COLUMNS.has(col.key)),
+  allColumns.value.filter((col) => !ALWAYS_VISIBLE_COLUMNS.has(col.key) && !(props.embedded && col.key === "id")),
 );
 const hiddenColumns = reactive<Set<string>>(new Set());
 const showColumnDropdown = ref(false);
@@ -4565,7 +4579,7 @@ const saveColumnsToStorage = () => {
   }
 };
 
-const isColumnVisible = (key: string) => !hiddenColumns.has(key);
+const isColumnVisible = (key: string) => (props.embedded && key === "id") || !hiddenColumns.has(key);
 const hasVisibleUsageSummaryConsumer = computed(
   () => !authStore.isSimpleMode && (isColumnVisible("usage") || isColumnVisible("billing_type")),
 );
@@ -4593,7 +4607,7 @@ const toggleColumn = (key: string) => {
 
 const columns = computed<Column[]>(() =>
   allColumns.value.filter(
-    (col) => ALWAYS_VISIBLE_COLUMNS.has(col.key) || !hiddenColumns.has(col.key),
+    (col) => ALWAYS_VISIBLE_COLUMNS.has(col.key) || isColumnVisible(col.key),
   ),
 );
 
@@ -4804,7 +4818,7 @@ const capacityMap = ref<
     }
   >
 >(new Map());
-const searchQuery = ref("");
+const searchQuery = ref(props.embedded ? props.initialGroupName ?? "" : "");
 const filters = reactive({
   platform: "",
   status: "",
@@ -5550,10 +5564,11 @@ const deleteConfirmMessage = computed(() => {
   }
   if (deletingGroup.value.subscription_type === "subscription") {
     return t("admin.groups.deleteConfirmSubscription", {
-      name: deletingGroup.value.name,
+      name: `${deletingGroup.value.name} (#${deletingGroup.value.id})`,
     });
   }
-  return t("admin.groups.deleteConfirm", { name: deletingGroup.value.name });
+  const message = t("admin.groups.deleteConfirm", { name: `${deletingGroup.value.name} (#${deletingGroup.value.id})` });
+  return props.embedded ? `${message} 将解除本组的账号和客户授权关联；账号本身保留。` : message;
 });
 
 const loadLiveCapability = async () => {
@@ -6628,24 +6643,29 @@ const previewCompositeRoute = async () => {
 };
 
 const handleDelete = (group: AdminGroup) => {
+  if (deleteSubmitting.value) return;
+  deleteError.value = "";
   deletingGroup.value = group;
   showDeleteDialog.value = true;
 };
 
 const confirmDelete = async () => {
-  if (!deletingGroup.value) return;
-
+  if (!deletingGroup.value || deleteSubmitting.value) return;
+  const targetId = deletingGroup.value.id;
+  deleteSubmitting.value = true;
+  deleteError.value = "";
   try {
-    await adminAPI.groups.delete(deletingGroup.value.id);
+    await adminAPI.groups.delete(targetId);
     appStore.showSuccess(t("admin.groups.groupDeleted"));
     showDeleteDialog.value = false;
     deletingGroup.value = null;
     loadGroups();
   } catch (error: any) {
-    appStore.showError(
-      error.response?.data?.detail || t("admin.groups.failedToDelete"),
-    );
+    deleteError.value = error.response?.data?.detail || error.response?.data?.message || error.message || t("admin.groups.failedToDelete");
+    appStore.showError(deleteError.value);
     console.error("Error deleting group:", error);
+  } finally {
+    deleteSubmitting.value = false;
   }
 };
 
@@ -6868,8 +6888,24 @@ const saveSortOrder = async () => {
   }
 };
 
+async function openInitialAction() {
+  if (!props.embedded) return;
+  initialActionError.value = '';
+  if (props.initialAction === 'create') { openCreateModal(); return; }
+  if (!props.initialGroupId || !['edit', 'delete'].includes(props.initialAction)) return;
+  try {
+    const group = await adminAPI.groups.getById(props.initialGroupId);
+    if (group.id !== props.initialGroupId) throw new Error('Group identity mismatch');
+    if (props.initialAction === 'edit') await handleEdit(group);
+    else handleDelete(group);
+  } catch {
+    initialActionError.value = `无法读取分组 #${props.initialGroupId}，尚未执行操作。`;
+  }
+}
+defineExpose({ busy: computed(() => submitting.value || sortSubmitting.value || deleteSubmitting.value || duplicatingGroupIds.size > 0 || compositeRouteSaving.value) });
+
 onMounted(() => {
-  loadGroups();
+  void loadGroups().then(openInitialAction);
   if (!authStore.isSimpleMode) {
     void loadLiveCapability();
     loadModelAllowlistCandidates("create", 0, createForm.platform);

@@ -10,6 +10,8 @@ import { adminAPI } from '@/api/admin'
 const {
   listGroups,
   duplicateGroup,
+  getGroup,
+  deleteGroup,
   updateGroup,
   getModelAllowlistCandidates,
   getUsageSummary,
@@ -20,6 +22,8 @@ const {
 } = vi.hoisted(() => ({
   listGroups: vi.fn(),
   duplicateGroup: vi.fn(),
+  getGroup: vi.fn(),
+  deleteGroup: vi.fn(),
   updateGroup: vi.fn(),
   getModelAllowlistCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
@@ -43,7 +47,8 @@ vi.mock('@/api/admin', () => ({
       getAll: vi.fn(),
       create: vi.fn(),
       update: updateGroup,
-      delete: vi.fn(),
+      getById: getGroup,
+      delete: deleteGroup,
       updateSortOrder: vi.fn()
     },
     accounts: {
@@ -153,8 +158,9 @@ const BaseDialogStub = defineComponent({
   template: '<div v-if="show"><slot /><slot name="footer" /></div>'
 })
 
-function mountView() {
+function mountView(props: { embedded?: boolean; initialAction?: 'list' | 'create' | 'edit' | 'delete'; initialGroupId?: number } = {}) {
   return mount(GroupsView, {
+    props,
     global: {
       stubs: {
         AppLayout: AppLayoutStub,
@@ -183,6 +189,8 @@ describe('GroupsView duplicate action', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     for (const fn of [
       listGroups,
+      getGroup,
+      deleteGroup,
       duplicateGroup,
       updateGroup,
       getModelAllowlistCandidates,
@@ -202,6 +210,8 @@ describe('GroupsView duplicate action', () => {
       page_size: 20,
       pages: 1
     })
+    getGroup.mockResolvedValue(sourceGroup)
+    deleteGroup.mockResolvedValue({ message: 'deleted' })
     duplicateGroup.mockResolvedValue({
       ...sourceGroup,
       id: 43,
@@ -216,6 +226,60 @@ describe('GroupsView duplicate action', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('embeds the complete native workspace with a visible ID and no second app shell', async () => {
+    const wrapper = mountView({ embedded: true })
+    await flushPromises()
+    expect(wrapper.findComponent(AppLayoutStub).exists()).toBe(false)
+    const columns = wrapper.getComponent(DataTableStub).props('columns') as { key: string }[]
+    expect(columns.some(column => column.key === 'id')).toBe(true)
+    expect(deleteGroup).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('reads the exact group before opening deletion and prevents duplicate submits', async () => {
+    let finish!: (value: { message: string }) => void
+    deleteGroup.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = mountView({ embedded: true, initialAction: 'delete', initialGroupId: 42 })
+    await flushPromises()
+    expect(getGroup).toHaveBeenCalledWith(42)
+    const dialog = wrapper.findAllComponents({ name: 'ConfirmDialog' }).find(component => component.props('title') === 'admin.groups.deleteGroup')!
+    expect(dialog.props('show')).toBe(true)
+    expect(dialog.props('message')).toContain('账号本身保留')
+    expect(deleteGroup).not.toHaveBeenCalled()
+    dialog.vm.$emit('confirm'); dialog.vm.$emit('confirm')
+    await flushPromises()
+    expect(deleteGroup).toHaveBeenCalledTimes(1)
+    expect(deleteGroup).toHaveBeenCalledWith(42)
+    expect(dialog.props('busy')).toBe(true)
+    finish({ message: 'deleted' }); await flushPromises()
+    expect(dialog.props('show')).toBe(false)
+    expect(listGroups).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('keeps deletion open and editable after a native backend refusal', async () => {
+    deleteGroup.mockRejectedValueOnce({ status: 409, message: 'The native group is protected' })
+    const wrapper = mountView({ embedded: true, initialAction: 'delete', initialGroupId: 42 })
+    await flushPromises()
+    const dialog = wrapper.findAllComponents({ name: 'ConfirmDialog' }).find(component => component.props('title') === 'admin.groups.deleteGroup')!
+    dialog.vm.$emit('confirm'); await flushPromises()
+    expect(dialog.props('show')).toBe(true)
+    expect(dialog.props('busy')).toBe(false)
+    expect(listGroups).toHaveBeenCalledTimes(1)
+    expect(showError).toHaveBeenCalledWith('The native group is protected')
+    wrapper.unmount()
+  })
+
+  it('refuses an initial group identity mismatch without opening any delete dialog', async () => {
+    getGroup.mockResolvedValueOnce({ ...sourceGroup, id: 99 })
+    const wrapper = mountView({ embedded: true, initialAction: 'delete', initialGroupId: 42 })
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('无法读取分组 #42')
+    expect(deleteGroup).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents({ name: 'ConfirmDialog' }).some(component => component.props('show'))).toBe(false)
+    wrapper.unmount()
   })
 
   it('duplicates the selected group, reports success, and refreshes the list', async () => {

@@ -337,3 +337,10 @@ details.mw-product-management[open] > :not(summary) { margin-top: .75rem; }
 @media (max-width: 720px) {
   .mw-current-problems { padding-inline-end: 1.5rem; }
 }
+
+/* Browse the same Accounts by supplier origin or native site membership. */
+.mw-account-views { display: inline-flex; flex-wrap: wrap; gap: .3rem; padding: .3rem; border: 1px solid var(--mw-border); border-radius: .75rem; background: var(--mw-soft); margin-bottom: 1.1rem; }
+.mw-account-views button { min-height: 44px; padding: .55rem 1rem; border: 1px solid transparent; border-radius: .55rem; color: var(--mw-muted); transition: background-color .15s ease, color .15s ease; font-size: .9rem; }
+.mw-account-views button[aria-pressed='true'] { background: var(--mw-surface); border-color: var(--mw-border); color: var(--mw-text); font-weight: 700; }
+.mw-account-views button:hover { color: var(--mw-text); }
+@media (max-width: 600px) { .mw-account-views { display: flex; }.mw-account-views button { flex: 1; padding-inline: .6rem; } }

@@ -50,6 +50,7 @@ if (scenario === 'SALES_CATEGORIES') {
 const persistent = management || videoPolish || mediaTypes || scenario.startsWith('WIZARD')
 const savedFixture = persistent ? sessionStorage.getItem(scenario) : null
 const dto = savedFixture ? JSON.parse(savedFixture) as typeof initialDTO : initialDTO
+if (query.has('groupSecondPageMedia')) dto.id = 151
 const otherAccount = supplier(44)
 if (mediaTypes) {
   // Synthetic legacy state only: the catalog name never grants a media type.
@@ -148,17 +149,42 @@ if (scenario === 'DRAFT_MANAGEMENT_VIDEO_LIMITS') {
   // Browser fixture only: the real model contract remains validated by Core.
   dto.native_adapters = { video: { kind: 'native_video', revision: 'fixture_v1', auth: 'account_apikey', task_flow: 'async', media_type: 'video', max_references: 30, parameters: {} } }
 }
+const makeSiteGroup = (id: number, name: string, status = 'active', account_count = 0) => ({
+  id, name, status, account_count, active_account_count: account_count, rate_limited_account_count: 0,
+  platform: 'openai', description: null, rate_multiplier: 1, rpm_limit: 0, subscription_type: 'standard',
+  is_exclusive: false, daily_limit_usd: null, weekly_limit_usd: null, monthly_limit_usd: null,
+  long_context_pricing_enabled: true, force_openai_fast: false, free_openai_fast: false,
+  model_pricing: [], allow_image_generation: false, allow_batch_image_generation: false,
+  image_rate_independent: false, image_rate_multiplier: 1, batch_image_discount_multiplier: 0.5,
+  batch_image_hold_multiplier: 0.6, image_price_1k: null, image_price_2k: null, image_price_4k: null,
+  video_rate_independent: false, video_rate_multiplier: 1, video_price_480p: null,
+  video_price_720p: null, video_price_1080p: null, web_search_price_per_call: null,
+  peak_rate_enabled: false, peak_start: '', peak_end: '', peak_rate_multiplier: 1,
+  profit_control_enabled: false, profit_min_margin: 0, profit_safety_buffer: 0,
+  claude_code_only: false, fallback_group_id: null, fallback_group_id_on_invalid_request: null,
+  allow_messages_dispatch: false, require_oauth_only: false, require_privacy_set: false,
+  model_routing: null, model_routing_enabled: false, mcp_xml_inject: true, supported_model_scopes: [],
+  sort_order: id, created_at: '2026-10-26T00:00:00Z', updated_at: '2026-10-26T00:00:00Z'
+})
+let fixtureGroups = [makeSiteGroup(31, '创作工作台分组', 'active', 2), makeSiteGroup(32, '待接入的图片分组', 'inactive'), makeSiteGroup(33, '高清创作与跨来源账号共同使用的长名称分组', 'active', 2), makeSiteGroup(34, '批量创作账号分组', 'active', 51)]
+let groupDeleteOutcome: 'reject' | 'hold' | undefined
+let releaseGroupDelete: (() => void) | undefined
 const fixtureCalls: { method: string; url: string; input: unknown }[] = []
 let nextDraftOutcome: 'reject' | 'hold' | undefined
 const detailOutcomes = new Map<number, 'hold' | 'reject'>()
 const heldDetails = new Map<number, () => void>()
 let releaseDraft: (() => void) | undefined
 let releaseSuppliers: (() => void) | undefined
+let groupListFailed = false
+let memberReadFailed = false
 let releasePaidCheck: (() => void) | undefined
 let releasePaidApply: (() => void) | undefined
 const paidEnabled = { image: true, video: false }
 Object.assign(window, { mediaFixture: {
   calls: fixtureCalls, snapshot: () => copy(dto),
+  groups: () => copy(fixtureGroups),
+  setGroupDeleteOutcome: (outcome: 'reject' | 'hold') => { groupDeleteOutcome = outcome },
+  releaseGroupDelete: () => { releaseGroupDelete?.(); releaseGroupDelete = undefined },
   setDraftOutcome: (outcome: 'reject' | 'hold') => { nextDraftOutcome = outcome },
   setDetailOutcome: (id: number, outcome: 'reject' | 'hold') => { detailOutcomes.set(id, outcome) },
   releaseDetail: (id: number) => { heldDetails.get(id)?.(); heldDetails.delete(id) },
@@ -252,6 +278,47 @@ apiClient.defaults.adapter = async config => {
       if (query.get('paidCheck') === 'status-error' && fixtureCalls.some(call => call.url === `${url}/check`)) throw { status: 503 }
       data = paidState()
     }
+  } else if (url === '/admin/groups') {
+    if (query.get('groupListFailOnce') && !groupListFailed) { groupListFailed = true; throw { status: 503 } }
+    if (config.method === 'post') {
+      const created = { ...makeSiteGroup(Math.max(...fixtureGroups.map(group => group.id)) + 1, String(input.name)), ...input }
+      fixtureGroups.push(created); data = copy(created)
+    } else {
+      const search = String(config.params?.search ?? '').toLowerCase()
+      const items = fixtureGroups.filter(group => !search || group.name.toLowerCase().includes(search))
+      const page = Number(config.params?.page ?? 1), pageSize = Number(config.params?.page_size ?? 100)
+      data = { items: copy(items.slice((page - 1) * pageSize, page * pageSize)), total: items.length, page, page_size: pageSize, pages: Math.ceil(items.length / pageSize) }
+    }
+  } else if (url === '/admin/groups/all') data = copy(fixtureGroups)
+  else if (url === '/admin/groups/live-capability') data = { supported: false }
+  else if (url === '/admin/groups/usage-summary' || url === '/admin/groups/capacity-summary') data = []
+  else if (url === '/admin/groups/sort-order') data = { message: 'Fixture sort updated' }
+  else if (/^\/admin\/groups\/\d+\/model-allowlist-candidates$/.test(url)) data = { models: [] }
+  else if (/^\/admin\/groups\/\d+\/(rate-multipliers|rpm-overrides|composite-routes)$/.test(url)) data = []
+  else if (/^\/admin\/groups\/\d+(\/duplicate)?$/.test(url)) {
+    const groupId = Number(url.split('/')[3])
+    const group = fixtureGroups.find(item => item.id === groupId)
+    if (!group) throw { isAxiosError: true, config, response: { status: 404, data: { detail: '分组不存在' } } }
+    if (config.method === 'delete') {
+      const outcome = groupDeleteOutcome; groupDeleteOutcome = undefined
+      if (outcome === 'reject') throw { isAxiosError: true, config, response: { status: 409, data: { detail: '分组仍在使用，删除未完成' } } }
+      if (outcome === 'hold') await new Promise<void>(resolve => { releaseGroupDelete = resolve })
+      fixtureGroups = fixtureGroups.filter(item => item.id !== groupId); data = { message: 'Fixture group deleted' }
+    } else if (url.endsWith('/duplicate')) {
+      const duplicate = { ...copy(group), id: Math.max(...fixtureGroups.map(item => item.id)) + 1, name: `${group.name} (Copy)`, status: 'inactive' }
+      fixtureGroups.push(duplicate); data = copy(duplicate)
+    } else if (config.method === 'put') { Object.assign(group, input); data = copy(group) }
+    else data = copy(group)
+  } else if (url === '/admin/accounts') {
+    const key = String(config.params?.group)
+    if (query.get('membersFailOnce') === key && !memberReadFailed) { memberReadFailed = true; throw { status: 503 } }
+    const member = (id: number, name: string, group_ids: number[]) => ({ id, name, group_ids, platform: 'openai', status: 'active', schedulable: id !== 99 })
+    const all = key === '31' ? [{ ...member(44, otherAccount.name, [31]), platform: otherAccount.platform }, { ...member(77, dto.name, [31, 33]), platform: dto.platform }]
+      : key === '33' ? [{ ...member(77, dto.name, [31, 33]), platform: dto.platform }, member(99, '原生 API 账号', [33])]
+        : key === '34' ? Array.from({ length: 51 }, (_, i) => member(101 + i, `批量创作账号 ${i + 1}`, [34]))
+          : key === 'ungrouped' ? [member(88, '待分组账号', [])] : []
+    const page = Number(config.params?.page ?? 1), pageSize = Number(config.params?.page_size ?? 50)
+    data = { items: all.slice((page - 1) * pageSize, page * pageSize), total: all.length, page, page_size: pageSize, pages: Math.ceil(all.length / pageSize) }
   } else if (url === '/admin/media-workbench/suppliers') {
     if (query.get('holdSuppliers')) await new Promise<void>(resolve => { releaseSuppliers = resolve })
     data = scenario === 'NAVIGATION' ? copy(navigationAccounts) : [copy(dto), copy(otherAccount)]

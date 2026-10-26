@@ -17,8 +17,8 @@
 
       <MediaPaidControls v-if="step === 'suppliers'" :suppliers="suppliers" :suppliers-loading="loading" />
       <div v-if="step === 'suppliers'" class="mw-statistics">
-        <div><span>来源分组</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
-        <div><span>Account 账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
+        <div><span>上游来源</span><strong data-test="source-count">{{ sourceGroups.length }}</strong></div>
+        <div><span>供应商账号</span><strong data-test="account-count">{{ suppliers.length }}</strong></div>
         <div><span>目录待配置</span><strong>{{ suppliers.reduce((n, s) => n + s.pending_count, 0) }}</strong></div>
         <div><span>已发布模型</span><strong>{{ publishedCount }}</strong></div>
       </div>
@@ -36,11 +36,17 @@
       <main class="mw-flow">
         <section v-if="step === 'suppliers'" class="mw-page mw-panel" aria-label="来源与账号导航" data-test="account-page">
           <div class="mw-page-heading">
-            <div><h2>来源与账号</h2></div>
-            <span class="mw-badge">{{ visibleAccountCount }} / {{ suppliers.length }} 个账号</span>
+            <div><h2>选择供应商账号</h2><p class="mw-muted">按上游来源查找账号，或查看本站分组及其成员。</p></div>
+            <span v-if="accountView === 'source'" class="mw-badge">{{ visibleAccountCount }} / {{ suppliers.length }} 个媒体账号</span>
           </div>
+          <div class="mw-account-views" role="group" aria-label="账号浏览方式">
+            <button type="button" :aria-pressed="accountView === 'source'" data-test="browse-by-source" @click="accountView = 'source'">按上游来源</button>
+            <button type="button" :aria-pressed="accountView === 'group'" data-test="browse-by-group" @click="accountView = 'group'; groupVisited = true">按本站分组</button>
+          </div>
+          <MediaGroupBrowser v-if="groupVisited" v-show="accountView === 'group'" v-model:expanded-keys="expandedSiteGroups" v-model:search="siteGroupSearch" :suppliers="suppliers" :disabled="busy" :member-pages="siteGroupPages" @member-page="(key, page) => siteGroupPages[key] = page" @open-account="(id, key) => navigate(() => openSupplier(id, key))" @ready="groupMembersReady = true; restoreGroupPosition()" />
+          <div v-show="accountView === 'source'" data-test="source-browser">
           <div class="mw-toolbar">
-            <label class="mw-field mw-account-search">查找账号<input v-model="accountSearch" class="input" placeholder="ID、名称、域名或平台" type="search" data-test="account-search" /></label>
+            <label class="mw-field mw-account-search">查找账号<input v-model="accountSearch" class="input" placeholder="账号编号、名称、来源域名或平台" type="search" data-test="account-search" /></label>
             <label class="mw-field">媒体状态<select v-model="accountFilter" class="input" data-test="account-filter"><option value="">全部状态</option><option v-for="(label, state) in accountStates" :key="state" :value="state">{{ label }}</option></select></label>
             <label class="mw-field">平台<select v-model="platformFilter" class="input" data-test="platform-filter"><option value="">全部平台</option><option v-for="platform in platforms" :key="platform" :value="platform">{{ platform }}</option></select></label>
             <button v-if="accountSearch || accountFilter || platformFilter" type="button" class="mw-link mw-clear-filter" data-test="clear-account-search" @click="clearAccountFilters">清空搜索与筛选</button>
@@ -52,14 +58,15 @@
               <summary @click.prevent="toggleSource(group.host)"><strong>{{ group.host || '未识别来源' }}</strong><span>{{ group.accounts.length }} 个账号</span></summary>
               <div class="mw-source-accounts">
                 <button v-for="supplier in group.accounts" :key="supplier.id" type="button" class="mw-supplier" :class="{ 'mw-selected': detail?.id === supplier.id }" :aria-pressed="detail?.id === supplier.id" :disabled="busy" :data-test="`supplier-${supplier.id}`" @click="navigate(() => openSupplier(supplier.id))">
-                  <span class="mw-account-title"><b>#{{ supplier.id }}</b><strong>{{ supplier.name }}</strong></span>
+                  <span class="mw-account-title"><b>账号 #{{ supplier.id }}</b><strong>{{ supplier.name }}</strong></span>
                   <span class="mw-account-meta"><span class="mw-platform">{{ supplier.platform || '未知平台' }}</span><span :title="effectiveLabel(supplier.effective_state)">{{ accountStates[accountState(supplier)] || effectiveLabel(supplier.effective_state) }}</span></span>
                   <small>{{ supplier.configured_count }} 已配置 · {{ supplier.pending_count }} 待配置<span v-if="supplier.problem_count"> · {{ supplier.problem_count }} 需处理</span></small>
                 </button>
               </div>
             </details>
           </div>
-          <p class="mw-source-note">域名只用于分组；每个 Account 的模型和销售状态独立管理。</p>
+          <p class="mw-source-note">上游来源按域名归类。每个账号的模型配置和媒体销售状态独立管理。</p>
+          </div>
         </section>
 
         <section v-else-if="step === 'models'" ref="modelPage" class="mw-page mw-panel" aria-label="模型列表" data-test="model-page">
@@ -345,6 +352,7 @@
 import { mediaPaidAPI, type PaidState, type PaidMedia } from '@/api/admin/mediaPaid'
 import MediaPaidControls from '@/components/admin/media/MediaPaidControls.vue'
 import MediaCatalogNotice from '@/components/admin/media/MediaCatalogNotice.vue'
+import MediaGroupBrowser from '@/components/admin/media/MediaGroupBrowser.vue'
 import { useAuthStore } from '@/stores/auth'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -423,6 +431,13 @@ const otherPendingProducts = computed(() => config.value?.draft.products.filter(
 const newProductType = ref('')
 const removeProductId = ref('')
 const removalTarget = computed(() => products.value.find(p => p.product_id === removeProductId.value))
+const accountView = ref<'source' | 'group'>('source')
+const groupVisited = ref(false)
+const groupMembersReady = ref(false)
+const groupReturnTarget = ref<{ accountId: number; groupKey: string } | null>(null)
+const expandedSiteGroups = ref<string[]>([])
+const siteGroupPages = ref<Record<string, number>>({})
+const siteGroupSearch = ref('')
 const accountSearch = ref('')
 const accountFilter = ref('')
 const platformFilter = ref('')
@@ -723,7 +738,7 @@ function requestNavigation(action: () => void | Promise<void>) {
   autoSavePaused.value = true
   nextNavigation.value = action
 }
-async function openSupplier(id: number) {
+async function openSupplier(id: number, groupKey?: string) {
   suppliersScrollPosition.value = { top: window.scrollY, left: window.scrollX }
   const previousId = detail.value?.id
   const selected = await selectSupplier(id)
@@ -732,10 +747,22 @@ async function openSupplier(id: number) {
       search.value = ''; filter.value = ''
       modelScope.value = visibleModels.value.some(m => hasConfiguredModel(m.model_id)) ? 'configured' : 'pending'
     }
+    groupReturnTarget.value = groupKey ? { accountId: id, groupKey } : null
     step.value = 'models'; void readPaidStatus()
     await nextTick()
     modelPage.value?.scrollIntoView?.({ block: 'start', behavior: 'instant' })
   }
+}
+async function restoreGroupPosition() {
+  const target = groupReturnTarget.value
+  if (!target || !groupMembersReady.value || step.value !== 'suppliers' || accountView.value !== 'group') return
+  await nextTick()
+  const group = document.querySelector(`[data-test="site-group-${target.groupKey}"]`)
+  const member = group?.querySelector<HTMLElement>(`[data-test="group-open-account-${target.accountId}"]`) ?? group?.querySelector<HTMLElement>('summary')
+  if (!member || member.matches(':disabled')) return
+  member.scrollIntoView?.({ block: 'center', behavior: 'instant' })
+  member.focus({ preventScroll: true })
+  groupReturnTarget.value = null
 }
 async function openEditor(modelId: string, pricing = false) {
   // AppLayout and .mw-page scroll with the document, not inside the model panel.
@@ -793,7 +820,14 @@ async function reload() {
   void readPaidStatus()
   step.value = previousStep === 'editor' && !selectedModel.value ? 'models' : previousStep
 }
-async function returnToSuppliers() { step.value = 'suppliers'; await loadSuppliers(); await nextTick(); window.scrollTo({ ...suppliersScrollPosition.value, behavior: 'instant' }) }
+async function returnToSuppliers() {
+  groupMembersReady.value = false
+  step.value = 'suppliers'
+  await loadSuppliers()
+  await nextTick()
+  if (accountView.value === 'group') await restoreGroupPosition()
+  else window.scrollTo({ ...suppliersScrollPosition.value, behavior: 'instant' })
+}
 async function locate(diagnostic: Diagnostic) {
   const { path, scope } = diagnostic
   const productIndex = /products(?:\[|\.)(\d+)/.exec(path)?.[1]
