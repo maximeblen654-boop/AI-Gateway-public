@@ -54,7 +54,13 @@ test('diagnostic navigation is bound to the actual Product and exact missing-mod
   assert.equal(targetFor(dto, 'p1').product.product_id, 'p1')
   assert.throws(() => targetFor(dto, 'p2'), /IDENTITY_MISSING/)
 })
-const goodReport = media => ({ source_sha: source, status: 'PASS', context_closed: true, admin_before: true, admin_after: true, paid_unchanged: true, errors: [], blocked: [], api: [], targets: [{ account: 77, product_sha256: sha256(media), before: 'a'.repeat(64), after: 'a'.repeat(64) }], viewports: VIEWPORTS.map(size => ({ ...size, account: 77, media, product_sha256: sha256(media), identity: true, focus: true, visible: true, highlight: true, wizard_step_preserved: true, png_not_visible: true, no_overflow: true, paid_reads: ['image', 'video'].map(media => ({ media, status: 200, body_finished: true })) })), screenshots: VIEWPORTS.map(size => ({ file: `${media}-${size.width}.png`, sha256: sha256('synthetic screenshot') })), assets: { frontend_origin: 'final Core image', vite: false, browser_api_mocking: false } })
+const goodReport = media => ({ source_sha: source, status: 'PASS', context_closed: true, admin_before: true, admin_after: true, paid_unchanged: true, errors: [], blocked: [], api: [], targets: [{ account: 77, product_sha256: sha256(media), before: 'a'.repeat(64), after: 'a'.repeat(64) }], viewports: VIEWPORTS.map(size => ({ ...size, account: 77, media, product_sha256: sha256(media), identity: true, focus: true, visible: true, highlight: true, binding_required: true, original_model_identity: true, selected_product_identity: true, wizard_hidden: true, png_not_visible: true, no_overflow: true, paid_reads: ['image', 'video'].map(media => ({ media, status: 200, body_finished: true })) })), screenshots: VIEWPORTS.map(size => ({ file: `${media}-${size.width}.png`, sha256: sha256('synthetic screenshot') })), assets: { frontend_origin: 'final Core image', vite: false, browser_api_mocking: false } })
+test('legacy wizard evidence cannot stand in for a missing-model binding interaction', () => {
+  for (const key of ['binding_required', 'original_model_identity', 'selected_product_identity', 'wizard_hidden']) {
+    const r = goodReport('image'); delete r.viewports[0][key]; r.viewports[0].wizard_step_preserved = true
+    assert(!reportPassed(r))
+  }
+})
 test('PASS requires every viewport, unchanged configuration, no writes, no errors and a closed context', () => {
   assert(reportPassed(goodReport('image')))
   for (const mutate of [r => r.viewports.pop(), r => { r.targets[0].after = 'b'.repeat(64) }, r => { r.viewports[0].focus = false }, r => r.errors.push({ code: 'BODY_CANCELED' }), r => r.blocked.push({ method: 'POST' }), r => { r.context_closed = false }, r => { r.paid_unchanged = false }, r => { r.viewports[0].paid_reads[0].body_finished = false }, r => r.screenshots.pop()]) { const r = goodReport('image'); mutate(r); assert(!reportPassed(r)) }

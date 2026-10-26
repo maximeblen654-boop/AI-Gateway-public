@@ -8,9 +8,16 @@ test.use({ reducedMotion: 'reduce', timezoneId: 'Asia/Shanghai' })
 // UI and Axios are real. Only the two GET responses use local HTTP fixtures.
 // This is browser regression evidence, NOT real Core/Bridge/BFF acceptance.
 for (const media of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
-  test(`shared collector reads actual Axios timezone and navigates ${media} ${width}`, async ({ page }, info) => {
+  test(`shared collector reads actual Axios timezone and navigates ${media} ${width}`, async ({ page, baseURL }, info) => {
     const size = { width, height: width === 390 ? 844 : 900 }
     await page.setViewportSize(size)
+    const origin = new URL(baseURL!).origin
+    const errors: string[] = [], blockedWrites: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.route('**/*', route => {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) { blockedWrites.push(route.request().method()); return route.abort() }
+      return new URL(route.request().url()).origin === origin ? route.continue() : route.abort()
+    })
     await page.route('**/api/v1/admin/media-workbench/paid-controls/*', async route => {
       expect(route.request().method()).toBe('GET')
       const u = new URL(route.request().url()), kind = u.pathname.split('/').pop()
@@ -22,8 +29,8 @@ for (const media of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
     const snapshot = () => page.evaluate(() => (window as unknown as { mediaFixture: { snapshot(): SupplierDetail } }).mediaFixture.snapshot())
     const before = await snapshot(), target = targetFor(before, before.media_workbench_v1!.draft.products[0]!.product_id)
     // Prove the original no-query predicate rejects the same browser request.
-    const actual = page.waitForRequest(q => matchesPaidRead(q, 'http://127.0.0.1:4190', 'image'))
-    const finished = armSupplierPaidReads(page, 'http://127.0.0.1:4190')
+    const actual = page.waitForRequest(q => matchesPaidRead(q, origin, 'image'))
+    const finished = armSupplierPaidReads(page, origin)
     await page.getByTestId('supplier-77').click()
     const completed = await finished()
     expect(new URL((await actual).url()).search).not.toBe('')
@@ -31,8 +38,14 @@ for (const media of ['IMAGE', 'VIDEO']) for (const width of [1440, 390]) {
     await page.getByTestId('model-page').waitFor({ state: 'visible' })
     const result = await verifyDiagnosticViewport(page, target, size)
     expect(result.identity).toBe(true)
+    expect(result.binding_required).toBe(true)
+    expect(result.original_model_identity).toBe(true)
+    expect(result.selected_product_identity).toBe(true)
+    expect(result.wizard_hidden).toBe(true)
     await page.screenshot({ path: info.outputPath(`shared-${media.toLowerCase()}-${width}.png`), animations: 'disabled' })
     expect(await snapshot()).toEqual(before)
+    expect(blockedWrites).toEqual([])
+    expect(errors).toEqual([])
     expect(await page.evaluate(() => (window as unknown as { mediaFixture: { calls: { method: string }[] } }).mediaFixture.calls.filter(c => c.method !== 'get'))).toEqual([])
     await info.attach('shared-collector-browser-proof', { body: JSON.stringify({ scope: 'REAL_UI_LOCAL_HTTP_FIXTURE', result, reads: completed }, null, 2), contentType: 'application/json' })
   })

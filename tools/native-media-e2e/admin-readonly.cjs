@@ -67,19 +67,25 @@ async function verifyDiagnosticViewport(page, target, size) {
   const select = page.locator('[data-test="product-select"]')
   if (await select.count()) assert.equal(await select.inputValue(), target.product.product_id)
   assert.equal((await page.locator('[data-test="upstream-model-name"]').innerText()).trim(), target.product.upstream_model)
-  await page.locator('[data-test="wizard-step-5"]').click()
-  await page.locator('[data-test="wizard-page-5"]').waitFor({ state: 'visible' })
-  await page.locator('.mw-diagnostic').nth(target.index).click()
+  const binding = page.locator('[data-test="model-binding"]')
+  await binding.waitFor({ state: 'visible' })
+  assert((await binding.innerText()).includes('原型号不可用，请更换绑定'))
+  assert.equal(await page.locator('[data-test="binding-old"]').inputValue(), target.product.upstream_model)
+  const product = page.locator('[data-test="binding-products"] input').filter({ visible: true })
+  const selectedProducts = await product.evaluateAll(nodes => nodes.filter(node => node.checked).map(node => node.value))
+  assert.deepEqual(selectedProducts, [target.product.product_id])
+  assert.equal(await page.locator('[data-test="binding-new"]').inputValue(), '')
+  assert(await page.locator('[data-test="binding-confirm"]').isDisabled())
+  for (const id of ['wizard-step-1', 'wizard-step-5', 'wizard-next', 'wizard-page-1', 'wizard-page-5', 'save']) assert.equal(await page.locator(`[data-test="${id}"]`).count(), 0)
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const observed = await page.locator('[data-test="selected-model-summary"]').evaluate(el => {
     const r = el.getBoundingClientRect()
     return { focus: document.activeElement === el, visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth, highlight: el.classList.contains('mw-field-located'), field: el.getAttribute('data-field'), tabindex: el.getAttribute('tabindex'), role: el.getAttribute('role'), label: el.getAttribute('aria-label') }
   })
   assert.deepEqual(observed, { focus: true, visible: true, highlight: true, field: 'upstream_model', tabindex: '-1', role: 'group', label: '当前上游模型' })
-  assert(await page.locator('[data-test="wizard-page-5"]').isVisible())
   assert(!await page.locator('[data-test="native-output-png"]').isVisible())
   assert(!await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1))
-  return { ...size, media: target.product.media_type, product_sha256: sha256(target.product.product_id), model_sha256: sha256(target.product.upstream_model), identity: true, focus: true, visible: true, highlight: true, wizard_step_preserved: true, png_not_visible: true, no_overflow: true }
+  return { ...size, media: target.product.media_type, product_sha256: sha256(target.product.product_id), model_sha256: sha256(target.product.upstream_model), identity: true, focus: true, visible: true, highlight: true, binding_required: true, original_model_identity: true, selected_product_identity: true, wizard_hidden: true, png_not_visible: true, no_overflow: true }
 }
 function screenshotsMasks(page) {
   return [page.locator('header.glass'), page.locator('.mw-product-context > div:first-child,[data-test="account-search"],[data-test^="supplier-"],[data-test="product-select"],[data-test="diagnostic-product"]'), page.locator('[data-test^="price-"],input[data-test^="video-sale-"],[data-test="pricing-preview"]'), page.getByText(/(?:CNY|USD|人民币|￥|¥)\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:CNY|USD)(?:\b|\s|\/)/i), page.getByText(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)]
@@ -88,7 +94,7 @@ function reportPassed(report) {
   return report.context_closed === true && report.source_sha?.match(/^[a-f0-9]{40}$/) && !report.errors.length && !report.blocked.length && !report.api.some(x => x.status >= 400)
     && report.admin_before === true && report.admin_after === true && report.paid_unchanged === true
     && report.targets.length > 0 && report.targets.every(t => t.before === t.after && /^[a-f0-9]{64}$/.test(t.before))
-    && report.viewports.length === report.targets.length * VIEWPORTS.length && report.targets.every(t => VIEWPORTS.every(s => report.viewports.some(v => v.account === t.account && v.product_sha256 === t.product_sha256 && v.width === s.width && v.height === s.height && ['identity', 'focus', 'visible', 'highlight', 'wizard_step_preserved', 'png_not_visible', 'no_overflow'].every(k => v[k] === true) && v.paid_reads?.length === 2 && v.paid_reads.every(r => r.body_finished === true && r.status === 200))))
+    && report.viewports.length === report.targets.length * VIEWPORTS.length && report.targets.every(t => VIEWPORTS.every(s => report.viewports.some(v => v.account === t.account && v.product_sha256 === t.product_sha256 && v.width === s.width && v.height === s.height && ['identity', 'focus', 'visible', 'highlight', 'binding_required', 'original_model_identity', 'selected_product_identity', 'wizard_hidden', 'png_not_visible', 'no_overflow'].every(k => v[k] === true) && v.paid_reads?.length === 2 && v.paid_reads.every(r => r.body_finished === true && r.status === 200))))
     && report.screenshots.length === report.viewports.length && report.screenshots.every(s => /^[a-f0-9]{64}$/.test(s.sha256))
 }
 async function collect({ origin, token, sourceSha, targets, out, launch, onPage = () => null }) {
