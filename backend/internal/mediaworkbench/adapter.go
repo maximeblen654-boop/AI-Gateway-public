@@ -16,6 +16,16 @@ import (
 )
 
 func VideoProfileModel(p Product) (videoplan.Model, bool) {
+	return videoProfileModel(p, true)
+}
+
+// Validation resolves the installed transport separately from editable domain
+// fields. The executable path still requires the original complete domain.
+func videoProfileValidationModel(p Product) (videoplan.Model, bool) {
+	return videoProfileModel(p, false)
+}
+
+func videoProfileModel(p Product, requireCompleteDomain bool) (videoplan.Model, bool) {
 	profile := p.AdapterConfig.WireProfile
 	if profile == videoplan.LaoliMediaProfile {
 		if p.AdapterConfig.Version != 1 {
@@ -32,7 +42,7 @@ func VideoProfileModel(p Product) (videoplan.Model, bool) {
 		// Existing generic products may predate explicit profile storage. Their
 		// own frozen capabilities still describe the compatible transport; no
 		// supplier model table or alias is needed to read those products.
-		if p.AdapterConfig.Version != 0 || p.AdapterConfig.ModelFamily != "" || p.MediaType != "video" || len(p.Capabilities.DurationsSeconds) == 0 || len(p.Capabilities.Resolutions) == 0 || len(p.Capabilities.AspectRatios) == 0 || p.Capabilities.Count != (Range{Min: 1, Max: 1}) {
+		if p.AdapterConfig.Version != 0 || p.MediaType != "video" || requireCompleteDomain && (p.AdapterConfig.ModelFamily != "" || len(p.Capabilities.DurationsSeconds) == 0 || len(p.Capabilities.Resolutions) == 0 || len(p.Capabilities.AspectRatios) == 0 || p.Capabilities.Count != (Range{Min: 1, Max: 1})) {
 			return videoplan.Model{}, false
 		}
 		profile = "images"

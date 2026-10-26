@@ -44,6 +44,7 @@ export interface NativeAdapter extends AdapterBinding { media_type: string; max_
 export type LifecycleAction = 'unlist' | 'relist' | 'archive' | 'restore' | 'hide'
 export type LifecycleTarget = { product_id: string; model_id?: never } | { model_id: string; product_id?: never }
 export interface ProductLifecycle { state: 'active' | 'unlisted' | 'archived'; revision: number; updated_at: string }
+export interface ModelBindingInput { action: 'rebind' | 'delete'; old_model_id: string; new_model_id?: string; product_ids: string[] }
 export interface SaveReceipt { submission_id: string; base_record_version: number; draft_revision: string }
 export interface MediaConfig {
   product_lifecycle?: Record<string, ProductLifecycle>
@@ -67,6 +68,7 @@ export interface CatalogChange {
   added_models: string[]; missing_models: string[]; truncated: boolean
 }
 export interface SupplierDetail {
+  binding_validation_products?: Product[]
   model_catalog_change?: CatalogChange
   publish_validation?: Validation
   product_states?: ProductState[]
@@ -145,6 +147,13 @@ export const mediaWorkbenchAPI = {
   async lifecycle(id: number, version: number, action: LifecycleAction, target: LifecycleTarget): Promise<SupplierDetail> {
     return (await apiClient.post<SupplierDetail>(`${accountPath(id)}/lifecycle`, {
       expected_version: version, action, ...target
+    })).data
+  },
+  async modelBinding(id: number, version: number, revision: string, input: ModelBindingInput): Promise<SupplierDetail> {
+    return (await apiClient.post<SupplierDetail>(`${accountPath(id)}/model-binding`, {
+      expected_record_version: version, expected_draft_revision: revision,
+      action: input.action, old_model_id: input.old_model_id,
+      ...(input.new_model_id !== undefined ? { new_model_id: input.new_model_id } : {}), product_ids: [...input.product_ids]
     })).data
   },
   sync: syncUpstreamModels

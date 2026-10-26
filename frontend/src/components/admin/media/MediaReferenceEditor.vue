@@ -55,6 +55,13 @@ const display = (field: Field) => current(field) < 0 ? '' : String(current(field
 watch(() => props.modelValue, () => {
   for (const field of Object.keys(inputValues) as Field[]) if (!dirty.has(field)) inputValues[field] = display(field)
 }, { deep: true, immediate: true })
+// An accepted type change closes the previous input context. Hidden buffered
+// video/audio edits must not reintroduce fields cleared by that change.
+watch(() => props.mediaType, () => {
+  dirty.clear()
+  inputError.value = ''
+  for (const field of Object.keys(inputValues) as Field[]) inputValues[field] = display(field)
+})
 function buffer(field: Field, event: Event) {
   inputValues[field] = (event.target as HTMLInputElement).value
   dirty.add(field)

@@ -259,8 +259,9 @@ type ModelState struct {
 	State   string `json:"state"`
 }
 type Detail struct {
-	ProductStates     []ProductState `json:"product_states"`
-	PublishValidation *Validation    `json:"publish_validation,omitempty"`
+	BindingValidationProducts []Product      `json:"binding_validation_products,omitempty"`
+	ProductStates             []ProductState `json:"product_states"`
+	PublishValidation         *Validation    `json:"publish_validation,omitempty"`
 	*Account
 	NativeAdapters map[string]AdapterDescriptor `json:"native_adapters"`
 	ProductRemoval map[string]DraftRemoval      `json:"product_removal"`

@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation } from '@/api/admin/mediaWorkbench'
+import { mediaWorkbenchAPI, draftInput, type Product, type SupplierDetail, type Diagnostic, type LifecycleAction, type LifecycleTarget, type Validation, type ModelBindingInput } from '@/api/admin/mediaWorkbench'
 import { draftFingerprint, videoSaleInputsFingerprint, persistedFingerprint, confirmedRecoveryProduct, recoveryDifferences, recoveryKey, recoveryCopyKey, listDraftRecoveries, MAX_ACCOUNT_RECOVERIES, readDraftRecovery, encodeDraftRecovery, type DraftRecovery, type RecoveryEntry, type RecoveryIdentity } from './draftRecovery'
 import type { VideoSaleInput } from '@/components/admin/media/videoSaleGroups'
 
@@ -18,6 +18,8 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   const errorStatus = ref(0)
   const errorDiagnostics = ref<Diagnostic[]>([])
   const publishValidation = ref<Validation | null>(null)
+  const bindingValidationProducts = ref<Product[]>([])
+  const bindingValidationModel = ref('')
   const deleted = ref(false)
   const conflict = ref(false)
   const validationUnavailable = ref(false)
@@ -266,7 +268,7 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
     }
     if (replaceDraft) discoverRecovery()
   }
-  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null }
+  function clearError() { message.value = ''; errorStatus.value = 0; errorDiagnostics.value = []; publishValidation.value = null; bindingValidationProducts.value = []; bindingValidationModel.value = '' }
   function requiresPublishedRecovery(error: unknown) {
     const e = error as { status?: number; reason?: string }
     return e.status === 409 && e.reason === 'MEDIA_PUBLISHED_RECOVERY_REQUIRED'
@@ -807,6 +809,30 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
       return false
     } finally { pending.value = '' }
   }
+  async function modelBinding(input: ModelBindingInput): Promise<boolean> {
+    if (pending.value || loading.value || deleted.value || conflict.value || !online.value || saveState.value === 'unconfirmed' || !detail.value || !config.value) return false
+    if (dirty.value) { message.value = '请先保存或放弃未保存修改，再更换型号或删除商品。'; return false }
+    pending.value = 'model-binding'; clearError(); stopPolling(); clearTimeout(autoSaveTimer)
+    try {
+      const dto = await mediaWorkbenchAPI.modelBinding(detail.value.id, config.value.record_version, config.value.draft.revision, input)
+      if (disposed) return false
+      apply(dto, true)
+      if (input.action === 'rebind' && input.new_model_id) selectModel(input.new_model_id)
+      else { selectedProduct.value = ''; selectedModel.value = '' }
+      message.value = input.action === 'delete' ? '当前商品已删除，历史订单、任务和账务保留。' : '绑定已更换；请查看商品状态，已下架商品可重新上架。'
+      return true
+    } catch (e) {
+      failure(e)
+      const receipt = (e as { data?: SupplierDetail }).data
+      if (errorStatus.value === 422 && receipt?.id === detail.value?.id) {
+        publishValidation.value = receipt.publish_validation ?? null
+        bindingValidationProducts.value = receipt.binding_validation_products ?? []
+        bindingValidationModel.value = input.new_model_id ?? input.old_model_id
+      }
+      if (![401, 403, 404, 409, 410, 422].includes(errorStatus.value)) { saveState.value = 'unconfirmed'; validationUnavailable.value = true }
+      return false
+    } finally { pending.value = '' }
+  }
   async function sync() {
     if (pending.value || loading.value || deleted.value || conflict.value || !detail.value) return
     pending.value = 'sync'; clearError(); stopPolling()
@@ -833,9 +859,9 @@ export function useMediaWorkbench(adminId: () => number | undefined = () => unde
   }
   onBeforeUnmount(() => { persistRecovery(); disposed = true; loadSequence++; stopPolling(); clearTimeout(autoSaveTimer); window.removeEventListener('online', becameOnline); window.removeEventListener('offline', becameOffline); window.removeEventListener('storage', storageChanged) })
   return { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
-    errorStatus, diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+    errorStatus, diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
     recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, recoveryEntries, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, unresolvedProductConflicts, serverSnapshot, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
     videoSaleInputs, updateVideoSaleInputs,
     addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval,
-    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard }
+    loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, modelBinding, sync, discard }
 }

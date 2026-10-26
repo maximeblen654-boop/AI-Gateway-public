@@ -4,7 +4,7 @@
       <summary>高级技术配置 · 接口、画质与执行能力</summary>
       <p class="mw-muted">供维护 Account 接口的管理员使用。依据已确认的接口合同填写，不代表系统已对供应商实测；保存和发布继续接受服务端适配校验。</p>
       <p v-if="binding" class="mw-muted">当前 Account 已接入媒体调用合同；绑定由 Sub2API 服务端维护，商品配置无需选择协议或适配器。</p>
-      <details v-if="nativeAdapter?.parameters.quality?.mode !== 'unsupported' || product.capabilities.qualities.length" data-test="quality-options" data-field="capabilities.qualities"><summary>接口独立画质字段（仅在已确认支持时配置）</summary><MediaTokensField label="已确认的实际画质值" placeholder="留空表示不发送 quality 字段" :model-value="product.capabilities.qualities" @update:model-value="edit(next => { next.capabilities.qualities = $event.map(String) })" /><p class="mw-muted">分辨率不等于画质。不提供通用画质预设，也不会按模型名称推断。</p></details>
+      <details v-if="product.media_type === 'image' && nativeAdapter?.parameters.quality?.mode !== 'unsupported' || product.capabilities.qualities.length" data-test="quality-options" data-field="capabilities.qualities"><summary>接口独立画质字段（仅在已确认支持时配置）</summary><MediaTokensField label="已确认的实际画质值" placeholder="留空表示不发送 quality 字段" :model-value="product.capabilities.qualities" @update:model-value="edit(next => { next.capabilities.qualities = $event.map(String) })" /><p class="mw-muted">分辨率不等于画质。不提供通用画质预设，也不会按模型名称推断。</p></details>
     <p class="mw-muted" data-test="native-contract">调用合同、认证与模型映射继承 Sub2API Account；商品不需要选择协议。已保存的内部技术字段保留兼容，服务端负责校验。</p>
     <details v-if="product.media_type === 'image'" data-test="image-execution-advanced">
       <summary>高级技术配置：图片接口单请求能力</summary>
@@ -65,6 +65,7 @@
 <script setup lang="ts">
 import { computed, nextTick } from 'vue'
 import type { AdapterBinding, ImageExecutionConfig, NativeAdapter, Product } from '@/api/admin/mediaWorkbench'
+import { mediaProductForType } from '@/utils/mediaProductType'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaMatchEditor from './MediaMatchEditor.vue'
 const props = defineProps<{ product: Product; mediaTypes: string[]; disabled: boolean; binding?: AdapterBinding; nativeAdapter?: NativeAdapter }>()
@@ -98,7 +99,7 @@ function edit(change: (next: Product) => void) {
 }
 async function setMediaType(event: Event) {
   if (text(event) === props.product.media_type) return
-  edit(next => { next.media_type = text(event); next.capabilities.count = { min: 1, max: next.media_type === 'video' ? 1 : 10 } })
+  edit(next => { Object.assign(next, mediaProductForType(next, text(event))) })
   await nextTick()
   ;(event.target as HTMLSelectElement).value = props.product.media_type
 }

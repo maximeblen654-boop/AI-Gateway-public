@@ -135,16 +135,16 @@
                 <div class="mw-product-type-actions">
                   <button v-if="products.some(p => p.product_id === item.product_id)" class="btn btn-secondary" :disabled="busy" @click="navigate(() => editAvailability(item))">编辑此商品</button>
                   <button v-if="item.state === 'UPSTREAM_REMOVED'" class="btn btn-secondary" :disabled="busy || deleted || conflict" @click="sync">同步上游目录</button>
-                  <button v-if="item.state === 'UPSTREAM_REMOVED' && detail && catalogAutoSyncConfigured" type="button" class="btn btn-secondary" data-test="view-catalog-report" @click="showCatalogReport">查看报告与修复提示词</button>
+                  <button v-if="item.state === 'UPSTREAM_REMOVED' && detail && catalogAutoSyncConfigured" type="button" class="btn btn-secondary" data-test="view-catalog-report" @click="editAvailability(item)">处理型号绑定</button>
                   <router-link v-if="item.state === 'ACCOUNT_UNAVAILABLE' && detail" :to="accountLink(detail.id)" class="mw-link">打开账户详情 ↗</router-link>
                 </div>
               </div>
             </template>
           </section>
           <p v-if="detail?.model_catalog" class="mw-muted" data-test="catalog-updated">上游模型目录（{{ catalogAutoSyncConfigured ? '自动同步' : '手动同步' }}）。最近成功同步：{{ catalogUpdatedAt }}。已移除的名字不能用于新请求；同步失败会保留上次目录，不会替换型号或自动发布。</p>
-          <MediaCatalogNotice v-if="detail && catalogAutoSyncConfigured" :detail="detail" />
+          <MediaCatalogNotice v-if="detail && catalogAutoSyncConfigured" :detail="detail" @configure="openBindingProduct" />
 
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
         </section>
 
         <section v-else ref="editorElement" class="mw-page mw-panel mw-editor-page" aria-label="模型配置编辑器" data-test="editor-page" @focusout="flushOnFocusOut" @click.capture="flushStep">
@@ -154,7 +154,8 @@
           </div>
           <template v-if="detail && selectedModel">
 
-            <p v-if="selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING'" class="mw-muted">{{ selectedRow?.state === 'UPSTREAM_NOT_DISCOVERED' || selectedRow?.state === 'UPSTREAM_MISSING' ? '上游最新成功目录中未发现此模型，配置会保留且新报价由后台阻止。' : '请填写已确认的供应商规格；示例值不会自动写入能力或报价。' }}</p>
+            <MediaModelBinding v-if="bindingRequired" :groups="missingModelGroups" :available="detail.model_catalog?.models ?? []" :added-models="detail.model_catalog_change?.added_models ?? []" :initial-model="bindingOldModel" :initial-product="selectedProduct" :disabled="lifecycleDisabled" :message="message" @submit="confirmModelBinding" />
+            <MediaValidationPanel v-if="bindingRequired && publishValidation" preview :validation="publishValidation" :current="false" :unavailable="false" :save-state="saveState" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="bindingValidationProducts" :draft-revision="config?.draft.revision" :account-id="detail.id" model-id="" :requested-model-id="bindingValidationModel" @locate="locate" @message="message = $event" />
             <section v-if="unsubmittedRecoveries.length" class="mw-banner" data-test="unsubmitted-recoveries" aria-label="尚未提交的新商品恢复副本">
               <h3>发现尚未提交服务器的新商品</h3>
               <p>以下商品仅有浏览器恢复副本。查看后可明确恢复原商品身份、规格和价格；不会自动发布。</p>
@@ -217,9 +218,9 @@
               <label v-if="modelProducts.length > 1" class="mw-field">切换商品（此模型共 {{ modelProducts.length }} 份）<select :value="selectedProduct" class="input" data-test="product-select" @change="changeProduct" :disabled="busy"><option v-for="(p, index) in modelProducts" :key="p.product_id" :value="p.product_id">{{ productOptionLabel(p, index) }}</option></select></label>
               <p v-if="modelProducts.length > 1" class="mw-product-description mw-muted" data-test="selected-product-description">当前：{{ productOptionLabel(product, modelProducts.indexOf(product)) }}</p>
             </div>
-            <MediaProductEditor v-if="product" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
+            <MediaProductEditor v-if="product && !bindingRequired" ref="productEditor" :key="`${detail.id}:${selectedProduct}`" :dirty="dirty" :account-id="detail.id" :admin-id="auth.user?.id" :binding="config?.adapter_bindings?.[product.media_type]" :native-adapter="detail.native_adapters?.[product.media_type]" :diagnostics="diagnostics" :product="product" :media-types="availableMediaTypes" :pending-video-sales="videoSaleInputs" :disabled="busy && pending !== 'save' || deleted || conflict || lifecycleState(product) === 'archived'" @pending-video-sales="updateVideoSaleInputs" @update:product="updateProduct" :account-label="`Account #${detail.id} · ${detail.name}`">
               <template #review>
-            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
+            <MediaValidationPanel v-if="config" :validation="config.validation" :current="validationCurrent && !dirty" :unavailable="validationUnavailable" :save-state="saveState" :diagnostics="diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" :model-id="selectedModel" @locate="locate" @message="message = $event" />
               </template>
               <template #save>
                 <div class="mw-save-draft">
@@ -232,7 +233,7 @@
                 </div>
               </template>
             </MediaProductEditor>
-            <details v-if="product" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
+            <details v-if="product && !bindingRequired" class="mw-product-management" aria-label="当前商品管理" data-test="product-management">
               <summary data-test="product-status">当前商品管理 · {{ lifecycleLabel(product) }} · {{ product.enabled ? '草稿已启用' : '草稿已停用' }}</summary>
               <div class="mw-product-type-actions" data-test="product-lifecycle">
                 <button v-if="lifecycleState(product) === 'active'" class="btn btn-secondary" data-test="product-unlist" :disabled="lifecycleDisabled" @click="requestLifecycle('unlist', { product_id: product.product_id })">下架此商品</button>
@@ -250,7 +251,7 @@
                 <p v-if="!addedProductIds.includes(product.product_id) && removalReason(product)" class="mw-muted" data-test="removal-protection">{{ removalReason(product) }}</p>
               </details>
             </details>
-            <details class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
+            <details v-if="!bindingRequired" class="mw-product-management" aria-label="模型生命周期" data-test="model-lifecycle">
               <summary>模型管理 · {{ selectedModel }} · {{ lifecycleModelProducts.length }} 份商品</summary>
               <p class="mw-muted">模型操作覆盖 {{ selectedModel }} 下的全部 {{ lifecycleModelProducts.length }} 份商品（包含已归档商品）。</p>
               <div class="mw-product-type-actions">
@@ -310,7 +311,7 @@
       <div class="mw-dialog-list" data-test="publish-products"><label v-for="p in config?.draft.products ?? []" :key="p.product_id" class="mw-product-toggle"><input v-model="publishProductIds" type="checkbox" :value="p.product_id" :data-test="`publish-product-${p.product_id}`" :disabled="busy" /><span>{{ productDisplayTitle(p) }} · {{ p.upstream_model }} · {{ p.media_type === 'video' ? '视频固定 1 条' : `图片 ${p.capabilities.count.min}～${p.capabilities.count.max} 张` }}</span></label></div>
       <p>发布配置不会自动开启销售或全局付费开关，已有订单不会改变，也不会发送真实生成请求。独立 API Key 的原生权限和路由保持原状。</p>
       <p v-if="message" role="alert">{{ message }}</p>
-      <section v-if="publishValidation" data-test="publish-validation"><h3>本次选中商品的发布检查</h3><MediaValidationPanel :validation="publishValidation" :current="true" :unavailable="false" save-state="" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :account-id="detail?.id" :model-id="selectedModel" @locate="publishDialog = false; locate($event)" @message="message = $event" /></section>
+      <section v-if="publishValidation" data-test="publish-validation"><h3>本次选中商品的发布检查</h3><MediaValidationPanel :validation="publishValidation" :current="true" :unavailable="false" save-state="" :diagnostics="publishValidation.diagnostics" :products="diagnosticProducts" :product-details="products" :draft-revision="config?.draft.revision" :account-id="detail?.id" model-id="" @locate="publishDialog = false; locate($event)" @message="message = $event" /></section>
       <template #actions><button class="btn btn-primary" data-test="confirm-publish" :disabled="!canPublish || !publishProductIds.length" @click="confirmPublish">确认发布选中商品</button></template>
     </MediaDialog>
     <MediaDialog :show="salesDialog" :title="config?.sales.enabled ? '暂停媒体销售？' : '开启媒体销售？'" :busy="pending === 'sales'" @close="salesDialog = false">
@@ -347,8 +348,9 @@ import MediaIndependentCalculator from '@/components/admin/media/MediaIndependen
 import MediaDialog from '@/components/admin/media/MediaDialog.vue'
 import MediaProductEditor from '@/components/admin/media/MediaProductEditor.vue'
 import MediaValidationPanel from '@/components/admin/media/MediaValidationPanel.vue'
+import MediaModelBinding from '@/components/admin/media/MediaModelBinding.vue'
 import { useMediaWorkbench } from '@/composables/useMediaWorkbench'
-import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget } from '@/api/admin/mediaWorkbench'
+import type { Product, ProductState, Diagnostic, SupplierDetail, LifecycleAction, LifecycleTarget, ModelBindingInput } from '@/api/admin/mediaWorkbench'
 import { formatDateTimeLocalInput } from '@/utils/format'
 import { mediaPublicationLabel, mediaProductPublicationLabel, mediaProductMatches } from '@/utils/mediaAdminPresentation'
 import '@/styles/media-workbench.css'
@@ -367,10 +369,10 @@ async function readPaidStatus() {
 const auth = useAuthStore()
 const workbench = useMediaWorkbench(() => auth.user?.id)
 const { suppliers, detail, config, products, selectedModel, selectedProduct, product, pending, autoSavePaused, loading, loadingAccountId, message,
-  diagnostics, publishValidation, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
+  diagnostics, publishValidation, bindingValidationProducts, bindingValidationModel, saveFeedback, publicationFeedback, salesFeedback, deleted, conflict, validationUnavailable, saveState, dirty, validationCurrent, canPublish,
   addedProductIds, removedProducts, removalReason, removeProduct, undoRemoval, videoSaleInputs, updateVideoSaleInputs,
   recovery, recoveryWarning, recoveryConflict, recoveryIsCurrentBuffer, recoveryDiff, productRecoveries, unsubmittedRecoveries, selectedRecoveryKey, chooseRecovery, online, checkServer, canRetryUnconfirmedSave, retryUnconfirmedSave, reloadFromServer, restoreRecovery, discardRecovery, flushAutoSave,
-  loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, sync, discard } = workbench
+  loadSuppliers, selectSupplier, selectModel, addProduct, saveDraft, publish, sales, lifecycle, modelBinding, sync, discard } = workbench
 // Saved types describe earlier Studio products; native adapters also expose
 // the Account's currently supported configuration paths. Selection is explicit,
 // and Core still validates the exact model, adapter and specification on save.
@@ -443,8 +445,18 @@ const catalogUpdatedAt = computed(() => {
  return Number.isFinite(at) ? formatDateTimeLocalInput(at/1000).replace('T',' ') : '尚未成功同步'
 })
 const selectedModelCurrent = computed(() => !!detail.value?.model_catalog?.models.includes(selectedModel.value))
-const modelStates = computed(() => [...new Set(detail.value?.models.map(m => m.state) ?? [])])
-const visibleModels = computed(() => detail.value?.models.filter(m => detail.value?.model_catalog?.models.includes(m.model_id) && !['UPSTREAM_NOT_DISCOVERED','UPSTREAM_MISSING','MODEL_SYNC_REQUIRED'].includes(m.state) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id)))) ?? [])
+const modelStates = computed(() => [...new Set(visibleModels.value.map(m => m.state))])
+const visibleModels = computed(() => (detail.value?.models ?? []).filter(m => {
+  const missing = missingModelGroups.value.find(g => g.model_id === m.model_id)
+  const needsOwnRow = missing?.products.some(item => {
+    const draft = products.value.find(p => p.product_id === item.id)
+    return !draft || draft.upstream_model === m.model_id
+  })
+  return (detail.value?.model_catalog?.models.includes(m.model_id) || needsOwnRow) && (showArchived.value || (m.state !== 'ARCHIVED' && !config.value?.hidden_models?.includes(m.model_id)))
+}).map(m => {
+  const affected = missingModelGroups.value.some(g => g.model_id === m.model_id || g.products.some(item => products.value.some(p => p.product_id === item.id && p.upstream_model === m.model_id)))
+  return affected ? { ...m, state: 'UPSTREAM_NOT_DISCOVERED' } : m
+}))
 function hasConfiguredModel(modelId: string) { return products.value.some(p => p.upstream_model === modelId) || !!config.value?.published?.products?.some(p => p.upstream_model === modelId) }
 const catalogAutoSyncConfigured = computed(() => detail.value?.type === 'apikey' && !!config.value && (
   config.value.media_types.some(type => type === 'image' || type === 'video') ||
@@ -457,13 +469,33 @@ const modelScopes = computed(() => [
 ])
 const filteredModels = computed(() => visibleModels.value.filter(m => (modelScope.value === 'all' || hasConfiguredModel(m.model_id) === (modelScope.value === 'configured')) && (!filter.value || m.state === filter.value) && `${m.model_id} ${rowProduct(m.model_id)?.display_name ?? ''}`.toLowerCase().includes(search.value.trim().toLowerCase())).sort((a, b) => Number(hasConfiguredModel(b.model_id)) - Number(hasConfiguredModel(a.model_id))))
 watch(showArchived, value => { if (value) modelScope.value = 'all' })
-const selectedRow = computed(() => detail.value?.models.find(m => m.model_id === selectedModel.value))
 const modelProducts = computed(() => products.value.filter(p => p.upstream_model === selectedModel.value && (showArchived.value || lifecycleState(p) !== 'archived')))
 const lifecycleProducts = computed(() => {
-  const byId = new Map((config.value?.published?.products ?? []).map(p => [`${p.product_id}:${p.upstream_model}`, p]))
-  for (const p of config.value?.draft.products ?? []) byId.set(`${p.product_id}:${p.upstream_model}`, p)
+  const byId = new Map((config.value?.published?.products ?? []).map(p => [p.product_id, p]))
+  for (const p of config.value?.draft.products ?? []) byId.set(p.product_id, p)
   return [...byId.values()]
 })
+const missingModelGroups = computed(() => {
+  if (!detail.value?.model_catalog?.synced_at) return []
+  const available = detail.value.model_catalog.models
+  const groups = new Map<string, Map<string, { id: string; label: string; current_model?: string }>>()
+  for (const p of [...(config.value?.published?.products ?? []), ...(config.value?.draft.products ?? [])]) {
+    if (!p.upstream_model || available.includes(p.upstream_model) || lifecycleState(p) === 'archived') continue
+    if (!groups.has(p.upstream_model)) groups.set(p.upstream_model, new Map())
+    groups.get(p.upstream_model)!.set(p.product_id, { id: p.product_id, label: productDisplayTitle(p), current_model: config.value?.draft.products.find(draft => draft.product_id === p.product_id)?.upstream_model })
+  }
+  return [...groups].map(([model_id, entries]) => ({ model_id, products: [...entries.values()] }))
+})
+const bindingRequired = computed(() => missingModelGroups.value.some(group => group.model_id === selectedModel.value || group.products.some(p => p.id === selectedProduct.value)))
+const bindingOldModel = computed(() => missingModelGroups.value.find(group => group.model_id === selectedModel.value)?.model_id ?? missingModelGroups.value.find(group => group.products.some(p => p.id === selectedProduct.value))?.model_id ?? '')
+async function openBindingProduct(productId: string) {
+  const group = missingModelGroups.value.find(g => g.products.some(p => p.id === productId))
+  if (!group) return
+  await navigate(() => { selectModel(group.model_id); selectedProduct.value = productId; step.value = 'editor' })
+}
+async function confirmModelBinding(input: ModelBindingInput) {
+  if (await modelBinding(input)) { if (input.action === 'delete') { step.value = 'models'; await loadSuppliers() } await readPaidStatus() }
+}
 const lifecycleModelProducts = computed(() => lifecycleProducts.value.filter(p => p.upstream_model === selectedModel.value))
 const publishedOnlyProducts = computed(() => lifecycleModelProducts.value.filter(p => !products.value.some(draft => draft.product_id === p.product_id) && (showArchived.value || lifecycleState(p) !== 'archived')))
 const lifecycleAffectedProducts = computed(() => lifecycleProducts.value.filter(p => lifecycleRequest.value?.target.product_id ? p.product_id === lifecycleRequest.value.target.product_id : p.upstream_model === lifecycleRequest.value?.target.model_id))
@@ -479,7 +511,11 @@ function lifecycleState(p: Product) { return config.value?.product_lifecycle?.[p
 function lifecycleLabel(p: Product) { return ({ active: '未下架', unlisted: '已下架', archived: '已归档' })[lifecycleState(p)] }
 function archiveBlocked(p: Product) { return lifecycleState(p) === 'active' && !!config.value?.published?.products?.some(item => item.product_id === p.product_id) }
 function lifecycleActionLabel(action?: LifecycleAction) { return action ? ({ unlist: '下架', relist: '重新上架', archive: '归档', restore: '恢复', hide: '隐藏模型' })[action] : '' }
-function requestLifecycle(action: LifecycleAction, target: LifecycleTarget) { if (!lifecycleDisabled.value) lifecycleRequest.value = { action, target } }
+function requestLifecycle(action: LifecycleAction, target: LifecycleTarget) {
+  const missing = missingModelGroups.value.some(g => target.model_id ? g.model_id === target.model_id : g.products.some(p => p.id === target.product_id))
+  if (action === 'relist' && missing) { message.value = '原型号不可用，请先更换绑定，再重新上架。'; return }
+  if (!lifecycleDisabled.value) lifecycleRequest.value = { action, target }
+}
 async function confirmLifecycle() {
   if (!lifecycleRequest.value || lifecycleDisabled.value || lifecycleModelAmbiguous.value) return
   const request = lifecycleRequest.value
@@ -525,11 +561,6 @@ async function backToReadinessGroups() {
   await nextTick()
   modelPage.value?.querySelector<HTMLButtonElement>(`[data-test="sales-category-${id}"]`)?.focus({ preventScroll: true })
 }
-function showCatalogReport() {
-  const notice = modelPage.value?.querySelector<HTMLElement>('[data-test="catalog-notice"]')
-  notice?.scrollIntoView?.({ block: 'center' })
-  notice?.querySelector<HTMLButtonElement>('[data-test="catalog-copy"]')?.focus({ preventScroll: true })
-}
 const draftValidationLabel = computed(() => !config.value ? '尚未检查' : !validationCurrent.value || validationUnavailable.value ? '结果待确认' : ({ PASS: '通过（仅草稿）', FAIL: '草稿有待修复项，可选择商品单独校验发布', UNKNOWN: '检查暂不可用', PENDING: '检查中', VALIDATING: '检查中', RUNNING: '检查中' } as Record<string, string>)[config.value.validation.status] ?? '结果待确认')
 function availabilityName(item: ProductState) {
   const p = config.value?.published?.products?.find(p => p.product_id === item.product_id) ?? products.value.find(p => p.product_id === item.product_id)
@@ -542,6 +573,7 @@ function availabilityLabel(item: ProductState) {
   return ({ READY: '已发布配置与 Account 销售已就绪', NOT_PUBLISHED: '尚未发布', UNLISTED: '已下架', ARCHIVED: '已归档', ACCOUNT_SALES_OFF: 'Account 销售已关闭', ACCOUNT_UNAVAILABLE: 'Account 当前不可用', UPSTREAM_REMOVED: '上游目录已移除此模型', DEPENDENCIES_CHANGED: '发布依赖已变化', PUBLISHED_INVALID: '已发布配置当前不可售' } as Record<string, string>)[item.state] ?? '状态待确认'
 }
 async function editAvailability(item: ProductState) {
+  if (missingModelGroups.value.some(g => g.products.some(p => p.id === item.product_id))) { await openBindingProduct(item.product_id); return }
   const draft = products.value.find(p => p.product_id === item.product_id)
   if (!draft) return
   if (lifecycleState(draft) === 'archived') showArchived.value = true
@@ -589,7 +621,7 @@ function matchesAccount(supplier: SupplierDetail, query: string) { const normali
 function clearAccountFilters() { accountSearch.value = ''; accountFilter.value = ''; platformFilter.value = '' }
 function toggleSource(host: string) { if (accountSearch.value || accountFilter.value || platformFilter.value) return; const next = new Set(collapsedSources.value); if (next.has(host)) next.delete(host); else next.add(host); collapsedSources.value = next }
 function sourceOpen(host: string) { return !!accountSearch.value || !!accountFilter.value || !!platformFilter.value || !collapsedSources.value.has(host) }
-function modelLabel(state: string) { return ({ ARCHIVED: '已归档', UNLISTED: '已下架', PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '需要修改', NEEDS_DEVELOPMENT: '需要适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '上游目录未发现', UPSTREAM_MISSING: '上游目录未发现', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
+function modelLabel(state: string) { return ({ ARCHIVED: '已归档', UNLISTED: '已下架', PENDING: '待配置', PUBLISHED: '已发布', DRAFT: '草稿修改', UI_FIXABLE: '配置待完善／填写有误', NEEDS_DEVELOPMENT: '需要技术适配', UNKNOWN: '检查暂不可用', UPSTREAM_NOT_DISCOVERED: '原型号不可用', UPSTREAM_MISSING: '原型号不可用', MODEL_SYNC_REQUIRED: '需要同步模型', DISABLED: '本站停用', INACTIVE: '本站停用' } as Record<string, string>)[state] ?? state }
 function effectiveLabel(state: string) { return ({ SALES_PAUSED: '媒体销售已暂停', NOT_YET_ENABLED: '未开启销售', SALES_OFF_UNKNOWN: '销售已关闭（历史启售状态未知）', ACCOUNT_INACTIVE: 'Sub2 账户已停用', ACCOUNT_UNSCHEDULABLE: 'Sub2 账户不可调度', ACCOUNT_RUNTIME_BLOCKED: '账户暂时无法提供服务，请打开账户详情处理', PUBLISHED_NOT_READY: '已发布配置当前不可售', NOT_INITIALIZED: '未开启销售', PUBLISHED_VALIDATOR_NOT_WIRED: '后台检查尚未接入', UNSUPPORTED_ACCOUNT_TYPE: '此账户类型不支持媒体供应商', ACTIVE: '媒体销售中', SALES_ENABLED: '媒体销售中', SELLING: '媒体销售中' } as Record<string, string>)[state] ?? state }
 function rowProduct(id: string) { return config.value?.draft.products.find(p => p.upstream_model === id) }
 function priceLabel(p?: Product) { if (!p?.pricing_rules?.length) return '未配置售价'; return p.pricing_rules.map(rule => rule.sale_price == null ? '未配置售价' : `${rule.sale_price.currency} ${rule.sale_price.amount}`).join(' / ') }

@@ -54,7 +54,7 @@ func TestSelectedPublishIgnoresUnconfiguredModelsAndIncompleteDraft(t *testing.T
 		states[state.ProductID] = state
 	}
 	require.True(t, states[healthyOffer.ProductID].PublishedReady)
-	require.Equal(t, "NOT_PUBLISHED", states[half.ProductID].State)
+	require.Equal(t, "UPSTREAM_REMOVED", states[half.ProductID].State)
 	before := hash(a.Config)
 	_, err = s.PublishSelected(ctx, 7, a.Config.RecordVersion, a.Config.Draft.Revision, []string{half.ProductID})
 	require.ErrorIs(t, err, ErrValidation)

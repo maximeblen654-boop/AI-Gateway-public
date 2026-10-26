@@ -22,6 +22,17 @@ const management = scenario.startsWith('DRAFT_MANAGEMENT')
 const videoPolish = scenario === 'VIDEO_POLISH'
 const mediaTypes = scenario.startsWith('MEDIA_TYPES_')
 const initialDTO = management || videoPolish ? draftManagementSupplier(scenario.includes('VIDEO') ? 'video' : 'image') : supplier(77, ['UI_FIXABLE', 'NEEDS_DEVELOPMENT', 'VALUE_MAPPING'].includes(scenario) ? 'FAIL' : scenario === 'UNKNOWN' ? 'UNKNOWN' : 'PASS')
+if (scenario === 'MODEL_BINDING') {
+  const c = initialDTO.media_workbench_v1!, current = c.draft.products[0]!
+  current.upstream_model = 'new-model'
+  current.pricing_rules[0]!.sale_price!.amount = '9.00'
+  const second = copy(current); second.product_id = 'second-product'; second.upstream_model = 'other-retired-model'; second.display_name = '另一旧型号商品'
+  c.draft.products.push(second)
+  initialDTO.model_catalog = { source: 'upstream', synced_at: new Date().toISOString(), models: ['new-model', 'existing-model'] }
+  initialDTO.models = [{ model_id: 'new-model', state: 'DRAFT' }, { model_id: 'existing-model', state: 'PENDING' }, { model_id: 'image-native-1', state: 'UPSTREAM_NOT_DISCOVERED' }, { model_id: 'other-retired-model', state: 'UPSTREAM_NOT_DISCOVERED' }]
+  initialDTO.model_catalog_change = { schema_version: 1, detected_at: new Date().toISOString(), previous_synced_at: new Date().toISOString(), added_count: 1, missing_count: 2, added_models: ['new-model'], missing_models: ['image-native-1', 'other-retired-model'], truncated: false }
+  c.product_lifecycle = { 'canvas-1': { state: 'unlisted', revision: 1, updated_at: new Date().toISOString() } }
+}
 if (scenario.endsWith('_SINGLE')) initialDTO.media_workbench_v1!.draft.products.splice(1)
 if (scenario === 'SALES_CATEGORIES') {
   initialDTO.host = 'api.image2pro.top'
@@ -250,6 +261,14 @@ apiClient.defaults.adapter = async config => {
     if (config.method !== 'get' && (scenario === 'DELETED' || scenario === 'STALE')) {
       const status = scenario === 'DELETED' ? 410 : 409
       throw { isAxiosError: true, config, response: { status, data: { code: 'FIXTURE_ERROR', message: 'Deterministic fixture' } } }
+    }
+    if (url.endsWith('/model-binding')) {
+      // Canned browser response only; real atomic writes are tested in Go.
+      const input = JSON.parse(config.data) as { action: string; new_model_id?: string }
+      if (scenario !== 'MODEL_BINDING' || input.action !== 'rebind' || input.new_model_id !== 'new-model') throw new Error('Unexpected browser binding fixture request')
+      account.media_workbench_v1!.record_version++
+      account.media_workbench_v1!.published!.products![0]!.upstream_model = 'new-model'
+      data = copy(account)
     }
     if (url.endsWith('/draft')) {
       // Control one response without disabling autosave or changing application state.

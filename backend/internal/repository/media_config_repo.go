@@ -41,6 +41,10 @@ const mediaAccountProjection = `SELECT id, name, platform, type, status, schedul
  FROM accounts `
 
 func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
+	return scanMediaAccountWithBindingIdentity(rows, false)
+}
+
+func scanMediaAccountWithBindingIdentity(rows *sql.Rows, requireBindingIdentity bool) (*mediaworkbench.Account, error) {
 	a := new(mediaworkbench.Account)
 	var catalog, config, routing []byte
 	if err := rows.Scan(&a.ID, &a.Name, &a.Platform, &a.Type, &a.Status, &a.Schedulable, &a.BaseURL, &catalog, &config, &routing); err != nil {
@@ -67,6 +71,7 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 		}
 	}
 	var local struct {
+		BindingCredentials        map[string]any                        `json:"model_binding_credentials"`
 		CatalogChange             json.RawMessage                       `json:"model_catalog_change"`
 		Mapping                   map[string]any                        `json:"model_mapping"`
 		MediaMetadata             service.UpstreamModelMetadataSnapshot `json:"media_metadata"`
@@ -87,6 +92,12 @@ func scanMediaAccount(rows *sql.Rows) (*mediaworkbench.Account, error) {
 	if err := json.Unmarshal(routing, &local); err != nil {
 		return nil, fmt.Errorf("invalid local Account routing projection")
 	}
+	if requireBindingIdentity {
+		if err := checkMediaModelBindingCatalogIdentity(a, local.BindingCredentials, local.Proxy); err != nil {
+			return nil, err
+		}
+	}
+	local.BindingCredentials = nil // Never copy the temporary secrets into Account or diagnostics.
 	account := service.Account{ID: a.ID, Platform: a.Platform, Type: a.Type, Status: a.Status, Schedulable: a.Schedulable, Credentials: map[string]any{"model_mapping": local.Mapping}, Extra: local.Quota, ExpiresAt: local.ExpiresAt, AutoPauseOnExpired: local.AutoPause, RateLimitResetAt: local.RateLimit, OverloadUntil: local.Overload, TempUnschedulableUntil: local.Temporary}
 	// A damaged or future observation must not break Account routing/config reads.
 	var change *mediaworkbench.CatalogChange
@@ -134,7 +145,7 @@ func (r *mediaConfigRepository) CompareAndSwapChecked(ctx context.Context, id, e
 			_ = tx.Rollback()
 		}
 	}()
-	rows, err := tx.QueryContext(ctx, mediaAccountProjection+`WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, id)
+	rows, err := tx.QueryContext(ctx, mediaAccountProjectionForBinding(ctx)+`WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, id)
 	if err != nil {
 		return err
 	}
@@ -146,7 +157,7 @@ func (r *mediaConfigRepository) CompareAndSwapChecked(ctx context.Context, id, e
 		}
 		return mediaworkbench.ErrNotFound
 	}
-	current, readErr := scanMediaAccount(rows)
+	current, readErr := scanMediaAccountWithBindingIdentity(rows, mediaworkbench.ModelBindingCatalogIdentityRequired(ctx))
 	if err = rows.Close(); err != nil {
 		return err
 	}
@@ -177,7 +188,7 @@ func (r *mediaConfigRepository) CompareAndSwapChecked(ctx context.Context, id, e
 	return tx.Commit()
 }
 func (r *mediaConfigRepository) Get(ctx context.Context, id int64) (_ *mediaworkbench.Account, err error) {
-	rows, err := r.db.QueryContext(ctx, mediaAccountProjection+`WHERE id=$1 AND deleted_at IS NULL`, id)
+	rows, err := r.db.QueryContext(ctx, mediaAccountProjectionForBinding(ctx)+`WHERE id=$1 AND deleted_at IS NULL`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +199,7 @@ func (r *mediaConfigRepository) Get(ctx context.Context, id int64) (_ *mediawork
 		}
 		return nil, mediaworkbench.ErrNotFound
 	}
-	return scanMediaAccount(rows)
+	return scanMediaAccountWithBindingIdentity(rows, mediaworkbench.ModelBindingCatalogIdentityRequired(ctx))
 }
 func (r *mediaConfigRepository) List(ctx context.Context) (_ []mediaworkbench.Account, err error) {
 	rows, err := r.db.QueryContext(ctx, mediaAccountProjection+`WHERE deleted_at IS NULL AND (type='apikey' OR (platform IN ('openai','grok','gemini') AND type IN ('oauth','setup-token','service_account'))) ORDER BY id`)

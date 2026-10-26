@@ -21,4 +21,5 @@ func registerMediaWorkbenchRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	media.PUT("/accounts/:id/sales", h.Admin.MediaWorkbench.SetSales)
 	media.POST("/accounts/:id/publish", h.Admin.MediaWorkbench.Publish)
 	media.POST("/accounts/:id/lifecycle", h.Admin.MediaWorkbench.Lifecycle)
+	media.POST("/accounts/:id/model-binding", h.Admin.MediaWorkbench.ModelBinding)
 }

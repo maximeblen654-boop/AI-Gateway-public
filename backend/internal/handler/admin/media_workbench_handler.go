@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/mediaworkbench"
+	apperrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -193,6 +194,11 @@ func (h *MediaWorkbenchHandler) Lifecycle(c *gin.Context) {
 		return
 	}
 	v, err := h.service.Lifecycle(c.Request.Context(), id, *in.Expected, mediaworkbench.LifecycleInput{Action: in.Action, ProductID: in.ProductID, ModelID: in.ModelID})
+	if errors.Is(err, mediaworkbench.ErrValidation) {
+		status := apperrors.FromError(err)
+		c.JSON(http.StatusUnprocessableEntity, response.Response{Code: 422, Reason: status.Reason, Message: status.Message, Metadata: status.Metadata, Data: v})
+		return
+	}
 	if !response.ErrorFrom(c, err) {
 		response.Success(c, v)
 	}

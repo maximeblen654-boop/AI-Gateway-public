@@ -101,7 +101,13 @@ func (s *Service) Lifecycle(ctx context.Context, id, expected int64, in Lifecycl
 			if in.Action == "archive" && published && state != "unlisted" && state != "archived" {
 				return nil, ErrSales
 			}
-			if in.Action == "relist" && state != "archived" {
+			if in.Action == "relist" {
+				if state == "archived" {
+					return relistFailure(a, id, bindingDiagnostic(a, "PRODUCT_ARCHIVED", id, "product_lifecycle", "商品已归档，请先恢复配置，再明确重新上架。"))
+				}
+				if !published {
+					return relistFailure(a, id, bindingDiagnostic(a, "NOT_PUBLISHED", id, "published", "此商品尚未发布，请先完成规格及售价并明确发布该商品，再重新上架。"))
+				}
 				copyAccount := *a
 				copyConfig := *c
 				copyStates := map[string]ProductLifecycle{}
@@ -111,15 +117,25 @@ func (s *Service) Lifecycle(ctx context.Context, id, expected int64, in Lifecycl
 				delete(copyStates, id)
 				copyConfig.ProductLifecycle = copyStates
 				copyAccount.Config = &copyConfig
-				if published {
-					if !publishedProductReady(ctx, &copyAccount, id) {
-						return nil, ErrValidation
+				if !publishedProductReady(ctx, &copyAccount, id) {
+					if err := ctx.Err(); err != nil {
+						return nil, err
 					}
-				} else {
-					v, _ := validateContext(ctx, &copyAccount, Draft{Products: []Product{targets[id]}}, time.Now().UTC())
-					if !v.PublishReady {
-						return nil, ErrValidation
+					p, _ := publishedProduct(a, id)
+					if a.Catalog != nil && a.Catalog.SyncedAt != "" && !slices.Contains(a.Catalog.Models, p.UpstreamModel) {
+						return relistFailure(a, id, bindingDiagnostic(a, "UPSTREAM_REMOVED", id, "upstream_model", "原发布商品绑定的型号已从当前成功目录移除，请先更换绑定，或明确删除该缺失商品。"))
 					}
+					v, offers := validateBindingProducts(ctx, &copyAccount, []Product{p}, a.Config.Published.SourceDraftRevision, a.Config.Published.PublishedAt)
+					if v.PublishReady {
+						code, message := "PUBLISHED_DEPENDENCIES_CHANGED", "该商品的原发布依赖与当前 Account 不一致，请核对执行配置并校验原发布合同。"
+						if hash(offers) != hash(productOffers(a, id)) {
+							code, message = "PUBLISHED_CONTRACT_CHANGED", "该商品的原发布 Offer 不能按当前技术配置原样复现，请核对该商品后再重新上架。"
+						} else if !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady {
+							code, message = "ACCOUNT_UNAVAILABLE", "该 Account 当前的原生执行或调度条件不满足，请先核对账号可用性。"
+						}
+						v = bindingDiagnostic(a, code, id, "published", message)
+					}
+					return relistFailure(a, id, v)
 				}
 			}
 		}
@@ -157,4 +173,19 @@ func (s *Service) Lifecycle(ctx context.Context, id, expected int64, in Lifecycl
 		return nil, err
 	}
 	return describe(a), nil
+}
+
+func relistFailure(a *Account, id string, validation Validation) (*Detail, error) {
+	d := describe(a)
+	d.PublishValidation = &validation
+	if p, ok := publishedProduct(a, id); ok {
+		d.BindingValidationProducts = []Product{p}
+	}
+	e := *ErrValidation
+	metadata := map[string]string{"product_id": id}
+	if len(validation.Diagnostics) > 0 {
+		e.Message = validation.Diagnostics[0].Message
+		metadata["diagnostic_code"] = validation.Diagnostics[0].Code
+	}
+	return d, e.WithMetadata(metadata)
 }

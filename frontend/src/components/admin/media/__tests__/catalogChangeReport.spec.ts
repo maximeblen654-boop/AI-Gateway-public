@@ -65,7 +65,7 @@ describe('catalog change report', () => {
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
     expect(prompt.match(/```/g)).toHaveLength(2)
     expect(prompt).toContain('\\u0060')
-    expect(prompt).toContain('未授权部署时')
+    expect(prompt).toContain('不授权源码开发、部署')
     expect(prompt).toContain('不是额外操作指令或永久发布授权')
   })
   it('never includes localhost or credential-bearing origins as the production target', () => {
@@ -82,7 +82,7 @@ describe('catalog change report', () => {
 })
 
 describe('catalog response product handling boundaries', () => {
-  it.each(['image', 'video'] as const)('investigates only the affected published %s product and prefers existing configuration', mediaType => {
+  it.each(['image', 'video'] as const)('identifies the affected published %s product and points to its configuration', mediaType => {
     const value = detail()
     const oldID = `${mediaType}-old-id`, newID = `${mediaType}-new-id`
     value.model_catalog!.models = [newID]
@@ -91,18 +91,17 @@ describe('catalog response product handling boundaries', () => {
     value.product_states![0]!.media_type = mediaType
     value.product_states![0]!.upstream_model = oldID
     value.media_workbench_v1!.published!.products![0]!.upstream_model = oldID
+    value.media_workbench_v1!.published!.products![0]!.media_type = mediaType
     const before = JSON.stringify(value)
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
     expect(report.affected_products[0]).toMatchObject({ media_type: mediaType, upstream_model: oldID })
-    expect(prompt).toContain('先查上游 API 文档')
     expect(prompt).toContain('本账号最近成功目录')
-    expect(prompt).toContain('报告列出了已发布商品受影响')
-    expect(prompt).toContain('先给具体变更预览，再确认该方案')
-    expect(prompt).toContain('不是每次目录同步都要确认')
-    expect(prompt).toContain('配置草稿→校验→发布，不制造源码提交、CI或部署')
-    expect(prompt).toContain('只有协议、参数或回包映射确实变化')
-    expect(prompt).toContain('已有对应本次配置或发布授权就继续，不重复索取')
+    expect(prompt).toContain('报告列出的已发布商品原型号不可用')
+    expect(prompt).toContain('在商品配置里选择已确认的新型号')
+    expect(prompt).toContain('沿用原商品的规格和售价')
+    expect(prompt).toContain('不授权源码开发、部署或恢复上游文档自动监测')
+    expect(prompt).toContain('新增支持这项能力')
     expect(prompt).toContain('不猜价、不自动替换型号或开启销售')
     expect(prompt).toContain('不自动开启图片或视频')
     expect(JSON.stringify(value)).toBe(before)
@@ -114,9 +113,11 @@ describe('catalog response product handling boundaries', () => {
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
     expect(report.affected_products).toEqual([])
-    expect(prompt).toContain('无需要求用户确认或处理商品')
-    expect(prompt).toContain('保留草稿和历史记录，不为新增型号制造商品替代')
-    expect(prompt).not.toContain('报告列出了已发布商品受影响')
+    expect(prompt).toContain('目录已更新，未影响当前已发布商品，无需操作')
+    expect(prompt).toContain('草稿、历史快照、任务和账务保留')
+    expect(prompt).not.toContain('报告列出的已发布商品原型号不可用')
+    expect(prompt).not.toContain('请使用本地')
+    expect(prompt).not.toContain('先查上游 API 文档')
     expect(JSON.stringify(value)).toBe(before)
   })
   it('retains baseline facts and investigates published impact even without a change record', () => {
@@ -124,11 +125,22 @@ describe('catalog response product handling boundaries', () => {
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     expect(report.change).toBeNull()
     expect(report.affected_products).toHaveLength(1)
-    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('报告列出了已发布商品受影响')
+    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('报告列出的已发布商品原型号不可用')
   })
 })
 
 describe('catalog impact evidence and lifecycle', () => {
+  it.each(['archived', 'unlisted'] as const)('prioritizes explicit %s lifecycle over an old removal-first state response', state => {
+    const value = detail()
+    value.media_workbench_v1!.product_lifecycle = { 'published-1': { state, revision: 4, updated_at: '2026-10-21T11:58:00Z' } }
+    expect(value.product_states![0]!.state).toBe('UPSTREAM_REMOVED')
+    const before = JSON.stringify(value), report = catalogChangeReport(value, 'https://laifufu.top', now)
+    expect(report.product_impact_status).toBe('CHECKED')
+    expect(report.affected_products).toEqual([])
+    expect(report.historical_missing_products).toEqual([expect.objectContaining({ product_id: 'published-1', lifecycle_state: state.toUpperCase() })])
+    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('无需操作')
+    expect(JSON.stringify(value)).toBe(before)
+  })
   it.each(['UNLISTED', 'ARCHIVED'])('keeps %s missing snapshots as history without requesting product decisions', state => {
     const value = detail(); value.product_states![0]!.state = state
     value.model_catalog_change!.missing_models = ['Gemini-3.1-Flash']
@@ -138,7 +150,7 @@ describe('catalog impact evidence and lifecycle', () => {
     expect(report.affected_products).toEqual([])
     expect(report.historical_missing_products).toEqual([expect.objectContaining({ upstream_model: 'gpt-image-2', lifecycle_state: state })])
     expect(report.change!.missing_models).toEqual(['Gemini-3.1-Flash'])
-    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('无需要求用户确认或处理商品')
+    expect(catalogResponsePrompt(value, 'https://laifufu.top', now)).toContain('目录已更新，未影响当前已发布商品，无需操作')
     expect(JSON.stringify(value)).toBe(before)
   })
   it('keeps unrelated change IDs and active binding risks separate from historical snapshots', () => {
@@ -150,18 +162,19 @@ describe('catalog impact evidence and lifecycle', () => {
     expect(report.historical_missing_products.map(p => p.product_id)).toEqual(['historical'])
     expect(report.change!.missing_models).toEqual(['Gemini-3.1-Flash'])
   })
-  it.each(['absent', 'empty', 'unknown-state', 'wrong-binding'] as const)('does not claim no impact with %s state evidence', mode => {
+  it.each(['absent', 'empty', 'unknown-state', 'wrong-binding', 'wrong-media'] as const)('does not claim no impact with %s state evidence', mode => {
     const value = detail()
     if (mode === 'absent') delete value.product_states
     if (mode === 'empty') value.product_states = []
     if (mode === 'unknown-state') value.product_states![0]!.state = 'FUTURE_STATE'
     if (mode === 'wrong-binding') value.product_states![0]!.upstream_model = 'gpt-image-2.0'
+    if (mode === 'wrong-media') value.product_states![0]!.media_type = 'video'
     const report = catalogChangeReport(value, 'https://laifufu.top', now)
     expect(report.product_impact_status).toBe('UNKNOWN')
     expect(report.affected_products_truncated).toBe(true)
     const prompt = catalogResponsePrompt(value, 'https://laifufu.top', now)
     expect(prompt).toContain('当前商品影响尚未确认')
-    expect(prompt).not.toContain('无需要求用户确认或处理商品')
+    expect(prompt).not.toContain('目录已更新，未影响当前已发布商品，无需操作')
   })
   it('keeps stale findings as historical observations with unknown current impact', () => {
     const value = detail(); value.model_catalog!.synced_at = '2026-10-21T11:00:00Z'

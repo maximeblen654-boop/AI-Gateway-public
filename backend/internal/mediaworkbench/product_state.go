@@ -52,6 +52,8 @@ func describeProductsContext(ctx context.Context, a *Account, ready func(string)
 			set("ARCHIVED", "商品已归档，不接受新的 Studio 报价和生成。", "如需经营，恢复配置并经校验后明确重新上架。")
 		case a.Config.ProductLifecycle[id].State == "unlisted":
 			set("UNLISTED", "商品已手动下架。", "核对商品后，通过重新上架操作恢复；同步目录不会自动上架。")
+		case a.Catalog != nil && a.Catalog.SyncedAt != "" && !slices.Contains(a.Catalog.Models, p.UpstreamModel):
+			set("UPSTREAM_REMOVED", "该商品绑定的型号已不在当前成功同步的目录中，仅此商品不可售。", "明确选择当前可用型号更换绑定，或删除该缺失型号的选中商品；历史订单和任务仍保留原快照。")
 		case !published:
 			set("NOT_PUBLISHED", "此商品尚未发布；草稿保存或校验通过不代表已可售。", "完成该商品的规格及正数售价，明确选择此商品发布。其他草稿无需同时完成。")
 		case !SupportsAccount(a) || a.Status != "active" || !a.Schedulable || !a.RuntimeReady:
@@ -60,8 +62,6 @@ func describeProductsContext(ctx context.Context, a *Account, ready func(string)
 			set("DEPENDENCIES_CHANGED", "缺少可信的模型目录。", "成功同步完整目录后重新检查，不要直接发布未完成草稿。")
 		case len(a.Config.Published.ProductDependencies) == 0 && !legacyPublishedReady(ctx, a):
 			set("DEPENDENCIES_CHANGED", "历史已发布快照的完整依赖校验未通过，尚未建立逐商品依赖。", "先对原已发布商品执行受控校验恢复；不要通过发布包含新草稿的整个 Account 来修复。")
-		case !slices.Contains(a.Catalog.Models, p.UpstreamModel):
-			set("UPSTREAM_REMOVED", "该已发布模型已不在当前可信目录中，仅此商品不可售。", "核对目录；不再经营时下架或归档此商品，其他正常商品可继续销售。")
 		case !productDependencyReady(a, id):
 			set("DEPENDENCIES_CHANGED", "该商品的已发布依赖与当前 Account 执行配置不一致。", "核对该模型的映射、路由和执行配置，校验后仅发布本次明确选择的商品。")
 		case !ready(id):

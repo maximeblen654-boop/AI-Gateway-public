@@ -95,7 +95,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { NativeAdapter, AdapterBinding, Diagnostic, Product } from '@/api/admin/mediaWorkbench'
-import { mediaDiagnosticGuidance } from '@/utils/mediaAdminPresentation'
+import { mediaDiagnosticGuidance, mediaVisibleDiagnostics } from '@/utils/mediaAdminPresentation'
 import MediaReferenceEditor from './MediaReferenceEditor.vue'
 import MediaTokensField from './MediaTokensField.vue'
 import MediaTechnicalEditor from './MediaTechnicalEditor.vue'
@@ -161,7 +161,7 @@ async function commitPending(): Promise<boolean> {
   return await referenceEditor.value?.commitPending() ?? true
 }
 defineExpose({ showField, invalidateSaleUndo, commitPending, goToStep })
-const adapterDiagnostics = computed(() => (props.diagnostics ?? []).filter(d => d.class === 'NEEDS_DEVELOPMENT' && (!d.scope || d.scope === 'account' || d.scope === props.product.product_id)))
+const adapterDiagnostics = computed(() => mediaVisibleDiagnostics((props.diagnostics ?? []).filter(d => !d.scope || d.scope === 'account' || d.scope === props.product.product_id)).filter(d => d.class === 'NEEDS_DEVELOPMENT'))
 const adapterStatus = computed(() => {
   if (adapterDiagnostics.value.length) return { title: '连接配置需要处理', description: '后台检查发现以下问题。请按提示处理后重新保存并检查；目前不能据此开启销售。' }
   if (props.nativeAdapter) return { title: '已识别账号连接方式', description: '连接方式由账号设置自动确定，无需手工选择。请配置准备出售的规格和售价，保存后执行检查；识别成功不代表已完成真实生成。' }
@@ -246,11 +246,11 @@ function losesPrices(previous: Product, nextRules: Product['pricing_rules'], spe
     return prices.some(rule => !preserved.has(rule.price))
   })
 }
-function editPricing(change: (value: Product) => void, dimensions = activePricingDimensions.value): boolean {
+function editPricing(change: (value: Product) => void, dimensions = activePricingDimensions.value, strictCapabilities = false): boolean {
   if (props.disabled) return false
   const next: Product = JSON.parse(JSON.stringify(props.product))
   change(next)
-  const specs = sellableSpecs(next)
+  const specs = strictCapabilities ? allowedSpecs(next.capabilities) : sellableSpecs(next)
   if (specs) {
     const rules = supportsCreationModePricing(next) && creationModePricing.value && !creationModePricingLocked.value
       ? splitCreationModePricing(next, dimensions, specs)
@@ -330,6 +330,21 @@ function setCapability(key: PricingDimension, value: string[] | number[]) {
   editPricing(change)
 }
 function updateTechnical(value: Product) {
+  if (value.media_type !== props.product.media_type) {
+    const next: Product = JSON.parse(JSON.stringify(value))
+    const seen = new Set<string>()
+    next.pricing_rules = next.pricing_rules.map(rule => {
+      if (next.media_type === 'video') delete rule.match.quality
+      else {
+        delete rule.match.duration_seconds
+        if (rule.match.references) { rule.match.references.video = { min: 0, max: 0 }; rule.match.references.audio = { min: 0, max: 0 } }
+      }
+      return rule
+    }).filter(rule => { const key = JSON.stringify(rule); if (seen.has(key)) return false; seen.add(key); return true })
+    const dimensions = dimensionsFor(next).filter(key => key !== 'quality' || next.media_type !== 'video').filter(key => key !== 'duration_seconds' || next.media_type === 'video')
+    editPricing(target => Object.assign(target, next), dimensions, true)
+    return
+  }
   if (JSON.stringify(value.capabilities) !== JSON.stringify(props.product.capabilities)) editPricing(next => Object.assign(next, value))
   else emit('update:product', value)
 }

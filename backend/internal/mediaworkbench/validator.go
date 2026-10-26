@@ -21,6 +21,7 @@ const maxCases = 32768
 const maxPreviews = 64
 
 var dimensionPattern = regexp.MustCompile(`^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$`)
+var videoRatioPattern = regexp.MustCompile(`^[1-9][0-9]{0,3}:[1-9][0-9]{0,3}$`)
 
 // resolveAccountModel preserves legacy v0 snapshots' read-only view of Account's
 // canonical model mapping. The exact/wildcard precedence is delegated to the
@@ -41,15 +42,15 @@ func resolveAccountModel(a *Account, requested string) (mapped string, mappingMa
 }
 
 func diagnostic(class, code, scope, path, message string) Diagnostic {
-	action := "Edit the indicated Draft field and save again"
+	action := "请修正指示的草稿字段，再重新保存并校验。"
 	if class == "NEEDS_DEVELOPMENT" {
-		action = "Develop and review the owning adapter before publishing this flow"
+		action = "由技术维护者核对并适配对应执行能力后，再校验发布。"
 	}
 	if class == "UI_FIXABLE" && (code == "IMAGE_EXECUTION_CAPABILITY_INVALID" || code == "IMAGE_EDIT_EXECUTION_CAPABILITY_INVALID") {
 		action = "请在指示的执行字段中修正单请求产出上限，然后重新保存草稿"
 	}
 	if class == "UNKNOWN" {
-		action = "Retry after the local dependency is available"
+		action = "本地依赖恢复后重新校验。"
 	}
 	return Diagnostic{Class: class, Severity: "error", Code: code, Scope: scope, Path: path, Message: message, Action: action}
 }
@@ -127,7 +128,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 		pid := p.ProductID
 		for name, value := range map[string]string{"product_id": pid, "site_model": p.SiteModel, "upstream_model": p.UpstreamModel} {
 			if value == "" || strings.TrimSpace(value) != value || len(value) > 256 {
-				add("UI_FIXABLE", "REQUIRED_FIELD", pid, name, "A nonempty bounded identifier is required")
+				add("UI_FIXABLE", "REQUIRED_FIELD", pid, name, "标识字段不能为空、不能含首尾空白，且长度不能超过 256 个字符。")
 			}
 		}
 		if ids[pid] {
@@ -207,42 +208,10 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			v.Diagnostics = append(v.Diagnostics, validateImage2ProSyncProduct(a, p)...)
 			v.Diagnostics = append(v.Diagnostics, validateLaoliSyncProduct(a, p)...)
 		}
-		v.Diagnostics = append(v.Diagnostics, validateImage2ProVideoProduct(a, p)...)
+		image2ProVideoDiagnostics := validateImage2ProVideoProduct(a, p)
+		v.Diagnostics = append(v.Diagnostics, image2ProVideoDiagnostics...)
 		if known && p.MediaType == "video" {
-			m, ok := VideoProfileModel(p)
-			if p.AdapterConfig.WireProfile == videoplan.LaoliMediaProfile && (!imagecontract.IsLaoliMediaBase(a.BaseURL) || binding.Kind != "laoli_video" || nativeAdapterKind(a, "video") != "laoli_video") {
-				ok = false
-			}
-			if imagecontract.IsLaoliMediaBase(a.BaseURL) && binding.Kind == "laoli_video" && p.AdapterConfig.WireProfile != videoplan.LaoliMediaProfile {
-				ok = false
-			}
-			if !ok || p.AdapterConfig.ModelFamily != "" || p.Capabilities.Count != (Range{Min: 1, Max: 1}) || len(p.Capabilities.Qualities) > 0 || len(p.AdapterConfig.SizeMappings) > 0 {
-				add("NEEDS_DEVELOPMENT", "VIDEO_PROFILE_UNSUPPORTED", pid, "capabilities", "Use a supported explicit video contract, count one, and no image size mappings")
-			} else {
-				for _, v := range p.Capabilities.DurationsSeconds {
-					if !slices.Contains(m.Durations, v) {
-						add("UI_FIXABLE", "VIDEO_DURATION_UNSUPPORTED", pid, "capabilities", "Duration is outside this adapter contract")
-					}
-				}
-				for _, v := range p.Capabilities.Resolutions {
-					valid := slices.Contains(m.Resolutions, v)
-					if m.Mode == "image2pro" && m.Image2Pro != nil && m.Image2Pro.Size != "" {
-						valid = strings.EqualFold(m.Image2Pro.Size, v)
-					}
-					if !valid {
-						add("UI_FIXABLE", "VIDEO_RESOLUTION_UNSUPPORTED", pid, "capabilities", "当前分辨率不在这个模型已确认的范围内")
-					}
-				}
-				for _, v := range p.Capabilities.AspectRatios {
-					if !slices.Contains(m.Ratios, v) {
-						add("UI_FIXABLE", "VIDEO_RATIO_UNSUPPORTED", pid, "capabilities", "Ratio is outside this adapter contract")
-					}
-				}
-				refs := p.Capabilities.References
-				if refs.Image.Max > m.Limits.Image || refs.Video.Max > m.Limits.Video || refs.Audio.Max > m.Limits.Audio || refs.TotalMax > m.Limits.Total {
-					add("UI_FIXABLE", "VIDEO_REFERENCES_UNSUPPORTED", pid, "capabilities", "Reference limit exceeds the adapter contract")
-				}
-			}
+			v.Diagnostics = append(v.Diagnostics, validateVideoProduct(a, p, binding, len(image2ProVideoDiagnostics) > 0)...)
 		}
 		if len(p.Capabilities.OutputFormats) > 3 {
 			add("UI_FIXABLE", "OUTPUT_FORMAT_UNSUPPORTED", pid, "capabilities.output_formats", "At most three native output formats are supported")
@@ -256,9 +225,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 				seenFormats[format] = true
 			}
 		}
-		if !validCapabilities(p.Capabilities) {
-			add("UI_FIXABLE", "INVALID_REFERENCE_LIMIT", pid, "capabilities", "Use valid bounded count/reference ranges and nonempty unique specification values")
-		}
+		v.Diagnostics = append(v.Diagnostics, capabilityDiagnostics(p.Capabilities, pid, p.MediaType)...)
 		priceRuleLimit := 100
 		if p.MediaType == "video" {
 			priceRuleLimit = 1024
@@ -273,7 +240,7 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 			}
 			for _, m := range p.AdapterConfig.SizeMappings {
 				if !dimensionPattern.MatchString(m.WireSize) && m.WireSize != "auto" {
-					add("UI_FIXABLE", "INVALID_VALUE_MAPPING", pid, "adapter_config.size_mappings", "Wire size must be auto or positive width x height")
+					add("UI_FIXABLE", "INVALID_VALUE_MAPPING", pid, "adapter_config.size_mappings", "图片尺寸映射须为 auto，或使用正整数宽x高，例如 1024x1024。")
 				} else if p.MediaType == "image" {
 					if _, _, err := validateImageMapping(m); err != nil {
 						add("UI_FIXABLE", "IMAGE_SPEC_MAPPING_MISMATCH", pid, "adapter_config.size_mappings", err.Error())
@@ -416,6 +383,174 @@ func validateContext(ctx context.Context, a *Account, d Draft, now time.Time) (V
 func validPrice(p Price) bool {
 	return ValidateMediaSalePrice(p) == nil
 }
+
+func validateVideoProduct(a *Account, p Product, binding AdapterBinding, image2ProDiagnosed bool) []Diagnostic {
+	var out []Diagnostic
+	add := func(class, code, path, message string) {
+		out = append(out, diagnostic(class, code, p.ProductID, path, message))
+	}
+	c, config := p.Capabilities, p.AdapterConfig
+	if len(c.DurationsSeconds) == 0 {
+		add("UI_FIXABLE", "VIDEO_DURATION_REQUIRED", "capabilities.durations_seconds", "请至少填写一个视频时长，再重新保存并校验。")
+	}
+	if len(c.Resolutions) == 0 {
+		add("UI_FIXABLE", "VIDEO_RESOLUTION_REQUIRED", "capabilities.resolutions", "请至少填写一个视频分辨率，再重新保存并校验。")
+	}
+	ratioInvalid := len(c.AspectRatios) == 0 || !validStrings(c.AspectRatios)
+	if len(c.AspectRatios) == 0 {
+		add("UI_FIXABLE", "VIDEO_RATIO_REQUIRED", "capabilities.aspect_ratios", "请至少填写一个视频比例；上游未列出比例时，须由商品配置明确填写，程序不会补默认比例。")
+	} else if config.WireProfile == videoplan.LaoliMediaProfile && validStrings(c.AspectRatios) {
+		for _, ratio := range c.AspectRatios {
+			if !videoRatioPattern.MatchString(ratio) {
+				ratioInvalid = true
+				add("UI_FIXABLE", "VIDEO_RATIO_INVALID", "capabilities.aspect_ratios", "视频比例须为正整数宽:高，例如 16:9；两侧数字最多四位，且比例不能重复。")
+				break
+			}
+		}
+	}
+	if validRange(c.Count, 10) && c.Count.Min >= 1 && c.Count != (Range{Min: 1, Max: 1}) {
+		add("NEEDS_DEVELOPMENT", "VIDEO_COUNT_UNSUPPORTED", "capabilities.count", "当前视频执行器每次只生成 1 个视频；如需一次生成多个视频，须新增对应的执行与结果处理能力。")
+	}
+	if len(c.Qualities) > 0 && validStrings(c.Qualities) {
+		add("NEEDS_DEVELOPMENT", "VIDEO_QUALITY_UNSUPPORTED", "capabilities.qualities", "当前视频执行器没有独立的质量参数；如需按质量档位生成，须先适配该参数。")
+	}
+	if len(config.SizeMappings) > 0 {
+		add("UI_FIXABLE", "VIDEO_IMAGE_SIZE_MAPPING_CONFLICT", "adapter_config.size_mappings", "视频商品不能使用图片尺寸映射；请清除这项图片配置，视频分辨率继续在商品规格中填写。")
+	}
+	if config.ModelFamily != "" {
+		class, code := "NEEDS_DEVELOPMENT", "VIDEO_MODEL_FAMILY_UNSUPPORTED"
+		message := "当前视频执行器不支持这个模型族配置；如需此能力，须先核对并适配对应合同。"
+		switch config.ModelFamily {
+		case "openai_json", "image2pro_json", laoliSyncFamily, "openai_images", "openai_images_oauth", "grok_images", "gemini_images":
+			class, code = "UI_FIXABLE", "VIDEO_MODEL_FAMILY_CONFLICT"
+			message = "视频商品残留了图片模型族配置；请清除该图片字段，再按当前视频规格校验。"
+		}
+		add(class, code, "adapter_config.model_family", message)
+	}
+
+	m, ok := videoProfileValidationModel(p)
+	scopeMismatch := config.WireProfile == videoplan.LaoliMediaProfile && (!imagecontract.IsLaoliMediaBase(a.BaseURL) || binding.Kind != "laoli_video" || nativeAdapterKind(a, "video") != "laoli_video") ||
+		imagecontract.IsLaoliMediaBase(a.BaseURL) && binding.Kind == "laoli_video" && config.WireProfile != videoplan.LaoliMediaProfile
+	profileDiagnosed := false
+	if config.Version == 1 && !scopeMismatch {
+		switch config.WireProfile {
+		case videoplan.LaoliMediaProfile:
+			profileDiagnosed = videoplan.IsLaoliMediaModel(p.UpstreamModel) && ratioInvalid
+		case "image2pro":
+			profileDiagnosed = image2ProDiagnosed
+		case "images":
+			if c.References.Video.Max > 0 || c.References.Audio.Max > 0 {
+				profileDiagnosed = true
+				add("UI_FIXABLE", "VIDEO_REFERENCES_PROFILE_CONFLICT", "adapter_config.wire_profile", "当前图片参考协议与视频或音频参考数量冲突；本站已有多媒体参考协议，请修正商品协议配置后再校验。")
+			}
+		case "seedance":
+			if c.References.Video.Max > 0 {
+				profileDiagnosed = true
+				if validRange(c.References.Video, 30) {
+					add("NEEDS_DEVELOPMENT", "VIDEO_REFERENCE_VIDEO_UNSUPPORTED", "capabilities.references.video", "当前 Seedance 视频执行器尚未接入视频参考；如需此素材能力，须先完成对应适配。")
+				}
+			}
+		case "grok":
+			for _, ref := range []struct {
+				path, label string
+				rangeValue  Range
+				limit       int
+			}{{"image", "图片", c.References.Image, 1}, {"video", "视频", c.References.Video, 0}, {"audio", "音频", c.References.Audio, 0}} {
+				if ref.rangeValue.Max > ref.limit {
+					profileDiagnosed = true
+					if validRange(ref.rangeValue, 30) {
+						add("NEEDS_DEVELOPMENT", "VIDEO_REFERENCE_"+strings.ToUpper(ref.path)+"_UNSUPPORTED", "capabilities.references."+ref.path, fmt.Sprintf("当前 Grok 视频执行器最多支持 %d 个%s参考；如需更多%s参考，须先完成对应适配。", ref.limit, ref.label, ref.label))
+					}
+				}
+			}
+		}
+	}
+	if scopeMismatch || !ok && !profileDiagnosed {
+		path, message := "adapter_config.wire_profile", "当前视频协议尚无可用执行合同；须由技术维护者核对并适配。"
+		if config.Version != 1 && (config.Version != 0 || config.WireProfile != "") {
+			path, message = "adapter_config.version", "当前视频配置版本尚未支持；须由技术维护者核对该版本的执行合同。"
+		} else if scopeMismatch {
+			message = "当前视频协议与 Account 地址或原生执行器不匹配；须核对该账号实际使用的协议，不能跨供应商沿用合同。"
+		} else if config.WireProfile == videoplan.LaoliMediaProfile {
+			path, message = "upstream_model", "当前精确型号尚未安装对应的视频执行合同；须先核对并适配该型号。"
+		}
+		add("NEEDS_DEVELOPMENT", "VIDEO_PROFILE_UNSUPPORTED", path, message)
+	}
+	if !ok || scopeMismatch {
+		return out
+	}
+	for _, value := range c.DurationsSeconds {
+		if !slices.Contains(m.Durations, value) {
+			add("UI_FIXABLE", "VIDEO_DURATION_UNSUPPORTED", "capabilities.durations_seconds", "当前时长不在这个模型已确认的范围内，请调整视频时长。")
+		}
+	}
+	for _, value := range c.Resolutions {
+		valid := slices.Contains(m.Resolutions, value)
+		if m.Mode == "image2pro" && m.Image2Pro != nil && m.Image2Pro.Size != "" {
+			valid = strings.EqualFold(m.Image2Pro.Size, value)
+		}
+		if !valid {
+			add("UI_FIXABLE", "VIDEO_RESOLUTION_UNSUPPORTED", "capabilities.resolutions", "当前分辨率不在这个模型已确认的范围内，请调整视频分辨率。")
+		}
+	}
+	for _, value := range c.AspectRatios {
+		if !slices.Contains(m.Ratios, value) {
+			add("UI_FIXABLE", "VIDEO_RATIO_UNSUPPORTED", "capabilities.aspect_ratios", "当前比例不在这个模型已确认的范围内，请调整视频比例。")
+		}
+	}
+	refs := c.References
+	if refs.Image.Max > m.Limits.Image || refs.Video.Max > m.Limits.Video || refs.Audio.Max > m.Limits.Audio || refs.TotalMax > m.Limits.Total {
+		add("UI_FIXABLE", "VIDEO_REFERENCES_UNSUPPORTED", "capabilities.references", "参考素材数量超出这个模型已确认的上限，请调整图片、视频、音频或素材总数。")
+	}
+	return out
+}
+
+func capabilityDiagnostics(c Capabilities, scope, mediaType string) []Diagnostic {
+	var out []Diagnostic
+	add := func(code, path, message string) {
+		out = append(out, diagnostic("UI_FIXABLE", code, scope, "capabilities."+path, message))
+	}
+	if !validRange(c.Count, 10) || c.Count.Min < 1 {
+		add("INVALID_REFERENCE_LIMIT", "count", "生成数量的最小值和最大值须为 1～10，且最小值不能大于最大值。")
+	}
+	for _, ref := range []struct {
+		path, label string
+		value       Range
+	}{{"image", "图片", c.References.Image}, {"video", "视频", c.References.Video}, {"audio", "音频", c.References.Audio}} {
+		if !validRange(ref.value, 30) {
+			add("INVALID_REFERENCE_LIMIT", "references."+ref.path, "参考"+ref.label+"数量须为 0～30，且最小值不能大于最大值。")
+		}
+	}
+	if c.References.TotalMax < c.References.Image.Min+c.References.Video.Min+c.References.Audio.Min || c.References.TotalMax > 30 {
+		add("INVALID_REFERENCE_LIMIT", "references.total_max", "参考素材总数须在 0～30 内，且不能小于各类素材最小数量之和。")
+	}
+	for _, field := range []struct {
+		path, label string
+		values      []string
+	}{{"resolutions", "分辨率", c.Resolutions}, {"aspect_ratios", "比例", c.AspectRatios}, {"qualities", "质量", c.Qualities}} {
+		if !validStrings(field.values) {
+			code := "INVALID_SPECIFICATION_FORMAT"
+			if mediaType == "video" && field.path == "aspect_ratios" {
+				code = "VIDEO_RATIO_INVALID"
+			}
+			add(code, field.path, field.label+"规格不能为空、重复或含首尾空白；单项最多 128 个字符，每类最多 32 项。")
+		}
+	}
+	seen := map[int]bool{}
+	invalidDurations := len(c.DurationsSeconds) > 32
+	for _, n := range c.DurationsSeconds {
+		invalidDurations = invalidDurations || n < 1 || n > 3600 || seen[n]
+		seen[n] = true
+	}
+	if invalidDurations {
+		add("INVALID_SPECIFICATION_FORMAT", "durations_seconds", "时长须为 1～3600 秒、不得重复，且最多填写 32 项。")
+	}
+	if len(c.CombinationRules) > 100 {
+		add("CONFIG_TOO_LARGE", "combination_rules", "规格排除规则最多配置 100 项。")
+	}
+	return out
+}
+
 func validRange(r Range, max int) bool { return r.Min >= 0 && r.Max >= r.Min && r.Max <= max }
 func validStrings(values []string) bool {
 	seen := map[string]bool{}
@@ -428,24 +563,7 @@ func validStrings(values []string) bool {
 	return len(values) <= 32
 }
 func validCapabilities(c Capabilities) bool {
-	r := c.References
-	if !validRange(c.Count, 10) || c.Count.Min < 1 || !validRange(r.Image, 30) || !validRange(r.Video, 30) || !validRange(r.Audio, 30) || r.TotalMax < r.Image.Min+r.Video.Min+r.Audio.Min || r.TotalMax > 30 {
-		return false
-	}
-	if !validStrings(c.Resolutions) || !validStrings(c.AspectRatios) || !validStrings(c.Qualities) {
-		return false
-	}
-	if len(c.DurationsSeconds) > 32 {
-		return false
-	}
-	seen := map[int]bool{}
-	for _, n := range c.DurationsSeconds {
-		if n < 1 || n > 3600 || seen[n] {
-			return false
-		}
-		seen[n] = true
-	}
-	return len(c.CombinationRules) <= 100
+	return len(capabilityDiagnostics(c, "", "")) == 0
 }
 func emptyMatch(m Match) bool {
 	return len(m.Resolution)+len(m.DurationSeconds)+len(m.AspectRatio)+len(m.Quality) == 0 && m.Count == nil && m.References == nil

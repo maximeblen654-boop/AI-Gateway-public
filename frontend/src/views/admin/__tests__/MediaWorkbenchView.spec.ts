@@ -11,7 +11,7 @@ import { supplier, saved, copy, draftManagementSupplier } from '@/components/adm
 
 vi.mock('@/api/admin/mediaWorkbench', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/admin/mediaWorkbench')>(),
-  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn() }
+  mediaWorkbenchAPI: { suppliers: vi.fn(), detail: vi.fn(), saveDraft: vi.fn(), publish: vi.fn(), sales: vi.fn(), sync: vi.fn(), initialize: vi.fn(), lifecycle: vi.fn(), modelBinding: vi.fn() }
 }))
 vi.mock('@/api/admin/mediaPaid', () => ({ mediaPaidAPI: { status: vi.fn(async (media: string) => ({ media, mode: 'managed-v1', effective_enabled: false, requested_enabled: false })) } }))
 const api = vi.mocked(mediaWorkbenchAPI)
@@ -57,6 +57,56 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
 })
 afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
+
+function missingBindingFixture() {
+  const dto = supplier()
+  dto.model_catalog!.models = ['new-model', 'other-model']
+  dto.models = [{ model_id: 'image-native-1', state: 'UNLISTED' }, { model_id: 'new-model', state: 'DRAFT' }, { model_id: 'other-model', state: 'PENDING' }]
+  dto.media_workbench_v1!.draft.products[0]!.upstream_model = 'new-model'
+  dto.media_workbench_v1!.draft.products[0]!.pricing_rules[0]!.sale_price!.amount = '9.00'
+  dto.media_workbench_v1!.product_lifecycle = { 'canvas-1': { state: 'unlisted', revision: 1, updated_at: '2026-10-26T00:00:00Z' } }
+  return dto
+}
+
+it('repairs a missing published binding inside the current product without exposing hidden specs or duplicate products', async () => {
+  const dto = missingBindingFixture()
+  api.detail.mockResolvedValue(copy(dto)); api.suppliers.mockResolvedValue([copy(dto)])
+  const rebound = copy(dto)
+  rebound.media_workbench_v1!.record_version++
+  rebound.media_workbench_v1!.published!.products![0]!.upstream_model = 'new-model'
+  rebound.models = rebound.models.filter(m => m.model_id !== 'image-native-1')
+  api.modelBinding.mockResolvedValue(rebound)
+  await openEditor(77, 'new-model')
+  expect(wrapper.find('[data-test="model-binding"]').exists()).toBe(true)
+  expect(wrapper.findComponent({ name: 'MediaProductEditor' }).exists()).toBe(false)
+  expect(wrapper.get('[data-test="binding-old"]').element).toHaveProperty('value', 'image-native-1')
+  await wrapper.get('[data-test="binding-new"]').setValue('new-model')
+  await wrapper.get('[data-test="binding-confirm"]').trigger('click'); await flushPromises()
+  expect(api.modelBinding).toHaveBeenCalledWith(77, 3, 'mwd_a', { action: 'rebind', old_model_id: 'image-native-1', new_model_id: 'new-model', product_ids: ['canvas-1'] })
+  expect(wrapper.find('[data-test="model-binding"]').exists()).toBe(false)
+  expect(wrapper.findComponent({ name: 'MediaProductEditor' }).props('product').pricing_rules[0].sale_price.amount).toBe('9.00')
+  expect(api.publish).not.toHaveBeenCalled()
+})
+
+it('keeps a rejected binding preview separate from the saved draft and shows its actual candidate diagnostics', async () => {
+  const dto = missingBindingFixture()
+  api.detail.mockResolvedValue(copy(dto)); api.suppliers.mockResolvedValue([copy(dto)])
+  const receipt = copy(dto)
+  receipt.publish_validation = { draft_revision: 'mwd_a', status: 'FAIL', checked_at: '2026-10-26T00:00:00Z', publish_ready: false, diagnostics: [{ class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'PROFILE_UNSUPPORTED', scope: 'canvas-1', path: 'adapter_config', message: '本站尚不支持这个型号的调用方式', action: '复制给 Codex' }] }
+  receipt.binding_validation_products = [copy(dto.media_workbench_v1!.draft.products[0]!)]
+  receipt.binding_validation_products[0]!.upstream_model = 'actual-candidate-model'
+  api.modelBinding.mockRejectedValue({ status: 422, data: receipt, message: '型号暂不兼容' })
+  await openEditor(77, 'new-model')
+  await wrapper.get('[data-test="binding-new"]').setValue('other-model')
+  await wrapper.get('[data-test="binding-confirm"]').trigger('click'); await flushPromises()
+  expect(wrapper.get('[data-test="model-binding"]').text()).toContain('型号暂不兼容')
+  expect(wrapper.text()).toContain('本站尚不支持这个型号的调用方式')
+  expect(wrapper.text()).toContain('本次更换尚未保存')
+  expect(wrapper.text()).not.toContain('整份草稿检查结果不属于当前版本')
+  expect(wrapper.find('[data-test="copy-codex"]').exists()).toBe(true)
+  expect(api.saveDraft).not.toHaveBeenCalled()
+  expect(api.publish).not.toHaveBeenCalled()
+})
 
 it('opens customer pricing directly and keeps account filters when returning', async () => {
   await mountWorkbench()
@@ -641,12 +691,12 @@ it('restores an archived product as unlisted without automatically relisting', a
   expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled()
 })
 
-it('shows both Draft and Published model identities and blocks ambiguous bulk action', async () => {
+it('shows one current product and blocks ambiguous bulk action until binding is resolved', async () => {
   const dto = supplier(); const c = dto.media_workbench_v1!
   c.draft.products[0]!.upstream_model = 'new-model'
   api.detail.mockResolvedValue(dto); api.lifecycle.mockResolvedValue(dto)
   await mountWorkbench(); await selectAccount()
-  await wrapper.get('[data-test="model-image-native-1"]').trigger('click'); await flushPromises()
+  await wrapper.get('[data-test="model-new-model"]').trigger('click'); await flushPromises()
   await wrapper.get('[data-test="model-unlist"]').trigger('click'); await flushPromises()
   expect(wrapper.find('dialog[open]').text()).toContain('草稿与已发布商品使用不同模型')
   expect(wrapper.get('[data-test="confirm-lifecycle"]').attributes('disabled')).toBeDefined()
@@ -768,6 +818,22 @@ describe('Per-product readiness and explicit publication',()=>{
   expect(feedback.text()).not.toContain('4K 条件缺少售价');expect(feedback.text()).not.toContain('canvas-1')
   expect(wrapper.get('[data-test="confirm-publish"]').attributes('disabled')).toBeUndefined()
   expect(wrapper.find('dialog[open]').exists()).toBe(true)
+ })
+ it('shows another selected models publication diagnostics after returning from the first model editor',async()=>{
+  const dto=supplier(), second=copy(dto.media_workbench_v1!.draft.products[0]!)
+  second.product_id='second';second.upstream_model='new-model';second.display_name='第二型号商品'
+  dto.media_workbench_v1!.draft.products.push(second)
+  const receipt=copy(dto)
+  receipt.publish_validation={...dto.media_workbench_v1!.validation,status:'FAIL',publish_ready:false,diagnostics:[{class:'UI_FIXABLE',severity:'error',code:'MISSING_PRICE',scope:'second',path:'pricing_rules',message:'第二型号缺少售价',action:'请填写第二型号售价'}]}
+  api.detail.mockResolvedValue(dto);api.publish.mockRejectedValue({status:422,data:receipt})
+  await openEditor();await wrapper.get('.mw-back').trigger('click');await flushPromises()
+  await wrapper.get('[data-test="publish"]').trigger('click')
+  await wrapper.get('[data-test="publish-product-canvas-1"]').setValue(false)
+  await wrapper.get('[data-test="publish-product-second"]').setValue(true)
+  await wrapper.get('[data-test="confirm-publish"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-test="publish-validation"]').text()).toContain('第二型号缺少售价')
+  expect(wrapper.get('[data-test="publish-validation"]').text()).not.toContain('当前型号没有相关报错')
+  expect(api.publish).toHaveBeenCalledWith(77,3,'mwd_a',['second'])
  })
  it('does not infer product readiness from Draft PASS when per-product evidence is absent',async()=>{
   await mountWorkbench();await selectAccount()
@@ -1312,14 +1378,14 @@ describe('publication time and plain-language status', () => {
 })
 
 
-it('automatically lists current names and excludes retired names without rewriting saved products',async()=>{
+it('retains affected retired names for binding repair without rewriting saved products',async()=>{
  const dto=supplier()
  dto.model_catalog={source:'upstream',synced_at:'2026-10-21T07:32:00Z',models:['gpt-image-2.0','gpt-image-2.0-原生4K']}
  dto.models=[{model_id:'image-native-1',state:'UPSTREAM_NOT_DISCOVERED'},{model_id:'gpt-image-2.0',state:'PENDING'},{model_id:'gpt-image-2.0-原生4K',state:'PENDING'}]
  const original=copy(dto.media_workbench_v1)
  api.detail.mockResolvedValue(dto)
  await mountWorkbench();await selectAccount()
- expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+ expect(wrapper.get('[data-test="model-image-native-1"]').text()).toContain('原型号不可用')
  expect(wrapper.find('[data-test="model-gpt-image-2.0"]').exists()).toBe(true)
  expect(wrapper.find('[data-test="model-gpt-image-2.0-原生4K"]').exists()).toBe(true)
  expect(wrapper.get('[data-test="catalog-updated"]').text()).toContain('最近成功同步')
@@ -1330,9 +1396,14 @@ it('automatically lists current names and excludes retired names without rewriti
 
 it.each(['UNLISTED','ARCHIVED'])('keeps retired %s IDs out of new candidates even when archived models are shown',async state=>{
  const dto=supplier();dto.models[0]!.state=state;dto.model_catalog!.models=['new-model','flow-needs-development']
+ if(state==='ARCHIVED') dto.media_workbench_v1!.product_lifecycle={'canvas-1':{state:'archived',revision:1,updated_at:'2026-10-26T00:00:00Z'}}
  api.detail.mockResolvedValue(dto);await mountWorkbench();await selectAccount()
  await wrapper.get('[data-test="show-archived-models"]').setValue(true)
- expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+ if(state==='ARCHIVED') expect(wrapper.find('[data-test="model-image-native-1"]').exists()).toBe(false)
+ else {
+  await wrapper.get('[data-test="model-image-native-1"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[data-test="binding-new"]').findAll('option').some(option=>option.attributes('value')==='image-native-1')).toBe(false)
+ }
  expect(dto.media_workbench_v1!.draft.products[0]!.upstream_model).toBe('image-native-1')
  expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
 })
@@ -1346,9 +1417,9 @@ it('allows historical inspection but disables creating another product for a rem
  api.detail.mockResolvedValue(dto);await mountWorkbench();await selectAccount()
  await wrapper.get('[data-test="sales-category-attention"]').trigger('click');await flushPromises()
  await wrapper.get('[data-test="view-catalog-report"]').trigger('click');await flushPromises()
- expect(document.activeElement).toBe(wrapper.get('[data-test="catalog-copy"]').element)
- await wrapper.get(`[data-test="readiness-${product.product_id}"] button`).trigger('click');await flushPromises()
- expect(wrapper.get('[data-test="new-independent-product"]').attributes('disabled')).toBeDefined()
+ expect(wrapper.find('[data-test="model-binding"]').exists()).toBe(true)
+ expect(wrapper.find('[data-test="new-independent-product"]').exists()).toBe(false)
+ expect(wrapper.findComponent({name:'MediaProductEditor'}).exists()).toBe(false)
  expect(api.saveDraft).not.toHaveBeenCalled();expect(api.publish).not.toHaveBeenCalled()
 })
 

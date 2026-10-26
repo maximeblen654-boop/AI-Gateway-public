@@ -181,7 +181,7 @@ func TestDiagnosticsAndPriceBoundaries(t *testing.T) {
 			a.Config.AdapterBindings["image"] = b
 		}},
 		{"Image2Pro absent", "BUILDER_REFACTOR_REQUIRED", "NEEDS_DEVELOPMENT", func(a *Account, _ *Product) { a.Config.AdapterBindings["image"] = AdapterBinding{Kind: "image2pro"} }},
-		{"video profile needs video values", "VIDEO_PROFILE_UNSUPPORTED", "NEEDS_DEVELOPMENT", func(_ *Account, p *Product) { p.MediaType = "video" }},
+		{"video profile needs video values", "VIDEO_DURATION_REQUIRED", "UI_FIXABLE", func(_ *Account, p *Product) { p.MediaType = "video" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

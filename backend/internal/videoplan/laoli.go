@@ -33,6 +33,17 @@ var laoliMediaModels = func() []Model {
 
 var laoliRatio = regexp.MustCompile(`^[1-9][0-9]{0,3}:[1-9][0-9]{0,3}$`)
 
+// IsLaoliMediaModel only identifies an installed exact model contract. It does
+// not supply omitted ratios or make an incomplete product executable.
+func IsLaoliMediaModel(upstream string) bool {
+	for _, m := range laoliMediaModels {
+		if m.Upstream == upstream {
+			return true
+		}
+	}
+	return false
+}
+
 // LaoliMediaModel resolves an exact upstream ID. The public document omits
 // ratios for some families; only the explicit product draft may supply those.
 func LaoliMediaModel(upstream string, explicitRatios []string) (Model, bool) {

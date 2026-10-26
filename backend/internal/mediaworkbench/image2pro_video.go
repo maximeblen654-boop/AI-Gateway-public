@@ -61,10 +61,16 @@ func validateImage2ProVideoProduct(a *Account, p Product) []Diagnostic {
 	if !native && !selected {
 		return nil
 	}
-	if !native || p.AdapterConfig.WireProfile != "image2pro" || !image2ProVideoMetadataMatches(a, p) {
+	if !native {
+		return []Diagnostic{diagnostic("NEEDS_DEVELOPMENT", "IMAGE2PRO_VIDEO_ACCOUNT_UNSUPPORTED", p.ProductID, "adapter_config.wire_profile", "当前 Account 没有 Image2Pro 视频执行合同；如需此协议，须先核对并适配该账号。")}
+	}
+	if p.AdapterConfig.WireProfile != "image2pro" || !image2ProVideoMetadataMatches(a, p) {
 		return []Diagnostic{diagnostic("UI_FIXABLE", "IMAGE2PRO_VIDEO_METADATA_REQUIRED", p.ProductID, "adapter_config.image2pro", "请先同步该 Account 的模型列表，再重新保存商品；视频能力缺失或已变化，当前不能发布或报价。")}
 	}
 	c := p.AdapterConfig.Image2Pro
+	if c.Size == "" && (len(p.Capabilities.Resolutions) != 1 || !validStrings(p.Capabilities.Resolutions) || len(p.Capabilities.Resolutions[0]) > 32) {
+		return []Diagnostic{diagnostic("UI_FIXABLE", "IMAGE2PRO_VIDEO_RESOLUTION_LABEL_REQUIRED", p.ProductID, "capabilities.resolutions", "该模型由上游决定输出尺寸；商品分辨率须填写一个不超过 32 个字符、无首尾空白的展示名称，不能配置多个分辨率。")}
+	}
 	refs := p.Capabilities.References
 	canText := refs.Image.Min+refs.Audio.Min+refs.Video.Min == 0
 	canReference := refs.Image.Max+refs.Audio.Max+refs.Video.Max > 0 && refs.TotalMax > 0
