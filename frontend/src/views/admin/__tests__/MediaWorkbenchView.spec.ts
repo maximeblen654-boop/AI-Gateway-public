@@ -1464,6 +1464,7 @@ it('shows current read-only technical diagnostics without resaving an old failed
   await openEditor()
   expect(wrapper.get('[data-test="current-technical-check"]').text()).toContain('尚未因此保存或发布')
   expect(wrapper.text()).toContain('旧视频连接配置可由系统自动更新')
+  expect(wrapper.find('[data-test="refresh-technical-config"]').exists()).toBe(true)
   expect(wrapper.text()).not.toContain('历史错误旧协议尚未接通')
   expect(wrapper.find('[data-test="copy-codex"]').exists()).toBe(false)
   expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled(); expect(api.modelBinding).not.toHaveBeenCalled()
@@ -1485,4 +1486,35 @@ it('offers issue access beside the model and places explanation before the editi
   expect(problem.compareDocumentPosition(wizard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(wrapper.get('[data-test="copy-codex"]').text()).toContain('当前商品')
   expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.publish).not.toHaveBeenCalled()
+})
+
+
+it.each(['configuration', 'unsupported', 'cleared'] as const)('refreshes an installed video profile without offering a migration: %s', async result => {
+  const dto = supplier()
+  const p = dto.media_workbench_v1!.draft.products[0]!
+  p.media_type = 'video'
+  p.adapter_config = { version: 1, wire_profile: 'laoli_openai_20261024', size_mappings: [] }
+  const historical = { class: 'NEEDS_DEVELOPMENT', severity: 'error', code: 'VIDEO_PROFILE_UNSUPPORTED', scope: p.product_id, path: 'adapter_config.wire_profile', message: '历史错误旧协议尚未接通', action: '旧操作' }
+  dto.media_workbench_v1!.validation.status = 'FAIL'
+  dto.media_workbench_v1!.validation.publish_ready = false
+  dto.media_workbench_v1!.validation.diagnostics = [historical]
+  const current = result === 'unsupported'
+    ? { ...historical, code: 'VIDEO_COUNT_UNSUPPORTED', path: 'capabilities.count', message: '当前确实不支持一次生成多个视频' }
+    : { ...historical, class: 'UI_FIXABLE', code: 'VIDEO_RATIO_REQUIRED', path: 'capabilities.aspect_ratios', message: '请填写当前商品的视频画幅' }
+  dto.models[0]!.state = result === 'unsupported' ? 'NEEDS_DEVELOPMENT' : result === 'configuration' ? 'UI_FIXABLE' : 'DRAFT'
+  dto.current_technical_diagnostics = { checked_at: '2026-10-27T02:00:00Z', source: 'current_local_video_technical_check', target_product_ids: [p.product_id], diagnostics: result === 'cleared' ? [] : [current] }
+  const before = JSON.stringify(dto.media_workbench_v1)
+  api.detail.mockResolvedValue(copy(dto)); api.suppliers.mockResolvedValue([copy(dto)])
+  await openEditor()
+  expect(wrapper.text()).not.toContain(historical.message)
+  expect(wrapper.find('[data-test="refresh-technical-config"]').exists()).toBe(false)
+  expect(wrapper.find('[data-test="copy-codex"]').exists()).toBe(result === 'unsupported')
+  if (result !== 'cleared') expect(wrapper.text()).toContain(current.message)
+  else {
+    expect(wrapper.find('[data-test="product-problems"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('账号草稿中的其他商品仍有事项需要处理')
+  }
+  expect(api.saveDraft).not.toHaveBeenCalled(); expect(api.modelBinding).not.toHaveBeenCalled()
+  expect(api.publish).not.toHaveBeenCalled(); expect(api.sales).not.toHaveBeenCalled(); expect(api.lifecycle).not.toHaveBeenCalled()
+  expect(JSON.stringify(dto.media_workbench_v1)).toBe(before)
 })

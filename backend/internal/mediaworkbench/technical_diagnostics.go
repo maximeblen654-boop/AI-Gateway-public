@@ -1,12 +1,13 @@
 package mediaworkbench
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
 )
 
-// TechnicalDiagnostics is a current, read-only check of selected video technical
+// TechnicalDiagnostics is a current, read-only check of discovered video technical
 // fields. It does not revalidate the full draft or authorize publication/offers.
 type TechnicalDiagnostics struct {
 	CheckedAt        time.Time    `json:"checked_at"`
@@ -23,10 +24,16 @@ func currentTechnicalDiagnostics(a *Account, now time.Time) *TechnicalDiagnostic
 	targets := map[string]Product{}
 	current := []Diagnostic{}
 	for _, p := range a.Config.Draft.Products {
-		if canUpgradeLegacyLaoliVideoProfile(a, p, binding) {
-			targets[p.ProductID] = p
-			current = append(current, validateVideoProduct(a, p, binding, false)...)
+		// Refresh every discovered video product, including products already
+		// using the installed profile. Persisted diagnostics may predate the
+		// current validator even when no profile upgrade is needed.
+		if p.MediaType != "video" || !slices.Contains(a.Catalog.Models, p.UpstreamModel) {
+			continue
 		}
+		targets[p.ProductID] = p
+		providerDiagnostics := validateImage2ProVideoProduct(a, p)
+		current = append(current, providerDiagnostics...)
+		current = append(current, validateVideoProduct(a, p, binding, len(providerDiagnostics) > 0)...)
 	}
 	if len(targets) == 0 {
 		return nil
@@ -45,7 +52,7 @@ func currentTechnicalDiagnostics(a *Account, now time.Time) *TechnicalDiagnostic
 		// VIDEO_RATIO_INVALID can also come from the generic capability check
 		// for blank/duplicate strings. That check is outside this projection.
 		genericRatio := d.Code == "VIDEO_RATIO_INVALID" && !validStrings(p.Capabilities.AspectRatios)
-		if targeted && strings.HasPrefix(d.Code, "VIDEO_") && !genericRatio {
+		if targeted && (strings.HasPrefix(d.Code, "VIDEO_") || strings.HasPrefix(d.Code, "IMAGE2PRO_VIDEO_")) && !genericRatio {
 			continue
 		}
 		appendDiagnostic(d)

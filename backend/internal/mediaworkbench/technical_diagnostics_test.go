@@ -146,11 +146,10 @@ func TestCurrentTechnicalDiagnosticsDeduplicatesScopedFieldDiagnostics(t *testin
 	}
 }
 
-func TestCurrentTechnicalDiagnosticsLeavesOtherModelStateOrderUnchanged(t *testing.T) {
+func TestCurrentTechnicalDiagnosticsLeavesImageModelStateOrderUnchanged(t *testing.T) {
 	s, r := persistedLegacyTechnicalFixture(t)
-	p := laoliVideoProduct("3.5")
+	p := validProduct()
 	p.ProductID = "other-model-product"
-	p.AdapterConfig = r.a.Config.Published.Products[0].AdapterConfig
 	r.a.Config.Draft.Products = append(r.a.Config.Draft.Products, p)
 	r.a.Catalog.Models = append(r.a.Catalog.Models, p.UpstreamModel)
 	r.a.Config.Validation.Diagnostics = append(r.a.Config.Validation.Diagnostics,
@@ -159,5 +158,5 @@ func TestCurrentTechnicalDiagnosticsLeavesOtherModelStateOrderUnchanged(t *testi
 	d, err := s.Detail(t.Context(), 7)
 	require.NoError(t, err)
 	require.Equal(t, []string{"new-video"}, d.CurrentTechnicalDiagnostics.TargetProductIDs)
-	requireModelState(t, d, "3.5", "UI_FIXABLE")
+	requireModelState(t, d, p.UpstreamModel, "UI_FIXABLE")
 }
